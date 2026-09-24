@@ -1,0 +1,83 @@
+<%- include('../partials/header') %>
+<header class="page-head no-print">
+  <div>
+    <a class="crumb" href="/app/monthly?month=<%= s.month %>">← Monthly statements</a>
+    <h1><%= s.landlord_name %></h1>
+    <p class="muted"><%= monthLabel %></p>
+  </div>
+  <div class="actions">
+    <button class="btn" type="button" data-print>Print / save as PDF</button>
+    <form method="post" action="/app/monthly/generate" data-busy="Regenerating…">
+      <%- include('../partials/csrf') %>
+      <input type="hidden" name="month" value="<%= s.month %>">
+      <input type="hidden" name="landlord_id" value="<%= s.landlord_id %>">
+      <button class="btn" type="submit">Regenerate</button>
+    </form>
+    <% if (s.closing_pence > 0) { %>
+      <a class="btn primary" href="/app/transactions/new?txn_type=landlord_payment&landlord_id=<%= s.landlord_id %>&amount_pence=<%= fmt.penceToInput(s.closing_pence) %>&description=<%= encodeURIComponent('Payment for ' + monthLabel + ' statement') %>">Pay landlord <%= fmt.money(s.closing_pence) %></a>
+    <% } %>
+  </div>
+</header>
+
+<section class="card statement-doc">
+  <div class="doc-head">
+    <div>
+      <div class="doc-agency"><%= user.agency_name %></div>
+      <h2>Landlord statement · <%= monthLabel %></h2>
+      <div class="muted small">Period <%= fmt.ukDate(detail.from) %> to <%= fmt.ukDate(detail.to) %> · Generated <%= fmt.ukDateTime(s.generated_at) %></div>
+    </div>
+    <div class="doc-to">
+      <strong><%= s.landlord_name %></strong>
+      <% if (s.landlord_address) { %><div class="pre small"><%= s.landlord_address %></div><% } %>
+    </div>
+  </div>
+
+  <div class="ai-summary">
+    <div class="ai-label"><%= s.summary_source === 'ai' ? '✨ Summary' : 'Summary' %></div>
+    <p class="pre"><%= s.summary %></p>
+    <% if (s.note) { %><p class="muted small no-print"><%= s.note %></p><% } %>
+  </div>
+
+  <div class="summary big">
+    <div><span>Rent received</span><strong><%= fmt.money(s.rent_pence) %></strong></div>
+    <div><span>Management fees</span><strong><%= s.fees_pence ? '−' : '' %><%= fmt.money(s.fees_pence) %></strong></div>
+    <div><span>Repairs &amp; other costs</span><strong><%= s.expenses_pence ? '−' : '' %><%= fmt.money(s.expenses_pence) %></strong></div>
+    <div class="hl"><span>Net for the month</span><strong><%= fmt.money(s.net_pence) %></strong></div>
+  </div>
+
+  <h3>By property</h3>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Property</th><th class="num">Rent due</th><th class="num">Rent received</th><th class="num">Fees</th><th class="num">Costs</th><th class="num">Net</th></tr></thead>
+    <tbody>
+    <% detail.properties.forEach(p => { %>
+      <tr>
+        <td><%= p.address_line1 %><% if (p.outstanding) { %> <span class="badge bad"><%= fmt.money(p.outstanding) %> outstanding</span><% } %></td>
+        <td class="num"><%= fmt.money(p.charged) %></td>
+        <td class="num"><%= fmt.money(p.rent) %></td>
+        <td class="num"><%= p.fees ? '−' + fmt.money(p.fees) : '—' %></td>
+        <td class="num"><%= p.expenses ? '−' + fmt.money(p.expenses) : '—' %></td>
+        <td class="num"><strong><%= fmt.money(p.net) %></strong></td>
+      </tr>
+    <% }) %>
+    </tbody>
+  </table></div>
+
+  <h3>Transactions</h3>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Date</th><th>Property</th><th>Description</th><th class="num">In</th><th class="num">Out</th><th class="num">Balance</th></tr></thead>
+    <tbody>
+      <tr class="sub"><td colspan="5">Balance held at start of month</td><td class="num"><%= fmt.money(s.opening_pence) %></td></tr>
+      <% detail.lines.forEach(l => { %>
+      <tr>
+        <td><%= fmt.ukDate(l.date) %></td><td><%= l.property %></td><td><%= l.description %></td>
+        <td class="num"><%= l.direction === 'in' ? fmt.money(l.amount) : '' %></td>
+        <td class="num"><%= l.direction === 'out' ? fmt.money(l.amount) : '' %></td>
+        <td class="num"><%= fmt.money(l.balance) %></td>
+      </tr>
+      <% }) %>
+      <% if (!detail.lines.length) { %><tr><td colspan="6" class="muted">No transactions this month.</td></tr><% } %>
+      <tr class="total"><td colspan="5">Balance held at end of month<% if (s.payments_pence) { %> (after <%= fmt.money(s.payments_pence) %> paid to you)<% } %></td><td class="num"><%= fmt.money(s.closing_pence) %></td></tr>
+    </tbody>
+  </table></div>
+</section>
+<%- include('../partials/footer') %>

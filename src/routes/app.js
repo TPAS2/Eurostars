@@ -240,6 +240,21 @@ module.exports = function appRoutes(db) {
     res.render('statement', { title: 'Landlord statements', section: 'statements', landlords, landlord, statement, balances, from, to, fmt, print: req.query.print === '1' });
   });
 
+  // ---------- export: everything this agency has stored, as JSON ----------
+
+  router.get('/export', (req, res) => {
+    const a = req.user.id;
+    const tables = ['landlords', 'properties', 'tenants', 'tenancies', 'maintenance_jobs', 'compliance_items', 'transactions', 'invoices', 'monthly_statements'];
+    const data = {
+      exported_at: new Date().toISOString(),
+      account: db.prepare('SELECT id, email, name, agency_name, created_at FROM users WHERE id = ?').get(a),
+    };
+    for (const t of tables) data[t] = db.prepare(`SELECT * FROM ${t} WHERE account_id = ? ORDER BY id`).all(a);
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="letwise-export-${fmt.today()}.json"`);
+    res.send(JSON.stringify(data, null, 2));
+  });
+
   // ---------- add a tenant to a property (tenant + tenancy in one step) ----------
 
   const TENANT_FIELDS = ENTITIES.tenants.fields.filter((f) => f.name !== 'notes');
@@ -389,8 +404,12 @@ module.exports = function appRoutes(db) {
     const row = getOwnedRow(def, req, res);
     if (!row) return;
     const a = req.user.id;
+    const autosave = req.get('X-Autosave') === '1';
     const { values, errors } = parseForm(def, req.body, a);
-    if (Object.keys(errors).length) return renderForm(res, def, { row, values, errors, accountId: a, status: 422 });
+    if (Object.keys(errors).length) {
+      if (autosave) return res.status(422).json({ ok: false, errors });
+      return renderForm(res, def, { row, values, errors, accountId: a, status: 422 });
+    }
     prepareValues(def, a, values);
     const cols = Object.keys(values);
     transaction(db, () => {
@@ -398,6 +417,7 @@ module.exports = function appRoutes(db) {
         .run(...cols.map((c) => values[c]), row.id, a);
       afterSave(def, a, row.id, values);
     });
+    if (autosave) return res.json({ ok: true, savedAt: new Date().toISOString() });
     res.redirect(`/app/${def.key}/${row.id}`);
   });
 

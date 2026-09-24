@@ -1,0 +1,63 @@
+<%- include('../partials/header') %>
+<header class="page-head">
+  <div>
+    <h1>Monthly statements</h1>
+    <p class="muted">A statement for each landlord every month: rent received, fees and costs deducted, and what's held for them. <%= aiEnabled ? 'Summaries are written by AI from the figures.' : 'Set ANTHROPIC_API_KEY to have AI write the summaries.' %></p>
+  </div>
+  <form method="get" class="inline-form">
+    <input type="month" name="month" value="<%= month %>">
+    <button class="btn" type="submit">Show</button>
+  </form>
+</header>
+<% if (flash) { %><div class="notice ok"><%= flash %></div><% } %>
+
+<section class="card">
+  <div class="card-head">
+    <h2><%= monthLabel %></h2>
+    <form method="post" action="/app/monthly/generate" data-busy="Generating statements… this can take a minute.">
+      <%- include('../partials/csrf') %>
+      <input type="hidden" name="month" value="<%= month %>">
+      <button class="btn primary" type="submit" <%= rows.length ? '' : 'disabled' %>><%= aiEnabled ? '✨ ' : '' %>Generate all statements</button>
+    </form>
+  </div>
+  <% if (!rows.length) { %><p class="muted">Add landlords to start producing statements.</p><% } else { %>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Landlord</th><th class="num">Rent</th><th class="num">Fees</th><th class="num">Costs</th><th class="num">Net</th><th class="num">Held</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+    <% rows.forEach(r => { %>
+      <tr>
+        <td><% if (r.id) { %><a href="/app/monthly/<%= r.id %>"><strong><%= r.name %></strong></a><% } else { %><%= r.name %><% } %></td>
+        <% if (r.id) { %>
+          <td class="num"><%= fmt.money(r.rent_pence) %></td>
+          <td class="num"><%= r.fees_pence ? '−' + fmt.money(r.fees_pence) : '—' %></td>
+          <td class="num"><%= r.expenses_pence ? '−' + fmt.money(r.expenses_pence) : '—' %></td>
+          <td class="num"><strong><%= fmt.money(r.net_pence) %></strong></td>
+          <td class="num"><%= fmt.money(r.closing_pence) %></td>
+          <td><span class="badge <%= r.summary_source === 'ai' ? 's-admin' : '' %>"><%= r.summary_source === 'ai' ? 'AI summary' : 'standard' %></span> <span class="muted small"><%= fmt.ukDateTime(r.generated_at) %></span></td>
+        <% } else { %>
+          <td colspan="6" class="muted">Not generated yet</td>
+        <% } %>
+        <td class="num">
+          <form method="post" action="/app/monthly/generate" data-busy="Generating statement…">
+            <%- include('../partials/csrf') %>
+            <input type="hidden" name="month" value="<%= month %>">
+            <input type="hidden" name="landlord_id" value="<%= r.landlord_id %>">
+            <button class="btn small" type="submit"><%= r.id ? 'Regenerate' : 'Generate' %></button>
+          </form>
+        </td>
+      </tr>
+    <% }) %>
+    </tbody>
+  </table></div>
+  <% } %>
+</section>
+
+<% if (months.length) { %>
+<section class="card">
+  <h2>Previous months</h2>
+  <nav class="tabs">
+    <% months.forEach(m => { %><a href="/app/monthly?month=<%= m %>" class="<%= m === month ? 'active' : '' %>"><%= m %></a><% }) %>
+  </nav>
+</section>
+<% } %>
+<%- include('../partials/footer') %>

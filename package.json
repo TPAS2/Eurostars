@@ -12,9 +12,12 @@
     "start": "node --disable-warning=ExperimentalWarning src/server.js",
     "dev": "node --watch src/server.js",
     "create-admin": "node scripts/create-admin.js",
-    "test": "node --test --disable-warning=ExperimentalWarning test/*.test.js"
+    "test": "node --test --disable-warning=ExperimentalWarning test/*.test.js",
+    "restore-backup": "node --disable-warning=ExperimentalWarning scripts/restore-backup.js",
+    "backup": "node --disable-warning=ExperimentalWarning scripts/backup-now.js"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.128.0",
     "ejs": "^3.1.10",
     "express": "^4.21.2",
     "multer": "^2.4.0"

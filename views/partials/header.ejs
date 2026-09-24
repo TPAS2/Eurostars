@@ -26,15 +26,18 @@
       <a href="/app/compliance" class="<%= s === 'compliance' ? 'active' : '' %>">Compliance</a>
       <div class="nav-label">Accounts</div>
       <a href="/app/transactions" class="<%= s === 'transactions' ? 'active' : '' %>">Transactions</a>
-      <a href="/app/statements" class="<%= s === 'statements' ? 'active' : '' %>">Landlord statements</a>
+      <a href="/app/monthly" class="<%= s === 'monthly' ? 'active' : '' %>">Monthly statements</a>
+      <a href="/app/statements" class="<%= s === 'statements' ? 'active' : '' %>">Statement by date range</a>
       <% if (user.is_admin) { %>
       <div class="nav-label">Owner</div>
       <a href="/admin" class="<%= s === 'admin' ? 'active' : '' %>">Admin panel</a>
+      <a href="/admin/backups" class="<%= s === 'backups' ? 'active' : '' %>">Backups</a>
       <% } %>
     </nav>
     <div class="me">
       <div><strong><%= user.name %></strong></div>
       <div class="muted small"><%= user.email %></div>
+      <a class="small export-link" href="/app/export">Download my data</a>
       <form method="post" action="/logout">
         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
         <button class="link-btn" type="submit">Sign out</button>

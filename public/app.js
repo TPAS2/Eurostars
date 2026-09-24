@@ -39,3 +39,155 @@ document.addEventListener('click', (e) => {
   if (!row || e.target.closest('a, button, input, select, form')) return;
   window.location.href = row.dataset.href;
 });
+
+// Long-running forms (AI generation): disable the button and show progress text.
+document.addEventListener('submit', (e) => {
+  const form = e.target;
+  if (!form.dataset || !form.dataset.busy || e.defaultPrevented) return;
+  const btn = form.querySelector('button[type="submit"]');
+  if (btn) { btn.disabled = true; btn.textContent = form.dataset.busy; }
+});
+
+// ---------- Autosave ----------
+// Edit forms ([data-autosave]) save to the server a moment after each change.
+// Create forms ([data-draft]) keep a draft in this browser until they're submitted.
+(() => {
+  const DEBOUNCE_MS = 900;
+
+  function formBody(form) {
+    const body = new URLSearchParams();
+    for (const [k, v] of new FormData(form)) if (typeof v === 'string') body.append(k, v);
+    return body;
+  }
+
+  function setStatus(form, text, cls) {
+    const el = form.querySelector('.save-status');
+    if (!el) return;
+    el.textContent = text;
+    el.className = `save-status ${cls || ''}`;
+  }
+
+  function clearFieldErrors(form) {
+    form.querySelectorAll('.field-err.live').forEach((e) => e.remove());
+  }
+
+  function showFieldErrors(form, errors) {
+    clearFieldErrors(form);
+    for (const [name, msg] of Object.entries(errors)) {
+      const input = form.querySelector(`[name="${CSS.escape(name)}"]`);
+      const field = input && input.closest('.field');
+      if (!field) continue;
+      const div = document.createElement('div');
+      div.className = 'field-err live';
+      div.textContent = msg;
+      field.appendChild(div);
+    }
+  }
+
+  function setupAutosave(form) {
+    let timer = null;
+    let inFlight = null;
+    let dirty = false;
+
+    async function save() {
+      if (inFlight) { await inFlight; }
+      if (!dirty) return;
+      dirty = false;
+      setStatus(form, 'Saving…', 'busy');
+      inFlight = fetch(form.action, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Autosave': '1', Accept: 'application/json' },
+        body: formBody(form),
+        credentials: 'same-origin',
+      }).then(async (res) => {
+        if (res.ok) {
+          clearFieldErrors(form);
+          setStatus(form, `All changes saved · ${new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`, 'ok');
+        } else if (res.status === 422) {
+          const data = await res.json().catch(() => ({ errors: {} }));
+          showFieldErrors(form, data.errors || {});
+          setStatus(form, 'Not saved: fix the highlighted field', 'err');
+        } else if (res.status === 403 || res.redirected) {
+          setStatus(form, 'Not saved: your session expired. Refresh the page and sign in.', 'err');
+        } else {
+          dirty = true;
+          setStatus(form, 'Not saved: will retry…', 'err');
+          timer = setTimeout(save, 5000);
+        }
+      }).catch(() => {
+        dirty = true;
+        setStatus(form, 'Offline: will retry…', 'err');
+        timer = setTimeout(save, 5000);
+      }).finally(() => { inFlight = null; });
+      await inFlight;
+    }
+
+    const schedule = () => {
+      dirty = true;
+      setStatus(form, 'Unsaved changes…', 'busy');
+      clearTimeout(timer);
+      timer = setTimeout(save, DEBOUNCE_MS);
+    };
+    form.addEventListener('input', schedule);
+    form.addEventListener('change', schedule);
+    form.addEventListener('submit', (e) => { e.preventDefault(); clearTimeout(timer); dirty = true; save(); });
+
+    // Flush on leaving the page; warn if a save is still pending.
+    window.addEventListener('beforeunload', (e) => {
+      if (!dirty && !inFlight) return;
+      clearTimeout(timer);
+      // sendBeacon survives the page closing; only warn if the browser can't send it.
+      const sent = navigator.sendBeacon && navigator.sendBeacon(form.action, formBody(form));
+      if (!sent) { e.preventDefault(); e.returnValue = ''; }
+    });
+    setStatus(form, 'Changes save automatically', '');
+  }
+
+  function storage() {
+    try { return window.localStorage; } catch { return null; }
+  }
+
+  function setupDraft(form) {
+    const store = storage();
+    if (!store) return;
+    const key = `draft:${form.dataset.draft}`;
+    const hasServerErrors = !!form.querySelector('.field-err');
+    let saved = null;
+    try { saved = JSON.parse(store.getItem(key) || 'null'); } catch { saved = null; }
+
+    // Restore a draft unless the server just re-rendered the form with the user's input.
+    if (saved && !hasServerErrors && Date.now() - saved.at < 7 * 86400000) {
+      for (const [name, value] of Object.entries(saved.values)) {
+        const inputs = form.querySelectorAll(`[name="${CSS.escape(name)}"]`);
+        inputs.forEach((el) => {
+          if (el.type === 'radio' || el.type === 'checkbox') el.checked = el.value === value;
+          else if (el.type !== 'file' && el.type !== 'hidden') el.value = value;
+        });
+      }
+      form.querySelectorAll('input[name="tenant_mode"]:checked').forEach((r) => r.dispatchEvent(new Event('change')));
+      const note = document.createElement('div');
+      note.className = 'notice ok draft-note';
+      note.innerHTML = 'Restored your unsaved draft. <button type="button" class="link-btn inline">Discard draft</button>';
+      note.querySelector('button').addEventListener('click', () => { store.removeItem(key); window.location.reload(); });
+      form.parentNode.insertBefore(note, form);
+    }
+
+    let timer = null;
+    const persist = () => {
+      const values = {};
+      for (const [k, v] of new FormData(form)) {
+        if (typeof v === 'string' && k !== '_csrf') values[k] = v;
+      }
+      try { store.setItem(key, JSON.stringify({ at: Date.now(), values })); } catch { /* storage full or blocked */ }
+      setStatus(form, 'Draft saved on this device', 'ok');
+    };
+    form.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(persist, 500); });
+    form.addEventListener('change', () => { clearTimeout(timer); timer = setTimeout(persist, 500); });
+    form.addEventListener('submit', () => { try { store.removeItem(key); } catch { /* ignore */ } });
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('form[data-autosave]').forEach(setupAutosave);
+    document.querySelectorAll('form[data-draft]').forEach(setupDraft);
+  });
+})();

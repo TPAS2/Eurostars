@@ -13,16 +13,21 @@ const config = {
   ...loadConfig({}),
   dbFile: ':memory:',
   uploadDir: path.join(tmp, 'uploads'),
+  backupDir: path.join(tmp, 'backups'),
+  backupKeep: 3,
+  registrationsPerHour: 1000,
   adminEmail: 'owner@example.com',
   adminPassword: 'owner-password-123',
 };
 const db = openDatabase(':memory:');
 ensureAdmin(db, config, () => {});
 let base;
+// Stand-in for the Claude call, swapped per test.
+let fakeWriter = async (facts) => ({ text: `${facts.landlord}: rent ${facts.rent_received}, net ${facts.net_for_month}.`, model: 'test-model' });
 let server;
 
 test.before(async () => {
-  server = createApp(config, db).listen(0);
+  server = createApp(config, db, { writer: (facts) => fakeWriter(facts) }).listen(0);
   await new Promise((r) => server.once('listening', r));
   base = `http://127.0.0.1:${server.address().port}`;
 });
@@ -297,4 +302,132 @@ test('only ADMIN_EMAIL keeps admin rights on restart', () => {
   ensureAdmin(db, config, () => {});
   const admins = db.prepare('SELECT email FROM users WHERE is_admin = 1').all().map((r) => r.email);
   assert.deepEqual(admins, ['owner@example.com']);
+});
+
+test('edits autosave: background save returns JSON, invalid values are reported', async () => {
+  const c = await registerAndLogin('autosave@example.com', 'Autosave Lets');
+  let r = await c.post('/app/landlords', { name: 'Before' });
+  const id = idFrom(r.location);
+  await c.get(`/app/landlords/${id}/edit`);
+  const post = (body) => fetch(`${base}/app/landlords/${id}`, {
+    method: 'POST',
+    headers: { cookie: c.cookie, 'content-type': 'application/x-www-form-urlencoded', 'x-autosave': '1' },
+    body: new URLSearchParams({ _csrf: c.csrf, ...body }).toString(),
+  });
+  r = await post({ name: 'After', email: '' });
+  assert.equal(r.status, 200);
+  assert.equal((await r.json()).ok, true);
+  assert.equal(db.prepare('SELECT name FROM landlords WHERE id = ?').get(id).name, 'After');
+  r = await post({ name: 'After', email: 'not-an-email' });
+  assert.equal(r.status, 422);
+  assert.ok((await r.json()).errors.email);
+  assert.equal(db.prepare('SELECT email FROM landlords WHERE id = ?').get(id).email, null);
+});
+
+async function monthlySetup(email) {
+  const c = await registerAndLogin(email, 'Monthly Lets');
+  let r = await c.post('/app/landlords', { name: 'Mary Owner' });
+  const landlordId = idFrom(r.location);
+  r = await c.post('/app/properties', { address_line1: '5 Oak Road', landlord_id: landlordId, status: 'vacant', management_fee_pct: '12' });
+  const propertyId = idFrom(r.location);
+  r = await c.post(`/app/properties/${propertyId}/add-tenant`, { tenant_mode: 'new', name: 'Tia', booking_date: '2026-07-20', start_date: '2026-08-01', rent_pence: '900', rent_frequency: 'monthly', status: 'active' });
+  const tenancyId = idFrom(r.location);
+  await c.get('/app');
+  await c.post('/app/rent/raise', { month: '2026-08' });
+  await c.post('/app/transactions', { txn_date: '2026-08-03', txn_type: 'rent_received', tenancy_id: tenancyId, amount_pence: '900' });
+  await c.post('/app/transactions', { txn_date: '2026-08-15', txn_type: 'expense', property_id: propertyId, description: 'Locksmith', amount_pence: '60' });
+  return { c, landlordId };
+}
+
+test('monthly statements: figures, AI summary, fabricated-number guard, fallback', async () => {
+  const { c, landlordId } = await monthlySetup('monthly@example.com');
+  await c.get('/app/monthly?month=2026-08');
+
+  let r = await c.post('/app/monthly/generate', { month: '2026-08', landlord_id: String(landlordId) });
+  assert.equal(r.status, 302);
+  let s = db.prepare('SELECT * FROM monthly_statements WHERE landlord_id = ?').get(landlordId);
+  assert.equal(s.rent_pence, 90000);
+  assert.equal(s.fees_pence, 10800); // 12% of £900
+  assert.equal(s.expenses_pence, 6000);
+  assert.equal(s.net_pence, 90000 - 10800 - 6000);
+  assert.equal(s.summary_source, 'ai');
+  assert.match(s.summary, /£900\.00/);
+  r = await c.get(r.location);
+  assert.match(r.text, /Mary Owner/);
+  assert.match(r.text, /Locksmith/);
+  assert.match(r.text, /£732\.00/);
+
+  // An AI summary quoting a number that isn't on the statement is thrown away.
+  fakeWriter = async () => ({ text: 'You earned £5,000.00 this month.', model: 'test-model' });
+  await c.post('/app/monthly/generate', { month: '2026-08', landlord_id: String(landlordId) });
+  s = db.prepare('SELECT * FROM monthly_statements WHERE landlord_id = ?').get(landlordId);
+  assert.equal(s.summary_source, 'template');
+  assert.match(s.note, /£5,000\.00/);
+  assert.match(s.summary, /£900\.00/);
+
+  // AI failure falls back to the standard summary rather than erroring.
+  fakeWriter = async () => { throw new Error('API down'); };
+  r = await c.post('/app/monthly/generate', { month: '2026-08' });
+  assert.match(decodeURIComponent(r.location), /Generated 1 statement/);
+  s = db.prepare('SELECT * FROM monthly_statements WHERE landlord_id = ?').get(landlordId);
+  assert.equal(s.summary_source, 'template');
+  fakeWriter = async (facts) => ({ text: `Net ${facts.net_for_month}.`, model: 'test-model' });
+});
+
+test('monthly job fills in last month only where missing', async () => {
+  const { runMonthlyJob } = require('../src/statements');
+  const { landlordId } = await monthlySetup('monthly-job@example.com');
+  const n = await runMonthlyJob(db, async (f) => ({ text: `Net ${f.net_for_month}.`, model: 'm' }), { today: '2026-09-02', log: () => {} });
+  assert.ok(n >= 1);
+  assert.ok(db.prepare("SELECT 1 FROM monthly_statements WHERE landlord_id = ? AND month = '2026-08'").get(landlordId));
+  assert.equal(await runMonthlyJob(db, null, { today: '2026-09-02', log: () => {} }), 0, 'second run has nothing to do');
+});
+
+test('agency data export', async () => {
+  const c = await registerAndLogin('export@example.com', 'Export Lets');
+  await c.post('/app/landlords', { name: 'Exported Landlord' });
+  const r = await c.get('/app/export');
+  const data = JSON.parse(r.text);
+  assert.equal(data.account.email, 'export@example.com');
+  assert.equal(data.landlords.length, 1);
+  assert.equal(data.account.password_hash, undefined);
+});
+
+test('backups: admin creates, downloads, prunes; archive restores', async () => {
+  const { execFileSync } = require('node:child_process');
+  const admin = new Client();
+  await admin.login('owner@example.com', 'owner-password-123');
+  const agent = await registerAndLogin('no-backups@example.com', 'Nope Lets');
+  assert.equal((await agent.get('/admin/backups')).status, 404);
+
+  await admin.get('/admin/backups');
+  for (let i = 0; i < 4; i++) {
+    const r = await admin.post('/admin/backups', {});
+    assert.match(decodeURIComponent(r.location), /Backup created/);
+  }
+  const page = await admin.get('/admin/backups');
+  const names = [...page.text.matchAll(/<code>(letwise-backup-[^<]+)<\/code>/g)].map((m) => m[1]);
+  assert.equal(names.length, 3, 'old backups pruned to BACKUP_KEEP');
+
+  const dl = await fetch(`${base}/admin/backups/${names[0]}`, { headers: { cookie: admin.cookie } });
+  assert.equal(dl.status, 200);
+  assert.equal((await fetch(`${base}/admin/backups/..%2F..%2Fetc%2Fpasswd`, { headers: { cookie: admin.cookie } })).status, 404);
+
+  // The archive opens with standard tar and contains the database and uploaded invoices.
+  const file = path.join(config.backupDir, names[0]);
+  const listing = execFileSync('tar', ['-tzf', file]).toString();
+  assert.match(listing, /manifest\.json/);
+  assert.match(listing, /letwise\.db/);
+  assert.match(listing, /uploads\/\d+\/[0-9a-f]{32}\.pdf/);
+
+  // Restore into a fresh data directory and check the data is there.
+  const target = path.join(tmp, 'restored');
+  const env = { ...process.env, DATABASE_FILE: path.join(target, 'letwise.db'), UPLOAD_DIR: path.join(target, 'uploads') };
+  execFileSync(process.execPath, ['--disable-warning=ExperimentalWarning', 'scripts/restore-backup.js', file], { env, cwd: path.join(__dirname, '..') });
+  const restored = openDatabase(path.join(target, 'letwise.db'));
+  assert.ok(restored.prepare("SELECT 1 FROM users WHERE email = 'agent1@example.com'").get());
+  assert.ok(restored.prepare("SELECT 1 FROM landlords WHERE name = 'Jane Landlord'").get());
+  const inv = restored.prepare('SELECT * FROM invoices WHERE file_name IS NOT NULL LIMIT 1').get();
+  assert.ok(fs.existsSync(path.join(target, 'uploads', String(inv.account_id), inv.file_name)));
+  restored.close();
 });

@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const express = require('express');
 const fmt = require('../format');
+const backup = require('../backup');
 
 // Owner-only area: every user of the software, their usage and login history.
 // It deliberately shows usage counts, not the contents of agencies' records.
@@ -111,6 +112,28 @@ module.exports = function adminRoutes(db, config) {
     db.prepare('DELETE FROM users WHERE id = ?').run(u.id);
     fs.rmSync(path.join(config.uploadDir, String(u.id)), { recursive: true, force: true });
     res.redirect('/admin?flash=' + encodeURIComponent(`Deleted ${u.email} and all of their data.`));
+  });
+
+  // ---------- backups ----------
+
+  router.get('/backups', (req, res) => {
+    res.render('admin/backups', {
+      title: 'Backups', section: 'backups', backups: backup.listBackups(config), config, fmt,
+      flash: req.query.flash || '', error: req.query.error || '',
+    });
+  });
+
+  router.post('/backups', (req, res, next) => {
+    backup.createBackup(db, config, { reason: `manual by ${req.user.email}` })
+      .then((b) => res.redirect('/admin/backups?flash=' + encodeURIComponent(`Backup created: ${b.name}`)))
+      .catch((err) => { console.error(err); res.redirect('/admin/backups?error=' + encodeURIComponent('Backup failed: ' + err.message)); })
+      .catch(next);
+  });
+
+  router.get('/backups/:name', (req, res) => {
+    const file = backup.backupPath(config, req.params.name);
+    if (!file) return res.status(404).render('error', { title: 'Not found', message: 'No such backup.' });
+    res.download(file, req.params.name);
   });
 
   router.get('/users.csv', (req, res) => {

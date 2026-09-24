@@ -5,6 +5,9 @@ const express = require('express');
 const { openDatabase } = require('./db');
 const auth = require('./auth');
 const fmt = require('./format');
+const { createStatementWriter } = require('./ai');
+const { runMonthlyJob } = require('./statements');
+const { scheduleBackups } = require('./backup');
 
 function loadConfig(env = process.env) {
   const production = env.NODE_ENV === 'production';
@@ -12,12 +15,18 @@ function loadConfig(env = process.env) {
     port: Number(env.PORT) || 3000,
     dbFile: env.DATABASE_FILE || path.join(__dirname, '..', 'data', 'letwise.db'),
     uploadDir: env.UPLOAD_DIR || path.join(__dirname, '..', 'data', 'uploads'),
+    backupDir: env.BACKUP_DIR || path.join(__dirname, '..', 'data', 'backups'),
+    backupCopyDir: env.BACKUP_COPY_DIR || '',
+    backupKeep: Math.max(1, Number(env.BACKUP_KEEP) || 14),
+    backupIntervalHours: Math.max(1, Number(env.BACKUP_INTERVAL_HOURS) || 24),
+    autoBackups: env.AUTO_BACKUPS !== 'false',
     appName: env.APP_NAME || 'LetWise',
     adminEmail: (env.ADMIN_EMAIL || '').trim().toLowerCase(),
     adminPassword: env.ADMIN_PASSWORD || '',
     allowRegistration: env.ALLOW_REGISTRATION !== 'false',
     secureCookies: env.SECURE_COOKIES ? env.SECURE_COOKIES === 'true' : production,
     trustProxy: env.TRUST_PROXY === 'true',
+    autoMonthlyStatements: env.AUTO_MONTHLY_STATEMENTS !== 'false',
   };
 }
 
@@ -43,7 +52,7 @@ function ensureAdmin(db, config, log = console.log) {
   else log(`No account exists for ADMIN_EMAIL=${config.adminEmail}. Set ADMIN_PASSWORD or run "npm run create-admin".`);
 }
 
-function createApp(config, db) {
+function createApp(config, db, { writer = null } = {}) {
   const app = express();
   app.set('view engine', 'ejs');
   app.set('views', path.join(__dirname, '..', 'views'));
@@ -85,6 +94,7 @@ function createApp(config, db) {
   app.use('/', require('./routes/auth')(db, config));
   app.use('/app/invoices', auth.requireLogin, require('./routes/invoices')(db, config));
   app.use(auth.rejectUncheckedMultipart);
+  app.use('/app/monthly', auth.requireLogin, require('./routes/monthly')(db, writer));
   app.use('/app', auth.requireLogin, require('./routes/app')(db));
   app.use('/admin', auth.requireAdmin, require('./routes/admin')(db, config));
 
@@ -101,9 +111,18 @@ if (require.main === module) {
   const config = loadConfig();
   const db = openDatabase(config.dbFile);
   ensureAdmin(db, config);
-  createApp(config, db).listen(config.port, () => {
+  const writer = createStatementWriter();
+  console.log(writer ? 'AI statement summaries enabled.' : 'ANTHROPIC_API_KEY not set: statements use standard summaries.');
+  createApp(config, db, { writer }).listen(config.port, () => {
     console.log(`${config.appName} running on http://localhost:${config.port}`);
   });
+  if (config.autoBackups) scheduleBackups(db, config);
+  // Last month's statements are produced automatically once the month ends.
+  if (config.autoMonthlyStatements) {
+    const run = () => runMonthlyJob(db, writer).catch((err) => console.error('Monthly statement job failed:', err));
+    setTimeout(run, 30 * 1000);
+    setInterval(run, 6 * 60 * 60 * 1000).unref();
+  }
 }
 
 module.exports = { createApp, loadConfig, ensureAdmin };

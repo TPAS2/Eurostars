@@ -7,7 +7,7 @@
 </header>
 <section class="card">
   <% if (Object.keys(errors).length) { %><div class="notice err">Please fix the highlighted fields.</div><% } %>
-  <form method="post" action="/app/invoices<%= invoice ? '/' + invoice.id : '' %>" enctype="multipart/form-data" class="form-grid">
+  <form method="post" action="/app/invoices<%= invoice ? '/' + invoice.id : '' %>" enctype="multipart/form-data" class="form-grid" data-draft="invoice-<%= invoice ? invoice.id : 'new' %>">
     <%- include('../partials/csrf') %>
     <div class="field wide">
       <label for="f-file">Invoice file <% if (!invoice) { %><span class="req">*</span><% } %></label>
@@ -63,6 +63,7 @@
     <div class="form-actions wide">
       <button class="btn primary" type="submit"><%= invoice ? 'Save changes' : 'Upload invoice' %></button>
       <a class="btn" href="<%= invoice ? '/app/invoices/' + invoice.id : '/app/invoices' %>">Cancel</a>
+      <span class="save-status" aria-live="polite"></span>
     </div>
   </form>
 </section>

@@ -1,0 +1,45 @@
+<%- include('../partials/header') %>
+<header class="page-head">
+  <div>
+    <h1>Backups</h1>
+    <p class="muted">Each backup is one file with the whole database (every agency's landlords, properties, tenants, accounts and statements) plus all uploaded invoices.</p>
+  </div>
+  <form method="post" action="/admin/backups" data-busy="Backing up…">
+    <%- include('../partials/csrf') %>
+    <button class="btn primary" type="submit">Back up now</button>
+  </form>
+</header>
+<% if (flash) { %><div class="notice ok"><%= flash %></div><% } %>
+<% if (error) { %><div class="notice err"><%= error %></div><% } %>
+
+<section class="tiles">
+  <div class="tile"><span class="label">Automatic backups</span><span class="value sm"><%= config.autoBackups ? `Every ${config.backupIntervalHours} h` : 'Off' %></span><span class="sub">Keeping the latest <%= config.backupKeep %></span></div>
+  <div class="tile"><span class="label">Latest backup</span><span class="value sm"><%= backups[0] ? fmt.ukDateTime(backups[0].created.toISOString().replace('T', ' ')) : 'None yet' %></span><span class="sub"><%= backups.length %> stored</span></div>
+  <div class="tile <%= config.backupCopyDir ? '' : 'warn' %>"><span class="label">Second copy</span><span class="value sm"><%= config.backupCopyDir ? 'On' : 'Off' %></span><span class="sub"><%= config.backupCopyDir ? 'Copied to BACKUP_COPY_DIR' : 'Set BACKUP_COPY_DIR, or download regularly' %></span></div>
+</section>
+
+<section class="card">
+  <h2>Stored backups</h2>
+  <% if (!backups.length) { %><p class="muted">No backups yet. Click "Back up now" to make the first one.</p><% } else { %>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Backup</th><th>Created (UTC)</th><th class="num">Size</th><th></th></tr></thead>
+    <tbody>
+    <% backups.forEach(b => { %>
+      <tr><td><code><%= b.name %></code></td><td><%= fmt.ukDateTime(b.created.toISOString().replace('T', ' ')) %></td>
+      <td class="num"><%= b.size > 1048576 ? (b.size / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(b.size / 1024)) + ' KB' %></td>
+      <td class="num"><a class="btn small" href="/admin/backups/<%= encodeURIComponent(b.name) %>">Download</a></td></tr>
+    <% }) %>
+    </tbody>
+  </table></div><% } %>
+</section>
+
+<section class="card">
+  <h2>Restoring a backup</h2>
+  <ol class="steps">
+    <li>Stop the server.</li>
+    <li>Run <code>npm run restore-backup -- path/to/letwise-backup-….tar.gz</code>. Your current data is moved aside first (to <code>data/pre-restore-…</code>), not deleted.</li>
+    <li>Start the server again.</li>
+  </ol>
+  <p class="muted small">Keep a copy of your backups somewhere other than this server, such as a download to your computer or <code>BACKUP_COPY_DIR</code> pointed at a network drive or cloud-synced folder, so a lost server doesn't mean lost backups.</p>
+</section>
+<%- include('../partials/footer') %>

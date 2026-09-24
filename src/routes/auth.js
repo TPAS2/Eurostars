@@ -8,7 +8,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 module.exports = function authRoutes(db, config) {
   const router = express.Router();
   const loginLimited = auth.rateLimiter({ windowMs: 15 * 60 * 1000, max: 10 });
-  const registerLimited = auth.rateLimiter({ windowMs: 60 * 60 * 1000, max: 10 });
+  const registerLimited = auth.rateLimiter({ windowMs: 60 * 60 * 1000, max: config.registrationsPerHour || 10 });
 
   const logEvent = db.prepare('INSERT INTO login_events (user_id, email, success, ip, user_agent) VALUES (?, ?, ?, ?, ?)');
 

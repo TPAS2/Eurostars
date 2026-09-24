@@ -160,7 +160,30 @@ CREATE TABLE IF NOT EXISTS invoices (
   created_at          TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
-CREATE INDEX IF NOT EXISTS idx_invoices_account    ON invoices(account_id, status);
+-- One statement per landlord per month. Figures are a snapshot taken when generated.
+CREATE TABLE IF NOT EXISTS monthly_statements (
+  id                 INTEGER PRIMARY KEY,
+  account_id         INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  landlord_id        INTEGER NOT NULL REFERENCES landlords(id) ON DELETE CASCADE,
+  month              TEXT NOT NULL,          -- YYYY-MM
+  opening_pence      INTEGER NOT NULL,
+  rent_pence         INTEGER NOT NULL,
+  fees_pence         INTEGER NOT NULL,
+  expenses_pence     INTEGER NOT NULL,
+  net_pence          INTEGER NOT NULL,
+  payments_pence     INTEGER NOT NULL,
+  closing_pence      INTEGER NOT NULL,
+  outstanding_pence  INTEGER NOT NULL,
+  detail_json        TEXT NOT NULL,
+  summary            TEXT NOT NULL,
+  summary_source     TEXT NOT NULL,          -- ai | template
+  ai_model           TEXT,
+  note               TEXT,
+  generated_at       TEXT NOT NULL,
+  UNIQUE (account_id, landlord_id, month)
+);
+
+CREATE INDEX IF NOT EXISTS idx_invoices_account   ON invoices(account_id, status);
 CREATE INDEX IF NOT EXISTS idx_landlords_account  ON landlords(account_id);
 CREATE INDEX IF NOT EXISTS idx_properties_account  ON properties(account_id);
 CREATE INDEX IF NOT EXISTS idx_tenants_account     ON tenants(account_id);

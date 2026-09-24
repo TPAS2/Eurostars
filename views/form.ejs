@@ -7,14 +7,21 @@
 </header>
 <section class="card">
   <% if (Object.keys(errors).length) { %><div class="notice err">Please fix the highlighted fields.</div><% } %>
-  <form method="post" action="/app/<%= def.key %><%= row ? '/' + row.id : '' %>" class="form-grid">
+  <form method="post" action="/app/<%= def.key %><%= row ? '/' + row.id : '' %>" class="form-grid"
+        <%- row ? 'data-autosave' : `data-draft="new-${def.key}"` %>>
     <%- include('partials/csrf') %>
     <% def.fields.forEach(f => { %>
       <%- include('partials/field', { f, value: values[f.name], error: errors[f.name], opts: options[f.name] }) %>
     <% }) %>
     <div class="form-actions wide">
-      <button class="btn primary" type="submit"><%= row ? 'Save changes' : 'Create ' + def.singular.toLowerCase() %></button>
-      <a class="btn" href="/app/<%= def.key %><%= row ? '/' + row.id : '' %>">Cancel</a>
+      <% if (row) { %>
+        <a class="btn primary" href="/app/<%= def.key %>/<%= row.id %>">Done</a>
+        <noscript><button class="btn" type="submit">Save changes</button></noscript>
+      <% } else { %>
+        <button class="btn primary" type="submit">Create <%= def.singular.toLowerCase() %></button>
+        <a class="btn" href="/app/<%= def.key %>">Cancel</a>
+      <% } %>
+      <span class="save-status" aria-live="polite"></span>
     </div>
   </form>
 </section>
