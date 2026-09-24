@@ -1,8 +1,8 @@
 <%- include('partials/header') %>
 <header class="page-head">
   <div>
-    <h1>Dashboard</h1>
-    <p class="muted">Welcome back, <%= user.name %>. Here's where <%= user.agency_name %> stands today, <%= fmt.ukDate(today) %>.</p>
+    <h1 class="co-title"><span class="co-name"><%= user.agency_name %></span><span class="co-sep" aria-hidden="true">/</span><span>Dashboard</span></h1>
+    <p class="muted">Welcome back, <%= user.name %>. Here's where things stand today, <%= fmt.ukDate(today) %>.</p>
   </div>
   <div class="actions">
     <a class="btn" href="/app/landlords/new">+ Landlord</a>

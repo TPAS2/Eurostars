@@ -219,3 +219,17 @@ document.addEventListener('submit', (e) => {
   document.addEventListener('focusout', hide);
   window.addEventListener('scroll', hide, true);
 })();
+
+// "Suggest one": fill a password box with an easy-to-read random password.
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-generate]');
+  if (!btn) return;
+  const input = document.querySelector(btn.dataset.generate);
+  const chars = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789';
+  const bytes = new Uint32Array(12);
+  crypto.getRandomValues(bytes);
+  const raw = [...bytes].map((n) => chars[n % chars.length]).join('');
+  input.value = `${raw.slice(0, 4)}-${raw.slice(4, 8)}-${raw.slice(8, 12)}`;
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  input.focus();
+});

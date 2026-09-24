@@ -17,6 +17,10 @@
   <% } %>
 </header>
 
+<% if (created) { %><div class="notice ok">Account created. Give <strong><%= u.agency_name %></strong> their username <strong><%= u.username %></strong> and the password you chose. They can sign in straight away.</div><% } %>
+<% if (flash) { %><div class="notice ok"><%= flash %></div><% } %>
+<% if (error) { %><div class="notice err"><%= error %></div><% } %>
+
 <section class="tiles">
   <div class="tile"><span class="label">Joined</span><span class="value sm"><%= fmt.ukDate(u.created_at) %></span></div>
   <div class="tile"><span class="label">Last login</span><span class="value sm"><%= fmt.ukDateTime(u.last_login_at) %></span><span class="sub"><%= u.login_count %> sign-ins</span></div>
@@ -37,6 +41,17 @@
     <% }) %>
     </tbody>
   </table></div><% } %>
+</section>
+
+<section class="card">
+  <h2>Reset password</h2>
+  <p class="muted small">Passwords are stored scrambled, so nobody (not even you) can look one up. If <%= isSelf ? 'you forget yours' : 'they forget theirs' %>, set a new one here<%= isSelf ? '' : ' and tell them what it is' %>.</p>
+  <form method="post" action="/admin/users/<%= u.id %>/password" class="inline-form">
+    <%- include('../partials/csrf') %>
+    <label>New password <input id="new_password" name="password" type="text" minlength="<%= minPassword %>" autocomplete="off" required></label>
+    <button class="btn" type="button" data-generate="#new_password">Suggest one</button>
+    <button class="btn primary" type="submit">Set password</button>
+  </form>
 </section>
 
 <% if (!isSelf) { %>

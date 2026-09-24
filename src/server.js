@@ -2,7 +2,7 @@
 
 const path = require('node:path');
 const express = require('express');
-const { openDatabase, uniqueUsername } = require('./db');
+const { openDatabase } = require('./db');
 const auth = require('./auth');
 const fmt = require('./format');
 const { createStatementWriter } = require('./ai');
@@ -23,35 +23,46 @@ function loadConfig(env = process.env) {
     appName: env.APP_NAME || 'Nexus',
     adminEmail: (env.ADMIN_EMAIL || '').trim().toLowerCase(),
     adminPassword: env.ADMIN_PASSWORD || '',
+    adminPasswordReset: env.ADMIN_PASSWORD_RESET === 'true',
     adminUsername: (env.ADMIN_USERNAME || 'admin').trim().toLowerCase(),
-    allowRegistration: env.ALLOW_REGISTRATION !== 'false',
+    // Off by default: only the admin adds accounts. Set to true to let anyone sign up.
+    allowRegistration: env.ALLOW_REGISTRATION === 'true',
     secureCookies: env.SECURE_COOKIES ? env.SECURE_COOKIES === 'true' : production,
     trustProxy: env.TRUST_PROXY === 'true',
     autoMonthlyStatements: env.AUTO_MONTHLY_STATEMENTS !== 'false',
   };
 }
 
-// The admin panel belongs to exactly one account: the one whose email is ADMIN_EMAIL.
-// It is created on first start if ADMIN_PASSWORD is set, and every other account is
-// stripped of admin rights so the panel stays owner-only.
+// The admin panel belongs to exactly one account: the one with username ADMIN_USERNAME
+// (or, for older setups, email ADMIN_EMAIL). It is created on first start from
+// ADMIN_PASSWORD, and every other account is stripped of admin rights so the panel stays
+// owner-only. Setting ADMIN_PASSWORD_RESET=true resets the admin password to ADMIN_PASSWORD
+// on the next start (for when you've forgotten it).
 function ensureAdmin(db, config, log = console.log) {
-  if (!config.adminEmail) {
-    log('ADMIN_EMAIL is not set: the admin panel is disabled until you set it.');
-    db.prepare('UPDATE users SET is_admin = 0').run();
-    return;
+  const byUsername = db.prepare('SELECT id, username FROM users WHERE username = ?').get(config.adminUsername);
+  const byEmail = config.adminEmail ? db.prepare('SELECT id, username FROM users WHERE email = ?').get(config.adminEmail) : null;
+  let admin = byUsername || byEmail;
+  if (config.adminPassword && config.adminPassword.length < 6) throw new Error('ADMIN_PASSWORD must be at least 6 characters.');
+  if (config.adminPassword && config.adminPassword.length < 10) {
+    log('Warning: ADMIN_PASSWORD is short. A longer password (10+ characters) is much harder to guess.');
   }
-  let admin = db.prepare('SELECT id FROM users WHERE email = ?').get(config.adminEmail);
   if (!admin && config.adminPassword) {
-    if (config.adminPassword.length < 10) throw new Error('ADMIN_PASSWORD must be at least 10 characters.');
-    const username = uniqueUsername(config.adminUsername, (u) => db.prepare('SELECT 1 FROM users WHERE username = ?').get(u));
     const info = db.prepare("INSERT INTO users (username, email, name, agency_name, password_hash) VALUES (?, ?, 'Administrator', ?, ?)")
-      .run(username, config.adminEmail, config.appName, auth.hashPassword(config.adminPassword));
-    admin = { id: Number(info.lastInsertRowid) };
-    log(`Created admin account: username ${username}, email ${config.adminEmail}.`);
+      .run(config.adminUsername, config.adminEmail || null, config.appName, auth.hashPassword(config.adminPassword));
+    admin = { id: Number(info.lastInsertRowid), username: config.adminUsername };
+    log(`Created admin account: username ${config.adminUsername}.`);
+  } else if (admin && !byUsername) {
+    // Found by email: give it the configured username.
+    db.prepare('UPDATE users SET username = ? WHERE id = ?').run(config.adminUsername, admin.id);
+  }
+  if (admin && config.adminPasswordReset && config.adminPassword) {
+    db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(auth.hashPassword(config.adminPassword), admin.id);
+    db.prepare('DELETE FROM sessions WHERE user_id = ?').run(admin.id);
+    log('Admin password reset from ADMIN_PASSWORD. Remove ADMIN_PASSWORD_RESET now.');
   }
   db.prepare('UPDATE users SET is_admin = CASE WHEN id = ? THEN 1 ELSE 0 END').run(admin ? admin.id : -1);
   if (admin) db.prepare("UPDATE users SET status = 'active' WHERE id = ?").run(admin.id);
-  else log(`No account exists for ADMIN_EMAIL=${config.adminEmail}. Set ADMIN_PASSWORD or run "npm run create-admin".`);
+  else log(`No admin account yet. Set ADMIN_USERNAME and ADMIN_PASSWORD, then restart.`);
 }
 
 function createApp(config, db, { writer = null } = {}) {

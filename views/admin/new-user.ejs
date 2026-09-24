@@ -1,0 +1,47 @@
+<%- include('../partials/header') %>
+<header class="page-head">
+  <div>
+    <a class="crumb" href="/admin">← All users</a>
+    <h1>Add account</h1>
+    <p class="muted">Create a login for a company. They get their own private workspace and only see their own data.</p>
+  </div>
+</header>
+<section class="card">
+  <% if (Object.keys(errors).length) { %><div class="notice err">Please fix the highlighted fields.</div><% } %>
+  <form method="post" action="/admin/users" class="form-grid">
+    <%- include('../partials/csrf') %>
+    <div class="field">
+      <label for="agency_name">Company name <span class="req">*</span></label>
+      <input id="agency_name" name="agency_name" value="<%= values.agency_name || '' %>" required autocomplete="off">
+      <% if (errors.agency_name) { %><div class="field-err"><%= errors.agency_name %></div><% } %>
+    </div>
+    <div class="field">
+      <label for="name">Contact name <span class="req">*</span></label>
+      <input id="name" name="name" value="<%= values.name || '' %>" required autocomplete="off">
+      <% if (errors.name) { %><div class="field-err"><%= errors.name %></div><% } %>
+    </div>
+    <div class="field">
+      <label for="username">Username <span class="req">*</span></label>
+      <input id="username" name="username" value="<%= values.username || '' %>" required minlength="3" maxlength="30" autocomplete="off" autocapitalize="none" spellcheck="false">
+      <% if (errors.username) { %><div class="field-err"><%= errors.username %></div><% } else { %><div class="help">What they'll type to sign in.</div><% } %>
+    </div>
+    <div class="field">
+      <label for="password">Password <span class="req">*</span></label>
+      <div class="input-row">
+        <input id="password" name="password" type="text" required minlength="<%= minPassword %>" autocomplete="off">
+        <button class="btn" type="button" data-generate="#password">Suggest one</button>
+      </div>
+      <% if (errors.password) { %><div class="field-err"><%= errors.password %></div><% } else { %><div class="help">At least <%= minPassword %> characters. Shown as you type so you can pass it on.</div><% } %>
+    </div>
+    <div class="field">
+      <label for="email">Email <span class="muted small">(optional)</span></label>
+      <input id="email" name="email" type="email" value="<%= values.email || '' %>" autocomplete="off">
+      <% if (errors.email) { %><div class="field-err"><%= errors.email %></div><% } %>
+    </div>
+    <div class="form-actions wide">
+      <button class="btn primary" type="submit">Create account</button>
+      <a class="btn" href="/admin">Cancel</a>
+    </div>
+  </form>
+</section>
+<%- include('../partials/footer') %>

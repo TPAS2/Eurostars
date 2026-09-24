@@ -5,6 +5,12 @@ const path = require('node:path');
 const express = require('express');
 const fmt = require('../format');
 const backup = require('../backup');
+const auth = require('../auth');
+const { USERNAME_RE } = require('../db');
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const RESERVED_USERNAMES = new Set(['admin', 'administrator', 'root', 'support', 'letwise', 'nexus', 'system']);
+const MIN_PASSWORD = 8;
 
 // Owner-only area: every user of the software, their usage and login history.
 // It deliberately shows usage counts, not the contents of agencies' records.
@@ -60,6 +66,50 @@ module.exports = function adminRoutes(db, config) {
     return u || null;
   }
 
+  // ---------- adding accounts (only the admin can) ----------
+
+  router.get('/users/new', (req, res) => {
+    res.render('admin/new-user', { title: 'Add account', section: 'admin', values: {}, errors: {}, minPassword: MIN_PASSWORD });
+  });
+
+  router.post('/users', (req, res) => {
+    const values = {
+      agency_name: String(req.body.agency_name || '').trim().slice(0, 200),
+      name: String(req.body.name || '').trim().slice(0, 200),
+      username: String(req.body.username || '').trim().toLowerCase().slice(0, 60),
+      email: String(req.body.email || '').trim().toLowerCase().slice(0, 254),
+    };
+    const password = String(req.body.password || '');
+    const errors = {};
+    if (!values.agency_name) errors.agency_name = 'Enter the company name.';
+    if (!values.name) errors.name = 'Enter the contact name.';
+    if (!USERNAME_RE.test(values.username)) errors.username = 'Use 3–30 letters, numbers, dots, dashes or underscores, starting with a letter or number.';
+    else if (RESERVED_USERNAMES.has(values.username) || values.username === config.adminUsername
+      || db.prepare('SELECT 1 FROM users WHERE username = ?').get(values.username)) errors.username = 'That username is taken.';
+    if (values.email && !EMAIL_RE.test(values.email)) errors.email = 'Enter a valid email address, or leave it blank.';
+    else if (values.email && db.prepare('SELECT 1 FROM users WHERE email = ?').get(values.email)) errors.email = 'Another account uses this email.';
+    if (password.length < MIN_PASSWORD) errors.password = `Use at least ${MIN_PASSWORD} characters.`;
+    if (password.length > 200) errors.password = 'Password is too long.';
+    if (Object.keys(errors).length) {
+      return res.status(422).render('admin/new-user', { title: 'Add account', section: 'admin', values, errors, minPassword: MIN_PASSWORD });
+    }
+    const info = db.prepare('INSERT INTO users (username, email, name, agency_name, password_hash) VALUES (?, ?, ?, ?, ?)')
+      .run(values.username, values.email || null, values.name, values.agency_name, auth.hashPassword(password));
+    res.redirect(`/admin/users/${info.lastInsertRowid}?created=1`);
+  });
+
+  router.post('/users/:id/password', (req, res) => {
+    const u = target(req, res);
+    if (!u) return;
+    const password = String(req.body.password || '');
+    if (password.length < MIN_PASSWORD || password.length > 200) {
+      return res.redirect(`/admin/users/${u.id}?error=` + encodeURIComponent(`The new password must be at least ${MIN_PASSWORD} characters.`));
+    }
+    db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(auth.hashPassword(password), u.id);
+    if (u.id !== req.user.id) db.prepare('DELETE FROM sessions WHERE user_id = ?').run(u.id);
+    res.redirect(`/admin/users/${u.id}?flash=` + encodeURIComponent(`Password changed for @${u.username}.` + (u.id !== req.user.id ? ' They have been signed out and must use the new password.' : '')));
+  });
+
   router.get('/users/:id', (req, res) => {
     const u = target(req, res);
     if (!u) return;
@@ -70,7 +120,10 @@ module.exports = function adminRoutes(db, config) {
               (SELECT COUNT(*) FROM transactions WHERE account_id = ?) AS transactions,
               (SELECT MAX(created_at) FROM transactions WHERE account_id = ?) AS last_txn`
     ).get(u.id, u.id, u.id, u.id);
-    res.render('admin/user', { title: u.agency_name, section: 'admin', u, logins, extra, fmt, isSelf: u.id === req.user.id });
+    res.render('admin/user', {
+      title: u.agency_name, section: 'admin', u, logins, extra, fmt, isSelf: u.id === req.user.id,
+      created: req.query.created === '1', flash: req.query.flash || '', error: req.query.error || '', minPassword: MIN_PASSWORD,
+    });
   });
 
   function guardSelf(req, res, u) {

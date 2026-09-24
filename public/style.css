@@ -294,3 +294,8 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fo
 .auth .narrow .stack label { text-align: center; }
 .auth .narrow input { text-align: center; }
 .auth .narrow .notice, .auth .narrow .help, .auth .narrow .field-err { text-align: center; }
+.input-row { display: flex; gap: 8px; }
+.input-row input { flex: 1; min-width: 0; }
+.co-title { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+.co-name { color: var(--brand); }
+.co-sep { color: var(--muted); font-weight: 400; }

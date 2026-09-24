@@ -16,6 +16,7 @@ const config = {
   backupDir: path.join(tmp, 'backups'),
   backupKeep: 3,
   registrationsPerHour: 1000,
+  allowRegistration: true, // most tests create accounts through the sign-up page
   adminEmail: 'owner@example.com',
   adminPassword: 'owner-password-123',
 };
@@ -485,4 +486,63 @@ test('older databases get usernames when upgraded', () => {
   assert.deepEqual(users.map((u) => u.username), ['admin', 'jouser', 'jouser2'], 'short names padded to the 3-character minimum, clashes numbered');
   assert.equal(db2.prepare('SELECT account_id FROM landlords').get().account_id, 2, 'linked data kept');
   db2.close();
+});
+
+test('sign-up is closed by default: only the admin adds accounts', async () => {
+  assert.equal(loadConfig({}).allowRegistration, false);
+  const closedDb = openDatabase(':memory:');
+  const closed = createApp({ ...config, allowRegistration: false }, closedDb).listen(0);
+  await new Promise((r) => closed.once('listening', r));
+  const url = `http://127.0.0.1:${closed.address().port}`;
+  try {
+    const page = await (await fetch(`${url}/login`)).text();
+    assert.doesNotMatch(page, /Create an account/);
+    const r = await fetch(`${url}/register`, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ username: 'sneaky', name: 'S', agency_name: 'S', password: 'password-1234', password_confirm: 'password-1234' }).toString() });
+    assert.equal(r.status, 403);
+    assert.equal(closedDb.prepare('SELECT COUNT(*) n FROM users').get().n, 0);
+  } finally { closed.close(); }
+});
+
+test('admin adds an account and resets passwords', async () => {
+  const admin = new Client();
+  await admin.login('admin', 'owner-password-123');
+  let r = await admin.get('/admin/users/new');
+  assert.equal(r.status, 200);
+  r = await admin.post('/admin/users', { agency_name: 'Coastal Homes', name: 'Pat Lee', username: 'coastal', password: 'short' });
+  assert.equal(r.status, 422);
+  r = await admin.post('/admin/users', { agency_name: 'Coastal Homes', name: 'Pat Lee', username: 'Coastal', password: 'sea-view-2026' });
+  assert.equal(r.status, 302);
+  assert.match(r.location, /\/admin\/users\/\d+\?created=1/);
+  const id = Number(r.location.match(/users\/(\d+)/)[1]);
+  const coastal = new Client();
+  assert.equal((await coastal.login('coastal', 'sea-view-2026')).location, '/app');
+  assert.match((await coastal.get('/app')).text, /Coastal Homes/);
+
+  // Non-admins can't add accounts.
+  assert.equal((await coastal.post('/admin/users', { agency_name: 'X', name: 'X', username: 'xx1', password: 'password-1234' })).status, 404);
+
+  // Reset: old password stops working, they're signed out, new one works.
+  await admin.get(`/admin/users/${id}`);
+  r = await admin.post(`/admin/users/${id}/password`, { password: 'new-pass-2027' });
+  assert.match(decodeURIComponent(r.location), /Password changed/);
+  assert.equal((await coastal.get('/app')).location, '/login');
+  assert.equal((await new Client().post('/login', { login: 'coastal', password: 'sea-view-2026' })).status, 401);
+  assert.equal((await new Client().login('coastal', 'new-pass-2027')).location, '/app');
+});
+
+test('admin account is set by username, and its password can be reset on restart', async () => {
+  const db3 = openDatabase(':memory:');
+  const cfg = { ...config, adminEmail: '', adminUsername: 'tpas2', adminPassword: 'Sample-6x' };
+  ensureAdmin(db3, cfg, () => {});
+  const row = db3.prepare('SELECT * FROM users WHERE is_admin = 1').get();
+  assert.equal(row.username, 'tpas2');
+  const { verifyPassword } = require('../src/auth');
+  assert.ok(verifyPassword('Sample-6x', row.password_hash));
+  // Restarting with a different password changes nothing unless a reset is asked for.
+  ensureAdmin(db3, { ...cfg, adminPassword: 'Changed99' }, () => {});
+  assert.ok(verifyPassword('Sample-6x', db3.prepare('SELECT password_hash FROM users WHERE id = ?').get(row.id).password_hash));
+  ensureAdmin(db3, { ...cfg, adminPassword: 'Changed99', adminPasswordReset: true }, () => {});
+  assert.ok(verifyPassword('Changed99', db3.prepare('SELECT password_hash FROM users WHERE id = ?').get(row.id).password_hash));
+  assert.throws(() => ensureAdmin(openDatabase(':memory:'), { ...cfg, adminPassword: 'abc' }, () => {}), /at least 6/);
 });

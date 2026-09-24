@@ -4,7 +4,10 @@
     <h1>Admin panel</h1>
     <p class="muted">Everyone using <%= appName %>. Only you can see this page.</p>
   </div>
-  <div class="actions"><a class="btn" href="/admin/users.csv">Export CSV</a></div>
+  <div class="actions">
+    <a class="btn" href="/admin/users.csv">Export CSV</a>
+    <a class="btn primary" href="/admin/users/new">+ Add account</a>
+  </div>
 </header>
 <% if (flash) { %><div class="notice ok"><%= flash %></div><% } %>
 

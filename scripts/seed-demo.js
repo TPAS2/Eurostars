@@ -1,11 +1,9 @@
 'use strict';
 
 // Usage: npm run seed-demo
-// Creates two demo agencies filled with realistic data, for trying the app out:
-//   harbour  / demo-password-123   (Harbour Lettings, Bristol)
-//   citylets / demo-password-456   (City Lets Bath)
-// plus two lightly used agencies so the admin panel has more to show.
-// Skips if the demo accounts already exist.
+// Creates one demo agency filled with realistic data, for trying the app out:
+//   harbour / demo-password-123   (Harbour Lettings, Bristol)
+// Skips if the demo account already exists.
 
 const fs = require('node:fs');
 const path = require('node:path');
@@ -21,7 +19,7 @@ const config = loadConfig();
 const db = openDatabase(config.dbFile);
 ensureAdmin(db, config, () => {});
 if (db.prepare("SELECT 1 FROM users WHERE username = 'harbour'").get()) {
-  console.log('Demo accounts already exist.');
+  console.log('Demo account already exists.');
   process.exit(0);
 }
 
@@ -83,46 +81,6 @@ const AGENCIES = [
     certs: [
       [0, 'Gas Safety (CP12)', -340, 25], [0, 'EICR', -700, 1125], [1, 'Gas Safety (CP12)', -380, -15],
       [2, 'EPC', -1500, 2150], [4, 'HMO licence', -1400, 40], [4, 'Fire risk assessment', -200, 165],
-    ],
-  },
-  {
-    username: 'citylets', password: 'demo-password-456', email: 'info@cityletsbath.example.com', name: 'Laura Mills', agency: 'City Lets Bath', logins: 12,
-    landlords: [
-      ['Margaret Ellis', 'm.ellis@example.com', '07700 900511', '9 Lansdown Crescent\nBath\nBA1 5EX'],
-      ['Tom & Keira Doyle', 'doyles@example.com', '07700 900522', '41 Widcombe Hill\nBath\nBA2 6AA'],
-      ['Avon Student Homes Ltd', 'lettings@avonstudent.example.com', '01225 496 100', '2 Kingsmead Square\nBath\nBA1 2AB'],
-    ],
-    properties: [
-      [0, '5 Gay Street', 'Bath', 'BA1 2PH', 'Flat', 2, 12],
-      [0, 'Flat 3, 18 Great Pulteney Street', 'Bath', 'BA2 4BR', 'Flat', 1, 12],
-      [1, '27 Oldfield Road', 'Bath', 'BA2 3NQ', 'House', 3, 10],
-      [2, '64 Wellsway', 'Bath', 'BA2 4SB', 'HMO', 5, 14],
-    ],
-    tenants: [
-      ['Chloe Harris', 'chloe.h@example.com', '07700 900601'],
-      ['Ben Foster', 'ben.foster@example.com', '07700 900602'],
-      ['Nadia & Omar Rahman', 'rahmans@example.com', '07700 900603'],
-      ['Bath Uni student group', 'wellsway64@example.com', '07700 900604'],
-    ],
-    tenancies: [
-      [0, 0, 1395, `${month(-11)}-18`, `${month(-10)}-01`, day(30), 1600],
-      [1, 1, 995, `${month(-4)}-02`, `${month(-3)}-15`, monthEnd(9), 1140],
-      [2, 2, 1550, `${month(-20)}-10`, `${month(-19)}-01`, null, 1780],
-      [3, 3, 2900, `${month(-6)}-01`, `${month(-2)}-01`, monthEnd(10), 3300],
-    ],
-    arrearsTenancy: 1,
-    jobs: [
-      [3, 'Shower pump replacement', 'Bath Plumbing & Heating', 'high', 'in progress', -5, null],
-      [0, 'Sash window sticking', 'Georgian Joinery', 'low', 'open', -18, null],
-      [2, 'Annual boiler service', 'Avon Gas Services', 'normal', 'completed', -50, 89],
-    ],
-    invoices: [
-      [0, 'Bath Plumbing & Heating', 'BPH-7781', 312, -4, 10, false],
-      [2, 'Avon Gas Services', 'AGS-5520', 89, -48, -34, true],
-    ],
-    certs: [
-      [0, 'Gas Safety (CP12)', -300, 65], [2, 'Gas Safety (CP12)', -50, 315], [3, 'HMO licence', -1000, 20],
-      [3, 'Fire risk assessment', -350, 15], [1, 'EICR', -1700, 125],
     ],
   },
 ];
@@ -211,19 +169,6 @@ function seedAgency(p, lastLoginHoursAgo) {
 
 const ids = transaction(db, () => {
   const seeded = AGENCIES.map((p, i) => seedAgency(p, i === 0 ? 2 : 70));
-  // Two lightly used agencies so the admin panel has more to show.
-  for (const [username, email, name, agency, logins, daysAgo] of [
-    ['severnhomes', null, 'Mark Evans', 'Severn Homes', 58, 0],
-    ['clifton.rentals', 'hello@cliftonrentals.example.com', 'Aisha Khan', 'Clifton Rentals', 4, 20],
-  ]) {
-    const id = Number(db.prepare(`INSERT INTO users (username, email, name, agency_name, password_hash, created_at, last_login_at, login_count) VALUES (?, ?, ?, ?, ?, datetime('now', '-${daysAgo + 30} days'), datetime('now', '-${daysAgo} days'), ?)`)
-      .run(username, email, name, agency, hashPassword(crypto.randomBytes(12).toString('hex')), logins).lastInsertRowid);
-    for (let i = 0; i < 3; i++) {
-      const l = Number(db.prepare('INSERT INTO landlords (account_id, name) VALUES (?, ?)').run(id, `Landlord ${i + 1}`).lastInsertRowid);
-      db.prepare("INSERT INTO properties (account_id, landlord_id, address_line1, status) VALUES (?, ?, ?, 'let')").run(id, l, `${10 + i} Example Street`);
-    }
-    db.prepare("INSERT INTO login_events (user_id, email, success, ip, user_agent, created_at) VALUES (?, ?, 1, '81.2.69.160', 'Mozilla/5.0', datetime('now', ?))").run(id, username, `-${daysAgo} days`);
-  }
   return seeded;
 });
 
@@ -231,6 +176,6 @@ const ids = transaction(db, () => {
   for (const [i, p] of AGENCIES.entries()) {
     await generateForAccount(db, { accountId: ids[i], agencyName: p.agency, month: previousMonth(today), writer: null });
   }
-  console.log('Demo agencies created. Sign in as:');
+  console.log('Demo agency created. Sign in as:');
   for (const p of AGENCIES) console.log(`  ${p.username} / ${p.password}   (${p.agency})`);
 })();

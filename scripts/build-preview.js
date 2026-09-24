@@ -5,7 +5,9 @@
 //
 // Usage: start the app with demo data (npm run seed-demo && npm start), then
 //   node scripts/build-preview.js [base-url] [output]
-// Accounts are taken from PREVIEW_ACCOUNTS as "username:password" pairs separated by commas.
+// Accounts are taken from PREVIEW_ACCOUNTS as "username:password" pairs separated by commas
+// (default: just the demo agency). Pass the admin login the same way, from your shell, so
+// it never ends up in the repository. Passwords are stored in the page only as PBKDF2 hashes.
 // The sign-in check is only a convenience gate: a static page can't truly protect its
 // contents, so only ever build it from sample data.
 
@@ -15,10 +17,11 @@ const crypto = require('node:crypto');
 
 const BASE = process.argv[2] || 'http://localhost:3000';
 const OUT = process.argv[3] || path.join(__dirname, '..', 'docs', 'index.html');
-const ACCOUNTS = (process.env.PREVIEW_ACCOUNTS || 'harbour:demo-password-123,citylets:demo-password-456,admin:owner-password-123')
+const ACCOUNTS = (process.env.PREVIEW_ACCOUNTS || 'harbour:demo-password-123')
   .split(',').map((pair) => { const i = pair.indexOf(':'); return { username: pair.slice(0, i), password: pair.slice(i + 1) }; });
 
 const SKIP = /\/file\b|\/export$|\.csv$|\/admin\/backups\/(?:nexus|letwise)-|[?&]download=|[?&]print=|\/new(\?|$)|\/edit$|\/add-tenant$/;
+const PBKDF2_ROUNDS = 310000;
 const decode = (s) => s.replace(/&amp;/g, '&').replace(/&#39;/g, "'").replace(/&#34;/g, '"');
 const stripCsrf = (html) => html.replace(/<input type="hidden" name="_csrf" value="[^"]*">/g, '');
 
@@ -66,14 +69,15 @@ async function crawl(cookie, start, limit) {
     .replace(/<p class="muted small">New here\?[\s\S]*?<\/p>/, '');
 
   const accounts = {};
+  // Usernames are case-insensitive, like the real app.
   for (const { username, password } of ACCOUNTS) {
     const { cookie, home } = await login(username, password);
     const starts = home === '/admin' ? ['/admin', '/admin/backups'] : ['/app', '/app/monthly', '/app/invoices?status=unpaid', '/app/invoices?status=overdue', '/app/invoices?status=paid', '/app/statements'];
     const { pages, sidebar } = await crawl(cookie, starts, 400);
     const salt = crypto.randomBytes(8).toString('hex');
-    accounts[username] = {
+    accounts[username.toLowerCase()] = {
       salt,
-      hash: crypto.createHash('sha256').update(`${salt}:${password}`).digest('hex'),
+      hash: crypto.pbkdf2Sync(password, salt, PBKDF2_ROUNDS, 32, 'sha256').toString('hex'),
       home, sidebar, pages,
     };
     console.log(`${username}: ${Object.keys(pages).length} pages`);
@@ -94,7 +98,7 @@ async function crawl(cookie, start, limit) {
   const shell = fs.readFileSync(path.join(__dirname, 'preview-shell.html'), 'utf8');
   const out = shell
     .replace('/*APP_CSS*/', () => css)
-    .replace('/*DATA*/', () => `const LOGIN_HTML = ${json(stripCsrf(loginMain))};\nconst ACCOUNTS = ${json(accounts)};`);
+    .replace('/*DATA*/', () => `const LOGIN_HTML = ${json(stripCsrf(loginMain))};\nconst PBKDF2_ROUNDS = ${PBKDF2_ROUNDS};\nconst ACCOUNTS = ${json(accounts)};`);
   fs.mkdirSync(path.dirname(OUT), { recursive: true });
   fs.writeFileSync(OUT, out);
   console.log(`Wrote ${OUT} (${Math.round(out.length / 1024)} KB)`);

@@ -39,14 +39,20 @@ export $(grep -v '^#' .env | xargs)
 npm start                   # http://localhost:3000
 ```
 
-Sign in as `admin` (or your `ADMIN_EMAIL`) with `ADMIN_PASSWORD` to reach the admin panel. Agencies create an account at `/register` with a username and password (email is optional) and can then sign in with either.
+Sign in with `ADMIN_USERNAME` and `ADMIN_PASSWORD` to reach the admin panel. Public sign-up is off: you add each company's login from **Admin panel → Add account**, and can reset anyone's password from their page there. (Set `ALLOW_REGISTRATION=true` to let companies sign themselves up instead.)
 
 To try it with realistic sample data, run `npm run seed-demo`, then sign in as `harbour` / `demo-password-123`.
 
+## Forgotten passwords
+
+Passwords are stored scrambled (hashed), so nobody can look one up, including the admin.
+- **A company forgets theirs:** open their page in the admin panel and use **Reset password**.
+- **You forget the admin password:** in Render, open the service's **Environment** tab, set `ADMIN_PASSWORD` to a new password and add `ADMIN_PASSWORD_RESET` = `true`, then save (it redeploys). Sign in with the new password, then delete `ADMIN_PASSWORD_RESET`.
+
 ## How the admin panel stays yours
 
-- Only the account whose email matches `ADMIN_EMAIL` has admin rights. Admin rights are re-checked every time the server starts.
-- Nobody can register with that email address or with the admin username (`admin`, or `ADMIN_USERNAME`).
+- Only the account with username `ADMIN_USERNAME` has admin rights. Admin rights are re-checked every time the server starts.
+- Nobody else can take that username, and only the admin can add accounts (unless you turn public sign-up on).
 - Anyone else who visits `/admin` gets a "page not found" response.
 - The admin panel shows usage counts only. It does not show the contents of an agency's records.
 
@@ -85,17 +91,16 @@ The current data is moved to `data/pre-restore-…/` first, so a restore never d
 | Username | Password | Shows |
 |---|---|---|
 | `harbour` | `demo-password-123` | Harbour Lettings (sample data) |
-| `citylets` | `demo-password-456` | City Lets Bath (sample data) |
-| `admin` | `owner-password-123` | The admin panel |
+| Your admin username | Your admin password | The admin panel (built in from `PREVIEW_ACCOUNTS`, never stored in the repo) |
 
-To rebuild it: run the app with demo data (`npm run seed-demo`, then `npm start`), then run `node scripts/build-preview.js http://localhost:3000`. It's static, so the sign-in only keeps casual visitors out; never build it from real data.
+To rebuild it: run the app with demo data (`npm run seed-demo`, then `npm start`), then run `PREVIEW_ACCOUNTS='harbour:demo-password-123,YOURNAME:YOURPASSWORD' node scripts/build-preview.js http://localhost:3000`. It's static, so the sign-in only keeps casual visitors out; never build it from real data.
 
 ## Deploying
 
 **Render (easiest).** The repo includes `render.yaml`:
 1. Sign in at https://render.com with your GitHub account.
 2. Open https://render.com/deploy?repo=https://github.com/TPAS2/Eurostars (or **New → Blueprint** and pick this repo).
-3. Fill in `ADMIN_EMAIL` and `ADMIN_PASSWORD` (and `ANTHROPIC_API_KEY` for AI statement summaries), then click **Apply**.
+3. Fill in `ADMIN_PASSWORD` (and optionally `ADMIN_EMAIL`, and `ANTHROPIC_API_KEY` for AI statement summaries), then click **Apply**. The admin username is `TPAS2` (change `ADMIN_USERNAME` in `render.yaml` to use another).
 4. When the deploy finishes, open the `https://nexus-….onrender.com` address it shows. You can add your own domain under **Settings → Custom Domains**.
 
 It uses Render's Starter plan with a 1 GB disk (about $7.25 a month), because the free plan has no permanent disk and would lose the data on every restart.

@@ -26,10 +26,13 @@ services:
         value: /var/data/uploads
       - key: BACKUP_DIR
         value: /var/data/backups
+      # The account that gets the admin panel. Only the admin can add accounts.
+      - key: ADMIN_USERNAME
+        value: TPAS2
       # You'll be asked for these when you create the service:
-      - key: ADMIN_EMAIL
-        sync: false
       - key: ADMIN_PASSWORD
+        sync: false
+      - key: ADMIN_EMAIL
         sync: false
       - key: ANTHROPIC_API_KEY
         sync: false
