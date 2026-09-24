@@ -1,0 +1,26 @@
+<%# locals: f, value, error, opts %>
+<div class="field <%= f.type === 'textarea' ? 'wide' : '' %>">
+  <label for="f-<%= f.name %>"><%= f.label %><% if (f.required) { %> <span class="req">*</span><% } %></label>
+  <% const v = value === null || value === undefined ? '' : value; %>
+  <% if (f.type === 'textarea') { %>
+    <textarea id="f-<%= f.name %>" name="<%= f.name %>" rows="3"><%= v %></textarea>
+  <% } else if (f.type === 'select') { %>
+    <select id="f-<%= f.name %>" name="<%= f.name %>" <%= f.required ? 'required' : '' %>>
+      <% if (!f.required) { %><option value="">—</option><% } %>
+      <% f.options.forEach(o => { %><option value="<%= o %>" <%= String(v) === o ? 'selected' : '' %>><%= (f.optionLabels && f.optionLabels[o]) || fmt.humanize(o) %></option><% }) %>
+    </select>
+  <% } else if (f.type === 'ref') { %>
+    <select id="f-<%= f.name %>" name="<%= f.name %>" <%= f.required ? 'required' : '' %>>
+      <option value="">— Select —</option>
+      <% opts.forEach(o => { %><option value="<%= o.id %>" <%= Number(v) === o.id ? 'selected' : '' %>><%= o.label %></option><% }) %>
+    </select>
+  <% } else if (f.type === 'money') { %>
+    <input id="f-<%= f.name %>" name="<%= f.name %>" inputmode="decimal" value="<%= typeof v === 'number' ? fmt.penceToInput(v) : v %>" <%= f.required ? 'required' : '' %> placeholder="0.00">
+  <% } else { %>
+    <input id="f-<%= f.name %>" name="<%= f.name %>" value="<%= v %>" <%= f.required ? 'required' : '' %>
+      type="<%= { date: 'date', email: 'email', tel: 'tel', integer: 'number', number: 'number' }[f.type] || 'text' %>"
+      <%- f.type === 'number' ? 'step="0.01" min="0" max="100"' : f.type === 'integer' ? 'step="1" min="0"' : '' %>>
+  <% } %>
+  <% if (f.help) { %><div class="help"><%= f.help %></div><% } %>
+  <% if (error) { %><div class="field-err"><%= error %></div><% } %>
+</div>

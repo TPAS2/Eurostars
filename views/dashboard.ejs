@@ -1,0 +1,70 @@
+<%- include('partials/header') %>
+<header class="page-head">
+  <div>
+    <h1>Dashboard</h1>
+    <p class="muted">Welcome back, <%= user.name %>. Here's where <%= user.agency_name %> stands today, <%= fmt.ukDate(today) %>.</p>
+  </div>
+  <div class="actions">
+    <a class="btn" href="/app/landlords/new">+ Landlord</a>
+    <a class="btn" href="/app/properties/new">+ Property</a>
+    <a class="btn primary" href="/app/transactions/new?txn_type=rent_received">Record rent received</a>
+  </div>
+</header>
+<% if (flash) { %><div class="notice ok"><%= flash %></div><% } %>
+
+<section class="tiles">
+  <a class="tile" href="/app/properties"><span class="label">Properties</span><span class="value"><%= stats.properties %></span><span class="sub"><%= stats.let %> let · <%= stats.vacant %> vacant</span></a>
+  <a class="tile" href="/app/landlords"><span class="label">Landlords</span><span class="value"><%= stats.landlords %></span><span class="sub"><%= stats.tenants %> tenants</span></a>
+  <a class="tile" href="/app/tenancies"><span class="label">Active tenancies</span><span class="value"><%= stats.activeTenancies %></span><span class="sub">&nbsp;</span></a>
+  <a class="tile" href="/app/transactions"><span class="label">Rent received this month</span><span class="value"><%= fmt.money(stats.rentThisMonth) %></span><span class="sub">Client account <%= fmt.money(stats.clientBalance) %></span></a>
+  <div class="tile <%= stats.arrearsTotal > 0 ? 'alert' : '' %>"><span class="label">Arrears</span><span class="value"><%= fmt.money(stats.arrearsTotal) %></span><span class="sub"><%= arrears.length %> tenanc<%= arrears.length === 1 ? 'y' : 'ies' %></span></div>
+  <a class="tile <%= stats.openJobs > 0 ? 'warn' : '' %>" href="/app/maintenance"><span class="label">Open maintenance</span><span class="value"><%= stats.openJobs %></span><span class="sub">&nbsp;</span></a>
+  <a class="tile <%= stats.overdueInvoices > 0 ? 'alert' : stats.unpaidInvoices > 0 ? 'warn' : '' %>" href="/app/invoices?status=unpaid"><span class="label">Unpaid invoices</span><span class="value"><%= fmt.money(stats.unpaidInvoicesTotal) %></span><span class="sub"><%= stats.unpaidInvoices %> unpaid · <%= stats.overdueInvoices %> overdue</span></a>
+</section>
+
+<section class="card">
+  <form method="post" action="/app/rent/raise" class="inline-form">
+    <%- include('partials/csrf') %>
+    <div>
+      <h2>Raise rent</h2>
+      <p class="muted small">Creates the rent due for every active tenancy in the chosen month. Tenancies already charged for that month are skipped.</p>
+    </div>
+    <input type="month" name="month" value="<%= month %>" required>
+    <button class="btn primary" type="submit">Raise rent charges</button>
+  </form>
+</section>
+
+<div class="grid-2">
+  <section class="card">
+    <h2>Rent arrears</h2>
+    <% if (!arrears.length) { %><p class="muted">No arrears. Nice.</p><% } else { %>
+    <table><thead><tr><th>Property</th><th>Tenant</th><th class="num">Owed</th></tr></thead><tbody>
+    <% arrears.forEach(r => { %><tr><td><a href="/app/tenancies/<%= r.id %>"><%= r.address_line1 %></a></td><td><%= r.tenant_name %></td><td class="num neg"><%= fmt.money(r.owed) %></td></tr><% }) %>
+    </tbody></table><% } %>
+  </section>
+
+  <section class="card">
+    <h2>Compliance due in 60 days</h2>
+    <% if (!compliance.length) { %><p class="muted">Nothing expiring soon.</p><% } else { %>
+    <table><thead><tr><th>Certificate</th><th>Property</th><th>Expires</th></tr></thead><tbody>
+    <% compliance.forEach(c => { const expired = c.expiry_date < today; %><tr><td><a href="/app/compliance/<%= c.id %>"><%= c.item_type %></a></td><td><a href="/app/properties/<%= c.property_id %>"><%= c.address_line1 %></a></td><td><span class="badge <%= expired ? 'bad' : 'warn' %>"><%= expired ? 'Expired ' : '' %><%= fmt.ukDate(c.expiry_date) %></span></td></tr><% }) %>
+    </tbody></table><% } %>
+  </section>
+
+  <section class="card">
+    <h2>Open maintenance</h2>
+    <% if (!jobs.length) { %><p class="muted">No open jobs.</p><% } else { %>
+    <table><thead><tr><th>Issue</th><th>Property</th><th>Priority</th></tr></thead><tbody>
+    <% jobs.forEach(j => { %><tr><td><a href="/app/maintenance/<%= j.id %>"><%= j.title %></a></td><td><%= j.address_line1 %></td><td><span class="badge p-<%= j.priority %>"><%= j.priority %></span></td></tr><% }) %>
+    </tbody></table><% } %>
+  </section>
+
+  <section class="card">
+    <h2>Tenancies ending in 60 days</h2>
+    <% if (!endingTenancies.length) { %><p class="muted">None.</p><% } else { %>
+    <table><thead><tr><th>Property</th><th>Tenant</th><th>Ends</th></tr></thead><tbody>
+    <% endingTenancies.forEach(t => { %><tr><td><a href="/app/tenancies/<%= t.id %>"><%= t.address_line1 %></a></td><td><%= t.tenant_name %></td><td><%= fmt.ukDate(t.end_date) %></td></tr><% }) %>
+    </tbody></table><% } %>
+  </section>
+</div>
+<%- include('partials/footer') %>

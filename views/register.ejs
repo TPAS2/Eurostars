@@ -1,0 +1,21 @@
+<%- include('partials/header', { bodyClass: 'auth' }) %>
+<div class="card narrow">
+  <a class="brand" href="/"><span class="logo">L</span><%= appName %></a>
+  <h1>Create your account</h1>
+  <% if (errors.form) { %><div class="notice err"><%= errors.form %></div><% } %>
+  <form method="post" action="/register" class="stack">
+    <label>Your name <input name="name" value="<%= values.name || '' %>" required autocomplete="name"></label>
+    <% if (errors.name) { %><div class="field-err"><%= errors.name %></div><% } %>
+    <label>Agency / business name <input name="agency_name" value="<%= values.agency_name || '' %>" required autocomplete="organization"></label>
+    <% if (errors.agency_name) { %><div class="field-err"><%= errors.agency_name %></div><% } %>
+    <label>Email <input type="email" name="email" value="<%= values.email || '' %>" required autocomplete="email"></label>
+    <% if (errors.email) { %><div class="field-err"><%= errors.email %></div><% } %>
+    <label>Password <input type="password" name="password" required minlength="10" autocomplete="new-password"></label>
+    <% if (errors.password) { %><div class="field-err"><%= errors.password %></div><% } %>
+    <label>Confirm password <input type="password" name="password_confirm" required minlength="10" autocomplete="new-password"></label>
+    <% if (errors.password_confirm) { %><div class="field-err"><%= errors.password_confirm %></div><% } %>
+    <button class="btn primary" type="submit">Create account</button>
+  </form>
+  <p class="muted small">Already have an account? <a href="/login">Sign in</a></p>
+</div>
+<%- include('partials/footer') %>

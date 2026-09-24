@@ -1,0 +1,53 @@
+<%- include('../partials/header') %>
+<header class="page-head">
+  <div>
+    <a class="crumb" href="/admin">← All users</a>
+    <h1><%= u.agency_name %></h1>
+    <p class="muted"><%= u.name %> · <%= u.email %> · <span class="badge s-<%= u.status %>"><%= u.status %></span></p>
+  </div>
+  <% if (!isSelf) { %>
+  <div class="actions">
+    <% if (u.status === 'active') { %>
+      <form method="post" action="/admin/users/<%= u.id %>/logout"><%- include('../partials/csrf') %><button class="btn" type="submit">Sign out everywhere</button></form>
+      <form method="post" action="/admin/users/<%= u.id %>/suspend" data-confirm="Suspend <%= u.email %>? They will be signed out and unable to log in."><%- include('../partials/csrf') %><button class="btn danger" type="submit">Suspend</button></form>
+    <% } else { %>
+      <form method="post" action="/admin/users/<%= u.id %>/activate"><%- include('../partials/csrf') %><button class="btn primary" type="submit">Reactivate</button></form>
+    <% } %>
+  </div>
+  <% } %>
+</header>
+
+<section class="tiles">
+  <div class="tile"><span class="label">Joined</span><span class="value sm"><%= fmt.ukDate(u.created_at) %></span></div>
+  <div class="tile"><span class="label">Last login</span><span class="value sm"><%= fmt.ukDateTime(u.last_login_at) %></span><span class="sub"><%= u.login_count %> sign-ins</span></div>
+  <div class="tile"><span class="label">Landlords</span><span class="value"><%= u.landlords %></span></div>
+  <div class="tile"><span class="label">Properties</span><span class="value"><%= u.properties %></span></div>
+  <div class="tile"><span class="label">Tenants</span><span class="value"><%= u.tenants %></span><span class="sub"><%= u.active_tenancies %> active tenancies</span></div>
+  <div class="tile"><span class="label">Activity</span><span class="value sm"><%= extra.transactions %> transactions</span><span class="sub"><%= extra.jobs %> jobs · <%= extra.certificates %> certificates</span></div>
+</section>
+
+<section class="card">
+  <h2>Sign-in history</h2>
+  <% if (!logins.length) { %><p class="muted">No sign-ins yet.</p><% } else { %>
+  <div class="table-wrap"><table>
+    <thead><tr><th>When</th><th>Result</th><th>IP</th><th>Device</th></tr></thead>
+    <tbody>
+    <% logins.forEach(e => { %>
+      <tr><td><%= fmt.ukDateTime(e.created_at) %></td><td><span class="badge <%= e.success ? 's-active' : 'bad' %>"><%= e.success ? 'success' : 'failed' %></span></td><td><%= e.ip %></td><td class="muted small"><%= e.user_agent %></td></tr>
+    <% }) %>
+    </tbody>
+  </table></div><% } %>
+</section>
+
+<% if (!isSelf) { %>
+<section class="card danger-zone">
+  <h2>Delete account</h2>
+  <p>Permanently deletes this user and <strong>all</strong> of their landlords, properties, tenants and accounts. This can't be undone.</p>
+  <form method="post" action="/admin/users/<%= u.id %>/delete" class="inline-form">
+    <%- include('../partials/csrf') %>
+    <label>Type <strong><%= u.email %></strong> to confirm <input name="confirm_email" autocomplete="off" required></label>
+    <button class="btn danger" type="submit">Delete permanently</button>
+  </form>
+</section>
+<% } %>
+<%- include('../partials/footer') %>

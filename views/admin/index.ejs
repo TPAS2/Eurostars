@@ -1,0 +1,78 @@
+<%- include('../partials/header') %>
+<header class="page-head">
+  <div>
+    <h1>Admin panel</h1>
+    <p class="muted">Everyone using <%= appName %>. Only you can see this page.</p>
+  </div>
+  <div class="actions"><a class="btn" href="/admin/users.csv">Export CSV</a></div>
+</header>
+<% if (flash) { %><div class="notice ok"><%= flash %></div><% } %>
+
+<section class="tiles">
+  <div class="tile"><span class="label">Total users</span><span class="value"><%= totals.users %></span><span class="sub"><%= totals.new30 %> joined in 30 days</span></div>
+  <div class="tile"><span class="label">Active (30 days)</span><span class="value"><%= totals.active30 %></span><span class="sub"><%= totals.onlineNow %> with a live session</span></div>
+  <div class="tile"><span class="label">Properties managed</span><span class="value"><%= totals.properties %></span><span class="sub"><%= totals.tenancies %> active tenancies</span></div>
+  <div class="tile <%= totals.suspended ? 'warn' : '' %>"><span class="label">Suspended</span><span class="value"><%= totals.suspended %></span><span class="sub">&nbsp;</span></div>
+  <div class="tile <%= totals.failedLogins24h > 20 ? 'alert' : '' %>"><span class="label">Failed logins (24h)</span><span class="value"><%= totals.failedLogins24h %></span><span class="sub">&nbsp;</span></div>
+</section>
+
+<% if (signups.length) { const max = Math.max(...signups.map(s => s.n)); %>
+<section class="card">
+  <h2>Sign-ups by month</h2>
+  <div class="bars">
+    <% signups.forEach(s => { %>
+      <div class="bar" title="<%= s.month %>: <%= s.n %>"><span class="bar-val"><%= s.n %></span><span class="bar-fill" data-h="<%= Math.round((s.n / max) * 100) %>"></span><span class="bar-label"><%= s.month.slice(2) %></span></div>
+    <% }) %>
+  </div>
+</section>
+<% } %>
+
+<section class="card">
+  <div class="card-head">
+    <h2>Users <span class="count"><%= users.length %></span></h2>
+    <form method="get" class="search inline-form">
+      <input type="search" name="q" value="<%= q %>" placeholder="Search name, email, agency…">
+      <select name="status">
+        <option value="">All statuses</option>
+        <option value="active" <%= status === 'active' ? 'selected' : '' %>>Active</option>
+        <option value="suspended" <%= status === 'suspended' ? 'selected' : '' %>>Suspended</option>
+      </select>
+      <button class="btn small" type="submit">Filter</button>
+    </form>
+  </div>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>User</th><th>Agency</th><th>Joined</th><th>Last login</th><th class="num">Logins</th><th class="num">Landlords</th><th class="num">Properties</th><th class="num">Tenancies</th><th>Status</th></tr></thead>
+    <tbody>
+    <% users.forEach(u => { %>
+      <tr>
+        <td><a href="/admin/users/<%= u.id %>"><strong><%= u.name %></strong></a><div class="muted small"><%= u.email %></div></td>
+        <td><%= u.agency_name %><% if (u.is_admin) { %> <span class="badge s-admin">you</span><% } %></td>
+        <td><%= fmt.ukDate(u.created_at) %></td>
+        <td><%= fmt.ukDateTime(u.last_login_at) %><% if (u.live_sessions) { %> <span class="dot" title="Has a live session"></span><% } %></td>
+        <td class="num"><%= u.login_count %></td>
+        <td class="num"><%= u.landlords %></td>
+        <td class="num"><%= u.properties %></td>
+        <td class="num"><%= u.active_tenancies %></td>
+        <td><span class="badge s-<%= u.status %>"><%= u.status %></span></td>
+      </tr>
+    <% }) %>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<section class="card">
+  <h2>Recent sign-in activity</h2>
+  <% if (!recentLogins.length) { %><p class="muted">No sign-ins yet.</p><% } else { %>
+  <div class="table-wrap"><table>
+    <thead><tr><th>When</th><th>Email</th><th>Agency</th><th>Result</th><th>IP</th></tr></thead>
+    <tbody>
+    <% recentLogins.forEach(e => { %>
+      <tr><td><%= fmt.ukDateTime(e.created_at) %></td><td><%= e.email %></td><td><%= e.agency_name || '' %></td>
+      <td><span class="badge <%= e.success ? 's-active' : 'bad' %>"><%= e.success ? 'success' : 'failed' %></span></td><td class="muted"><%= e.ip %></td></tr>
+    <% }) %>
+    </tbody>
+  </table></div><% } %>
+</section>
+<%- include('../partials/footer') %>

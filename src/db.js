@@ -1,0 +1,196 @@
+'use strict';
+
+const fs = require('node:fs');
+const path = require('node:path');
+const { DatabaseSync } = require('node:sqlite');
+
+const SCHEMA = `
+PRAGMA foreign_keys = ON;
+
+CREATE TABLE IF NOT EXISTS users (
+  id              INTEGER PRIMARY KEY,
+  email           TEXT NOT NULL UNIQUE COLLATE NOCASE,
+  name            TEXT NOT NULL,
+  agency_name     TEXT NOT NULL,
+  password_hash   TEXT NOT NULL,
+  is_admin        INTEGER NOT NULL DEFAULT 0,
+  status          TEXT NOT NULL DEFAULT 'active',      -- active | suspended
+  created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+  last_login_at   TEXT,
+  login_count     INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS sessions (
+  token_hash  TEXT PRIMARY KEY,
+  user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  csrf_token  TEXT NOT NULL,
+  created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+  expires_at  TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS login_events (
+  id          INTEGER PRIMARY KEY,
+  user_id     INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  email       TEXT NOT NULL,
+  success     INTEGER NOT NULL,
+  ip          TEXT,
+  user_agent  TEXT,
+  created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS landlords (
+  id          INTEGER PRIMARY KEY,
+  account_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name        TEXT NOT NULL,
+  email       TEXT,
+  phone       TEXT,
+  address     TEXT,
+  notes       TEXT,
+  created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS properties (
+  id                  INTEGER PRIMARY KEY,
+  account_id          INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  landlord_id         INTEGER REFERENCES landlords(id) ON DELETE SET NULL,
+  address_line1       TEXT NOT NULL,
+  town                TEXT,
+  postcode            TEXT,
+  property_type       TEXT,
+  bedrooms            INTEGER,
+  management_fee_pct  REAL,
+  status              TEXT NOT NULL DEFAULT 'vacant',
+  notes               TEXT,
+  created_at          TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS tenants (
+  id          INTEGER PRIMARY KEY,
+  account_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name        TEXT NOT NULL,
+  email       TEXT,
+  phone       TEXT,
+  notes       TEXT,
+  created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS tenancies (
+  id              INTEGER PRIMARY KEY,
+  account_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  property_id     INTEGER NOT NULL REFERENCES properties(id) ON DELETE CASCADE,
+  tenant_id       INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  booking_date    TEXT,
+  start_date      TEXT NOT NULL,
+  end_date        TEXT,
+  rent_pence      INTEGER NOT NULL,
+  rent_frequency  TEXT NOT NULL DEFAULT 'monthly',
+  deposit_pence   INTEGER,
+  deposit_scheme  TEXT,
+  status          TEXT NOT NULL DEFAULT 'active',
+  created_at      TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS maintenance_jobs (
+  id             INTEGER PRIMARY KEY,
+  account_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  property_id    INTEGER NOT NULL REFERENCES properties(id) ON DELETE CASCADE,
+  title          TEXT NOT NULL,
+  description    TEXT,
+  contractor     TEXT,
+  priority       TEXT NOT NULL DEFAULT 'normal',
+  status         TEXT NOT NULL DEFAULT 'open',
+  reported_date  TEXT,
+  cost_pence     INTEGER,
+  created_at     TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS compliance_items (
+  id           INTEGER PRIMARY KEY,
+  account_id   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  property_id  INTEGER NOT NULL REFERENCES properties(id) ON DELETE CASCADE,
+  item_type    TEXT NOT NULL,
+  issued_date  TEXT,
+  expiry_date  TEXT NOT NULL,
+  reference    TEXT,
+  notes        TEXT,
+  created_at   TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Client-account ledger. Amounts are always positive; the type gives the direction.
+--   rent_charge       tenant owes rent (increases arrears)
+--   rent_received     tenant paid (reduces arrears, money in for the landlord)
+--   fee               agency management fee taken from landlord funds
+--   expense           paid out on the landlord's behalf (repairs, certificates...)
+--   landlord_payment  paid out to the landlord
+CREATE TABLE IF NOT EXISTS transactions (
+  id           INTEGER PRIMARY KEY,
+  account_id   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  txn_date     TEXT NOT NULL,
+  txn_type     TEXT NOT NULL,
+  landlord_id  INTEGER REFERENCES landlords(id) ON DELETE SET NULL,
+  property_id  INTEGER REFERENCES properties(id) ON DELETE SET NULL,
+  tenancy_id   INTEGER REFERENCES tenancies(id) ON DELETE SET NULL,
+  description  TEXT,
+  amount_pence INTEGER NOT NULL,
+  source_txn_id INTEGER REFERENCES transactions(id) ON DELETE CASCADE,
+  created_at   TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Supplier/contractor invoices, usually for a maintenance job, with the uploaded document.
+CREATE TABLE IF NOT EXISTS invoices (
+  id                  INTEGER PRIMARY KEY,
+  account_id          INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  maintenance_job_id  INTEGER REFERENCES maintenance_jobs(id) ON DELETE SET NULL,
+  property_id         INTEGER REFERENCES properties(id) ON DELETE SET NULL,
+  supplier            TEXT NOT NULL,
+  invoice_number      TEXT,
+  invoice_date        TEXT,
+  due_date            TEXT,
+  amount_pence        INTEGER NOT NULL,
+  description         TEXT,
+  status              TEXT NOT NULL DEFAULT 'unpaid',   -- unpaid | paid
+  paid_date           TEXT,
+  payment_method      TEXT,
+  payment_reference   TEXT,
+  payment_txn_id      INTEGER REFERENCES transactions(id) ON DELETE SET NULL,
+  file_name           TEXT,          -- random name on disk
+  file_original       TEXT,          -- name as uploaded
+  file_mime           TEXT,
+  file_size           INTEGER,
+  created_at          TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_invoices_account    ON invoices(account_id, status);
+CREATE INDEX IF NOT EXISTS idx_landlords_account  ON landlords(account_id);
+CREATE INDEX IF NOT EXISTS idx_properties_account  ON properties(account_id);
+CREATE INDEX IF NOT EXISTS idx_tenants_account     ON tenants(account_id);
+CREATE INDEX IF NOT EXISTS idx_tenancies_account   ON tenancies(account_id);
+CREATE INDEX IF NOT EXISTS idx_maint_account       ON maintenance_jobs(account_id);
+CREATE INDEX IF NOT EXISTS idx_compliance_account  ON compliance_items(account_id);
+CREATE INDEX IF NOT EXISTS idx_txn_account         ON transactions(account_id, txn_date);
+CREATE INDEX IF NOT EXISTS idx_sessions_user       ON sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_login_events_user   ON login_events(user_id, created_at);
+`;
+
+function openDatabase(file) {
+  if (file !== ':memory:') fs.mkdirSync(path.dirname(file), { recursive: true });
+  const db = new DatabaseSync(file);
+  db.exec('PRAGMA journal_mode = WAL;');
+  db.exec(SCHEMA);
+  return db;
+}
+
+// Run fn inside a transaction, rolling back if it throws.
+function transaction(db, fn) {
+  db.exec('BEGIN');
+  try {
+    const result = fn();
+    db.exec('COMMIT');
+    return result;
+  } catch (err) {
+    db.exec('ROLLBACK');
+    throw err;
+  }
+}
+
+module.exports = { openDatabase, transaction };

@@ -1,0 +1,69 @@
+<%- include('../partials/header') %>
+<header class="page-head">
+  <div>
+    <a class="crumb" href="<%= invoice ? '/app/invoices/' + invoice.id : '/app/invoices' %>">← <%= invoice ? 'Invoice' : 'Invoices' %></a>
+    <h1><%= title %></h1>
+  </div>
+</header>
+<section class="card">
+  <% if (Object.keys(errors).length) { %><div class="notice err">Please fix the highlighted fields.</div><% } %>
+  <form method="post" action="/app/invoices<%= invoice ? '/' + invoice.id : '' %>" enctype="multipart/form-data" class="form-grid">
+    <%- include('../partials/csrf') %>
+    <div class="field wide">
+      <label for="f-file">Invoice file <% if (!invoice) { %><span class="req">*</span><% } %></label>
+      <input id="f-file" type="file" name="file" accept="application/pdf,image/png,image/jpeg,image/webp" <%= invoice ? '' : 'required' %>>
+      <div class="help">PDF, PNG, JPG or WebP, up to 10 MB.<% if (invoice && invoice.file_original) { %> Current file: <%= invoice.file_original %>. Choose a new file to replace it.<% } %></div>
+      <% if (errors.file) { %><div class="field-err"><%= errors.file %></div><% } %>
+    </div>
+    <div class="field">
+      <label for="f-supplier">Supplier / contractor <span class="req">*</span></label>
+      <input id="f-supplier" name="supplier" value="<%= values.supplier || '' %>" required>
+      <% if (errors.supplier) { %><div class="field-err"><%= errors.supplier %></div><% } %>
+    </div>
+    <div class="field">
+      <label for="f-invoice_number">Invoice number</label>
+      <input id="f-invoice_number" name="invoice_number" value="<%= values.invoice_number || '' %>">
+    </div>
+    <div class="field">
+      <label for="f-amount">Amount (£) <span class="req">*</span></label>
+      <input id="f-amount" name="amount" inputmode="decimal" placeholder="0.00" value="<%= values.amount || '' %>" required>
+      <% if (errors.amount) { %><div class="field-err"><%= errors.amount %></div><% } %>
+    </div>
+    <div class="field">
+      <label for="f-invoice_date">Invoice date</label>
+      <input id="f-invoice_date" type="date" name="invoice_date" value="<%= values.invoice_date || '' %>">
+      <% if (errors.invoice_date) { %><div class="field-err"><%= errors.invoice_date %></div><% } %>
+    </div>
+    <div class="field">
+      <label for="f-due_date">Due date</label>
+      <input id="f-due_date" type="date" name="due_date" value="<%= values.due_date || '' %>">
+      <% if (errors.due_date) { %><div class="field-err"><%= errors.due_date %></div><% } %>
+    </div>
+    <div class="field">
+      <label for="f-job">Maintenance job</label>
+      <select id="f-job" name="maintenance_job_id">
+        <option value="">— None —</option>
+        <% jobs.forEach(j => { %><option value="<%= j.id %>" <%= Number(values.maintenance_job_id) === j.id ? 'selected' : '' %>><%= j.label %></option><% }) %>
+      </select>
+      <div class="help">The property is taken from the job.</div>
+      <% if (errors.maintenance_job_id) { %><div class="field-err"><%= errors.maintenance_job_id %></div><% } %>
+    </div>
+    <div class="field">
+      <label for="f-property">Property</label>
+      <select id="f-property" name="property_id">
+        <option value="">— None —</option>
+        <% properties.forEach(p => { %><option value="<%= p.id %>" <%= Number(values.property_id) === p.id ? 'selected' : '' %>><%= p.label %></option><% }) %>
+      </select>
+      <% if (errors.property_id) { %><div class="field-err"><%= errors.property_id %></div><% } %>
+    </div>
+    <div class="field wide">
+      <label for="f-description">Notes</label>
+      <textarea id="f-description" name="description" rows="3"><%= values.description || '' %></textarea>
+    </div>
+    <div class="form-actions wide">
+      <button class="btn primary" type="submit"><%= invoice ? 'Save changes' : 'Upload invoice' %></button>
+      <a class="btn" href="<%= invoice ? '/app/invoices/' + invoice.id : '/app/invoices' %>">Cancel</a>
+    </div>
+  </form>
+</section>
+<%- include('../partials/footer') %>

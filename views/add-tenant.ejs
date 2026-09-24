@@ -1,0 +1,49 @@
+<%- include('partials/header') %>
+<header class="page-head">
+  <div>
+    <a class="crumb" href="/app/properties/<%= property.id %>">← <%= property.address_line1 %></a>
+    <h1>Add tenant</h1>
+    <p class="muted"><%= property.address_line1 %><%= property.postcode ? ', ' + property.postcode : '' %></p>
+  </div>
+</header>
+<section class="card">
+  <% if (Object.keys(errors).length) { %><div class="notice err">Please fix the highlighted fields.</div><% } %>
+  <form method="post" action="/app/properties/<%= property.id %>/add-tenant" class="form-grid">
+    <%- include('partials/csrf') %>
+    <fieldset class="wide">
+      <legend>Tenant</legend>
+      <div class="segmented">
+        <label><input type="radio" name="tenant_mode" value="new" <%= values.tenant_mode !== 'existing' ? 'checked' : '' %>> New tenant</label>
+        <label><input type="radio" name="tenant_mode" value="existing" <%= values.tenant_mode === 'existing' ? 'checked' : '' %> <%= tenants.length ? '' : 'disabled' %>> Existing tenant</label>
+      </div>
+      <div class="form-grid" data-mode="new">
+        <% tenantFields.forEach(f => { %>
+          <%- include('partials/field', { f: { ...f, required: f.required }, value: values[f.name], error: errors[f.name], opts: null }) %>
+        <% }) %>
+      </div>
+      <div class="form-grid" data-mode="existing">
+        <div class="field">
+          <label for="f-tenant_id">Tenant <span class="req">*</span></label>
+          <select id="f-tenant_id" name="tenant_id">
+            <option value="">— Select —</option>
+            <% tenants.forEach(t => { %><option value="<%= t.id %>" <%= Number(values.tenant_id) === t.id ? 'selected' : '' %>><%= t.label %></option><% }) %>
+          </select>
+          <% if (errors.tenant_id) { %><div class="field-err"><%= errors.tenant_id %></div><% } %>
+        </div>
+      </div>
+    </fieldset>
+    <fieldset class="wide">
+      <legend>Tenancy</legend>
+      <div class="form-grid">
+        <% letFields.forEach(f => { %>
+          <%- include('partials/field', { f, value: values[f.name], error: errors[f.name], opts: null }) %>
+        <% }) %>
+      </div>
+    </fieldset>
+    <div class="form-actions wide">
+      <button class="btn primary" type="submit">Add tenant</button>
+      <a class="btn" href="/app/properties/<%= property.id %>">Cancel</a>
+    </div>
+  </form>
+</section>
+<%- include('partials/footer') %>

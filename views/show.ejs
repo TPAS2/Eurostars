@@ -1,0 +1,59 @@
+<%- include('partials/header') %>
+<header class="page-head">
+  <div>
+    <a class="crumb" href="/app/<%= def.key %>">← <%= def.plural %></a>
+    <h1><%= title %></h1>
+  </div>
+  <div class="actions">
+    <% if (def.key === 'properties') { %><a class="btn primary" href="/app/properties/<%= row.id %>/add-tenant">+ Add tenant</a><% } %>
+    <% if (def.key === 'landlords') { %><a class="btn primary" href="/app/properties/new?landlord_id=<%= row.id %>">+ Add property</a><% } %>
+    <% if (def.key === 'maintenance') { %><a class="btn primary" href="/app/invoices/new?maintenance_job_id=<%= row.id %>">+ Upload invoice</a><% } %>
+    <% if (def.key === 'tenancies') { %><a class="btn primary" href="/app/transactions/new?txn_type=rent_received&tenancy_id=<%= row.id %>">Record rent received</a><% } %>
+    <a class="btn" href="/app/<%= def.key %>/<%= row.id %>/edit">Edit</a>
+    <form method="post" action="/app/<%= def.key %>/<%= row.id %>/delete" data-confirm="Delete this <%= def.singular.toLowerCase() %>? Linked records may also be removed.">
+      <%- include('partials/csrf') %>
+      <button class="btn danger" type="submit">Delete</button>
+    </form>
+  </div>
+</header>
+
+<section class="card">
+  <% if (extra) { %><div class="callout <%= extra.alert ? 'alert' : '' %>"><span><%= extra.label %></span><strong><%= extra.value %></strong></div><% } %>
+  <dl class="details">
+    <% def.fields.forEach(f => { const d = display(def, f.name, row, maps); %>
+      <div class="<%= f.type === 'textarea' ? 'wide' : '' %>">
+        <dt><%= f.label %></dt>
+        <dd><% if (!d.text) { %><span class="muted">—</span><% } else if (d.href) { %><a href="<%= d.href %>"><%= d.text %></a><% } else if (d.badge) { %><span class="badge s-<%= String(row[f.name]).replace(/\W+/g, '-') %>"><%= d.text %></span><% } else { %><span class="pre"><%= d.text %></span><% } %></dd>
+      </div>
+    <% }) %>
+  </dl>
+</section>
+
+<% if (invoices) { const q = def.key === 'maintenance' ? 'maintenance_job_id' : 'property_id'; %>
+<section class="card">
+  <div class="card-head">
+    <h2>Invoices <span class="count"><%= invoices.length %></span></h2>
+    <a class="btn small" href="/app/invoices/new?<%= q %>=<%= row.id %>">+ Upload invoice</a>
+  </div>
+  <% if (!invoices.length) { %><p class="muted">No invoices yet.</p><% } else { %>
+    <%- include('invoices/table', { invoices, showProperty: false }) %>
+  <% } %>
+</section>
+<% } %>
+
+<% children.forEach(c => { %>
+<section class="card">
+  <div class="card-head">
+    <h2><%= def.key === 'landlords' && c.def.key === 'properties' ? 'Properties owned' : c.def.plural %> <span class="count"><%= c.rows.length %></span></h2>
+    <% if (def.key === 'properties' && c.def.key === 'tenancies') { %>
+      <a class="btn small" href="/app/properties/<%= row.id %>/add-tenant">+ Add tenant</a>
+    <% } else { %>
+      <a class="btn small" href="/app/<%= c.def.key %>/new?<%= c.fk %>=<%= row.id %>">+ Add <%= c.def.singular.toLowerCase() %></a>
+    <% } %>
+  </div>
+  <% if (!c.rows.length) { %><p class="muted">None yet.</p><% } else { %>
+    <%- include('partials/table', { def: c.def, rows: c.rows, maps: c.maps, hideField: c.fk }) %>
+  <% } %>
+</section>
+<% }) %>
+<%- include('partials/footer') %>

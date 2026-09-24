@@ -1,0 +1,19 @@
+<%- include('partials/header', { bodyClass: 'landing' }) %>
+<section class="hero">
+  <div class="brand big"><span class="logo">L</span><%= appName %></div>
+  <h1>Lettings, property management and client accounting in one place.</h1>
+  <p class="lead">Manage landlords, properties, tenants and tenancies. Collect rent, track arrears, deduct management fees automatically, produce landlord statements and never miss a gas safety or EICR renewal.</p>
+  <div class="actions">
+    <% if (allowRegistration) { %><a class="btn primary" href="/register">Create your account</a><% } %>
+    <a class="btn" href="/login">Sign in</a>
+  </div>
+</section>
+<section class="features">
+  <div class="card"><h3>Landlords &amp; properties</h3><p>Every landlord with their portfolio, contact details and management fee.</p></div>
+  <div class="card"><h3>Tenants &amp; tenancies</h3><p>Add tenants to properties with booking, start and end dates, rent and deposit scheme.</p></div>
+  <div class="card"><h3>Rent &amp; arrears</h3><p>Raise monthly rent in one click, record receipts and see who owes what.</p></div>
+  <div class="card"><h3>Client accounting</h3><p>Automatic fees, expenses, landlord payments and printable statements.</p></div>
+  <div class="card"><h3>Compliance</h3><p>Gas safety, EICR, EPC, licences and alarms, with expiry warnings.</p></div>
+  <div class="card"><h3>Maintenance</h3><p>Log repairs, assign contractors and track costs by priority.</p></div>
+</section>
+<%- include('partials/footer') %>

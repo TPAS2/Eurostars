@@ -1,0 +1,24 @@
+<%# locals: def, rows, maps, display, rowTitle, hideField %>
+<div class="table-wrap">
+<table>
+  <thead><tr>
+  <% def.columns.filter(c => c !== hideField).forEach(c => { const f = def.fieldMap[c]; %>
+    <th class="<%= ['money','number','integer'].includes(f.type) ? 'num' : '' %>"><%= f.label.replace(' (£)', '') %></th>
+  <% }) %>
+  </tr></thead>
+  <tbody>
+  <% rows.forEach(row => { %>
+    <tr>
+    <% def.columns.filter(c => c !== hideField).forEach((c, i) => { const d = display(def, c, row, maps); %>
+      <td class="<%= d.num ? 'num' : '' %>">
+        <% if (i === 0) { %><a href="/app/<%= def.key %>/<%= row.id %>"><%= d.text || rowTitle(def, row, maps) %></a>
+        <% } else if (d.href) { %><a href="<%= d.href %>"><%= d.text %></a>
+        <% } else if (d.badge) { %><span class="badge s-<%= String(row[c]).replace(/\W+/g, '-') %>"><%= d.text %></span>
+        <% } else { %><%= d.text %><% } %>
+      </td>
+    <% }) %>
+    </tr>
+  <% }) %>
+  </tbody>
+</table>
+</div>

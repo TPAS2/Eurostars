@@ -1,0 +1,19 @@
+<%- include('partials/header') %>
+<header class="page-head">
+  <h1><%= def.plural %></h1>
+  <div class="actions">
+    <% if (searchable) { %>
+    <form method="get" class="search"><input type="search" name="q" value="<%= q %>" placeholder="Search <%= def.plural.toLowerCase() %>…"></form>
+    <% } %>
+    <a class="btn primary" href="/app/<%= def.key %>/new">+ Add <%= def.singular.toLowerCase() %></a>
+  </div>
+</header>
+<section class="card">
+  <% if (!rows.length) { %>
+    <p class="muted"><%= q ? 'No matches.' : `No ${def.plural.toLowerCase()} yet.` %></p>
+  <% } else { %>
+    <%- include('partials/table', { rows, hideField: null }) %>
+    <% if (truncated) { %><p class="muted small">Showing the first 500. Use search to narrow down.</p><% } %>
+  <% } %>
+</section>
+<%- include('partials/footer') %>

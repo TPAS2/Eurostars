@@ -1,0 +1,79 @@
+<%- include('../partials/header') %>
+<% const overdue = inv.status === 'unpaid' && inv.due_date && inv.due_date < today; %>
+<header class="page-head">
+  <div>
+    <a class="crumb" href="/app/invoices">← Invoices</a>
+    <h1><%= inv.supplier %> · <%= fmt.money(inv.amount_pence) %></h1>
+    <p class="muted">
+      <%= inv.invoice_number ? 'Invoice ' + inv.invoice_number + ' · ' : '' %>
+      <% if (inv.status === 'paid') { %><span class="badge s-active">paid</span><% } else if (overdue) { %><span class="badge bad">overdue</span><% } else { %><span class="badge warn">unpaid</span><% } %>
+    </p>
+  </div>
+  <div class="actions">
+    <a class="btn" href="/app/invoices/<%= inv.id %>/edit">Edit</a>
+    <% if (inv.status !== 'paid') { %>
+    <form method="post" action="/app/invoices/<%= inv.id %>/delete" data-confirm="Delete this invoice and its file?">
+      <%- include('../partials/csrf') %><button class="btn danger" type="submit">Delete</button>
+    </form>
+    <% } %>
+  </div>
+</header>
+<% if (flash) { %><div class="notice ok"><%= flash %></div><% } %>
+<% if (error) { %><div class="notice err"><%= error %></div><% } %>
+
+<div class="grid-2">
+  <section class="card">
+    <h2>Details</h2>
+    <dl class="details">
+      <div><dt>Supplier</dt><dd><%= inv.supplier %></dd></div>
+      <div><dt>Amount</dt><dd><strong><%= fmt.money(inv.amount_pence) %></strong></dd></div>
+      <div><dt>Invoice date</dt><dd><%= fmt.ukDate(inv.invoice_date) || '—' %></dd></div>
+      <div><dt>Due date</dt><dd class="<%= overdue ? 'neg' : '' %>"><%= fmt.ukDate(inv.due_date) || '—' %></dd></div>
+      <div><dt>Property</dt><dd><% if (property) { %><a href="/app/properties/<%= property.id %>"><%= property.address_line1 %></a><% } else { %>—<% } %></dd></div>
+      <div><dt>Maintenance job</dt><dd><% if (job) { %><a href="/app/maintenance/<%= job.id %>"><%= job.title %></a><% } else { %>—<% } %></dd></div>
+      <div><dt>Landlord</dt><dd><% if (landlord) { %><a href="/app/landlords/<%= landlord.id %>"><%= landlord.name %></a><% } else { %>—<% } %></dd></div>
+      <% if (inv.description) { %><div class="wide"><dt>Notes</dt><dd class="pre"><%= inv.description %></dd></div><% } %>
+    </dl>
+    <% if (inv.file_name) { %>
+    <div class="file-box">
+      <span>📄 <%= inv.file_original %> <span class="muted small">(<%= Math.max(1, Math.round(inv.file_size / 1024)) %> KB)</span></span>
+      <span class="actions">
+        <a class="btn small" href="/app/invoices/<%= inv.id %>/file" target="_blank" rel="noopener">View</a>
+        <a class="btn small" href="/app/invoices/<%= inv.id %>/file?download=1">Download</a>
+      </span>
+    </div>
+    <% } %>
+  </section>
+
+  <section class="card" id="pay">
+    <% if (inv.status === 'paid') { %>
+      <h2>Payment</h2>
+      <div class="callout"><span>Paid on <%= fmt.ukDate(inv.paid_date) %></span><strong><%= fmt.money(inv.amount_pence) %></strong></div>
+      <dl class="details">
+        <div><dt>Method</dt><dd><%= inv.payment_method %></dd></div>
+        <div><dt>Reference</dt><dd><%= inv.payment_reference || '—' %></dd></div>
+        <div><dt>Client account</dt><dd><% if (inv.payment_txn_id) { %><a href="/app/transactions/<%= inv.payment_txn_id %>">Charged to landlord</a><% } else { %>Not charged to a landlord<% } %></dd></div>
+      </dl>
+      <form method="post" action="/app/invoices/<%= inv.id %>/unpay" data-confirm="Undo this payment? The invoice will go back to unpaid and the landlord charge will be removed." class="spaced">
+        <%- include('../partials/csrf') %><button class="btn small" type="submit">Undo payment</button>
+      </form>
+    <% } else { %>
+      <h2>Pay this invoice</h2>
+      <p class="muted small">Record the payment to <%= inv.supplier %>. It's marked as paid and, if you tick the box, charged to the landlord as an expense so it appears on their statement.</p>
+      <form method="post" action="/app/invoices/<%= inv.id %>/pay" class="stack" data-confirm="Mark <%= fmt.money(inv.amount_pence) %> to <%= inv.supplier %> as paid?">
+        <%- include('../partials/csrf') %>
+        <label>Payment date <input type="date" name="paid_date" value="<%= today %>" required></label>
+        <label>Paid by
+          <select name="payment_method" required>
+            <% methods.forEach(m => { %><option><%= m %></option><% }) %>
+          </select>
+        </label>
+        <label>Payment reference <input name="payment_reference" placeholder="e.g. bank transfer reference"></label>
+        <label class="check"><input type="checkbox" name="charge_landlord" value="1" <%= landlord ? 'checked' : '' %>>
+          Charge to <%= landlord ? landlord.name + "'s" : "the landlord's" %> client account<% if (!landlord) { %> <span class="muted small">(no landlord linked)</span><% } %></label>
+        <button class="btn primary" type="submit">Pay <%= fmt.money(inv.amount_pence) %></button>
+      </form>
+    <% } %>
+  </section>
+</div>
+<%- include('../partials/footer') %>

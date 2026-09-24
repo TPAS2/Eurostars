@@ -1,0 +1,21 @@
+<%- include('partials/header') %>
+<header class="page-head">
+  <div>
+    <a class="crumb" href="/app/<%= def.key %>">← <%= def.plural %></a>
+    <h1><%= title %></h1>
+  </div>
+</header>
+<section class="card">
+  <% if (Object.keys(errors).length) { %><div class="notice err">Please fix the highlighted fields.</div><% } %>
+  <form method="post" action="/app/<%= def.key %><%= row ? '/' + row.id : '' %>" class="form-grid">
+    <%- include('partials/csrf') %>
+    <% def.fields.forEach(f => { %>
+      <%- include('partials/field', { f, value: values[f.name], error: errors[f.name], opts: options[f.name] }) %>
+    <% }) %>
+    <div class="form-actions wide">
+      <button class="btn primary" type="submit"><%= row ? 'Save changes' : 'Create ' + def.singular.toLowerCase() %></button>
+      <a class="btn" href="/app/<%= def.key %><%= row ? '/' + row.id : '' %>">Cancel</a>
+    </div>
+  </form>
+</section>
+<%- include('partials/footer') %>

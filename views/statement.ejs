@@ -1,0 +1,61 @@
+<%- include('partials/header', { bodyClass: print ? 'print' : '' }) %>
+<header class="page-head no-print">
+  <h1>Landlord statements</h1>
+</header>
+<section class="card no-print">
+  <form method="get" class="inline-form">
+    <label>Landlord
+      <select name="landlord_id" required>
+        <option value="">— Select —</option>
+        <% landlords.forEach(l => { %><option value="<%= l.id %>" <%= landlord && landlord.id === l.id ? 'selected' : '' %>><%= l.label %></option><% }) %>
+      </select>
+    </label>
+    <label>From <input type="date" name="from" value="<%= from %>"></label>
+    <label>To <input type="date" name="to" value="<%= to %>"></label>
+    <button class="btn primary" type="submit">Show statement</button>
+  </form>
+</section>
+
+<% if (statement) { %>
+<section class="card statement">
+  <div class="card-head">
+    <div>
+      <h2>Statement: <%= landlord.name %></h2>
+      <p class="muted"><%= user.agency_name %> · <%= fmt.ukDate(from) %> to <%= fmt.ukDate(to) %></p>
+    </div>
+    <button class="btn small no-print" type="button" data-print>Print / save as PDF</button>
+  </div>
+  <table>
+    <thead><tr><th>Date</th><th>Property</th><th>Description</th><th class="num">Money in</th><th class="num">Money out</th><th class="num">Balance</th></tr></thead>
+    <tbody>
+      <tr class="sub"><td colspan="5">Opening balance</td><td class="num"><%= fmt.money(statement.opening) %></td></tr>
+      <% statement.rows.forEach(r => { const incoming = r.txn_type === 'rent_received'; %>
+      <tr>
+        <td><%= fmt.ukDate(r.txn_date) %></td>
+        <td><%= r.address_line1 || '' %></td>
+        <td><%= r.description || fmt.humanize(r.txn_type) %></td>
+        <td class="num"><%= incoming ? fmt.money(r.amount_pence) : '' %></td>
+        <td class="num"><%= incoming ? '' : fmt.money(r.amount_pence) %></td>
+        <td class="num"><%= fmt.money(r.balance) %></td>
+      </tr>
+      <% }) %>
+      <tr class="total"><td colspan="5">Closing balance (held for landlord)</td><td class="num"><%= fmt.money(statement.closing) %></td></tr>
+    </tbody>
+  </table>
+  <div class="summary">
+    <div><span>Rent received</span><strong><%= fmt.money(statement.totals.rent_received) %></strong></div>
+    <div><span>Management fees</span><strong><%= fmt.money(statement.totals.fee) %></strong></div>
+    <div><span>Expenses</span><strong><%= fmt.money(statement.totals.expense) %></strong></div>
+    <div><span>Paid to landlord</span><strong><%= fmt.money(statement.totals.landlord_payment) %></strong></div>
+  </div>
+</section>
+<% } %>
+
+<section class="card no-print">
+  <h2>Balances held per landlord</h2>
+  <% if (!balances.length) { %><p class="muted">No landlords yet.</p><% } else { %>
+  <table><thead><tr><th>Landlord</th><th class="num">Balance</th><th></th></tr></thead><tbody>
+  <% balances.forEach(b => { %><tr><td><a href="/app/landlords/<%= b.id %>"><%= b.name %></a></td><td class="num <%= b.balance < 0 ? 'neg' : '' %>"><%= fmt.money(b.balance) %></td><td class="num"><a href="/app/statements?landlord_id=<%= b.id %>&from=<%= from %>&to=<%= to %>">Statement</a> · <a href="/app/transactions/new?txn_type=landlord_payment&landlord_id=<%= b.id %>">Pay out</a></td></tr><% }) %>
+  </tbody></table><% } %>
+</section>
+<%- include('partials/footer') %>
