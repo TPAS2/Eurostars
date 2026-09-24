@@ -23,6 +23,36 @@
 <div id="pv-root"></div>
 <div class="pv-toast" id="pv-toast" hidden role="status" aria-live="polite"><span id="pv-toast-text"></span><button type="button" id="pv-toast-close">OK</button></div>
 <script>
+// Labels for the icon rail: shown beside the square (or below it on narrow screens)
+// on hover and keyboard focus. Positioned here so the scrolling rail doesn't clip them.
+(() => {
+  let tip = null;
+  const show = (el) => {
+    if (!tip) { tip = document.createElement('div'); tip.className = 'rail-tip'; tip.setAttribute('role', 'tooltip'); document.body.appendChild(tip); }
+    tip.textContent = el.dataset.tip;
+    tip.hidden = false;
+    const r = el.getBoundingClientRect();
+    const narrow = window.matchMedia('(max-width: 900px)').matches;
+    tip.classList.toggle('below', narrow);
+    if (narrow) {
+      const left = Math.min(Math.max(8, r.left + r.width / 2 - tip.offsetWidth / 2), window.innerWidth - tip.offsetWidth - 8);
+      tip.style.left = `${left}px`;
+      tip.style.top = `${r.bottom + 8}px`;
+    } else {
+      tip.style.left = `${r.right + 10}px`;
+      tip.style.top = `${r.top + r.height / 2 - tip.offsetHeight / 2}px`;
+    }
+  };
+  const hide = () => { if (tip) tip.hidden = true; };
+  document.addEventListener('mouseover', (e) => { const el = e.target.closest('[data-tip]'); if (el) show(el); });
+  document.addEventListener('mouseout', (e) => { const el = e.target.closest('[data-tip]'); if (el && !el.contains(e.relatedTarget)) hide(); });
+  document.addEventListener('focusin', (e) => { const el = e.target.closest('[data-tip]'); if (el) show(el); else hide(); });
+  document.addEventListener('focusout', hide);
+  window.addEventListener('scroll', hide, true);
+})();
+
+</script>
+<script>
 /*DATA*/
 (() => {
   const root = document.getElementById('pv-root');
@@ -72,6 +102,15 @@
     document.title = page.title;
     document.body.className = '';
     root.innerHTML = '<div class="shell"><aside class="sidebar">' + acct.sidebar + '</aside><main class="content">' + page.main + '</main></div>';
+    // Highlight the menu square for the section being viewed (longest matching link wins).
+    const path = url.split('?')[0];
+    let best = null;
+    root.querySelectorAll('.rail-btn[href]').forEach((b) => {
+      b.classList.remove('active'); b.removeAttribute('aria-current');
+      const h = b.getAttribute('href');
+      if ((path === h || path.startsWith(h + '/')) && (!best || h.length > best.getAttribute('href').length)) best = b;
+    });
+    if (best) { best.classList.add('active'); best.setAttribute('aria-current', 'page'); }
     root.querySelectorAll('.bar-fill[data-h]').forEach((el) => { el.style.height = Math.max(2, Number(el.dataset.h)) + '%'; });
     window.scrollTo(0, 0);
   }

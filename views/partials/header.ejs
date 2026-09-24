@@ -8,39 +8,34 @@
   <script src="/static/app.js" defer></script>
 </head>
 <body class="<%= typeof bodyClass !== 'undefined' ? bodyClass : '' %>">
-<% if (user) { const s = typeof section !== 'undefined' ? section : ''; %>
+<% if (user) {
+  const s = typeof section !== 'undefined' ? section : '';
+  const initials = String(user.name || user.username).split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase();
+  const groups = [
+    [['dashboard', '/app', 'Dashboard']],
+    [['landlords', '/app/landlords', 'Landlords'], ['properties', '/app/properties', 'Properties'], ['tenants', '/app/tenants', 'Tenants'], ['tenancies', '/app/tenancies', 'Tenancies']],
+    [['maintenance', '/app/maintenance', 'Maintenance'], ['invoices', '/app/invoices', 'Invoices'], ['compliance', '/app/compliance', 'Compliance']],
+    [['transactions', '/app/transactions', 'Transactions'], ['monthly', '/app/monthly', 'Monthly statements'], ['statements', '/app/statements', 'Statement by date range']],
+  ];
+  if (user.is_admin) groups.push([['admin', '/admin', 'Admin panel'], ['backups', '/admin/backups', 'Backups']]);
+%>
 <div class="shell">
   <aside class="sidebar">
-    <a class="brand" href="/app"><span class="logo">L</span><%= appName %></a>
-    <div class="agency"><%= user.agency_name %></div>
-    <nav>
-      <a href="/app" class="<%= s === 'dashboard' ? 'active' : '' %>">Dashboard</a>
-      <div class="nav-label">Portfolio</div>
-      <a href="/app/landlords" class="<%= s === 'landlords' ? 'active' : '' %>">Landlords</a>
-      <a href="/app/properties" class="<%= s === 'properties' ? 'active' : '' %>">Properties</a>
-      <a href="/app/tenants" class="<%= s === 'tenants' ? 'active' : '' %>">Tenants</a>
-      <a href="/app/tenancies" class="<%= s === 'tenancies' ? 'active' : '' %>">Tenancies</a>
-      <div class="nav-label">Management</div>
-      <a href="/app/maintenance" class="<%= s === 'maintenance' ? 'active' : '' %>">Maintenance</a>
-      <a href="/app/invoices" class="<%= s === 'invoices' ? 'active' : '' %>">Invoices</a>
-      <a href="/app/compliance" class="<%= s === 'compliance' ? 'active' : '' %>">Compliance</a>
-      <div class="nav-label">Accounts</div>
-      <a href="/app/transactions" class="<%= s === 'transactions' ? 'active' : '' %>">Transactions</a>
-      <a href="/app/monthly" class="<%= s === 'monthly' ? 'active' : '' %>">Monthly statements</a>
-      <a href="/app/statements" class="<%= s === 'statements' ? 'active' : '' %>">Statement by date range</a>
-      <% if (user.is_admin) { %>
-      <div class="nav-label">Owner</div>
-      <a href="/admin" class="<%= s === 'admin' ? 'active' : '' %>">Admin panel</a>
-      <a href="/admin/backups" class="<%= s === 'backups' ? 'active' : '' %>">Backups</a>
-      <% } %>
+    <a class="rail-btn brand-btn" href="/app" data-tip="<%= appName %> · <%= user.agency_name %>" aria-label="<%= appName %> home"><span class="logo">L</span></a>
+    <nav class="rail" aria-label="Main">
+      <% groups.forEach((g, gi) => { %>
+        <% if (gi) { %><span class="rail-sep" aria-hidden="true"></span><% } %>
+        <% g.forEach(([key, href, label]) => { %>
+          <a class="rail-btn <%= s === key ? 'active' : '' %>" href="<%= href %>" data-tip="<%= label %>" aria-label="<%= label %>" <%- s === key ? 'aria-current="page"' : '' %>><%- include('icon', { name: key }) %></a>
+        <% }) %>
+      <% }) %>
     </nav>
-    <div class="me">
-      <div><strong><%= user.name %></strong></div>
-      <div class="muted small">@<%= user.username %></div>
-      <a class="small export-link" href="/app/export">Download my data</a>
+    <div class="rail rail-me">
+      <span class="rail-btn avatar" tabindex="0" data-tip="<%= user.name %> · @<%= user.username %> · <%= user.agency_name %>" aria-label="Signed in as <%= user.name %>"><%= initials %></span>
+      <a class="rail-btn" href="/app/export" data-tip="Download my data" aria-label="Download my data"><%- include('icon', { name: 'download' }) %></a>
       <form method="post" action="/logout">
         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-        <button class="link-btn" type="submit">Sign out</button>
+        <button class="rail-btn" type="submit" data-tip="Sign out" aria-label="Sign out"><%- include('icon', { name: 'signout' }) %></button>
       </form>
     </div>
   </aside>
