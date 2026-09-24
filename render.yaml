@@ -1,0 +1,35 @@
+# One-click deployment on Render (https://render.com): New → Blueprint → pick this repo.
+# The disk keeps the database, uploaded invoices and backups across restarts and deploys.
+services:
+  - type: web
+    name: letwise
+    runtime: node
+    plan: starter
+    branch: claude/hopeful-ramanujan-jdgrpx
+    buildCommand: npm ci --omit=dev
+    startCommand: npm start
+    healthCheckPath: /login
+    disk:
+      name: letwise-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      - key: TRUST_PROXY
+        value: "true"
+      - key: DATABASE_FILE
+        value: /var/data/letwise.db
+      - key: UPLOAD_DIR
+        value: /var/data/uploads
+      - key: BACKUP_DIR
+        value: /var/data/backups
+      # You'll be asked for these when you create the service:
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false

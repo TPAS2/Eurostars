@@ -92,6 +92,16 @@ To rebuild it: run the app with demo data (`npm run seed-demo`, then `npm start`
 
 ## Deploying
 
+**Render (easiest).** The repo includes `render.yaml`:
+1. Sign in at https://render.com with your GitHub account.
+2. Open https://render.com/deploy?repo=https://github.com/TPAS2/Eurostars (or **New → Blueprint** and pick this repo).
+3. Fill in `ADMIN_EMAIL` and `ADMIN_PASSWORD` (and `ANTHROPIC_API_KEY` for AI statement summaries), then click **Apply**.
+4. When the deploy finishes, open the `https://letwise-….onrender.com` address it shows. You can add your own domain under **Settings → Custom Domains**.
+
+It uses Render's Starter plan with a 1 GB disk (about $7.25 a month), because the free plan has no permanent disk and would lose the data on every restart.
+
+**Anywhere else:**
+
 - Run behind HTTPS.
 - Set `NODE_ENV=production`, which makes session cookies secure.
 - Set `TRUST_PROXY=true` if the app runs behind a proxy.
