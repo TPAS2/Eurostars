@@ -15,13 +15,16 @@
 <% if (user) {
   const s = typeof section !== 'undefined' ? section : '';
   const initials = String(user.name || user.username).split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase();
-  const groups = [
+  // The admin runs the software rather than letting properties, so only gets the owner pages.
+  const groups = user.is_admin ? [
+    [['dashboard', '/app', 'Dashboard']],
+    [['admin', '/admin', 'Admin panel'], ['backups', '/admin/backups', 'Backups']],
+  ] : [
     [['dashboard', '/app', 'Dashboard']],
     [['landlords', '/app/landlords', 'Landlords'], ['properties', '/app/properties', 'Properties'], ['tenants', '/app/tenants', 'Tenants'], ['tenancies', '/app/tenancies', 'Tenancies']],
     [['maintenance', '/app/maintenance', 'Maintenance'], ['invoices', '/app/invoices', 'Invoices'], ['compliance', '/app/compliance', 'Compliance']],
     [['transactions', '/app/transactions', 'Transactions'], ['monthly', '/app/monthly', 'Monthly statements'], ['statements', '/app/statements', 'Statement by date range']],
   ];
-  if (user.is_admin) groups.push([['admin', '/admin', 'Admin panel'], ['backups', '/admin/backups', 'Backups']]);
 %>
 <div class="shell">
   <aside class="sidebar">

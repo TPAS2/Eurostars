@@ -285,6 +285,12 @@ test('admin panel: lists all users, suspend, reactivate, delete', async () => {
 
   let r = await admin.get('/admin');
   assert.equal(r.status, 200);
+  // The admin's menu only has the owner pages.
+  const rail = r.text.match(/<nav class="rail"[\s\S]*?<\/nav>/)[0];
+  assert.match(rail, /aria-label="Dashboard"/);
+  assert.match(rail, /aria-label="Admin panel"/);
+  assert.match(rail, /aria-label="Backups"/);
+  assert.doesNotMatch(rail, /aria-label="Landlords"|aria-label="Invoices"|aria-label="Transactions"/);
   for (const email of ['agent1@example.com', 'agent-inv@example.com', 'suspend-me@example.com']) assert.match(r.text, new RegExp(email));
 
   const u = db.prepare('SELECT id FROM users WHERE email = ?').get('suspend-me@example.com');
