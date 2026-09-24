@@ -36,7 +36,7 @@ const monthEnd = (offset) => fmt.addDays(`${month(offset)}-01`, -1);
 
 const AGENCIES = [
   {
-    username: 'harbour', password: 'demo-password-123', email: 'demo@letwise.test', name: 'Sam Carter', agency: 'Harbour Lettings', logins: 37,
+    username: 'harbour', password: 'demo-password-123', email: 'demo@nexus.test', name: 'Sam Carter', agency: 'Harbour Lettings', logins: 37,
     landlords: [
       ['Jane Smith', 'jane.smith@example.com', '07700 900111', '12 Clifton Park\nBristol\nBS8 3BP'],
       ['Robert & Ann Hughes', 'hughes.family@example.com', '07700 900222', '3 Mill Lane\nBath\nBA1 2AB'],

@@ -251,7 +251,7 @@ module.exports = function appRoutes(db) {
     };
     for (const t of tables) data[t] = db.prepare(`SELECT * FROM ${t} WHERE account_id = ? ORDER BY id`).all(a);
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="letwise-export-${fmt.today()}.json"`);
+    res.setHeader('Content-Disposition', `attachment; filename="nexus-export-${fmt.today()}.json"`);
     res.send(JSON.stringify(data, null, 2));
   });
 

@@ -8,7 +8,7 @@ const path = require('node:path');
 const zlib = require('node:zlib');
 const { once } = require('node:events');
 
-const NAME_RE = /^letwise-backup-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}Z(-\d+)?\.tar\.gz$/;
+const NAME_RE = /^(?:nexus|letwise)-backup-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}Z(-\d+)?\.tar\.gz$/;
 
 // ---- minimal ustar writer ----
 
@@ -74,8 +74,8 @@ function stamp(date = new Date()) {
 // Create a backup and prune old ones. Returns { name, file, size }.
 async function createBackup(db, config, { reason = 'manual' } = {}) {
   fs.mkdirSync(config.backupDir, { recursive: true, mode: 0o700 });
-  let name = `letwise-backup-${stamp()}.tar.gz`;
-  for (let i = 1; fs.existsSync(path.join(config.backupDir, name)); i++) name = `letwise-backup-${stamp()}-${i}.tar.gz`;
+  let name = `nexus-backup-${stamp()}.tar.gz`;
+  for (let i = 1; fs.existsSync(path.join(config.backupDir, name)); i++) name = `nexus-backup-${stamp()}-${i}.tar.gz`;
   const file = path.join(config.backupDir, name);
 
   // VACUUM INTO produces a consistent copy even while the app is serving requests.
@@ -102,7 +102,7 @@ async function createBackup(db, config, { reason = 'manual' } = {}) {
     manifest.counts.uploaded_files = uploads.length;
     await writeTarGz(file, [
       { name: 'manifest.json', data: Buffer.from(JSON.stringify(manifest, null, 2)) },
-      { name: 'letwise.db', file: tmpDb },
+      { name: 'nexus.db', file: tmpDb },
       ...uploads.map((u) => ({ name: `uploads/${u.rel}`, file: u.full, mtime: fs.statSync(u.full).mtimeMs })),
     ]);
   } catch (err) {

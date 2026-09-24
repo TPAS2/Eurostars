@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex">
-<title>LetWise</title>
+<title>Nexus</title>
 <style>
 /*APP_CSS*/
 
@@ -69,8 +69,8 @@
   document.getElementById('pv-toast-close').addEventListener('click', () => { document.getElementById('pv-toast').hidden = true; });
 
   const store = {
-    get() { try { return sessionStorage.getItem('letwise-preview-user'); } catch (e) { return null; } },
-    set(v) { try { v ? sessionStorage.setItem('letwise-preview-user', v) : sessionStorage.removeItem('letwise-preview-user'); } catch (e) { /* ignore */ } },
+    get() { try { return sessionStorage.getItem('nexus-preview-user'); } catch (e) { return null; } },
+    set(v) { try { v ? sessionStorage.setItem('nexus-preview-user', v) : sessionStorage.removeItem('nexus-preview-user'); } catch (e) { /* ignore */ } },
   };
 
   async function sha256(text) {
@@ -80,7 +80,7 @@
 
   function showLogin(error) {
     account = null; current = null;
-    document.title = 'Sign in · LetWise';
+    document.title = 'Sign in · Nexus';
     document.body.className = 'auth';
     root.innerHTML = '<main class="public">' + LOGIN_HTML + '<p class="pv-note">Preview with sample data.</p></main>';
     if (error) {
@@ -134,7 +134,7 @@
       if (/\/file(\?|$)|download=1/.test(href)) toast('In the full app this opens the uploaded invoice.');
       else if (/\/export$/.test(href)) toast('In the full app this downloads all of your agency’s data.');
       else if (/\.csv$/.test(href)) toast('In the full app this downloads the user list as a spreadsheet.');
-      else if (/\/admin\/backups\/letwise-/.test(href)) toast('In the full app this downloads the backup file.');
+      else if (/\/admin\/backups\/(nexus|letwise)-/.test(href)) toast('In the full app this downloads the backup file.');
       else go(href);
       return;
     }

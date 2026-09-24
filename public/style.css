@@ -287,3 +287,10 @@ label.check input { width: auto; margin-top: 4px; }
 .steps { margin: 0 0 10px; padding-left: 20px; }
 .steps li { margin-bottom: 6px; }
 code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .85em; background: var(--surface-2); padding: 1px 5px; border-radius: 4px; }
+
+/* ---------- sign-in / create-account pages: everything centred ---------- */
+.auth .narrow { text-align: center; }
+.auth .narrow .brand { display: flex; justify-content: center; padding: 0; }
+.auth .narrow .stack label { text-align: center; }
+.auth .narrow input { text-align: center; }
+.auth .narrow .notice, .auth .narrow .help, .auth .narrow .field-err { text-align: center; }

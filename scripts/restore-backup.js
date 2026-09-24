@@ -1,6 +1,6 @@
 'use strict';
 
-// Usage (with the server stopped): npm run restore-backup -- path/to/letwise-backup-....tar.gz
+// Usage (with the server stopped): npm run restore-backup -- path/to/nexus-backup-....tar.gz
 // The current database and uploads are moved to data/pre-restore-<time>/ first, never deleted.
 
 const fs = require('node:fs');
@@ -17,11 +17,12 @@ if (!archive || !fs.existsSync(archive)) {
 }
 
 const config = loadConfig();
-const work = fs.mkdtempSync(path.join(os.tmpdir(), 'letwise-restore-'));
+const work = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-restore-'));
 try {
   execFileSync('tar', ['-xzf', path.resolve(archive), '-C', work], { stdio: 'inherit' });
-  const restoredDb = path.join(work, 'letwise.db');
-  if (!fs.existsSync(restoredDb)) throw new Error('This file does not look like a LetWise backup (no letwise.db inside).');
+  // Backups made before the rename to Nexus call the database letwise.db.
+  const restoredDb = ['nexus.db', 'letwise.db'].map((f) => path.join(work, f)).find((f) => fs.existsSync(f));
+  if (!restoredDb) throw new Error('This file does not look like a Nexus backup (no database inside).');
 
   const check = new DatabaseSync(restoredDb, { readOnly: true });
   const ok = check.prepare('PRAGMA integrity_check').get();

@@ -13,14 +13,14 @@ function loadConfig(env = process.env) {
   const production = env.NODE_ENV === 'production';
   return {
     port: Number(env.PORT) || 3000,
-    dbFile: env.DATABASE_FILE || path.join(__dirname, '..', 'data', 'letwise.db'),
+    dbFile: env.DATABASE_FILE || path.join(__dirname, '..', 'data', 'nexus.db'),
     uploadDir: env.UPLOAD_DIR || path.join(__dirname, '..', 'data', 'uploads'),
     backupDir: env.BACKUP_DIR || path.join(__dirname, '..', 'data', 'backups'),
     backupCopyDir: env.BACKUP_COPY_DIR || '',
     backupKeep: Math.max(1, Number(env.BACKUP_KEEP) || 14),
     backupIntervalHours: Math.max(1, Number(env.BACKUP_INTERVAL_HOURS) || 24),
     autoBackups: env.AUTO_BACKUPS !== 'false',
-    appName: env.APP_NAME || 'LetWise',
+    appName: env.APP_NAME || 'Nexus',
     adminEmail: (env.ADMIN_EMAIL || '').trim().toLowerCase(),
     adminPassword: env.ADMIN_PASSWORD || '',
     adminUsername: (env.ADMIN_USERNAME || 'admin').trim().toLowerCase(),

@@ -8,7 +8,7 @@ const path = require('node:path');
 const { openDatabase } = require('../src/db');
 const { createApp, loadConfig, ensureAdmin } = require('../src/server');
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'letwise-test-'));
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-test-'));
 const config = {
   ...loadConfig({}),
   dbFile: ':memory:',
@@ -413,7 +413,7 @@ test('backups: admin creates, downloads, prunes; archive restores', async () => 
     assert.match(decodeURIComponent(r.location), /Backup created/);
   }
   const page = await admin.get('/admin/backups');
-  const names = [...page.text.matchAll(/<code>(letwise-backup-[^<]+)<\/code>/g)].map((m) => m[1]);
+  const names = [...page.text.matchAll(/<code>(nexus-backup-[^<]+)<\/code>/g)].map((m) => m[1]);
   assert.equal(names.length, 3, 'old backups pruned to BACKUP_KEEP');
 
   const dl = await fetch(`${base}/admin/backups/${names[0]}`, { headers: { cookie: admin.cookie } });
@@ -424,7 +424,7 @@ test('backups: admin creates, downloads, prunes; archive restores', async () => 
   const file = path.join(config.backupDir, names[0]);
   const listing = execFileSync('tar', ['-tzf', file]).toString();
   assert.match(listing, /manifest\.json/);
-  assert.match(listing, /letwise\.db/);
+  assert.match(listing, /nexus\.db/);
   assert.match(listing, /uploads\/\d+\/[0-9a-f]{32}\.pdf/);
 
   // Restore into a fresh data directory and check the data is there.
@@ -448,7 +448,7 @@ test('create account with a username and password (email optional)', async () =>
   assert.equal(r.status, 302, r.text);
   assert.match(r.location, /^\/app/, 'signed in straight away');
   r = await c.get(r.location);
-  assert.match(r.text, /Welcome to LetWise/);
+  assert.match(r.text, /Welcome to Nexus/);
   assert.match(r.text, /@harbour\.lets/);
   const u = db.prepare("SELECT * FROM users WHERE username = 'harbour.lets'").get();
   assert.equal(u.email, null);

@@ -18,7 +18,7 @@ const OUT = process.argv[3] || path.join(__dirname, '..', 'docs', 'index.html');
 const ACCOUNTS = (process.env.PREVIEW_ACCOUNTS || 'harbour:demo-password-123,citylets:demo-password-456,admin:owner-password-123')
   .split(',').map((pair) => { const i = pair.indexOf(':'); return { username: pair.slice(0, i), password: pair.slice(i + 1) }; });
 
-const SKIP = /\/file\b|\/export$|\.csv$|\/admin\/backups\/letwise-|[?&]download=|[?&]print=|\/new(\?|$)|\/edit$|\/add-tenant$/;
+const SKIP = /\/file\b|\/export$|\.csv$|\/admin\/backups\/(?:nexus|letwise)-|[?&]download=|[?&]print=|\/new(\?|$)|\/edit$|\/add-tenant$/;
 const decode = (s) => s.replace(/&amp;/g, '&').replace(/&#39;/g, "'").replace(/&#34;/g, '"');
 const stripCsrf = (html) => html.replace(/<input type="hidden" name="_csrf" value="[^"]*">/g, '');
 

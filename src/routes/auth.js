@@ -57,7 +57,7 @@ module.exports = function authRoutes(db, config) {
     res.render('register', { title: 'Create account', errors: {}, values: {} });
   });
 
-  const RESERVED_USERNAMES = new Set(['admin', 'administrator', 'root', 'support', 'letwise', 'system']);
+  const RESERVED_USERNAMES = new Set(['admin', 'administrator', 'root', 'support', 'letwise', 'nexus', 'system']);
 
   router.post('/register', (req, res) => {
     if (!config.allowRegistration) return res.status(403).render('error', { title: 'Registration closed', message: 'New sign-ups are currently closed.' });
