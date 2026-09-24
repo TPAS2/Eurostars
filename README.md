@@ -78,6 +78,18 @@ npm run restore-backup -- data/backups/letwise-backup-2026-09-24T02-00-00Z.tar.g
 
 The current data is moved to `data/pre-restore-…/` first, so a restore never deletes anything. The backup is also a normal tar archive (`tar -xzf file.tar.gz`), so you can open it without this app.
 
+## Online preview (GitHub Pages)
+
+`docs/index.html` is a read-only copy of the app for showing people. It opens on the sign-in page, and each login shows only that company's pages:
+
+| Username | Password | Shows |
+|---|---|---|
+| `harbour` | `demo-password-123` | Harbour Lettings (sample data) |
+| `citylets` | `demo-password-456` | City Lets Bath (sample data) |
+| `admin` | `owner-password-123` | The admin panel |
+
+To rebuild it: run the app with demo data (`npm run seed-demo`, then `npm start`), then run `node scripts/build-preview.js http://localhost:3000`. It's static, so the sign-in only keeps casual visitors out; never build it from real data.
+
 ## Deploying
 
 - Run behind HTTPS.
