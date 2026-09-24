@@ -109,9 +109,9 @@ test('registration validates input and never grants admin', async () => {
 
 test('wrong password is rejected and logged', async () => {
   const c = new Client();
-  const r = await c.post('/login', { login: 'owner@example.com', password: 'nope' });
+  const r = await c.post('/login', { login: 'admin', password: 'nope' });
   assert.equal(r.status, 401);
-  const ev = db.prepare('SELECT * FROM login_events WHERE email = ? AND success = 0').get('owner@example.com');
+  const ev = db.prepare('SELECT * FROM login_events WHERE email = ? AND success = 0').get('admin');
   assert.ok(ev);
 });
 
@@ -280,7 +280,7 @@ test('agencies cannot see or touch each other\'s data', async () => {
 test('admin panel: lists all users, suspend, reactivate, delete', async () => {
   const victim = await registerAndLogin('suspend-me@example.com', 'Suspended Lets');
   const admin = new Client();
-  const l = await admin.login('owner@example.com', 'owner-password-123');
+  const l = await admin.login('admin', 'owner-password-123');
   assert.equal(l.location, '/admin');
 
   let r = await admin.get('/admin');
@@ -414,7 +414,7 @@ test('agency data export', async () => {
 test('backups: admin creates, downloads, prunes; archive restores', async () => {
   const { execFileSync } = require('node:child_process');
   const admin = new Client();
-  await admin.login('owner@example.com', 'owner-password-123');
+  await admin.login('admin', 'owner-password-123');
   const agent = await registerAndLogin('no-backups@example.com', 'Nope Lets');
   assert.equal((await agent.get('/admin/backups')).status, 404);
 
@@ -477,6 +477,12 @@ test('create account with a username and password (email optional)', async () =>
   assert.equal((await again.login('HARBOUR.LETS', 'password-1234')).location, '/app');
   assert.equal((await new Client().login('admin', 'owner-password-123')).location, '/admin');
   assert.equal((await new Client().post('/login', { login: 'harbour.lets', password: 'wrong-password' })).status, 401);
+  // Email addresses aren't accepted as a login, only usernames.
+  const withEmail = new Client();
+  await withEmail.post('/register', { username: 'mailtest', name: 'M', agency_name: 'M', email: 'mail@test.com', password: 'password-1234', password_confirm: 'password-1234' });
+  assert.equal((await new Client().post('/login', { login: 'mail@test.com', password: 'password-1234' })).status, 401);
+  assert.equal((await new Client().login('mailtest', 'password-1234')).location, '/app');
+  assert.match((await new Client().get('/login')).text, />Username <input/);
 });
 
 test('older databases get usernames when upgraded', () => {

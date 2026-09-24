@@ -22,7 +22,7 @@ module.exports = function authRoutes(db, config) {
     res.render('login', { title: 'Sign in', error: '', login: String(req.query.u || '').slice(0, 254), allowRegistration: config.allowRegistration });
   });
 
-  // Sign in with either the username or the email address.
+  // Sign in with the username (case-insensitive) and password.
   router.post('/login', (req, res) => {
     const login = String(req.body.login || req.body.email || '').trim().toLowerCase().slice(0, 254);
     const password = String(req.body.password || '');
@@ -30,7 +30,7 @@ module.exports = function authRoutes(db, config) {
     const ua = String(req.headers['user-agent'] || '').slice(0, 300);
     const fail = (status, error) => res.status(status).render('login', { title: 'Sign in', error, login, allowRegistration: config.allowRegistration });
     if (loginLimited(`${ip}|${login}`)) return fail(429, 'Too many attempts. Please wait 15 minutes and try again.');
-    const user = login ? db.prepare('SELECT * FROM users WHERE username = ? OR email = ?').get(login, login) : null;
+    const user = login ? db.prepare('SELECT * FROM users WHERE username = ?').get(login) : null;
     const ok = auth.verifyPassword(password, user ? user.password_hash : auth.DUMMY_HASH) && !!user;
     if (!ok) {
       logEvent.run(user ? user.id : null, login, 0, ip, ua);

@@ -4,7 +4,7 @@
   <h1>Sign in</h1>
   <% if (error) { %><div class="notice err"><%= error %></div><% } %>
   <form method="post" action="/login" class="stack">
-    <label>Username or email <input id="login" name="login" value="<%= login %>" required autofocus autocomplete="username" autocapitalize="none" spellcheck="false"></label>
+    <label>Username <input id="login" name="login" value="<%= login %>" required autofocus autocomplete="username" autocapitalize="none" spellcheck="false"></label>
     <label>Password <input id="password" type="password" name="password" required autocomplete="current-password"></label>
     <button class="btn primary" type="submit">Sign in</button>
   </form>
