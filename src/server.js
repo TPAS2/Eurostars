@@ -91,7 +91,7 @@ function createApp(config, db, { writer = null } = {}) {
 
   app.get('/', (req, res) => {
     if (req.user) return res.redirect(req.user.is_admin ? '/admin' : '/app');
-    res.render('home', { title: config.appName, allowRegistration: config.allowRegistration });
+    res.redirect('/login');
   });
   app.use('/', require('./routes/auth')(db, config));
   app.use('/app/invoices', auth.requireLogin, require('./routes/invoices')(db, config));

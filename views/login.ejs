@@ -8,6 +8,6 @@
     <label>Password <input id="password" type="password" name="password" required autocomplete="current-password"></label>
     <button class="btn primary" type="submit">Sign in</button>
   </form>
-  <p class="muted small">New here? <a href="/register">Create an account</a></p>
+  <% if (allowRegistration) { %><p class="muted small">New here? <a href="/register">Create an account</a></p><% } %>
 </div>
 <%- include('partials/footer') %>

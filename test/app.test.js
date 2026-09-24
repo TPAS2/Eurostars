@@ -81,7 +81,9 @@ const idFrom = (location) => Number(location.split('/').pop());
 
 test('public pages and protected areas', async () => {
   const c = new Client();
-  assert.equal((await c.get('/')).status, 200);
+  const home = await c.get('/');
+  assert.equal(home.location, '/login', 'the front page is the sign-in page');
+  assert.equal((await c.get('/login')).status, 200);
   assert.equal((await c.get('/app')).location, '/login');
   assert.equal((await c.get('/admin')).location, '/login');
 });
