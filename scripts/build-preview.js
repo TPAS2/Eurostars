@@ -96,7 +96,12 @@ async function crawl(cookie, start, limit) {
 
   const json = (v) => JSON.stringify(v).replace(/</g, '\\u003c');
   const shell = fs.readFileSync(path.join(__dirname, 'preview-shell.html'), 'utf8');
+  const iconSvg = fs.readFileSync(path.join(__dirname, '..', 'public', 'favicon.svg'));
+  const iconPng = fs.readFileSync(path.join(__dirname, '..', 'public', 'apple-touch-icon.png'));
+  const icons = `<link rel="icon" href="data:image/svg+xml;base64,${iconSvg.toString('base64')}" type="image/svg+xml">\n`
+    + `<link rel="apple-touch-icon" href="data:image/png;base64,${iconPng.toString('base64')}">\n<meta name="theme-color" content="#1f5eff">`;
   const out = shell
+    .replace('<!--ICONS-->', () => icons)
     .replace('/*APP_CSS*/', () => css)
     .replace('/*DATA*/', () => `const LOGIN_HTML = ${json(stripCsrf(loginMain))};\nconst PBKDF2_ROUNDS = ${PBKDF2_ROUNDS};\nconst ACCOUNTS = ${json(accounts)};`);
   fs.mkdirSync(path.dirname(OUT), { recursive: true });

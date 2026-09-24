@@ -82,6 +82,7 @@ function createApp(config, db, { writer = null } = {}) {
     res.setHeader('Content-Security-Policy', "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; form-action 'self'; frame-ancestors 'none'");
     next();
   });
+  app.get('/favicon.ico', (req, res) => res.redirect(301, '/static/favicon-32.png'));
   app.use('/static', express.static(path.join(__dirname, '..', 'public'), { maxAge: '1h' }));
   app.use(express.urlencoded({ extended: false, limit: '100kb' }));
 

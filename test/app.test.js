@@ -85,6 +85,10 @@ test('public pages and protected areas', async () => {
   const home = await c.get('/');
   assert.equal(home.location, '/login', 'the front page is the sign-in page');
   assert.equal((await c.get('/login')).status, 200);
+  assert.match((await c.get('/login')).text, /rel="icon" href="\/static\/favicon\.svg"/);
+  assert.equal((await c.get('/favicon.ico')).location, '/static/favicon-32.png');
+  const icon = await fetch(base + '/static/favicon.svg');
+  assert.equal(icon.status, 200);
   assert.equal((await c.get('/app')).location, '/login');
   assert.equal((await c.get('/admin')).location, '/login');
 });
