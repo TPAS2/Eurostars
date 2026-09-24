@@ -16,11 +16,10 @@
   const s = typeof section !== 'undefined' ? section : '';
   const initials = String(user.name || user.username).split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase();
   // The admin runs the software rather than letting properties, so only gets the owner pages.
+  // The logo button at the top is the way to the dashboard.
   const groups = user.is_admin ? [
-    [['dashboard', '/app', 'Dashboard']],
     [['admin', '/admin', 'Admin panel'], ['backups', '/admin/backups', 'Backups']],
   ] : [
-    [['dashboard', '/app', 'Dashboard']],
     [['landlords', '/app/landlords', 'Landlords'], ['properties', '/app/properties', 'Properties'], ['tenants', '/app/tenants', 'Tenants'], ['tenancies', '/app/tenancies', 'Tenancies']],
     [['maintenance', '/app/maintenance', 'Maintenance'], ['invoices', '/app/invoices', 'Invoices'], ['compliance', '/app/compliance', 'Compliance']],
     [['transactions', '/app/transactions', 'Transactions'], ['monthly', '/app/monthly', 'Monthly statements'], ['statements', '/app/statements', 'Statement by date range']],
@@ -28,7 +27,7 @@
 %>
 <div class="shell">
   <aside class="sidebar">
-    <a class="rail-btn brand-btn" href="/app" data-tip="<%= appName %> · <%= user.agency_name %>" aria-label="<%= appName %> home"><span class="logo">N</span></a>
+    <a class="rail-btn brand-btn <%= s === 'dashboard' ? 'active' : '' %>" href="/app" data-tip="Dashboard · <%= user.agency_name %>" aria-label="Dashboard" <%- s === 'dashboard' ? 'aria-current="page"' : '' %>><span class="logo">N</span></a>
     <nav class="rail" aria-label="Main">
       <% groups.forEach((g, gi) => { %>
         <% if (gi) { %><span class="rail-sep" aria-hidden="true"></span><% } %>

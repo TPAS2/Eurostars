@@ -86,7 +86,8 @@ nav.rail { flex: 1; }
 .rail-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 .rail-btn.active { background: var(--brand); color: #fff; }
 .brand-btn { margin-bottom: 4px; }
-.brand-btn:hover { background: transparent; }
+.brand-btn:hover, .brand-btn.active { background: transparent; }
+.brand-btn.active .logo { box-shadow: 0 0 0 2px var(--sidebar), 0 0 0 4px #fff; }
 .avatar { background: var(--sidebar-active); color: #fff; font-size: .8rem; font-weight: 700; letter-spacing: .02em; cursor: default; }
 
 /* Hover / focus label for the icon rail (positioned by app.js so it isn't clipped). */
