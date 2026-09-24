@@ -2,11 +2,10 @@
 <div class="card narrow">
   <a class="brand" href="/"><span class="logo">L</span><%= appName %></a>
   <h1>Sign in</h1>
-  <% if (registered) { %><div class="notice ok">Account created. Please sign in.</div><% } %>
   <% if (error) { %><div class="notice err"><%= error %></div><% } %>
   <form method="post" action="/login" class="stack">
-    <label>Email <input type="email" name="email" value="<%= email %>" required autofocus autocomplete="username"></label>
-    <label>Password <input type="password" name="password" required autocomplete="current-password"></label>
+    <label>Username or email <input id="login" name="login" value="<%= login %>" required autofocus autocomplete="username" autocapitalize="none" spellcheck="false"></label>
+    <label>Password <input id="password" type="password" name="password" required autocomplete="current-password"></label>
     <button class="btn primary" type="submit">Sign in</button>
   </form>
   <p class="muted small">New here? <a href="/register">Create an account</a></p>

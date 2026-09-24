@@ -36,7 +36,7 @@
     </nav>
     <div class="me">
       <div><strong><%= user.name %></strong></div>
-      <div class="muted small"><%= user.email %></div>
+      <div class="muted small">@<%= user.username %></div>
       <a class="small export-link" href="/app/export">Download my data</a>
       <form method="post" action="/logout">
         <input type="hidden" name="_csrf" value="<%= csrfToken %>">

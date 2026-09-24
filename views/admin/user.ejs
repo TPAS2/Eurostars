@@ -3,13 +3,13 @@
   <div>
     <a class="crumb" href="/admin">← All users</a>
     <h1><%= u.agency_name %></h1>
-    <p class="muted"><%= u.name %> · <%= u.email %> · <span class="badge s-<%= u.status %>"><%= u.status %></span></p>
+    <p class="muted"><%= u.name %> · @<%= u.username %><%= u.email ? ' · ' + u.email : '' %> · <span class="badge s-<%= u.status %>"><%= u.status %></span></p>
   </div>
   <% if (!isSelf) { %>
   <div class="actions">
     <% if (u.status === 'active') { %>
       <form method="post" action="/admin/users/<%= u.id %>/logout"><%- include('../partials/csrf') %><button class="btn" type="submit">Sign out everywhere</button></form>
-      <form method="post" action="/admin/users/<%= u.id %>/suspend" data-confirm="Suspend <%= u.email %>? They will be signed out and unable to log in."><%- include('../partials/csrf') %><button class="btn danger" type="submit">Suspend</button></form>
+      <form method="post" action="/admin/users/<%= u.id %>/suspend" data-confirm="Suspend @<%= u.username %>? They will be signed out and unable to log in."><%- include('../partials/csrf') %><button class="btn danger" type="submit">Suspend</button></form>
     <% } else { %>
       <form method="post" action="/admin/users/<%= u.id %>/activate"><%- include('../partials/csrf') %><button class="btn primary" type="submit">Reactivate</button></form>
     <% } %>
@@ -45,7 +45,7 @@
   <p>Permanently deletes this user and <strong>all</strong> of their landlords, properties, tenants and accounts. This can't be undone.</p>
   <form method="post" action="/admin/users/<%= u.id %>/delete" class="inline-form">
     <%- include('../partials/csrf') %>
-    <label>Type <strong><%= u.email %></strong> to confirm <input name="confirm_email" autocomplete="off" required></label>
+    <label>Type the username <strong><%= u.username %></strong> to confirm <input id="confirm_username" name="confirm_username" autocomplete="off" autocapitalize="none" required></label>
     <button class="btn danger" type="submit">Delete permanently</button>
   </form>
 </section>

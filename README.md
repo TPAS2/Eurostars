@@ -39,14 +39,14 @@ export $(grep -v '^#' .env | xargs)
 npm start                   # http://localhost:3000
 ```
 
-Sign in with `ADMIN_EMAIL` / `ADMIN_PASSWORD` to reach the admin panel. Agencies sign up at `/register`.
+Sign in as `admin` (or your `ADMIN_EMAIL`) with `ADMIN_PASSWORD` to reach the admin panel. Agencies create an account at `/register` with a username and password (email is optional) and can then sign in with either.
 
-To try it with realistic sample data, run `npm run seed-demo`, then sign in as `demo@letwise.test` / `demo-password-123`.
+To try it with realistic sample data, run `npm run seed-demo`, then sign in as `harbour` / `demo-password-123`.
 
 ## How the admin panel stays yours
 
 - Only the account whose email matches `ADMIN_EMAIL` has admin rights. Admin rights are re-checked every time the server starts.
-- Nobody can register with that email address.
+- Nobody can register with that email address or with the admin username (`admin`, or `ADMIN_USERNAME`).
 - Anyone else who visits `/admin` gets a "page not found" response.
 - The admin panel shows usage counts only. It does not show the contents of an agency's records.
 

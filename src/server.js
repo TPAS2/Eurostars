@@ -2,7 +2,7 @@
 
 const path = require('node:path');
 const express = require('express');
-const { openDatabase } = require('./db');
+const { openDatabase, uniqueUsername } = require('./db');
 const auth = require('./auth');
 const fmt = require('./format');
 const { createStatementWriter } = require('./ai');
@@ -23,6 +23,7 @@ function loadConfig(env = process.env) {
     appName: env.APP_NAME || 'LetWise',
     adminEmail: (env.ADMIN_EMAIL || '').trim().toLowerCase(),
     adminPassword: env.ADMIN_PASSWORD || '',
+    adminUsername: (env.ADMIN_USERNAME || 'admin').trim().toLowerCase(),
     allowRegistration: env.ALLOW_REGISTRATION !== 'false',
     secureCookies: env.SECURE_COOKIES ? env.SECURE_COOKIES === 'true' : production,
     trustProxy: env.TRUST_PROXY === 'true',
@@ -42,10 +43,11 @@ function ensureAdmin(db, config, log = console.log) {
   let admin = db.prepare('SELECT id FROM users WHERE email = ?').get(config.adminEmail);
   if (!admin && config.adminPassword) {
     if (config.adminPassword.length < 10) throw new Error('ADMIN_PASSWORD must be at least 10 characters.');
-    const info = db.prepare("INSERT INTO users (email, name, agency_name, password_hash) VALUES (?, 'Administrator', ?, ?)")
-      .run(config.adminEmail, config.appName, auth.hashPassword(config.adminPassword));
+    const username = uniqueUsername(config.adminUsername, (u) => db.prepare('SELECT 1 FROM users WHERE username = ?').get(u));
+    const info = db.prepare("INSERT INTO users (username, email, name, agency_name, password_hash) VALUES (?, ?, 'Administrator', ?, ?)")
+      .run(username, config.adminEmail, config.appName, auth.hashPassword(config.adminPassword));
     admin = { id: Number(info.lastInsertRowid) };
-    log(`Created admin account ${config.adminEmail}.`);
+    log(`Created admin account: username ${username}, email ${config.adminEmail}.`);
   }
   db.prepare('UPDATE users SET is_admin = CASE WHEN id = ? THEN 1 ELSE 0 END').run(admin ? admin.id : -1);
   if (admin) db.prepare("UPDATE users SET status = 'active' WHERE id = ?").run(admin.id);

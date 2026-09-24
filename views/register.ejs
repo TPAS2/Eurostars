@@ -4,16 +4,21 @@
   <h1>Create your account</h1>
   <% if (errors.form) { %><div class="notice err"><%= errors.form %></div><% } %>
   <form method="post" action="/register" class="stack">
-    <label>Your name <input name="name" value="<%= values.name || '' %>" required autocomplete="name"></label>
-    <% if (errors.name) { %><div class="field-err"><%= errors.name %></div><% } %>
-    <label>Agency / business name <input name="agency_name" value="<%= values.agency_name || '' %>" required autocomplete="organization"></label>
-    <% if (errors.agency_name) { %><div class="field-err"><%= errors.agency_name %></div><% } %>
-    <label>Email <input type="email" name="email" value="<%= values.email || '' %>" required autocomplete="email"></label>
-    <% if (errors.email) { %><div class="field-err"><%= errors.email %></div><% } %>
-    <label>Password <input type="password" name="password" required minlength="10" autocomplete="new-password"></label>
-    <% if (errors.password) { %><div class="field-err"><%= errors.password %></div><% } %>
-    <label>Confirm password <input type="password" name="password_confirm" required minlength="10" autocomplete="new-password"></label>
+    <label>Username
+      <input id="username" name="username" value="<%= values.username || '' %>" required minlength="3" maxlength="30"
+             pattern="[A-Za-z0-9][A-Za-z0-9._\-]{2,29}" autocomplete="username" autocapitalize="none" spellcheck="false" autofocus>
+    </label>
+    <% if (errors.username) { %><div class="field-err"><%= errors.username %></div><% } else { %><div class="help">You'll use this to sign in. Letters, numbers, dots, dashes or underscores.</div><% } %>
+    <label>Password <input id="password" type="password" name="password" required minlength="10" autocomplete="new-password"></label>
+    <% if (errors.password) { %><div class="field-err"><%= errors.password %></div><% } else { %><div class="help">At least 10 characters.</div><% } %>
+    <label>Confirm password <input id="password_confirm" type="password" name="password_confirm" required minlength="10" autocomplete="new-password"></label>
     <% if (errors.password_confirm) { %><div class="field-err"><%= errors.password_confirm %></div><% } %>
+    <label>Your name <input id="name" name="name" value="<%= values.name || '' %>" required autocomplete="name"></label>
+    <% if (errors.name) { %><div class="field-err"><%= errors.name %></div><% } %>
+    <label>Agency / business name <input id="agency_name" name="agency_name" value="<%= values.agency_name || '' %>" required autocomplete="organization"></label>
+    <% if (errors.agency_name) { %><div class="field-err"><%= errors.agency_name %></div><% } %>
+    <label>Email <span class="muted small">(optional)</span> <input id="email" type="email" name="email" value="<%= values.email || '' %>" autocomplete="email"></label>
+    <% if (errors.email) { %><div class="field-err"><%= errors.email %></div><% } %>
     <button class="btn primary" type="submit">Create account</button>
   </form>
   <p class="muted small">Already have an account? <a href="/login">Sign in</a></p>

@@ -31,7 +31,7 @@
   <div class="card-head">
     <h2>Users <span class="count"><%= users.length %></span></h2>
     <form method="get" class="search inline-form">
-      <input type="search" name="q" value="<%= q %>" placeholder="Search name, email, agency…">
+      <input type="search" name="q" value="<%= q %>" placeholder="Search username, name, email, agency…">
       <select name="status">
         <option value="">All statuses</option>
         <option value="active" <%= status === 'active' ? 'selected' : '' %>>Active</option>
@@ -46,7 +46,7 @@
     <tbody>
     <% users.forEach(u => { %>
       <tr>
-        <td><a href="/admin/users/<%= u.id %>"><strong><%= u.name %></strong></a><div class="muted small"><%= u.email %></div></td>
+        <td><a href="/admin/users/<%= u.id %>"><strong><%= u.name %></strong></a><div class="muted small">@<%= u.username %><%= u.email ? ' · ' + u.email : '' %></div></td>
         <td><%= u.agency_name %><% if (u.is_admin) { %> <span class="badge s-admin">you</span><% } %></td>
         <td><%= fmt.ukDate(u.created_at) %></td>
         <td><%= fmt.ukDateTime(u.last_login_at) %><% if (u.live_sessions) { %> <span class="dot" title="Has a live session"></span><% } %></td>
@@ -66,7 +66,7 @@
   <h2>Recent sign-in activity</h2>
   <% if (!recentLogins.length) { %><p class="muted">No sign-ins yet.</p><% } else { %>
   <div class="table-wrap"><table>
-    <thead><tr><th>When</th><th>Email</th><th>Agency</th><th>Result</th><th>IP</th></tr></thead>
+    <thead><tr><th>When</th><th>Signed in as</th><th>Agency</th><th>Result</th><th>IP</th></tr></thead>
     <tbody>
     <% recentLogins.forEach(e => { %>
       <tr><td><%= fmt.ukDateTime(e.created_at) %></td><td><%= e.email %></td><td><%= e.agency_name || '' %></td>

@@ -12,7 +12,7 @@ module.exports = function adminRoutes(db, config) {
   const router = express.Router();
 
   const USAGE_SQL = `
-    SELECT u.id, u.email, u.name, u.agency_name, u.is_admin, u.status, u.created_at, u.last_login_at, u.login_count,
+    SELECT u.id, u.username, u.email, u.name, u.agency_name, u.is_admin, u.status, u.created_at, u.last_login_at, u.login_count,
            (SELECT COUNT(*) FROM landlords  WHERE account_id = u.id) AS landlords,
            (SELECT COUNT(*) FROM properties WHERE account_id = u.id) AS properties,
            (SELECT COUNT(*) FROM tenants    WHERE account_id = u.id) AS tenants,
@@ -27,8 +27,8 @@ module.exports = function adminRoutes(db, config) {
     const where = [];
     const params = [];
     if (q) {
-      where.push('(u.email LIKE ? OR u.name LIKE ? OR u.agency_name LIKE ?)');
-      params.push(`%${q}%`, `%${q}%`, `%${q}%`);
+      where.push('(u.username LIKE ? OR u.email LIKE ? OR u.name LIKE ? OR u.agency_name LIKE ?)');
+      params.push(`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`);
     }
     if (status) { where.push('u.status = ?'); params.push(status); }
     const users = db.prepare(`${USAGE_SQL} ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY u.created_at DESC`).all(...params);
@@ -106,12 +106,12 @@ module.exports = function adminRoutes(db, config) {
   router.post('/users/:id/delete', (req, res) => {
     const u = target(req, res);
     if (!u || !guardSelf(req, res, u)) return;
-    if (String(req.body.confirm_email || '').toLowerCase() !== u.email.toLowerCase()) {
+    if (String(req.body.confirm_username || '').trim().toLowerCase() !== u.username.toLowerCase()) {
       return res.redirect(`/admin/users/${u.id}?error=confirm`);
     }
     db.prepare('DELETE FROM users WHERE id = ?').run(u.id);
     fs.rmSync(path.join(config.uploadDir, String(u.id)), { recursive: true, force: true });
-    res.redirect('/admin?flash=' + encodeURIComponent(`Deleted ${u.email} and all of their data.`));
+    res.redirect('/admin?flash=' + encodeURIComponent(`Deleted ${u.username} (${u.agency_name}) and all of their data.`));
   });
 
   // ---------- backups ----------
@@ -124,7 +124,7 @@ module.exports = function adminRoutes(db, config) {
   });
 
   router.post('/backups', (req, res, next) => {
-    backup.createBackup(db, config, { reason: `manual by ${req.user.email}` })
+    backup.createBackup(db, config, { reason: `manual by ${req.user.username}` })
       .then((b) => res.redirect('/admin/backups?flash=' + encodeURIComponent(`Backup created: ${b.name}`)))
       .catch((err) => { console.error(err); res.redirect('/admin/backups?error=' + encodeURIComponent('Backup failed: ' + err.message)); })
       .catch(next);
@@ -138,7 +138,7 @@ module.exports = function adminRoutes(db, config) {
 
   router.get('/users.csv', (req, res) => {
     const users = db.prepare(`${USAGE_SQL} ORDER BY u.created_at`).all();
-    const cols = ['id', 'email', 'name', 'agency_name', 'status', 'created_at', 'last_login_at', 'login_count', 'landlords', 'properties', 'tenants', 'active_tenancies'];
+    const cols = ['id', 'username', 'email', 'name', 'agency_name', 'status', 'created_at', 'last_login_at', 'login_count', 'landlords', 'properties', 'tenants', 'active_tenancies'];
     const cell = (v) => {
       let s = v === null || v === undefined ? '' : String(v);
       if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`; // stop spreadsheet formula injection

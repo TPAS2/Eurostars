@@ -59,19 +59,21 @@ class Client {
   }
   get(url) { return this.req('GET', url); }
   post(url, body, opts) { return this.req('POST', url, body, opts); }
-  async login(email, password) {
-    const r = await this.post('/login', { email, password });
+  async login(login, password) {
+    const r = await this.post('/login', { login, password });
     if (r.location) await this.get(r.location);
     return r;
   }
 }
 
+const usernameFor = (email) => email.split('@')[0].replace(/[^a-z0-9._-]/g, '');
+
 async function registerAndLogin(email, agency) {
   const c = new Client();
-  const r = await c.post('/register', { name: 'Test User', agency_name: agency, email, password: 'password-1234', password_confirm: 'password-1234' });
+  const r = await c.post('/register', { username: usernameFor(email), name: 'Test User', agency_name: agency, email, password: 'password-1234', password_confirm: 'password-1234' });
   assert.equal(r.status, 302, r.text);
-  const l = await c.login(email, 'password-1234');
-  assert.equal(l.location, '/app');
+  assert.match(r.location, /^\/app/, 'new accounts are signed in straight away');
+  await c.get(r.location);
   return c;
 }
 
@@ -88,8 +90,11 @@ test('registration validates input and never grants admin', async () => {
   const c = new Client();
   let r = await c.post('/register', { name: '', agency_name: 'X', email: 'bad', password: 'short', password_confirm: 'x' });
   assert.equal(r.status, 422);
-  r = await c.post('/register', { name: 'Imposter', agency_name: 'X', email: 'owner@example.com', password: 'password-1234', password_confirm: 'password-1234' });
+  r = await c.post('/register', { username: 'imposter', name: 'Imposter', agency_name: 'X', email: 'owner@example.com', password: 'password-1234', password_confirm: 'password-1234' });
   assert.equal(r.status, 422, 'the admin email is reserved');
+  r = await c.post('/register', { username: 'admin', name: 'Imposter', agency_name: 'X', password: 'password-1234', password_confirm: 'password-1234' });
+  assert.equal(r.status, 422, 'the admin username is reserved');
+  assert.match(r.text, /username is taken/);
   const agent = await registerAndLogin('agent-reg@example.com', 'Reg Lettings');
   assert.equal((await agent.get('/admin')).status, 404, 'non-admins cannot see the admin panel');
   assert.doesNotMatch((await agent.get('/app')).text, /Admin panel/);
@@ -97,7 +102,7 @@ test('registration validates input and never grants admin', async () => {
 
 test('wrong password is rejected and logged', async () => {
   const c = new Client();
-  const r = await c.post('/login', { email: 'owner@example.com', password: 'nope' });
+  const r = await c.post('/login', { login: 'owner@example.com', password: 'nope' });
   assert.equal(r.status, 401);
   const ev = db.prepare('SELECT * FROM login_events WHERE email = ? AND success = 0').get('owner@example.com');
   assert.ok(ev);
@@ -279,21 +284,21 @@ test('admin panel: lists all users, suspend, reactivate, delete', async () => {
   await admin.get(`/admin/users/${u.id}`);
   await admin.post(`/admin/users/${u.id}/suspend`, {});
   assert.equal((await victim.get('/app')).location, '/login', 'suspended user is signed out');
-  assert.equal((await victim.post('/login', { email: 'suspend-me@example.com', password: 'password-1234' })).status, 403);
+  assert.equal((await victim.post('/login', { login: 'suspend-me', password: 'password-1234' })).status, 403);
 
   await admin.post(`/admin/users/${u.id}/activate`, {});
-  assert.equal((await victim.login('suspend-me@example.com', 'password-1234')).location, '/app');
+  assert.equal((await victim.login('suspend-me', 'password-1234')).location, '/app');
 
   const csv = await admin.get('/admin/users.csv');
   assert.match(csv.text, /suspend-me@example.com/);
 
-  // Admin can't delete themselves; deleting another user needs the email typed.
+  // Admin can't delete themselves; deleting another user needs their username typed.
   const me = db.prepare('SELECT id FROM users WHERE email = ?').get('owner@example.com');
-  await admin.post(`/admin/users/${me.id}/delete`, { confirm_email: 'owner@example.com' });
+  await admin.post(`/admin/users/${me.id}/delete`, { confirm_username: 'admin' });
   assert.ok(db.prepare('SELECT 1 FROM users WHERE id = ?').get(me.id));
-  await admin.post(`/admin/users/${u.id}/delete`, { confirm_email: 'wrong' });
+  await admin.post(`/admin/users/${u.id}/delete`, { confirm_username: 'wrong' });
   assert.ok(db.prepare('SELECT 1 FROM users WHERE id = ?').get(u.id));
-  await admin.post(`/admin/users/${u.id}/delete`, { confirm_email: 'suspend-me@example.com' });
+  await admin.post(`/admin/users/${u.id}/delete`, { confirm_username: 'suspend-me' });
   assert.equal(db.prepare('SELECT 1 FROM users WHERE id = ?').get(u.id), undefined);
 });
 
@@ -430,4 +435,52 @@ test('backups: admin creates, downloads, prunes; archive restores', async () => 
   const inv = restored.prepare('SELECT * FROM invoices WHERE file_name IS NOT NULL LIMIT 1').get();
   assert.ok(fs.existsSync(path.join(target, 'uploads', String(inv.account_id), inv.file_name)));
   restored.close();
+});
+
+test('create account with a username and password (email optional)', async () => {
+  const c = new Client();
+  let r = await c.get('/register');
+  assert.match(r.text, /name="username"/);
+
+  r = await c.post('/register', { username: 'harbour.lets', name: 'Sam', agency_name: 'Harbour', password: 'password-1234', password_confirm: 'password-1234' });
+  assert.equal(r.status, 302, r.text);
+  assert.match(r.location, /^\/app/, 'signed in straight away');
+  r = await c.get(r.location);
+  assert.match(r.text, /Welcome to LetWise/);
+  assert.match(r.text, /@harbour\.lets/);
+  const u = db.prepare("SELECT * FROM users WHERE username = 'harbour.lets'").get();
+  assert.equal(u.email, null);
+  assert.equal(u.is_admin, 0);
+
+  // Same username (any capitalisation) can't be taken twice; bad usernames are rejected.
+  const other = new Client();
+  r = await other.post('/register', { username: 'Harbour.Lets', name: 'X', agency_name: 'X', password: 'password-1234', password_confirm: 'password-1234' });
+  assert.equal(r.status, 422);
+  r = await other.post('/register', { username: 'a b', name: 'X', agency_name: 'X', password: 'password-1234', password_confirm: 'password-1234' });
+  assert.equal(r.status, 422);
+
+  // Sign in by username (case-insensitive); admin can also sign in by username.
+  const again = new Client();
+  assert.equal((await again.login('HARBOUR.LETS', 'password-1234')).location, '/app');
+  assert.equal((await new Client().login('admin', 'owner-password-123')).location, '/admin');
+  assert.equal((await new Client().post('/login', { login: 'harbour.lets', password: 'wrong-password' })).status, 401);
+});
+
+test('older databases get usernames when upgraded', () => {
+  const { DatabaseSync } = require('node:sqlite');
+  const file = path.join(tmp, 'old.db');
+  const old = new DatabaseSync(file);
+  old.exec(`CREATE TABLE users (id INTEGER PRIMARY KEY, email TEXT NOT NULL UNIQUE COLLATE NOCASE, name TEXT NOT NULL,
+    agency_name TEXT NOT NULL, password_hash TEXT NOT NULL, is_admin INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT 'active',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')), last_login_at TEXT, login_count INTEGER NOT NULL DEFAULT 0);
+    CREATE TABLE landlords (id INTEGER PRIMARY KEY, account_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, name TEXT NOT NULL,
+    email TEXT, phone TEXT, address TEXT, notes TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')));
+    INSERT INTO users (email, name, agency_name, password_hash, is_admin) VALUES ('boss@x.com', 'B', 'X', 'h', 1), ('jo@a.com', 'J', 'A', 'h', 0), ('jo@b.com', 'J2', 'B', 'h', 0);
+    INSERT INTO landlords (account_id, name) VALUES (2, 'Kept landlord');`);
+  old.close();
+  const db2 = openDatabase(file);
+  const users = db2.prepare('SELECT id, username, email FROM users ORDER BY id').all();
+  assert.deepEqual(users.map((u) => u.username), ['admin', 'jouser', 'jouser2'], 'short names padded to the 3-character minimum, clashes numbered');
+  assert.equal(db2.prepare('SELECT account_id FROM landlords').get().account_id, 2, 'linked data kept');
+  db2.close();
 });

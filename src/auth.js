@@ -63,7 +63,7 @@ function destroySession(db, req, res, secure) {
 // Attaches req.user and req.csrfToken when a valid session cookie is present.
 function loadSession(db) {
   const lookup = db.prepare(
-    `SELECT u.id, u.email, u.name, u.agency_name, u.is_admin, u.status, s.csrf_token
+    `SELECT u.id, u.username, u.email, u.name, u.agency_name, u.is_admin, u.status, s.csrf_token
        FROM sessions s JOIN users u ON u.id = s.user_id
       WHERE s.token_hash = ? AND s.expires_at > datetime('now')`
   );

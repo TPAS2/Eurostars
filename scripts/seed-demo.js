@@ -1,7 +1,7 @@
 'use strict';
 
 // Usage: npm run seed-demo
-// Creates a demo agency (demo@letwise.test / demo-password-123) filled with realistic data,
+// Creates a demo agency (username harbour / demo-password-123) filled with realistic data,
 // for trying the app out. Refuses to run if the demo account already exists.
 
 const fs = require('node:fs');
@@ -15,6 +15,7 @@ const fmt = require('../src/format');
 const { generateForAccount, previousMonth } = require('../src/statements');
 
 const EMAIL = 'demo@letwise.test';
+const USERNAME = 'harbour';
 const PASSWORD = 'demo-password-123';
 
 const config = loadConfig();
@@ -34,8 +35,8 @@ const day = (offset) => fmt.addDays(today, offset);
 const pence = (pounds) => Math.round(pounds * 100);
 
 const accountId = transaction(db, () => {
-  const u = db.prepare("INSERT INTO users (email, name, agency_name, password_hash, last_login_at, login_count) VALUES (?, 'Sam Carter', 'Harbour Lettings', ?, datetime('now', '-2 hours'), 37)")
-    .run(EMAIL, hashPassword(PASSWORD));
+  const u = db.prepare("INSERT INTO users (username, email, name, agency_name, password_hash, last_login_at, login_count) VALUES (?, ?, 'Sam Carter', 'Harbour Lettings', ?, datetime('now', '-2 hours'), 37)")
+    .run(USERNAME, EMAIL, hashPassword(PASSWORD));
   const a = Number(u.lastInsertRowid);
   const ins = (sql, ...p) => Number(db.prepare(sql).run(...p).lastInsertRowid);
 
@@ -146,22 +147,22 @@ const accountId = transaction(db, () => {
   cert(props[4], 'Fire risk assessment', day(-200), day(165));
 
   // A few other agencies so the admin panel has something to show.
-  for (const [email, name, agency, logins, daysAgo] of [
-    ['info@cityletsbath.example.com', 'Laura Mills', 'City Lets Bath', 12, 3],
-    ['office@severnhomes.example.com', 'Mark Evans', 'Severn Homes', 58, 0],
-    ['hello@cliftonrentals.example.com', 'Aisha Khan', 'Clifton Rentals', 4, 20],
+  for (const [username, email, name, agency, logins, daysAgo] of [
+    ['citylets', 'info@cityletsbath.example.com', 'Laura Mills', 'City Lets Bath', 12, 3],
+    ['severnhomes', null, 'Mark Evans', 'Severn Homes', 58, 0],
+    ['clifton.rentals', 'hello@cliftonrentals.example.com', 'Aisha Khan', 'Clifton Rentals', 4, 20],
   ]) {
-    const id = ins(`INSERT INTO users (email, name, agency_name, password_hash, created_at, last_login_at, login_count) VALUES (?, ?, ?, ?, datetime('now', '-${daysAgo + 30} days'), datetime('now', '-${daysAgo} days'), ?)`,
-      email, name, agency, hashPassword(crypto.randomBytes(12).toString('hex')), logins);
+    const id = ins(`INSERT INTO users (username, email, name, agency_name, password_hash, created_at, last_login_at, login_count) VALUES (?, ?, ?, ?, ?, datetime('now', '-${daysAgo + 30} days'), datetime('now', '-${daysAgo} days'), ?)`,
+      username, email, name, agency, hashPassword(crypto.randomBytes(12).toString('hex')), logins);
     for (let i = 0; i < 3; i++) {
       const l = ins('INSERT INTO landlords (account_id, name) VALUES (?, ?)', id, `Landlord ${i + 1}`);
       ins("INSERT INTO properties (account_id, landlord_id, address_line1, status) VALUES (?, ?, ?, 'let')", id, l, `${10 + i} Example Street`);
     }
-    db.prepare("INSERT INTO login_events (user_id, email, success, ip, user_agent, created_at) VALUES (?, ?, 1, '81.2.69.160', 'Mozilla/5.0', datetime('now', ?))").run(id, email, `-${daysAgo} days`);
+    db.prepare("INSERT INTO login_events (user_id, email, success, ip, user_agent, created_at) VALUES (?, ?, 1, '81.2.69.160', 'Mozilla/5.0', datetime('now', ?))").run(id, username, `-${daysAgo} days`);
   }
-  db.prepare("INSERT INTO login_events (user_id, email, success, ip, user_agent) VALUES (?, ?, 1, '81.2.69.142', 'Mozilla/5.0')").run(a, EMAIL);
+  db.prepare("INSERT INTO login_events (user_id, email, success, ip, user_agent) VALUES (?, ?, 1, '81.2.69.142', 'Mozilla/5.0')").run(a, USERNAME);
   return a;
 });
 
 generateForAccount(db, { accountId, agencyName: 'Harbour Lettings', month: previousMonth(today), writer: null })
-  .then((n) => console.log(`Demo agency created with ${n} monthly statements.\nSign in as ${EMAIL} / ${PASSWORD}`));
+  .then((n) => console.log(`Demo agency created with ${n} monthly statements.\nSign in as ${USERNAME} / ${PASSWORD}`));

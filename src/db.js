@@ -9,7 +9,8 @@ PRAGMA foreign_keys = ON;
 
 CREATE TABLE IF NOT EXISTS users (
   id              INTEGER PRIMARY KEY,
-  email           TEXT NOT NULL UNIQUE COLLATE NOCASE,
+  username        TEXT NOT NULL UNIQUE COLLATE NOCASE,
+  email           TEXT UNIQUE COLLATE NOCASE,          -- optional contact address
   name            TEXT NOT NULL,
   agency_name     TEXT NOT NULL,
   password_hash   TEXT NOT NULL,
@@ -199,8 +200,50 @@ function openDatabase(file) {
   if (file !== ':memory:') fs.mkdirSync(path.dirname(file), { recursive: true });
   const db = new DatabaseSync(file);
   db.exec('PRAGMA journal_mode = WAL;');
+  migrateUsersToUsernames(db);
   db.exec(SCHEMA);
   return db;
+}
+
+const USERNAME_RE = /^[a-z0-9][a-z0-9._-]{2,29}$/;
+
+// Turn any string into a valid username that `isTaken` says is free.
+function uniqueUsername(seed, isTaken) {
+  let base = String(seed || 'user').toLowerCase().replace(/[^a-z0-9._-]/g, '').replace(/^[^a-z0-9]+/, '').slice(0, 24);
+  if (base.length < 3) base = (base + 'user').slice(0, 24);
+  const exists = (u) => !!isTaken(u);
+  let name = base;
+  for (let i = 2; exists(name); i++) name = `${base}${i}`;
+  return name;
+}
+
+// Databases created before usernames existed: rebuild the users table with a username
+// column (generated from each email address) and email made optional.
+function migrateUsersToUsernames(db) {
+  const cols = db.prepare("SELECT name FROM pragma_table_info('users')").all().map((c) => c.name);
+  if (!cols.length || cols.includes('username')) return;
+  const users = db.prepare('SELECT * FROM users ORDER BY id').all();
+  const taken = new Set();
+  db.exec('PRAGMA foreign_keys = OFF');
+  transaction(db, () => {
+    db.exec(`CREATE TABLE users_new (
+      id INTEGER PRIMARY KEY, username TEXT NOT NULL UNIQUE COLLATE NOCASE, email TEXT UNIQUE COLLATE NOCASE,
+      name TEXT NOT NULL, agency_name TEXT NOT NULL, password_hash TEXT NOT NULL,
+      is_admin INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT 'active',
+      created_at TEXT NOT NULL DEFAULT (datetime('now')), last_login_at TEXT, login_count INTEGER NOT NULL DEFAULT 0)`);
+    const ins = db.prepare(`INSERT INTO users_new (id, username, email, name, agency_name, password_hash, is_admin, status, created_at, last_login_at, login_count)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+    for (const u of users) {
+      const username = u.is_admin ? 'admin' : String(u.email).split('@')[0];
+      const unique = uniqueUsername(username, (n) => taken.has(n));
+      taken.add(unique);
+      ins.run(u.id, unique, u.email, u.name, u.agency_name,
+        u.password_hash, u.is_admin, u.status, u.created_at, u.last_login_at, u.login_count);
+    }
+    db.exec('DROP TABLE users');
+    db.exec('ALTER TABLE users_new RENAME TO users');
+  });
+  db.exec('PRAGMA foreign_keys = ON');
 }
 
 // Run fn inside a transaction, rolling back if it throws.
@@ -216,4 +259,4 @@ function transaction(db, fn) {
   }
 }
 
-module.exports = { openDatabase, transaction };
+module.exports = { openDatabase, transaction, uniqueUsername, USERNAME_RE };
