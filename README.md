@@ -41,6 +41,8 @@ npm start                   # http://localhost:3000
 
 Sign in with `ADMIN_EMAIL` / `ADMIN_PASSWORD` to reach the admin panel. Agencies sign up at `/register`.
 
+To try it with realistic sample data, run `npm run seed-demo`, then sign in as `demo@letwise.test` / `demo-password-123`.
+
 ## How the admin panel stays yours
 
 - Only the account whose email matches `ADMIN_EMAIL` has admin rights. Admin rights are re-checked every time the server starts.

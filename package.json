@@ -14,7 +14,8 @@
     "create-admin": "node scripts/create-admin.js",
     "test": "node --test --disable-warning=ExperimentalWarning test/*.test.js",
     "restore-backup": "node --disable-warning=ExperimentalWarning scripts/restore-backup.js",
-    "backup": "node --disable-warning=ExperimentalWarning scripts/backup-now.js"
+    "backup": "node --disable-warning=ExperimentalWarning scripts/backup-now.js",
+    "seed-demo": "node --disable-warning=ExperimentalWarning scripts/seed-demo.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.128.0",
