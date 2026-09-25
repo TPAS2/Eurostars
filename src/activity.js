@@ -47,6 +47,14 @@ function describe(db, req) {
       if (target) return { action: 'viewed', text: `Viewed account ${who}` };
       return { action: 'viewed', text: 'Viewed the admin panel' };
     }
+    if (parts[1] === 'people') {
+      const m = /^\d+$/.test(parts[2] || '') ? db.prepare('SELECT name, login_name, company_id FROM users WHERE id = ?').get(Number(parts[2])) : null;
+      const c = m ? db.prepare('SELECT username FROM users WHERE id = ?').get(m.company_id) : null;
+      const label = m ? `${m.name} (${c ? c.username : ''}/${m.login_name})` : 'a person';
+      const verb = { password: 'Reset password for', suspend: 'Suspended', activate: 'Reactivated', delete: 'Removed' }[parts[3]] || 'Changed';
+      return { action: parts[3] === 'delete' ? 'deleted' : 'updated', text: `${verb} ${label}` };
+    }
+    if (parts[1] === 'users' && parts[3] === 'people') return { action: 'created', text: `Added ${String(req.body.name || 'a person').trim()} to ${who}` };
     if (parts[1] === 'users' && parts.length === 2) return { action: 'created', text: `Created account @${String(req.body.username || '').trim().toLowerCase()}` };
     if (parts[1] === 'backups') return { action: 'created', text: 'Made a backup' };
     const verb = { details: 'Saved details for', password: 'Reset password for', suspend: 'Suspended', activate: 'Reactivated', logout: 'Signed out everywhere', delete: 'Deleted account' }[parts[3]];
@@ -124,8 +132,8 @@ function middleware(db) {
       if (res.statusCode >= 400) return;
       if (req.method === 'GET' && res.statusCode !== 200) return; // redirects aren't page views
       try {
-        if (info.autosave && recentEdit.get(user.id, pagePath, `-${AUTOSAVE_QUIET_MS / 1000} seconds`)) return;
-        insert.run(user.id, info.action, info.text.slice(0, 300), info.autosave ? pagePath : fullPath, req.ip);
+        if (info.autosave && recentEdit.get(user.person_id, pagePath, `-${AUTOSAVE_QUIET_MS / 1000} seconds`)) return;
+        insert.run(user.person_id, info.action, info.text.slice(0, 300), info.autosave ? pagePath : fullPath, req.ip);
       } catch (err) {
         console.error('Could not record activity:', err.message);
       }

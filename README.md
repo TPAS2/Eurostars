@@ -43,6 +43,15 @@ Sign in with `ADMIN_USERNAME` and `ADMIN_PASSWORD` to reach the admin panel. Pub
 
 To try it with realistic sample data, run `npm run seed-demo`, then sign in as `harbour` / `demo-password-123`.
 
+## Several people at one company
+
+Each company has one username (e.g. `eurostars`). In the admin panel, open the company and use **People → Add a person** to give someone their own sign-in name (e.g. `john`) and password. They sign in with:
+- **Username:** the company's username, e.g. `eurostars`
+- **Your name:** their own name, e.g. `john` (left blank for the company's main login)
+- **Password:** their own
+
+Everyone at the company sees the same data, and the activity log shows who did what. From the People section you can reset a person's password, suspend them or remove them without affecting anyone else. Suspending the company suspends everyone in it.
+
 ## Forgotten passwords
 
 Passwords are stored scrambled (hashed), so nobody can look one up, including the admin.
@@ -90,7 +99,8 @@ The current data is moved to `data/pre-restore-…/` first, so a restore never d
 
 | Username | Password | Shows |
 |---|---|---|
-| `harbour` | `demo-password-123` | Harbour Lettings (sample data) |
+| `harbour` | `demo-password-123` | Harbour Lettings (sample data), main login |
+| `harbour` + name `john` | `john-password-123` | John Price at Harbour Lettings |
 | Your admin username | Your admin password | The admin panel (built in from `PREVIEW_ACCOUNTS`, never stored in the repo) |
 
 To rebuild it: run the app with demo data (`npm run seed-demo`, then `npm start`), then run `PREVIEW_ACCOUNTS='harbour:demo-password-123,YOURNAME:YOURPASSWORD' node scripts/build-preview.js http://localhost:3000`. It's static, so the sign-in only keeps casual visitors out; never build it from real data.

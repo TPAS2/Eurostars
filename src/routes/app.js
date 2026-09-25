@@ -325,7 +325,11 @@ module.exports = function appRoutes(db) {
   // ---------- my account: read-only; only the admin edits account details ----------
 
   router.get('/account', (req, res) => {
-    const acct = db.prepare('SELECT id, username, name, agency_name, email, phone, address, is_admin, created_at FROM users WHERE id = ?').get(req.user.id);
+    const acct = db.prepare(
+      `SELECT m.id, c.id AS company_id, c.username, m.login_name, m.name, c.agency_name, COALESCE(m.email, c.email) AS email,
+              COALESCE(m.phone, c.phone) AS phone, c.address, m.is_admin, m.created_at
+         FROM users m JOIN users c ON c.id = COALESCE(m.company_id, m.id) WHERE m.id = ?`
+    ).get(req.user.person_id);
     res.render('account', { title: 'My account', section: 'account', acct });
   });
 

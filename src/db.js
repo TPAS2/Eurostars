@@ -233,6 +233,11 @@ function openDatabase(file) {
   db.exec(SCHEMA);
   // Columns added after the first release.
   addColumnIfMissing(db, 'compliance_items', 'provider', 'TEXT');
+  // People inside a company: company_id points at the company's main login row, and
+  // login_name is the person's short name they type when signing in.
+  addColumnIfMissing(db, 'users', 'company_id', 'INTEGER REFERENCES users(id) ON DELETE CASCADE');
+  addColumnIfMissing(db, 'users', 'login_name', 'TEXT');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_users_company ON users(company_id)');
   addColumnIfMissing(db, 'users', 'phone', 'TEXT');
   addColumnIfMissing(db, 'users', 'address', 'TEXT');
   addColumnIfMissing(db, 'properties', 'council_id', 'INTEGER REFERENCES councils(id) ON DELETE SET NULL');
@@ -246,6 +251,9 @@ function addColumnIfMissing(db, table, column, type) {
   const cols = db.prepare(`SELECT name FROM pragma_table_info('${table}')`).all().map((c) => c.name);
   if (!cols.includes(column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);
 }
+
+// A person's short name within their company (no dots, so it can't clash with usernames).
+const LOGIN_NAME_RE = /^[a-z0-9][a-z0-9_-]{0,29}$/;
 
 const USERNAME_RE = /^[a-z0-9][a-z0-9._-]{2,29}$/;
 
@@ -301,4 +309,4 @@ function transaction(db, fn) {
   }
 }
 
-module.exports = { openDatabase, transaction, uniqueUsername, USERNAME_RE };
+module.exports = { openDatabase, transaction, uniqueUsername, USERNAME_RE, LOGIN_NAME_RE };

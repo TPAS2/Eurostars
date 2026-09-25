@@ -734,3 +734,70 @@ test('activity log: the admin sees each user\'s sign-ins, page views and changes
   // Companies can't see anyone's activity.
   assert.equal((await c.get(`/admin/users/${uid}`)).status, 404);
 });
+
+test('several people at one company share its username, each with their own name and password', async () => {
+  const admin = new Client();
+  await admin.login('admin', 'owner-password-123');
+  await admin.get('/admin/users/new');
+  let r = await admin.post('/admin/users', { agency_name: 'Eurostars Lettings', name: 'Theo Owner', username: 'eurostars', password: 'main-login-123' });
+  const companyId = Number(r.location.match(/users\/(\d+)/)[1]);
+  await admin.get(`/admin/users/${companyId}`);
+  r = await admin.post(`/admin/users/${companyId}/people`, { name: 'John Price', login_name: 'John', password: 'johns-pass-1' });
+  assert.match(decodeURIComponent(r.location), /Added John Price/);
+  await admin.post(`/admin/users/${companyId}/people`, { name: 'Amy Hall', login_name: 'amy', password: 'amys-pass-22' });
+  r = await admin.post(`/admin/users/${companyId}/people`, { name: 'Dupe', login_name: 'john', password: 'whatever-123' });
+  assert.match(decodeURIComponent(r.location), /already has someone called "john"/);
+
+  // Each person signs in with the company username + their name + their own password.
+  const john = new Client();
+  assert.equal((await john.post('/login', { login: 'eurostars', member: 'amy', password: 'johns-pass-1' })).status, 401, "John's password doesn't open Amy");
+  assert.equal((await john.post('/login', { login: 'eurostars', password: 'johns-pass-1' })).status, 401, "a blank name means the main login, so John's password doesn't work there");
+  r = await john.post('/login', { login: 'EUROSTARS', member: 'JOHN', password: 'johns-pass-1' });
+  assert.equal(r.location, '/app');
+  await john.get('/app');
+  const amy = new Client();
+  await amy.post('/login', { login: 'eurostars', member: 'amy', password: 'amys-pass-22' });
+  await amy.get('/app');
+  const main = new Client();
+  assert.equal((await main.login('eurostars', 'main-login-123')).location, '/app');
+
+  // They all work on the same company's data.
+  r = await john.post('/app/landlords', { name: 'Shared Landlord' });
+  const lid = idFrom(r.location);
+  assert.match((await amy.get(`/app/landlords/${lid}`)).text, /Shared Landlord/);
+  assert.match((await main.get('/app/landlords')).text, /Shared Landlord/);
+  assert.equal(db.prepare('SELECT account_id FROM landlords WHERE id = ?').get(lid).account_id, companyId);
+  assert.match((await amy.get('/app')).text, /Welcome back, Amy Hall/);
+  assert.match((await amy.get('/app/account')).text, /<code>eurostars<\/code>[\s\S]*<code>amy<\/code>/);
+
+  // The admin sees who did what, and the company is listed once.
+  r = await admin.get(`/admin/users/${companyId}`);
+  assert.match(r.text, /id="people"[\s\S]*John Price[\s\S]*<code>john<\/code>/);
+  assert.match(r.text, /id="activity"[\s\S]*John Price[\s\S]*Added landlord: Shared Landlord/);
+  r = await admin.get('/admin');
+  assert.equal((r.text.match(/<code>eurostars<\/code><\/td>/g) || []).length, 1);
+
+  // Suspending one person only blocks them; suspending the company blocks everyone.
+  const johnId = db.prepare("SELECT id FROM users WHERE company_id = ? AND login_name = 'john'").get(companyId).id;
+  await admin.get(`/admin/users/${companyId}`);
+  await admin.post(`/admin/people/${johnId}/suspend`, {});
+  assert.equal((await john.get('/app')).location, '/login');
+  assert.equal((await amy.get('/app')).status, 200);
+  await admin.post(`/admin/people/${johnId}/activate`, {});
+  await admin.post(`/admin/users/${companyId}/suspend`, {});
+  assert.equal((await amy.get('/app')).location, '/login');
+  assert.equal((await new Client().post('/login', { login: 'eurostars', member: 'john', password: 'johns-pass-1' })).status, 403);
+  await admin.post(`/admin/users/${companyId}/activate`, {});
+
+  // Password reset for one person; removing a person keeps the company's data.
+  await admin.post(`/admin/people/${johnId}/password`, { password: 'johns-new-pass' });
+  assert.equal((await new Client().post('/login', { login: 'eurostars', member: 'john', password: 'johns-new-pass' })).location, '/app');
+  await admin.post(`/admin/people/${johnId}/delete`, {});
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM users WHERE id = ?').get(johnId).n, 0);
+  assert.ok(db.prepare('SELECT 1 FROM landlords WHERE id = ?').get(lid));
+
+  // Companies can't add people themselves (the main login was signed out by the suspension above).
+  await main.login('eurostars', 'main-login-123');
+  await main.get('/app');
+  assert.equal((await main.post(`/admin/users/${companyId}/people`, { name: 'X', login_name: 'x', password: 'password-123' })).status, 404);
+});

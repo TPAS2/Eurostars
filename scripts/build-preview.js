@@ -5,7 +5,8 @@
 //
 // Usage: start the app with demo data (npm run seed-demo && npm start), then
 //   node scripts/build-preview.js [base-url] [output]
-// Accounts are taken from PREVIEW_ACCOUNTS as "username:password" pairs separated by commas
+// Accounts are taken from PREVIEW_ACCOUNTS as "username:password" or "username/name:password"
+// (a person at a company) pairs separated by commas
 // (default: just the demo agency). Pass the admin login the same way, from your shell, so
 // it never ends up in the repository. Passwords are stored in the page only as PBKDF2 hashes.
 // The sign-in check is only a convenience gate: a static page can't truly protect its
@@ -26,10 +27,11 @@ const decode = (s) => s.replace(/&amp;/g, '&').replace(/&#39;/g, "'").replace(/&
 const stripCsrf = (html) => html.replace(/<input type="hidden" name="_csrf" value="[^"]*">/g, '');
 
 async function login(username, password) {
+  const [company, member = ''] = username.split('/');
   const r = await fetch(`${BASE}/login`, {
     method: 'POST', redirect: 'manual',
     headers: { 'content-type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ login: username, password }).toString(),
+    body: new URLSearchParams({ login: company, member, password }).toString(),
   });
   if (r.status !== 302) throw new Error(`Could not sign in as ${username}`);
   return { cookie: r.headers.get('set-cookie').split(';')[0], home: r.headers.get('location') };

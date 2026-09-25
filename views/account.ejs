@@ -7,12 +7,13 @@
       <% } else { %>To change any of these details, contact your <%= appName %> administrator.<% } %>
     </p>
   </div>
-  <% if (acct.is_admin) { %><div class="actions"><a class="btn primary" href="/admin/users/<%= acct.id %>#details">Edit in admin panel</a></div><% } %>
+  <% if (acct.is_admin) { %><div class="actions"><a class="btn primary" href="/admin/users/<%= acct.company_id %>#details">Edit in admin panel</a></div><% } %>
 </header>
 
 <section class="card">
   <dl class="details">
     <div><dt>Username</dt><dd><code><%= acct.username %></code></dd></div>
+    <% if (acct.login_name) { %><div><dt>Your name (sign-in)</dt><dd><code><%= acct.login_name %></code></dd></div><% } %>
     <div><dt>Password</dt><dd>••••••••</dd></div>
     <div><dt>Account since</dt><dd><%= fmt.ukDate(acct.created_at) %></dd></div>
     <div><dt>Your name</dt><dd><%= acct.name %></dd></div>

@@ -20,28 +20,35 @@ module.exports = function authRoutes(db, config) {
 
   router.get('/login', (req, res) => {
     if (req.user) return res.redirect(landing(req.user));
-    res.render('login', { title: 'Sign in', error: '', login: String(req.query.u || '').slice(0, 254), allowRegistration: config.allowRegistration });
+    res.render('login', { title: 'Sign in', error: '', login: String(req.query.u || '').slice(0, 254), member: '', allowRegistration: config.allowRegistration });
   });
 
-  // Sign in with the username (case-insensitive) and password.
+  // Sign in with the company username, the person's own name (blank for the company's
+  // main login) and their password. Usernames and names are case-insensitive.
+  const findCompany = db.prepare('SELECT * FROM users WHERE username = ? AND company_id IS NULL');
+  const findPerson = db.prepare('SELECT * FROM users WHERE company_id = ? AND login_name = ?');
+
   router.post('/login', (req, res) => {
     const login = String(req.body.login || req.body.email || '').trim().toLowerCase().slice(0, 254);
+    const member = String(req.body.member || '').trim().toLowerCase().slice(0, 60);
     const password = String(req.body.password || '');
     const ip = req.ip;
     const ua = String(req.headers['user-agent'] || '').slice(0, 300);
-    const fail = (status, error) => res.status(status).render('login', { title: 'Sign in', error, login, allowRegistration: config.allowRegistration });
-    if (loginLimited(`${ip}|${login}`)) return fail(429, 'Too many attempts. Please wait 15 minutes and try again.');
-    const user = login ? db.prepare('SELECT * FROM users WHERE username = ?').get(login) : null;
+    const who = member ? `${login} / ${member}` : login;
+    const fail = (status, error) => res.status(status).render('login', { title: 'Sign in', error, login, member, allowRegistration: config.allowRegistration });
+    if (loginLimited(`${ip}|${who}`)) return fail(429, 'Too many attempts. Please wait 15 minutes and try again.');
+    const company = login ? findCompany.get(login) : null;
+    const user = company && member ? findPerson.get(company.id, member) : company;
     const ok = auth.verifyPassword(password, user ? user.password_hash : auth.DUMMY_HASH) && !!user;
     if (!ok) {
-      logEvent.run(user ? user.id : null, login, 0, ip, ua);
-      return fail(401, 'Incorrect username or password.');
+      logEvent.run(user ? user.id : null, who, 0, ip, ua);
+      return fail(401, 'Incorrect username, name or password.');
     }
-    if (user.status !== 'active') {
-      logEvent.run(user.id, login, 0, ip, ua);
-      return fail(403, 'This account has been suspended. Please contact support.');
+    if (user.status !== 'active' || company.status !== 'active') {
+      logEvent.run(user.id, who, 0, ip, ua);
+      return fail(403, 'This account has been suspended. Please contact your administrator.');
     }
-    logEvent.run(user.id, login, 1, ip, ua);
+    logEvent.run(user.id, who, 1, ip, ua);
     if (config.activityLog !== false) activity.logSignIn(db, user.id, ip);
     startSession(user, res);
     res.redirect(landing({ is_admin: user.is_admin === 1 }));

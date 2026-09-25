@@ -154,10 +154,11 @@
 
     if (action === '/login') {
       const data = new FormData(form);
-      const username = String(data.get('login') || '').trim().toLowerCase();
+      const member = String(data.get('member') || '').trim().toLowerCase();
+      const username = String(data.get('login') || '').trim().toLowerCase() + (member ? '/' + member : '');
       const acct = ACCOUNTS[username];
       const ok = acct && (await pbkdf2(String(data.get('password') || ''), acct.salt)) === acct.hash;
-      if (!ok) return showLogin('Incorrect username or password.');
+      if (!ok) return showLogin('Incorrect username, name or password.');
       account = username;
       store.set(username);
       return render(acct.home);

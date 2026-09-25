@@ -30,21 +30,84 @@
   <div class="tile"><span class="label">Activity</span><span class="value sm"><%= extra.transactions %> transactions</span><span class="sub"><%= extra.jobs %> jobs · <%= extra.certificates %> certificates</span></div>
 </section>
 
+<section class="card" id="people">
+  <div class="card-head">
+    <h2>People <span class="count"><%= people.length %></span></h2>
+  </div>
+  <p class="muted small">Everyone who can sign in to <strong><%= u.agency_name %></strong>. They all type the username <code><%= u.username %></code>, then their own name and password. They see the same company data.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Person</th><th>Signs in with</th><th>Last login</th><th>Last active</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+    <% people.forEach(m => { const main = !m.company_id; %>
+      <tr>
+        <td><strong><%= m.name %></strong><% if (main) { %> <span class="badge">main login</span><% } %></td>
+        <td><code><%= u.username %></code><%= main ? '' : ' + ' %><% if (!main) { %><code><%= m.login_name %></code><% } else { %> <span class="muted small">(name left blank)</span><% } %></td>
+        <td><%= fmt.ukDateTime(m.last_login_at) %></td>
+        <td><% if (m.last_active) { %><a href="/admin/users/<%= u.id %>?person=<%= m.id %>#activity"><%= fmt.ukDateTime(m.last_active) %></a><% } else { %>No activity<% } %></td>
+        <td><span class="badge s-<%= m.status %>"><%= m.status %></span></td>
+        <td class="num">
+          <% if (!main) { %>
+          <details class="person-menu">
+            <summary class="btn small">Manage</summary>
+            <div class="person-actions">
+              <form method="post" action="/admin/people/<%= m.id %>/password" class="inline-form">
+                <%- include('../partials/csrf') %>
+                <input id="pw-<%= m.id %>" name="password" type="text" minlength="<%= minPassword %>" placeholder="New password" autocomplete="off" required>
+                <button class="btn small" type="button" data-generate="#pw-<%= m.id %>">Suggest</button>
+                <button class="btn small primary" type="submit">Set password</button>
+              </form>
+              <div class="actions">
+                <form method="post" action="/admin/people/<%= m.id %>/<%= m.status === 'active' ? 'suspend' : 'activate' %>"><%- include('../partials/csrf') %><button class="btn small" type="submit"><%= m.status === 'active' ? 'Suspend' : 'Reactivate' %></button></form>
+                <form method="post" action="/admin/people/<%= m.id %>/delete" data-confirm="Remove <%= m.name %>? They won't be able to sign in any more. The company's data is kept."><%- include('../partials/csrf') %><button class="btn small danger" type="submit">Remove</button></form>
+              </div>
+            </div>
+          </details>
+          <% } else { %><a class="small" href="#reset-password">Reset password below</a><% } %>
+        </td>
+      </tr>
+    <% }) %>
+    </tbody>
+  </table></div>
+
+  <h3 class="spaced">Add a person</h3>
+  <form method="post" action="/admin/users/<%= u.id %>/people" class="form-grid">
+    <%- include('../partials/csrf') %>
+    <div class="field">
+      <label for="p-name">Full name <span class="req">*</span></label>
+      <input id="p-name" name="name" required autocomplete="off" placeholder="e.g. John Price">
+    </div>
+    <div class="field">
+      <label for="p-login">Sign-in name <span class="req">*</span></label>
+      <input id="p-login" name="login_name" required maxlength="30" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="e.g. john">
+      <div class="help">What they type in "Your name" when signing in.</div>
+    </div>
+    <div class="field">
+      <label for="p-password">Password <span class="req">*</span></label>
+      <div class="input-row">
+        <input id="p-password" name="password" type="text" required minlength="<%= minPassword %>" autocomplete="off">
+        <button class="btn" type="button" data-generate="#p-password">Suggest one</button>
+      </div>
+    </div>
+    <div class="form-actions wide"><button class="btn primary" type="submit">Add person</button></div>
+  </form>
+</section>
+
 <section class="card" id="activity">
   <div class="card-head">
     <h2>Activity <span class="count"><%= activityRows.length %><%= activityRows.length === 300 ? '+' : '' %></span></h2>
     <nav class="tabs compact">
       <a href="/admin/users/<%= u.id %>#activity" class="<%= activityFilter === 'all' ? 'active' : '' %>">Everything</a>
-      <a href="/admin/users/<%= u.id %>?activity=changes#activity" class="<%= activityFilter === 'changes' ? 'active' : '' %>">Changes only</a>
+      <a href="/admin/users/<%= u.id %>?activity=changes<%= personFilter ? '&person=' + personFilter : '' %>#activity" class="<%= activityFilter === 'changes' ? 'active' : '' %>">Changes only</a>
     </nav>
   </div>
-  <p class="muted small">Pages <%= isSelf ? 'you' : 'they' %> opened and changes <%= isSelf ? 'you' : 'they' %> made, newest first. Kept for 6 months.</p>
+  <p class="muted small">Pages <%= isSelf ? 'you' : 'everyone at this company' %> opened and changes made, newest first. Kept for 6 months.
+    <% if (personFilter) { %>Showing one person only. <a href="/admin/users/<%= u.id %>#activity">Show everyone</a><% } %></p>
   <% if (!activityRows.length) { %><p class="muted">No activity recorded yet.</p><% } else { %>
   <div class="table-wrap activity-scroll"><table>
-    <thead><tr><th>When</th><th>Activity</th><th>IP</th></tr></thead>
+    <thead><tr><th>When</th><th>Who</th><th>Activity</th><th>IP</th></tr></thead>
     <tbody>
     <% activityRows.forEach(e => { %>
-      <tr><td class="nowrap"><%= fmt.ukDateTime(e.created_at) %></td>
+      <tr><td class="nowrap"><%= fmt.ukDateTime(e.created_at) %></td><td class="nowrap"><%= e.person_name %></td>
       <td><span class="act act-<%= e.action.replace(/\s+/g, '-') %>"><%= e.action %></span> <%= e.summary %></td>
       <td class="muted small"><%= e.ip %></td></tr>
     <% }) %>
@@ -56,10 +119,10 @@
   <h2>Sign-in history</h2>
   <% if (!logins.length) { %><p class="muted">No sign-ins yet.</p><% } else { %>
   <div class="table-wrap"><table>
-    <thead><tr><th>When</th><th>Result</th><th>IP</th><th>Device</th></tr></thead>
+    <thead><tr><th>When</th><th>Who</th><th>Result</th><th>IP</th><th>Device</th></tr></thead>
     <tbody>
     <% logins.forEach(e => { %>
-      <tr><td><%= fmt.ukDateTime(e.created_at) %></td><td><span class="badge <%= e.success ? 's-active' : 'bad' %>"><%= e.success ? 'success' : 'failed' %></span></td><td><%= e.ip %></td><td class="muted small"><%= e.user_agent %></td></tr>
+      <tr><td><%= fmt.ukDateTime(e.created_at) %></td><td class="nowrap"><%= e.person_name %></td><td><span class="badge <%= e.success ? 's-active' : 'bad' %>"><%= e.success ? 'success' : 'failed' %></span></td><td><%= e.ip %></td><td class="muted small"><%= e.user_agent %></td></tr>
     <% }) %>
     </tbody>
   </table></div><% } %>
@@ -94,8 +157,8 @@
   </form>
 </section>
 
-<section class="card">
-  <h2>Reset password</h2>
+<section class="card" id="reset-password">
+  <h2>Reset password <span class="muted small">(main login)</span></h2>
   <p class="muted small">Passwords are stored scrambled, so nobody (not even you) can look one up. If <%= isSelf ? 'you forget yours' : 'they forget theirs' %>, set a new one here<%= isSelf ? '' : ' and tell them what it is' %>.</p>
   <form method="post" action="/admin/users/<%= u.id %>/password" class="inline-form">
     <%- include('../partials/csrf') %>

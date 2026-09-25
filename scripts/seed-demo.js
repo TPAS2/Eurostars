@@ -2,7 +2,8 @@
 
 // Usage: npm run seed-demo
 // Creates one demo agency filled with realistic data, for trying the app out:
-//   harbour / demo-password-123   (Harbour Lettings, Bristol)
+//   harbour / demo-password-123   (Harbour Lettings, Bristol) - the company's main login
+//   harbour + name john / john-password-123   (John Price at Harbour Lettings)
 // Skips if the demo account already exists.
 
 const fs = require('node:fs');
@@ -190,6 +191,12 @@ function seedAgency(p, lastLoginHoursAgo) {
   }
   db.prepare("INSERT INTO login_events (user_id, email, success, ip, user_agent, created_at) VALUES (?, ?, 1, '81.2.69.142', 'Mozilla/5.0', datetime('now', ?))")
     .run(a, p.username, `-${lastLoginHoursAgo} hours`);
+  // A second person at the company: signs in with the company username + "john".
+  if (p.username === 'harbour') {
+    ins("INSERT INTO users (username, company_id, login_name, name, agency_name, password_hash, created_at, last_login_at, login_count) VALUES (?, ?, 'john', 'John Price', ?, ?, datetime('now', '-60 days'), datetime('now', '-1 days'), 9)",
+      `${p.username}.john`, a, p.agency, hashPassword('john-password-123'));
+  }
+
   // A few days of typical activity for the admin panel's activity log.
   const act = db.prepare("INSERT INTO activity_log (user_id, action, summary, path, ip, created_at) VALUES (?, ?, ?, ?, '81.2.69.142', datetime('now', ?))");
   const addr = p.properties.map((x) => x[1]);

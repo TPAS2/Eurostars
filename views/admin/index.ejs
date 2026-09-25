@@ -45,12 +45,13 @@
   </div>
   <div class="table-wrap">
   <table>
-    <thead><tr><th>User</th><th>Username</th><th>Agency</th><th>Joined</th><th>Last login</th><th>Last active</th><th class="num">Actions (7 days)</th><th class="num">Logins</th><th class="num">Landlords</th><th class="num">Properties</th><th class="num">Tenancies</th><th>Status</th></tr></thead>
+    <thead><tr><th>User</th><th>Username</th><th class="num">People</th><th>Agency</th><th>Joined</th><th>Last login</th><th>Last active</th><th class="num">Actions (7 days)</th><th class="num">Logins</th><th class="num">Landlords</th><th class="num">Properties</th><th class="num">Tenancies</th><th>Status</th></tr></thead>
     <tbody>
     <% users.forEach(u => { %>
       <tr>
         <td><a href="/admin/users/<%= u.id %>"><strong><%= u.name %></strong></a><% if (u.email) { %><div class="muted small"><%= u.email %></div><% } %></td>
         <td><code><%= u.username %></code></td>
+        <td class="num"><%= u.people + 1 %></td>
         <td><%= u.agency_name %><% if (u.is_admin) { %> <span class="badge s-admin">you</span><% } %></td>
         <td><%= fmt.ukDate(u.created_at) %></td>
         <td><%= fmt.ukDateTime(u.last_login_at) %><% if (u.live_sessions) { %> <span class="dot" title="Has a live session"></span><% } %></td>
@@ -76,7 +77,7 @@
     <thead><tr><th>When</th><th>User</th><th>Activity</th></tr></thead>
     <tbody>
     <% recentActivity.forEach(e => { %>
-      <tr><td class="nowrap"><%= fmt.ukDateTime(e.created_at) %></td><td><a href="/admin/users/<%= e.user_id %>"><code><%= e.username %></code></a><div class="muted small"><%= e.agency_name %></div></td>
+      <tr><td class="nowrap"><%= fmt.ukDateTime(e.created_at) %></td><td><a href="/admin/users/<%= e.company_id %>?person=<%= e.user_id %>#activity"><%= e.person_name %></a><div class="muted small"><code><%= e.username %></code> · <%= e.agency_name %></div></td>
       <td><span class="act act-<%= e.action.replace(/\s+/g, '-') %>"><%= e.action %></span> <%= e.summary %></td></tr>
     <% }) %>
     </tbody>

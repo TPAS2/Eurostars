@@ -349,3 +349,9 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fo
 .act-signed-in, .act-signed-out, .act-downloaded { background: var(--warn-soft); color: var(--warn); }
 .activity-scroll { max-height: 480px; overflow-y: auto; }
 .tabs.compact { margin: 0; border-bottom: 0; }
+.person-menu { display: inline-block; text-align: left; }
+.person-menu > summary { list-style: none; }
+.person-menu > summary::-webkit-details-marker { display: none; }
+.person-menu[open] .person-actions { display: flex; }
+.person-actions { display: none; flex-direction: column; gap: 8px; padding: 10px 0 0; }
+.person-actions input { width: 150px; }
