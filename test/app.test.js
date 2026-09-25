@@ -606,7 +606,7 @@ test('councils link to properties, and through them to landlords and tenants', a
   // "+ Add property in this council" pre-selects the council.
   r = await c.get(`/app/properties/new?council_id=${councilId}`);
   assert.match(r.text, new RegExp(`<option value="${councilId}" selected>Bristol City Council`));
-  r = await c.post('/app/properties', { address_line1: '9 Cotham Hill', landlord_id: landlordId, council_id: councilId, council_tax_band: 'C', council_tax_account: 'CT-55501', council_tax_payer: 'Tenant', status: 'vacant' });
+  r = await c.post('/app/properties', { address_line1: '9 Cotham Hill', landlord_id: landlordId, council_id: councilId, council_tax_account: 'CT-55501', council_tax_payer: 'Tenant', status: 'vacant' });
   const propertyId = idFrom(r.location);
   r = await c.post(`/app/properties/${propertyId}/add-tenant`, { tenant_mode: 'new', name: 'Iris Moss', booking_date: '2026-09-01', start_date: '2026-09-10', rent_pence: '1100', rent_frequency: 'monthly', status: 'active' });
   const tenantId = db.prepare('SELECT tenant_id FROM tenancies WHERE id = ?').get(idFrom(r.location)).tenant_id;
@@ -615,7 +615,8 @@ test('councils link to properties, and through them to landlords and tenants', a
   assert.match(council.text, /Properties in this council/);
   assert.match(council.text, /9 Cotham Hill/);
   assert.match(council.text, /Landlords in this council[\s\S]*Olive Grant/);
-  assert.match(council.text, /Current tenants in this council[\s\S]*Iris Moss[\s\S]*Band C, paid by tenant/);
+  assert.match(council.text, /Current tenants in this council[\s\S]*Iris Moss[\s\S]*Paid by tenant/);
+  assert.doesNotMatch((await c.get(`/app/properties/${propertyId}`)).text, /Council tax band/);
   assert.match((await c.get(`/app/landlords/${landlordId}`)).text, /Councils[\s\S]*Bristol City Council/);
   assert.match((await c.get(`/app/tenants/${tenantId}`)).text, /Councils[\s\S]*Bristol City Council[\s\S]*CT-55501/);
   assert.match((await c.get(`/app/properties/${propertyId}`)).text, /href="\/app\/councils\/\d+">Bristol City Council/);

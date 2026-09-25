@@ -200,7 +200,7 @@ module.exports = function appRoutes(db) {
           WHERE p.account_id = ? AND p.council_id = ? GROUP BY l.id ORDER BY l.name COLLATE NOCASE`
       ).all(a, row.id);
       const tenants = db.prepare(
-        `SELECT t.id, t.name, t.phone, p.id AS property_id, p.address_line1, p.council_tax_band, p.council_tax_payer
+        `SELECT t.id, t.name, t.phone, p.id AS property_id, p.address_line1, p.council_tax_payer
            FROM tenancies ty JOIN properties p ON p.id = ty.property_id JOIN tenants t ON t.id = ty.tenant_id
           WHERE ty.account_id = ? AND p.council_id = ? AND ty.status = 'active' ORDER BY t.name COLLATE NOCASE`
       ).all(a, row.id);
@@ -209,7 +209,7 @@ module.exports = function appRoutes(db) {
           rows: landlords.map((l) => [link('landlords', l.id, l.name), { text: l.phone || '' }, { text: l.props }]) },
         { title: 'Current tenants in this council', empty: 'No current tenants here.', headers: ['Tenant', 'Phone', 'Property', 'Council tax'],
           rows: tenants.map((t) => [link('tenants', t.id, t.name), { text: t.phone || '' }, link('properties', t.property_id, t.address_line1),
-            { text: [t.council_tax_band && `Band ${t.council_tax_band}`, t.council_tax_payer && `paid by ${t.council_tax_payer.toLowerCase()}`].filter(Boolean).join(', ') }]) },
+            { text: t.council_tax_payer ? `Paid by ${t.council_tax_payer.toLowerCase()}` : '' }]) },
       ];
     }
     const councilsVia = (sql, ...params) => db.prepare(sql).all(...params);
@@ -222,12 +222,12 @@ module.exports = function appRoutes(db) {
     }
     if (def.key === 'tenants') {
       const rows = councilsVia(
-        `SELECT DISTINCT c.id, c.name, c.council_tax_phone, p.id AS property_id, p.address_line1, p.council_tax_band, p.council_tax_account
+        `SELECT DISTINCT c.id, c.name, c.council_tax_phone, p.id AS property_id, p.address_line1, p.council_tax_account
            FROM tenancies ty JOIN properties p ON p.id = ty.property_id JOIN councils c ON c.id = p.council_id
           WHERE ty.account_id = ? AND ty.tenant_id = ? ORDER BY c.name COLLATE NOCASE`, a, row.id);
-      return [{ title: 'Councils', empty: 'None of this tenant\'s properties has a council set yet.', headers: ['Council', 'Council tax phone', 'Property', 'Band', 'Account no.'],
+      return [{ title: 'Councils', empty: 'None of this tenant\'s properties has a council set yet.', headers: ['Council', 'Council tax phone', 'Property', 'Account no.'],
         rows: rows.map((c) => [link('councils', c.id, c.name), { text: c.council_tax_phone || '' }, link('properties', c.property_id, c.address_line1),
-          { text: c.council_tax_band || '' }, { text: c.council_tax_account || '' }]) }];
+          { text: c.council_tax_account || '' }]) }];
     }
     return [];
   }

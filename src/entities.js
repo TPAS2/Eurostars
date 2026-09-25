@@ -42,7 +42,6 @@ const ENTITIES = {
       { name: 'bedrooms', label: 'Bedrooms', type: 'integer' },
       { name: 'management_fee_pct', label: 'Management fee %', type: 'number', help: 'Deducted automatically from rent received.' },
       { name: 'council_id', label: 'Council', type: 'ref', ref: 'councils', help: 'The local authority for this address.' },
-      { name: 'council_tax_band', label: 'Council tax band', type: 'select', options: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'Exempt'] },
       { name: 'council_tax_account', label: 'Council tax account no.', type: 'text' },
       { name: 'council_tax_payer', label: 'Council tax paid by', type: 'select', options: ['Tenant', 'Landlord', 'Agent'] },
       { name: 'status', label: 'Status', type: 'select', options: ['vacant', 'let', 'under offer', 'unavailable'], required: true, default: 'vacant' },
