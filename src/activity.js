@@ -74,9 +74,16 @@ function describe(db, req) {
   // Sections with their own routes.
   if (section === 'account') return { action: 'viewed', text: 'Viewed my account' };
   if (section === 'statements') return { action: 'viewed', text: 'Viewed landlord statements' };
+  if (section === 'rent-run') return { action: 'viewed', text: 'Viewed the rent run' };
   if (section === 'rent-roll') return { action: 'viewed', text: `Viewed the rent roll for ${/^\d{4}-\d{2}$/.test(String(req.query.month || '')) ? req.query.month : 'this month'}` };
   if (section === 'rent' && post) return { action: 'created', text: `Raised rent for ${req.body.month || 'a month'}` };
   if (section === 'monthly') {
+    const m = /^\d{4}-\d{2}$/.test(String(req.body.month || req.query.month || '')) ? String(req.body.month || req.query.month) : '';
+    if (idPart === 'calculate' && post) return { action: 'created', text: `Calculated all rents and statements for ${m}` };
+    if (idPart === 'email' && post) return { action: 'updated', text: req.body.landlord_id ? `Emailed a landlord their statement for ${m}` : `Emailed landlords their statements for ${m}` };
+    if (idPart === 'report' && sub === 'email' && post) return { action: 'updated', text: `Emailed the statements report for ${m}` };
+    if (idPart === 'report' && !post) return { action: 'viewed', text: `Previewed the statements report for ${m}` };
+    if (idPart === 'report.csv') return { action: 'downloaded', text: `Downloaded the statements report CSV for ${m}` };
     if (post) return { action: 'created', text: `Generated monthly statement${req.body.landlord_id ? '' : 's'} for ${req.body.month || ''}`.trim() };
     return { action: 'viewed', text: id ? 'Viewed a monthly statement' : 'Viewed monthly statements' };
   }

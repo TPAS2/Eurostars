@@ -1,0 +1,80 @@
+<%- include('../partials/header') %>
+<% const t = report.totals; const minus = (v) => v ? '−' + fmt.money(v) : '—'; %>
+<header class="page-head">
+  <div>
+    <a class="crumb" href="/app/rent-run?month=<%= report.month %>">← Rent run</a>
+    <h1>Statements report</h1>
+    <p class="muted"><%= report.monthLabel %> · preview of the CSV spreadsheet, one line per property</p>
+  </div>
+  <div class="actions">
+    <form method="get" class="inline-form">
+      <input type="month" name="month" value="<%= report.month %>" aria-label="Month">
+      <button class="btn" type="submit">Show</button>
+    </form>
+    <a class="btn primary <%= report.landlords.length ? '' : 'disabled' %>" href="/app/monthly/report.csv?month=<%= report.month %>" <%- report.landlords.length ? '' : 'aria-disabled="true" tabindex="-1"' %>>Download CSV</a>
+  </div>
+</header>
+<% if (flash) { %><div class="notice ok"><%= flash %></div><% } %>
+<% if (error) { %><div class="notice err"><%= error %></div><% } %>
+<% if (report.missing.length) { %>
+<div class="notice warn">
+  <%= report.missing.length %> landlord<%= report.missing.length === 1 ? ' has' : 's have' %> no statement for <%= report.monthLabel %> yet (<%= report.missing.slice(0, 6).map(m => m.name).join(', ') %><%= report.missing.length > 6 ? '…' : '' %>).
+  Use <a href="/app/rent-run?month=<%= report.month %>">Calculate all rents</a> on the Rent run to include them.
+</div>
+<% } %>
+
+<section class="card">
+  <div class="card-head">
+    <h2><%= report.landlords.length %> landlord<%= report.landlords.length === 1 ? '' : 's' %></h2>
+    <form method="post" action="/app/monthly/report/email" class="step-email" data-busy="Sending…">
+      <%- include('../partials/csrf') %>
+      <input type="hidden" name="month" value="<%= report.month %>">
+      <input type="hidden" name="back" value="report">
+      <input type="email" name="to" value="<%= reportTo %>" placeholder="name@example.com" aria-label="Send the report to" required>
+      <button class="btn primary" type="submit" <%= emailEnabled && report.landlords.length ? '' : 'disabled' %>>Email report</button>
+    </form>
+  </div>
+  <% if (!emailEnabled) { %><p class="muted small">Email isn't set up yet, so the report can only be downloaded for now.</p><% } %>
+  <% if (!report.landlords.length) { %>
+    <p class="muted">No statements for <%= report.monthLabel %> yet. Go back and click <strong>Calculate all rents</strong> first.</p>
+  <% } else { %>
+  <div class="table-wrap"><table class="report">
+    <thead><tr>
+      <th>Landlord</th><th>Property</th>
+      <th class="num">Rent due</th><th class="num">Received</th><th class="num">Fees</th><th class="num">Costs</th><th class="num">Net</th><th class="num">Outstanding</th>
+      <th class="num">Paid to landlord</th><th class="num">Held at end</th>
+    </tr></thead>
+    <tbody>
+    <% report.landlords.forEach(l => { %>
+      <% l.properties.forEach((p, i) => { %>
+      <tr>
+        <td><% if (i === 0) { %><a href="/app/monthly/<%= l.statementId %>"><strong><%= l.name %></strong></a><% if (l.code) { %> <span class="muted small"><%= l.code %></span><% } %><% } %></td>
+        <td><%= p.address %></td>
+        <td class="num"><%= fmt.money(p.due) %></td><td class="num"><%= fmt.money(p.received) %></td>
+        <td class="num"><%= minus(p.fees) %></td><td class="num"><%= minus(p.costs) %></td>
+        <td class="num"><%= fmt.money(p.net) %></td><td class="num"><%= p.outstanding ? fmt.money(p.outstanding) : '—' %></td>
+        <td></td><td></td>
+      </tr>
+      <% }) %>
+      <tr class="subtotal">
+        <td><% if (!l.properties.length) { %><a href="/app/monthly/<%= l.statementId %>"><strong><%= l.name %></strong></a><% } %></td>
+        <td>Landlord total</td>
+        <td class="num"><%= fmt.money(l.totals.due) %></td><td class="num"><%= fmt.money(l.totals.received) %></td>
+        <td class="num"><%= minus(l.totals.fees) %></td><td class="num"><%= minus(l.totals.costs) %></td>
+        <td class="num"><strong><%= fmt.money(l.totals.net) %></strong></td><td class="num"><%= l.totals.outstanding ? fmt.money(l.totals.outstanding) : '—' %></td>
+        <td class="num"><%= fmt.money(l.totals.paid) %></td><td class="num"><%= fmt.money(l.totals.held) %></td>
+      </tr>
+    <% }) %>
+      <tr class="total">
+        <td colspan="2">Grand total</td>
+        <td class="num"><%= fmt.money(t.due) %></td><td class="num"><%= fmt.money(t.received) %></td>
+        <td class="num"><%= minus(t.fees) %></td><td class="num"><%= minus(t.costs) %></td>
+        <td class="num"><%= fmt.money(t.net) %></td><td class="num"><%= fmt.money(t.outstanding) %></td>
+        <td class="num"><%= fmt.money(t.paid) %></td><td class="num"><%= fmt.money(t.held) %></td>
+      </tr>
+    </tbody>
+  </table></div>
+  <p class="muted small">The CSV also includes each landlord's code, email address and balance at the start of the month. Amounts are in pounds without the £ sign, so they add up in Excel or Google Sheets.</p>
+  <% } %>
+</section>
+<%- include('../partials/footer') %>

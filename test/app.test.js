@@ -27,9 +27,19 @@ let base;
 // Stand-in for the Claude call, swapped per test.
 let fakeWriter = async (facts) => ({ text: `${facts.landlord}: rent ${facts.rent_received}, net ${facts.net_for_month}.`, model: 'test-model' });
 let server;
+// Stand-in for sending email: records messages; addresses containing "bounce" fail.
+const sentMail = [];
+let mailEnabled = true;
+const fakeMailer = {
+  get enabled() { return mailEnabled; },
+  async send(msg) {
+    if (msg.to.includes('bounce')) throw new Error('Mailbox unavailable');
+    sentMail.push(msg);
+  },
+};
 
 test.before(async () => {
-  server = createApp(config, db, { writer: (facts) => fakeWriter(facts) }).listen(0);
+  server = createApp(config, db, { writer: (facts) => fakeWriter(facts), mailer: fakeMailer }).listen(0);
   await new Promise((r) => server.once('listening', r));
   base = `http://127.0.0.1:${server.address().port}`;
 });
@@ -1242,4 +1252,119 @@ test('signed out after an hour without use, then back to the same page', async (
   r = await d.post('/logout', { reason: 'idle', next: '/app/rent-roll?month=2026-08' });
   assert.equal(r.location, `/login?timeout=1&next=${encodeURIComponent('/app/rent-roll?month=2026-08')}`);
   assert.equal((await d.get('/app')).location, '/login');
+});
+
+test('month end: calculate rents, email landlords, CSV report with preview, email the report', async () => {
+  const c = await registerAndLogin('month-end@example.com', 'Month End Lets');
+  const accountId = db.prepare("SELECT id FROM users WHERE username = 'month-end'").get().id;
+  db.prepare("UPDATE users SET email = 'office@monthend.example' WHERE id = ?").run(accountId);
+  let r = await c.post('/app/landlords', { name: 'Ann Able', code: 'AA1', email: 'ann@example.com' });
+  const ann = idFrom(r.location);
+  r = await c.post('/app/landlords', { name: '=Bad Formula', email: 'bounce@example.com' });
+  r = await c.post('/app/landlords', { name: 'Cy NoEmail' });
+  r = await c.post('/app/properties', { address_line1: '1 First Street', landlord_id: ann, status: 'vacant', management_fee_pct: '10' });
+  const prop = idFrom(r.location);
+  r = await c.post(`/app/properties/${prop}/add-tenant`, { tenant_mode: 'new', name: 'Tess', booking_date: '2026-07-01', start_date: '2026-08-01', rent_pence: '1000', rent_frequency: 'monthly', status: 'active' });
+  const tenancy = idFrom(r.location);
+
+  assert.match((await c.get('/app')).text, /aria-label="Rent run"/, 'Rent run is in the menu');
+  r = await c.get('/app/rent-run?month=2026-08');
+  assert.match(r.text, /<h1>Rent run<\/h1>/);
+  for (const b of ['Calculate all rents', 'Email all landlords', 'Preview report', 'Download CSV', 'Email report']) assert.match(r.text, new RegExp(b), `has the ${b} button`);
+  assert.match(r.text, /name="to" value="office@monthend.example"/, 'report goes to the agency by default');
+
+  // 1. Calculate: raises the month's rent and works out every statement.
+  r = await c.post('/app/monthly/calculate', { month: '2026-08' });
+  assert.match(r.location, /^\/app\/rent-run\?month=2026-08&flash=/);
+  assert.match(decodeURIComponent(r.location.replace(/\+/g, ' ')), /Raised 1 new rent charge and calculated 3 statements for August 2026/);
+  assert.equal(db.prepare("SELECT COUNT(*) n FROM transactions WHERE tenancy_id = ? AND txn_type = 'rent_charge'").get(tenancy).n, 1);
+  await c.post('/app/transactions', { txn_date: '2026-08-02', txn_type: 'rent_received', tenancy_id: tenancy, amount_pence: '1000' });
+  await c.get('/app/rent-run?month=2026-08');
+  r = await c.post('/app/monthly/calculate', { month: '2026-08' });
+  assert.match(decodeURIComponent(r.location.replace(/\+/g, ' ')), /Raised 0 new rent charges/, 'running it again does not double-charge');
+  assert.equal(db.prepare('SELECT net_pence FROM monthly_statements WHERE landlord_id = ?').get(ann).net_pence, 90000);
+
+  // 2. Email every landlord: sent, no address, and a failure are all reported.
+  await c.get('/app/rent-run?month=2026-08');
+  sentMail.length = 0;
+  r = await c.post('/app/monthly/email', { month: '2026-08' });
+  const msg = decodeURIComponent(r.location.replace(/\+/g, ' '));
+  assert.match(msg, /Emailed 1 landlord their August 2026 statement/);
+  assert.match(msg, /No email address for: Cy NoEmail/);
+  assert.match(msg, /error=Couldn’t email: =Bad Formula \(Mailbox unavailable\)/);
+  assert.equal(sentMail.length, 1);
+  const mail = sentMail[0];
+  assert.equal(mail.to, 'ann@example.com');
+  assert.equal(mail.fromName, 'Month End Lets');
+  assert.equal(mail.replyTo, 'office@monthend.example');
+  assert.match(mail.subject, /Your statement for August 2026 from Month End Lets/);
+  assert.match(mail.text, /Rent received: +£1,000\.00/);
+  assert.match(mail.text, /Management fees: +−£100\.00/);
+  assert.match(mail.text, /Net for the month: +£900\.00/);
+  assert.match(mail.html, /1 First Street/);
+  assert.ok(db.prepare('SELECT emailed_at FROM monthly_statements WHERE landlord_id = ?').get(ann).emailed_at, 'marked as emailed');
+  r = await c.get('/app/rent-run?month=2026-08');
+  assert.match(r.text, /Ann Able[\s\S]*?badge s-active">sent/);
+  assert.match(r.text, /Skip those already emailed/);
+  // Sending again skips anyone already emailed; a single landlord can be emailed again.
+  sentMail.length = 0;
+  await c.post('/app/monthly/email', { month: '2026-08', skip_sent: '1' });
+  assert.equal(sentMail.length, 0);
+  await c.post('/app/monthly/email', { month: '2026-08', landlord_id: String(ann) });
+  assert.equal(sentMail.length, 1);
+
+  // 3. Report preview and CSV.
+  r = await c.get('/app/monthly/report?month=2026-08');
+  assert.match(r.text, /Statements report/);
+  assert.match(r.text, /Ann Able[\s\S]*?1 First Street[\s\S]*?£1,000\.00[\s\S]*?−£100\.00[\s\S]*?£900\.00/);
+  assert.match(r.text, /Grand total/);
+  r = await c.get('/app/monthly/report.csv?month=2026-08');
+  assert.equal(r.status, 200);
+  assert.match(r.headers.get('content-type'), /text\/csv/);
+  assert.match(r.headers.get('content-disposition'), /statements-2026-08\.csv/);
+  const csv = r.text.replace(/^﻿/, '').trim().split('\r\n');
+  assert.equal(csv[0], 'Month,Landlord,Landlord code,Landlord email,Property,Rent due,Rent received,Management fees,Costs,Net for month,Rent outstanding,Balance at start,Paid to landlord,Balance held at end');
+  assert.ok(csv.includes('2026-08,Ann Able,AA1,ann@example.com,1 First Street,1000.00,1000.00,100.00,0.00,900.00,0.00,,,'));
+  assert.ok(csv.includes('2026-08,Ann Able,AA1,ann@example.com,Landlord total,1000.00,1000.00,100.00,0.00,900.00,0.00,0.00,0.00,900.00'));
+  assert.ok(csv.some((l) => l.startsWith("2026-08,'=Bad Formula,")), 'a name starting with = cannot run as a spreadsheet formula');
+  assert.ok(csv[csv.length - 1].startsWith('2026-08,ALL LANDLORDS,,,Grand total,1000.00,1000.00,100.00,0.00,900.00'));
+
+  // 4. Email the report, with the CSV attached.
+  await c.get('/app/monthly/report?month=2026-08');
+  sentMail.length = 0;
+  r = await c.post('/app/monthly/report/email', { month: '2026-08', to: 'boss@example.com', back: 'report' });
+  assert.match(r.location, /^\/app\/monthly\/report\?month=2026-08&flash=/);
+  assert.equal(sentMail.length, 1);
+  assert.equal(sentMail[0].to, 'boss@example.com');
+  assert.equal(sentMail[0].attachments[0].filename, 'statements-2026-08.csv');
+  assert.match(sentMail[0].attachments[0].content, /Ann Able/);
+  r = await c.post('/app/monthly/report/email', { month: '2026-08', to: 'not-an-email' });
+  assert.match(decodeURIComponent(r.location.replace(/\+/g, ' ')), /Enter the email address/);
+
+  // Without email set up, nothing is sent and the page says why.
+  mailEnabled = false;
+  try {
+    r = await c.get('/app/rent-run?month=2026-08');
+    assert.match(r.text, /Email isn't set up yet/);
+    sentMail.length = 0;
+    r = await c.post('/app/monthly/email', { month: '2026-08' });
+    assert.match(decodeURIComponent(r.location.replace(/\+/g, ' ')), /Email isn’t set up yet/);
+    assert.equal(sentMail.length, 0);
+  } finally { mailEnabled = true; }
+
+  // Another company can't see this report.
+  const other = await registerAndLogin('month-end-2@example.com', 'Other End');
+  r = await other.get('/app/monthly/report.csv?month=2026-08');
+  assert.doesNotMatch(r.text, /Ann Able/);
+});
+
+test('mailer: needs a sender and a provider, and refuses bad addresses', async () => {
+  const { createMailer, isEmail } = require('../src/mailer');
+  assert.equal(createMailer({}).enabled, false);
+  assert.equal(createMailer({ resendApiKey: 'k' }).enabled, false, 'no EMAIL_FROM');
+  assert.equal(createMailer({ resendApiKey: 'k', emailFrom: 'Nexus <statements@example.com>' }).provider, 'Resend');
+  assert.equal(createMailer({ smtpHost: 'smtp.example.com', emailFrom: 'statements@example.com' }).provider, 'SMTP');
+  assert.ok(isEmail('a@b.co'));
+  for (const bad of ['', 'a@b', 'a b@c.com', 'a@b.com, c@d.com', 'x@y.com\r\nBcc: z@z.com']) assert.ok(!isEmail(bad), bad);
+  await assert.rejects(createMailer({ smtpHost: 'h', emailFrom: 's@example.com' }).send({ to: 'bad', subject: 's', text: 't' }), /Not a valid email/);
 });

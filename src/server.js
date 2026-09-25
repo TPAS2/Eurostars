@@ -4,6 +4,7 @@ const path = require('node:path');
 const express = require('express');
 const { openDatabase } = require('./db');
 const auth = require('./auth');
+const { createMailer } = require('./mailer');
 const fmt = require('./format');
 const { createStatementWriter } = require('./ai');
 const { runMonthlyJob } = require('./statements');
@@ -39,6 +40,14 @@ function loadConfig(env = process.env) {
     // Record what users view and change for the admin panel's activity log.
     activityLog: env.ACTIVITY_LOG !== 'false',
     // Sign people out after this many minutes without using the site (0 turns it off).
+    // Email for statements and reports: Resend (RESEND_API_KEY) or SMTP. EMAIL_FROM is the sender.
+    emailFrom: env.EMAIL_FROM || '',
+    resendApiKey: env.RESEND_API_KEY || '',
+    smtpUrl: env.SMTP_URL || '',
+    smtpHost: env.SMTP_HOST || '',
+    smtpPort: Number(env.SMTP_PORT) || 587,
+    smtpUser: env.SMTP_USER || '',
+    smtpPass: env.SMTP_PASS || '',
     idleTimeoutMinutes: env.IDLE_TIMEOUT_MINUTES === undefined ? 60 : Math.max(0, Number(env.IDLE_TIMEOUT_MINUTES) || 0),
   };
 }
@@ -81,7 +90,8 @@ function ensureAdmin(db, config, log = console.log) {
   else log(`No admin account yet. Set ADMIN_USERNAME and ADMIN_PASSWORD, then restart.`);
 }
 
-function createApp(config, db, { writer = null } = {}) {
+function createApp(config, db, { writer = null, mailer = null } = {}) {
+  mailer = mailer || createMailer(config);
   const app = express();
   app.set('view engine', 'ejs');
   app.set('views', path.join(__dirname, '..', 'views'));
@@ -126,7 +136,9 @@ function createApp(config, db, { writer = null } = {}) {
   app.use('/app/invoices', auth.requireLogin, require('./routes/invoices')(db, config));
   app.use('/app/councils', auth.requireLogin, require('./routes/councilPhotos')(db));
   app.use(auth.rejectUncheckedMultipart);
-  app.use('/app/monthly', auth.requireLogin, require('./routes/monthly')(db, writer));
+  const monthly = require('./routes/monthly')(db, writer, mailer);
+  app.use('/app/monthly', auth.requireLogin, monthly);
+  app.get('/app/rent-run', auth.requireLogin, monthly.runPage);
   app.use('/app', auth.requireLogin, require('./routes/app')(db));
   app.use('/admin', auth.requireAdmin, require('./routes/admin')(db, config));
 

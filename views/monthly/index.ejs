@@ -2,6 +2,7 @@
 <header class="page-head">
   <div>
     <h1>Monthly statements</h1>
+    <p class="muted">To calculate rents, email landlords and get the CSV report, use <a href="/app/rent-run?month=<%= month %>">Rent run</a>.</p>
     <p class="muted">A statement for each landlord every month: rent received, fees and costs deducted, and what's held for them. <%= aiEnabled ? 'Summaries are written by AI from the figures.' : 'Set ANTHROPIC_API_KEY to have AI write the summaries.' %></p>
   </div>
   <form method="get" class="inline-form">
@@ -10,6 +11,7 @@
   </form>
 </header>
 <% if (flash) { %><div class="notice ok"><%= flash %></div><% } %>
+<% if (error) { %><div class="notice err"><%= error %></div><% } %>
 
 <section class="card">
   <div class="card-head">
@@ -22,7 +24,7 @@
   </div>
   <% if (!rows.length) { %><p class="muted">Add landlords to start producing statements.</p><% } else { %>
   <div class="table-wrap"><table>
-    <thead><tr><th>Landlord</th><th class="num">Rent</th><th class="num">Fees</th><th class="num">Costs</th><th class="num">Net</th><th class="num">Held</th><th>Status</th><th></th></tr></thead>
+    <thead><tr><th>Landlord</th><th class="num">Rent</th><th class="num">Fees</th><th class="num">Costs</th><th class="num">Net</th><th class="num">Held</th><th>Status</th><th>Emailed</th><th></th></tr></thead>
     <tbody>
     <% rows.forEach(r => { %>
       <tr>
@@ -37,7 +39,8 @@
         <% } else { %>
           <td colspan="6" class="muted">Not generated yet</td>
         <% } %>
-        <td class="num">
+        <td class="small"><% if (r.emailed_at) { %><span class="badge s-active">sent</span> <span class="muted"><%= fmt.ukDateTime(r.emailed_at) %></span><% } else if (!r.email) { %><span class="muted">No email address</span><% } else { %><span class="muted">Not yet</span><% } %></td>
+        <td class="num row-actions">
           <form method="post" action="/app/monthly/generate" data-busy="Generating statement…">
             <%- include('../partials/csrf') %>
             <input type="hidden" name="month" value="<%= month %>">

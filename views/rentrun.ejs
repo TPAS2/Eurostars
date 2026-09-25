@@ -1,0 +1,93 @@
+<%- include('partials/header') %>
+<header class="page-head">
+  <div>
+    <h1>Rent run</h1>
+    <p class="muted">Month end in four steps: calculate the rents, email every landlord their statement, check the report, and email it.</p>
+  </div>
+  <form method="get" class="inline-form">
+    <input type="month" name="month" value="<%= month %>" aria-label="Month">
+    <button class="btn" type="submit">Show</button>
+  </form>
+</header>
+<% if (flash) { %><div class="notice ok"><%= flash %></div><% } %>
+<% if (error) { %><div class="notice err"><%= error %></div><% } %>
+<% const withEmail = rows.filter(r => r.email).length; const emailed = rows.filter(r => r.emailed_at).length; const generated = rows.filter(r => r.id).length; %>
+
+<section class="card" id="month-end">
+  <div class="card-head"><h2><%= monthLabel %></h2></div>
+  <ol class="monthend">
+    <li>
+      <div><strong>Calculate rents</strong><p class="muted small">Charges each active tenancy's rent for <%= monthLabel %> (any already charged are skipped), then works out every landlord's statement: rent received, minus management fees and costs.</p></div>
+      <form method="post" action="/app/monthly/calculate" data-busy="Calculating… this can take a minute.">
+        <%- include('partials/csrf') %><input type="hidden" name="month" value="<%= month %>">
+        <button class="btn primary" type="submit" <%= rows.length ? '' : 'disabled' %>>Calculate all rents</button>
+      </form>
+    </li>
+    <li>
+      <div><strong>Email landlords</strong><p class="muted small">
+        Sends each landlord their <%= monthLabel %> statement. <%= withEmail %> of <%= rows.length %> landlord<%= rows.length === 1 ? ' has an' : 's have an' %> email address<%= emailed ? ` · ${emailed} already emailed` : '' %>.
+        <% if (!emailEnabled) { %><br><strong class="warn-text">Email isn't set up yet.</strong> Your administrator needs to add the email settings.<% } %>
+      </p></div>
+      <form method="post" action="/app/monthly/email" data-busy="Sending emails…" data-confirm="Email <%= monthLabel %> statements to <%= withEmail %> landlord<%= withEmail === 1 ? '' : 's' %>?">
+        <%- include('partials/csrf') %><input type="hidden" name="month" value="<%= month %>">
+        <% if (emailed) { %><label class="check small"><input type="checkbox" name="skip_sent" value="1" checked> Skip those already emailed</label><% } %>
+        <button class="btn primary" type="submit" <%= emailEnabled && withEmail ? '' : 'disabled' %>>Email all landlords</button>
+      </form>
+    </li>
+    <li>
+      <div><strong>Statements report</strong><p class="muted small">Every landlord's statement for <%= monthLabel %> in one CSV spreadsheet, one line per property with totals. Check it in the preview first.</p></div>
+      <div class="step-actions">
+        <a class="btn" href="/app/monthly/report?month=<%= month %>">Preview report</a>
+        <a class="btn primary <%= generated ? '' : 'disabled' %>" href="/app/monthly/report.csv?month=<%= month %>" <%- generated ? '' : 'aria-disabled="true" tabindex="-1"' %>>Download CSV</a>
+      </div>
+    </li>
+    <li>
+      <div><strong>Email the report</strong><p class="muted small">Sends the CSV report as an attachment.</p></div>
+      <form method="post" action="/app/monthly/report/email" class="step-email" data-busy="Sending…">
+        <%- include('partials/csrf') %><input type="hidden" name="month" value="<%= month %>">
+        <input type="email" name="to" value="<%= reportTo %>" placeholder="name@example.com" aria-label="Send the report to" required>
+        <button class="btn primary" type="submit" <%= emailEnabled && generated ? '' : 'disabled' %>>Email report</button>
+      </form>
+    </li>
+  </ol>
+</section>
+
+<section class="card">
+  <div class="card-head">
+    <h2>Landlords</h2>
+    <a class="btn small" href="/app/rent-roll?month=<%= month %>">Rent roll by property</a>
+  </div>
+  <% if (!rows.length) { %><p class="muted">Add landlords to start your rent run.</p><% } else { %>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Landlord</th><th>Email</th><th class="num">Rent received</th><th class="num">Deductions</th><th class="num">Net</th><th class="num">Held</th><th>Statement emailed</th><th></th></tr></thead>
+    <tbody>
+    <% rows.forEach(r => { %>
+      <tr>
+        <td><% if (r.id) { %><a href="/app/monthly/<%= r.id %>"><strong><%= r.name %></strong></a><% } else { %><a href="/app/landlords/<%= r.landlord_id %>"><%= r.name %></a><% } %></td>
+        <td class="small"><%= r.email || '' %><% if (!r.email) { %><a class="muted" href="/app/landlords/<%= r.landlord_id %>/edit">Add email</a><% } %></td>
+        <% if (r.id) { %>
+          <td class="num"><%= fmt.money(r.rent_pence) %></td>
+          <td class="num"><%= r.fees_pence + r.expenses_pence ? '−' + fmt.money(r.fees_pence + r.expenses_pence) : '—' %></td>
+          <td class="num"><strong><%= fmt.money(r.net_pence) %></strong></td>
+          <td class="num"><%= fmt.money(r.closing_pence) %></td>
+        <% } else { %>
+          <td colspan="4" class="muted">Not calculated yet</td>
+        <% } %>
+        <td class="small"><% if (r.emailed_at) { %><span class="badge s-active">sent</span> <span class="muted"><%= fmt.ukDateTime(r.emailed_at) %></span><% } else { %><span class="muted">Not yet</span><% } %></td>
+        <td class="num row-actions">
+          <% if (emailEnabled && r.email) { %>
+          <form method="post" action="/app/monthly/email" data-busy="Sending…" data-confirm="Email the <%= monthLabel %> statement to <%= r.name %> (<%= r.email %>)?">
+            <%- include('partials/csrf') %>
+            <input type="hidden" name="month" value="<%= month %>">
+            <input type="hidden" name="landlord_id" value="<%= r.landlord_id %>">
+            <button class="btn small" type="submit"><%= r.emailed_at ? 'Email again' : 'Email' %></button>
+          </form>
+          <% } %>
+        </td>
+      </tr>
+    <% }) %>
+    </tbody>
+  </table></div>
+  <% } %>
+</section>
+<%- include('partials/footer') %>

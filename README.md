@@ -136,3 +136,9 @@ npm test       # end-to-end tests
 ```
 
 This is a solid starting point, not a finished regulated product. Before charging agencies, get an accountant to review the client-money accounting. Also add password reset emails, two-factor login for the admin account, and a privacy policy and data processing agreement (you will be processing tenants' and landlords' personal data under UK GDPR).
+
+## Rent run and email
+
+The **Rent run** tab does month end in four steps: calculate all rents (charges each tenancy and works out every landlord's statement), email every landlord their statement, preview/download the CSV statements report, and email the report.
+
+Emails need a sending service. Set `EMAIL_FROM` (e.g. `statements@youragency.co.uk`) and either `RESEND_API_KEY` ([Resend](https://resend.com), after verifying your domain there) or `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER` and `SMTP_PASS` for any SMTP provider. Emails show the agency's name as the sender and replies go to the agency's email address. Until email is set up, the email buttons are disabled and the report can still be downloaded.
