@@ -20,7 +20,7 @@ module.exports = function adminRoutes(db, config) {
   // A company is its main login row (company_id IS NULL) plus the people added to it.
   const PEOPLE = '(SELECT m.id FROM users m WHERE m.id = u.id OR m.company_id = u.id)';
   const USAGE_SQL = `
-    SELECT u.id, u.username, u.email, u.phone, u.address, u.name, u.agency_name, u.is_admin, u.status, u.created_at,
+    SELECT u.id, u.username, u.login_name, u.email, u.phone, u.address, u.name, u.agency_name, u.is_admin, u.status, u.created_at,
            (SELECT MAX(last_login_at) FROM users m WHERE m.id = u.id OR m.company_id = u.id) AS last_login_at,
            (SELECT SUM(login_count) FROM users m WHERE m.id = u.id OR m.company_id = u.id) AS login_count,
            (SELECT COUNT(*) FROM users m WHERE m.company_id = u.id) AS people,
@@ -83,14 +83,15 @@ module.exports = function adminRoutes(db, config) {
   // ---------- adding accounts (only the admin can) ----------
 
   router.get('/users/new', (req, res) => {
-    res.render('admin/new-user', { title: 'Add account', section: 'admin', values: {}, errors: {}, minPassword: MIN_PASSWORD });
+    res.render('admin/new-user', { title: 'Add account', section: 'admin', values: { login_name: 'main' }, errors: {}, minPassword: MIN_PASSWORD });
   });
 
   router.post('/users', (req, res) => {
     const values = {
       agency_name: String(req.body.agency_name || '').trim().slice(0, 200),
       name: String(req.body.name || '').trim().slice(0, 200),
-      username: String(req.body.username || '').trim().toLowerCase().slice(0, 60),
+      username: String(req.body.username || '').trim().slice(0, 60),
+      login_name: String(req.body.login_name || '').trim().slice(0, 60),
       email: String(req.body.email || '').trim().toLowerCase().slice(0, 254),
     };
     const password = String(req.body.password || '');
@@ -98,8 +99,9 @@ module.exports = function adminRoutes(db, config) {
     if (!values.agency_name) errors.agency_name = 'Enter the company name.';
     if (!values.name) errors.name = 'Enter the contact name.';
     if (!USERNAME_RE.test(values.username)) errors.username = 'Use 3–30 letters, numbers, dots, dashes or underscores, starting with a letter or number.';
-    else if (RESERVED_USERNAMES.has(values.username) || values.username === config.adminUsername
-      || db.prepare('SELECT 1 FROM users WHERE username = ?').get(values.username)) errors.username = 'That username is taken.';
+    else if (RESERVED_USERNAMES.has(values.username.toLowerCase()) || values.username.toLowerCase() === config.adminUsername.toLowerCase()
+      || db.prepare('SELECT 1 FROM users WHERE username = ? COLLATE NOCASE').get(values.username)) errors.username = 'That username is taken.';
+    if (!LOGIN_NAME_RE.test(values.login_name)) errors.login_name = 'Use 1–30 letters, numbers, dashes or underscores (no spaces or dots).';
     if (values.email && !EMAIL_RE.test(values.email)) errors.email = 'Enter a valid email address, or leave it blank.';
     else if (values.email && db.prepare('SELECT 1 FROM users WHERE email = ?').get(values.email)) errors.email = 'Another account uses this email.';
     if (password.length < MIN_PASSWORD) errors.password = `Use at least ${MIN_PASSWORD} characters.`;
@@ -107,8 +109,8 @@ module.exports = function adminRoutes(db, config) {
     if (Object.keys(errors).length) {
       return res.status(422).render('admin/new-user', { title: 'Add account', section: 'admin', values, errors, minPassword: MIN_PASSWORD });
     }
-    const info = db.prepare('INSERT INTO users (username, email, name, agency_name, password_hash) VALUES (?, ?, ?, ?, ?)')
-      .run(values.username, values.email || null, values.name, values.agency_name, auth.hashPassword(password));
+    const info = db.prepare('INSERT INTO users (username, login_name, email, name, agency_name, password_hash) VALUES (?, ?, ?, ?, ?, ?)')
+      .run(values.username, values.login_name, values.email || null, values.name, values.agency_name, auth.hashPassword(password));
     res.redirect(`/admin/users/${info.lastInsertRowid}?created=1`);
   });
 
@@ -119,15 +121,18 @@ module.exports = function adminRoutes(db, config) {
     const values = {
       name: text('name', 200), agency_name: text('agency_name', 200),
       email: text('email', 254).toLowerCase(), phone: text('phone', 50), address: text('address', 1000),
+      login_name: text('login_name', 60) || u.login_name,
     };
     let error = '';
-    if (!values.name) error = 'Enter the contact name.';
+    if (!LOGIN_NAME_RE.test(values.login_name || '')) error = 'The sign-in name must be 1–30 letters, numbers, dashes or underscores.';
+    else if (db.prepare('SELECT 1 FROM users WHERE company_id = ? AND login_name = ? COLLATE NOCASE').get(u.id, values.login_name)) error = `Someone else at ${u.agency_name} already uses the name "${values.login_name}".`;
+    else if (!values.name) error = 'Enter the contact name.';
     else if (!values.agency_name) error = 'Enter the company name.';
     else if (values.email && !EMAIL_RE.test(values.email)) error = 'Enter a valid email address, or leave it blank.';
     else if (values.email && db.prepare('SELECT 1 FROM users WHERE email = ? AND id != ?').get(values.email, u.id)) error = 'Another account already uses this email.';
     if (error) return res.redirect(`/admin/users/${u.id}?error=${encodeURIComponent(error)}#details`);
-    db.prepare('UPDATE users SET name = ?, agency_name = ?, email = ?, phone = ?, address = ? WHERE id = ?')
-      .run(values.name, values.agency_name, values.email || null, values.phone || null, values.address || null, u.id);
+    db.prepare('UPDATE users SET name = ?, agency_name = ?, email = ?, phone = ?, address = ?, login_name = ? WHERE id = ?')
+      .run(values.name, values.agency_name, values.email || null, values.phone || null, values.address || null, values.login_name, u.id);
     res.redirect(`/admin/users/${u.id}?flash=${encodeURIComponent('Account details saved.')}#details`);
   });
 
@@ -149,12 +154,12 @@ module.exports = function adminRoutes(db, config) {
     const u = target(req, res);
     if (!u) return;
     const name = String(req.body.name || '').trim().slice(0, 200);
-    const loginName = String(req.body.login_name || '').trim().toLowerCase().slice(0, 60);
+    const loginName = String(req.body.login_name || '').trim().slice(0, 60);
     const password = String(req.body.password || '');
     const back = (msg, ok) => res.redirect(`/admin/users/${u.id}?${ok ? 'flash' : 'error'}=${encodeURIComponent(msg)}#people`);
     if (!name) return back('Enter the person\'s full name.');
     if (!LOGIN_NAME_RE.test(loginName)) return back('Their sign-in name must be 1–30 letters, numbers, dashes or underscores (no spaces or dots).');
-    if (db.prepare('SELECT 1 FROM users WHERE company_id = ? AND login_name = ?').get(u.id, loginName)) return back(`${u.agency_name} already has someone called "${loginName}".`);
+    if (db.prepare('SELECT 1 FROM users WHERE (company_id = ? OR id = ?) AND login_name = ? COLLATE NOCASE').get(u.id, u.id, loginName)) return back(`${u.agency_name} already has someone called "${loginName}".`);
     if (password.length < MIN_PASSWORD || password.length > 200) return back(`Their password must be at least ${MIN_PASSWORD} characters.`);
     db.prepare('INSERT INTO users (username, company_id, login_name, name, agency_name, password_hash) VALUES (?, ?, ?, ?, ?, ?)')
       .run(`${u.username}.${loginName}`, u.id, loginName, name, u.agency_name, auth.hashPassword(password));

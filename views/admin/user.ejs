@@ -17,7 +17,7 @@
   <% } %>
 </header>
 
-<% if (created) { %><div class="notice ok">Account created. Give <strong><%= u.agency_name %></strong> their username <strong><%= u.username %></strong> and the password you chose. They can sign in straight away.</div><% } %>
+<% if (created) { %><div class="notice ok">Account created. Give <strong><%= u.agency_name %></strong> their username <strong><%= u.username %></strong>, name <strong><%= u.login_name %></strong> and the password you chose. Capitals count. They can sign in straight away.</div><% } %>
 <% if (flash) { %><div class="notice ok"><%= flash %></div><% } %>
 <% if (error) { %><div class="notice err"><%= error %></div><% } %>
 
@@ -34,14 +34,14 @@
   <div class="card-head">
     <h2>People <span class="count"><%= people.length %></span></h2>
   </div>
-  <p class="muted small">Everyone who can sign in to <strong><%= u.agency_name %></strong>. They all type the username <code><%= u.username %></code>, then their own name and password. They see the same company data.</p>
+  <p class="muted small">Everyone who can sign in to <strong><%= u.agency_name %></strong>. They all type the username <code><%= u.username %></code> exactly as shown (capitals count), then their own name and password. They see the same company data.</p>
   <div class="table-wrap"><table>
     <thead><tr><th>Person</th><th>Signs in with</th><th>Last login</th><th>Last active</th><th>Status</th><th></th></tr></thead>
     <tbody>
     <% people.forEach(m => { const main = !m.company_id; %>
       <tr>
         <td><strong><%= m.name %></strong><% if (main) { %> <span class="badge">main login</span><% } %></td>
-        <td><code><%= u.username %></code><%= main ? '' : ' + ' %><% if (!main) { %><code><%= m.login_name %></code><% } else { %> <span class="muted small">(name left blank)</span><% } %></td>
+        <td><code><%= u.username %></code> + <code><%= m.login_name %></code></td>
         <td><%= fmt.ukDateTime(m.last_login_at) %></td>
         <td><% if (m.last_active) { %><a href="/admin/users/<%= u.id %>?person=<%= m.id %>#activity"><%= fmt.ukDateTime(m.last_active) %></a><% } else { %>No activity<% } %></td>
         <td><span class="badge s-<%= m.status %>"><%= m.status %></span></td>
@@ -79,7 +79,7 @@
     <div class="field">
       <label for="p-login">Sign-in name <span class="req">*</span></label>
       <input id="p-login" name="login_name" required maxlength="30" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="e.g. john">
-      <div class="help">What they type in "Your name" when signing in.</div>
+      <div class="help">What they type in "Your name" when signing in. Capitals count.</div>
     </div>
     <div class="field">
       <label for="p-password">Password <span class="req">*</span></label>
@@ -136,6 +136,10 @@
     <div class="field">
       <label for="d-agency_name">Company name <span class="req">*</span></label>
       <input id="d-agency_name" name="agency_name" value="<%= u.agency_name %>" required>
+    </div>
+    <div class="field">
+      <label for="d-login_name">Main login's sign-in name <span class="req">*</span></label>
+      <input id="d-login_name" name="login_name" value="<%= u.login_name || '' %>" required maxlength="30" autocomplete="off" autocapitalize="none" spellcheck="false">
     </div>
     <div class="field">
       <label for="d-name">Contact name <span class="req">*</span></label>

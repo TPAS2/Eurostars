@@ -23,22 +23,24 @@ module.exports = function authRoutes(db, config) {
     res.render('login', { title: 'Sign in', error: '', login: String(req.query.u || '').slice(0, 254), member: '', allowRegistration: config.allowRegistration });
   });
 
-  // Sign in with the company username, the person's own name (blank for the company's
-  // main login) and their password. Usernames and names are case-insensitive.
-  const findCompany = db.prepare('SELECT * FROM users WHERE username = ? AND company_id IS NULL');
-  const findPerson = db.prepare('SELECT * FROM users WHERE company_id = ? AND login_name = ?');
+  // Sign in with the company username, the person's own name and their password. All three
+  // are required and must match exactly, including capital letters.
+  const findCompany = db.prepare('SELECT * FROM users WHERE username = ? COLLATE BINARY AND company_id IS NULL');
+  const findPerson = db.prepare('SELECT * FROM users WHERE company_id = ? AND login_name = ? COLLATE BINARY');
 
   router.post('/login', (req, res) => {
-    const login = String(req.body.login || req.body.email || '').trim().toLowerCase().slice(0, 254);
-    const member = String(req.body.member || '').trim().toLowerCase().slice(0, 60);
+    const login = String(req.body.login || '').trim().slice(0, 254);
+    const member = String(req.body.member || '').trim().slice(0, 60);
     const password = String(req.body.password || '');
     const ip = req.ip;
     const ua = String(req.headers['user-agent'] || '').slice(0, 300);
-    const who = member ? `${login} / ${member}` : login;
+    const who = `${login} / ${member}`;
     const fail = (status, error) => res.status(status).render('login', { title: 'Sign in', error, login, member, allowRegistration: config.allowRegistration });
     if (loginLimited(`${ip}|${who}`)) return fail(429, 'Too many attempts. Please wait 15 minutes and try again.');
-    const company = login ? findCompany.get(login) : null;
-    const user = company && member ? findPerson.get(company.id, member) : company;
+    if (!login || !member || !password) return fail(422, 'Enter your username, your name and your password.');
+    const company = findCompany.get(login);
+    // The company's own row is its main login; everyone else is a person inside it.
+    const user = !company ? null : company.login_name === member ? company : findPerson.get(company.id, member);
     const ok = auth.verifyPassword(password, user ? user.password_hash : auth.DUMMY_HASH) && !!user;
     if (!ok) {
       logEvent.run(user ? user.id : null, who, 0, ip, ua);
@@ -71,7 +73,7 @@ module.exports = function authRoutes(db, config) {
   router.post('/register', (req, res) => {
     if (!config.allowRegistration) return res.status(403).render('error', { title: 'Registration closed', message: 'New sign-ups are currently closed.' });
     const values = {
-      username: String(req.body.username || '').trim().toLowerCase().slice(0, 60),
+      username: String(req.body.username || '').trim().slice(0, 60),
       name: String(req.body.name || '').trim().slice(0, 200),
       agency_name: String(req.body.agency_name || '').trim().slice(0, 200),
       email: String(req.body.email || '').trim().toLowerCase().slice(0, 254),
@@ -80,7 +82,7 @@ module.exports = function authRoutes(db, config) {
     const errors = {};
     if (!USERNAME_RE.test(values.username)) {
       errors.username = 'Use 3–30 letters, numbers, dots, dashes or underscores, starting with a letter or number.';
-    } else if (RESERVED_USERNAMES.has(values.username) || values.username === config.adminUsername
+    } else if (RESERVED_USERNAMES.has(values.username.toLowerCase()) || values.username.toLowerCase() === config.adminUsername.toLowerCase()
       || db.prepare('SELECT 1 FROM users WHERE username = ?').get(values.username)) {
       errors.username = 'That username is taken. Try another.';
     }
@@ -97,7 +99,7 @@ module.exports = function authRoutes(db, config) {
     if (registerLimited(req.ip)) errors.form = 'Too many sign-ups from your network. Please try again later.';
     if (Object.keys(errors).length) return res.status(422).render('register', { title: 'Create account', errors, values });
     // is_admin is never set here: the admin account comes only from ADMIN_EMAIL / create-admin.
-    const info = db.prepare('INSERT INTO users (username, email, name, agency_name, password_hash) VALUES (?, ?, ?, ?, ?)')
+    const info = db.prepare("INSERT INTO users (username, login_name, email, name, agency_name, password_hash) VALUES (?, 'main', ?, ?, ?, ?)")
       .run(values.username, values.email || null, values.name, values.agency_name, auth.hashPassword(password));
     const user = db.prepare('SELECT * FROM users WHERE id = ?').get(Number(info.lastInsertRowid));
     logEvent.run(user.id, user.username, 1, req.ip, String(req.headers['user-agent'] || '').slice(0, 300));

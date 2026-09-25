@@ -44,10 +44,12 @@ Sign in with `ADMIN_USERNAME` and `ADMIN_PASSWORD` to reach the admin panel. Pub
 
 ## Several people at one company
 
-Each company has one username (e.g. `eurostars`). In the admin panel, open the company and use **People → Add a person** to give someone their own sign-in name (e.g. `john`) and password. They sign in with:
+Each company has one username (e.g. `eurostars`). In the admin panel, open the company and use **People → Add a person** to give someone their own sign-in name (e.g. `john`) and password. Everyone signs in with all three boxes filled in, typed exactly (capitals count):
 - **Username:** the company's username, e.g. `eurostars`
-- **Your name:** their own name, e.g. `john` (left blank for the company's main login)
+- **Your name:** their own name, e.g. `john`. A company's main login uses the name set when the company was added (`main` unless you chose another); change it under **Account details**.
 - **Password:** their own
+
+The admin signs in with `ADMIN_USERNAME` (e.g. `TPAS2`), the name `ADMIN_LOGIN_NAME` (default `admin`) and `ADMIN_PASSWORD`.
 
 Everyone at the company sees the same data, and the activity log shows who did what. From the People section you can reset a person's password, suspend them or remove them without affecting anyone else. Suspending the company suspends everyone in it.
 

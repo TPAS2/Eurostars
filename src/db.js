@@ -238,6 +238,8 @@ function openDatabase(file) {
   addColumnIfMissing(db, 'users', 'company_id', 'INTEGER REFERENCES users(id) ON DELETE CASCADE');
   addColumnIfMissing(db, 'users', 'login_name', 'TEXT');
   db.exec('CREATE INDEX IF NOT EXISTS idx_users_company ON users(company_id)');
+  // Every login needs a name now, including each company's main login.
+  db.exec("UPDATE users SET login_name = CASE WHEN is_admin = 1 THEN 'admin' ELSE 'main' END WHERE company_id IS NULL AND login_name IS NULL");
   addColumnIfMissing(db, 'users', 'phone', 'TEXT');
   addColumnIfMissing(db, 'users', 'address', 'TEXT');
   addColumnIfMissing(db, 'properties', 'council_id', 'INTEGER REFERENCES councils(id) ON DELETE SET NULL');
@@ -253,9 +255,10 @@ function addColumnIfMissing(db, table, column, type) {
 }
 
 // A person's short name within their company (no dots, so it can't clash with usernames).
-const LOGIN_NAME_RE = /^[a-z0-9][a-z0-9_-]{0,29}$/;
+const LOGIN_NAME_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,29}$/;
 
-const USERNAME_RE = /^[a-z0-9][a-z0-9._-]{2,29}$/;
+// Case is kept and must be typed exactly at sign-in; uniqueness ignores case.
+const USERNAME_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{2,29}$/;
 
 // Turn any string into a valid username that `isTaken` says is free.
 function uniqueUsername(seed, isTaken) {

@@ -60,8 +60,9 @@ class Client {
   }
   get(url) { return this.req('GET', url); }
   post(url, body, opts) { return this.req('POST', url, body, opts); }
-  async login(login, password) {
-    const r = await this.post('/login', { login, password });
+  // Every sign-in needs a name: 'admin' for the admin, 'main' for a company's main login.
+  async login(login, password, member = login === 'admin' ? 'admin' : 'main') {
+    const r = await this.post('/login', { login, member, password });
     if (r.location) await this.get(r.location);
     return r;
   }
@@ -109,9 +110,9 @@ test('registration validates input and never grants admin', async () => {
 
 test('wrong password is rejected and logged', async () => {
   const c = new Client();
-  const r = await c.post('/login', { login: 'admin', password: 'nope' });
+  const r = await c.post('/login', { login: 'admin', member: 'admin', password: 'nope' });
   assert.equal(r.status, 401);
-  const ev = db.prepare('SELECT * FROM login_events WHERE email = ? AND success = 0').get('admin');
+  const ev = db.prepare('SELECT * FROM login_events WHERE email = ? AND success = 0').get('admin / admin');
   assert.ok(ev);
 });
 
@@ -298,7 +299,7 @@ test('admin panel: lists all users, suspend, reactivate, delete', async () => {
   await admin.get(`/admin/users/${u.id}`);
   await admin.post(`/admin/users/${u.id}/suspend`, {});
   assert.equal((await victim.get('/app')).location, '/login', 'suspended user is signed out');
-  assert.equal((await victim.post('/login', { login: 'suspend-me', password: 'password-1234' })).status, 403);
+  assert.equal((await victim.post('/login', { login: 'suspend-me', member: 'main', password: 'password-1234' })).status, 403);
 
   await admin.post(`/admin/users/${u.id}/activate`, {});
   assert.equal((await victim.login('suspend-me', 'password-1234')).location, '/app');
@@ -475,13 +476,16 @@ test('create account with a username and password (email optional)', async () =>
 
   // Sign in by username (case-insensitive); admin can also sign in by username.
   const again = new Client();
-  assert.equal((await again.login('HARBOUR.LETS', 'password-1234')).location, '/app');
+  // Capitals count: the username and name must be typed exactly.
+  assert.equal((await new Client().post('/login', { login: 'HARBOUR.LETS', member: 'main', password: 'password-1234' })).status, 401);
+  assert.equal((await new Client().post('/login', { login: 'harbour.lets', member: 'Main', password: 'password-1234' })).status, 401);
+  assert.equal((await again.login('harbour.lets', 'password-1234')).location, '/app');
   assert.equal((await new Client().login('admin', 'owner-password-123')).location, '/admin');
-  assert.equal((await new Client().post('/login', { login: 'harbour.lets', password: 'wrong-password' })).status, 401);
+  assert.equal((await new Client().post('/login', { login: 'harbour.lets', member: 'main', password: 'wrong-password' })).status, 401);
   // Email addresses aren't accepted as a login, only usernames.
   const withEmail = new Client();
   await withEmail.post('/register', { username: 'mailtest', name: 'M', agency_name: 'M', email: 'mail@test.com', password: 'password-1234', password_confirm: 'password-1234' });
-  assert.equal((await new Client().post('/login', { login: 'mail@test.com', password: 'password-1234' })).status, 401);
+  assert.equal((await new Client().post('/login', { login: 'mail@test.com', member: 'main', password: 'password-1234' })).status, 401);
   assert.equal((await new Client().login('mailtest', 'password-1234')).location, '/app');
   assert.match((await new Client().get('/login')).text, />Username <input/);
 });
@@ -526,9 +530,9 @@ test('admin adds an account and resets passwords', async () => {
   await admin.login('admin', 'owner-password-123');
   let r = await admin.get('/admin/users/new');
   assert.equal(r.status, 200);
-  r = await admin.post('/admin/users', { agency_name: 'Coastal Homes', name: 'Pat Lee', username: 'coastal', password: 'short' });
+  r = await admin.post('/admin/users', { agency_name: 'Coastal Homes', name: 'Pat Lee', username: 'coastal', login_name: 'main', password: 'short' });
   assert.equal(r.status, 422);
-  r = await admin.post('/admin/users', { agency_name: 'Coastal Homes', name: 'Pat Lee', username: 'Coastal', password: 'sea-view-2026' });
+  r = await admin.post('/admin/users', { agency_name: 'Coastal Homes', name: 'Pat Lee', username: 'coastal', login_name: 'main', password: 'sea-view-2026' });
   assert.equal(r.status, 302);
   assert.match(r.location, /\/admin\/users\/\d+\?created=1/);
   const id = Number(r.location.match(/users\/(\d+)/)[1]);
@@ -544,7 +548,7 @@ test('admin adds an account and resets passwords', async () => {
   r = await admin.post(`/admin/users/${id}/password`, { password: 'new-pass-2027' });
   assert.match(decodeURIComponent(r.location), /Password changed/);
   assert.equal((await coastal.get('/app')).location, '/login');
-  assert.equal((await new Client().post('/login', { login: 'coastal', password: 'sea-view-2026' })).status, 401);
+  assert.equal((await new Client().post('/login', { login: 'coastal', member: 'main', password: 'sea-view-2026' })).status, 401);
   assert.equal((await new Client().login('coastal', 'new-pass-2027')).location, '/app');
 });
 
@@ -562,6 +566,10 @@ test('admin account is set by username, and its password can be reset on restart
   ensureAdmin(db3, { ...cfg, adminPassword: 'Changed99', adminPasswordReset: true }, () => {});
   assert.ok(verifyPassword('Changed99', db3.prepare('SELECT password_hash FROM users WHERE id = ?').get(row.id).password_hash));
   assert.throws(() => ensureAdmin(openDatabase(':memory:'), { ...cfg, adminPassword: 'abc' }, () => {}), /at least 6/);
+  // Capitals in ADMIN_USERNAME are kept (so the admin must type them), and the admin's name is set.
+  ensureAdmin(db3, { ...cfg, adminUsername: 'TPAS2', adminLoginName: 'admin' }, () => {});
+  const upper = db3.prepare('SELECT username, login_name FROM users WHERE id = ?').get(row.id);
+  assert.deepEqual({ ...upper }, { username: 'TPAS2', login_name: 'admin' });
 });
 
 test('councils link to properties, and through them to landlords and tenants', async () => {
@@ -739,20 +747,24 @@ test('several people at one company share its username, each with their own name
   const admin = new Client();
   await admin.login('admin', 'owner-password-123');
   await admin.get('/admin/users/new');
-  let r = await admin.post('/admin/users', { agency_name: 'Eurostars Lettings', name: 'Theo Owner', username: 'eurostars', password: 'main-login-123' });
+  let r = await admin.post('/admin/users', { agency_name: 'Eurostars Lettings', name: 'Theo Owner', username: 'eurostars', login_name: 'main', password: 'main-login-123' });
   const companyId = Number(r.location.match(/users\/(\d+)/)[1]);
   await admin.get(`/admin/users/${companyId}`);
-  r = await admin.post(`/admin/users/${companyId}/people`, { name: 'John Price', login_name: 'John', password: 'johns-pass-1' });
+  r = await admin.post(`/admin/users/${companyId}/people`, { name: 'John Price', login_name: 'john', password: 'johns-pass-1' });
   assert.match(decodeURIComponent(r.location), /Added John Price/);
   await admin.post(`/admin/users/${companyId}/people`, { name: 'Amy Hall', login_name: 'amy', password: 'amys-pass-22' });
-  r = await admin.post(`/admin/users/${companyId}/people`, { name: 'Dupe', login_name: 'john', password: 'whatever-123' });
-  assert.match(decodeURIComponent(r.location), /already has someone called "john"/);
+  r = await admin.post(`/admin/users/${companyId}/people`, { name: 'Dupe', login_name: 'John', password: 'whatever-123' });
+  assert.match(decodeURIComponent(r.location), /already has someone called "John"/, 'names are unique ignoring capitals');
 
   // Each person signs in with the company username + their name + their own password.
   const john = new Client();
   assert.equal((await john.post('/login', { login: 'eurostars', member: 'amy', password: 'johns-pass-1' })).status, 401, "John's password doesn't open Amy");
-  assert.equal((await john.post('/login', { login: 'eurostars', password: 'johns-pass-1' })).status, 401, "a blank name means the main login, so John's password doesn't work there");
-  r = await john.post('/login', { login: 'EUROSTARS', member: 'JOHN', password: 'johns-pass-1' });
+  for (const blank of [{ login: '', member: 'john', password: 'johns-pass-1' }, { login: 'eurostars', member: '', password: 'johns-pass-1' }, { login: 'eurostars', member: 'john', password: '' }]) {
+    assert.equal((await john.post('/login', blank)).status, 422, `blank box refused: ${JSON.stringify(blank)}`);
+  }
+  assert.equal((await john.post('/login', { login: 'EUROSTARS', member: 'JOHN', password: 'johns-pass-1' })).status, 401, 'capitals count');
+  assert.equal((await john.post('/login', { login: 'eurostars', member: 'main', password: 'johns-pass-1' })).status, 401, "John's password doesn't open the main login");
+  r = await john.post('/login', { login: 'eurostars', member: 'john', password: 'johns-pass-1' });
   assert.equal(r.location, '/app');
   await john.get('/app');
   const amy = new Client();

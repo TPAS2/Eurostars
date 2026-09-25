@@ -25,7 +25,9 @@ function loadConfig(env = process.env) {
     adminEmail: (env.ADMIN_EMAIL || '').trim().toLowerCase(),
     adminPassword: env.ADMIN_PASSWORD || '',
     adminPasswordReset: env.ADMIN_PASSWORD_RESET === 'true',
-    adminUsername: (env.ADMIN_USERNAME || 'admin').trim().toLowerCase(),
+    adminUsername: (env.ADMIN_USERNAME || 'admin').trim(),
+    // The admin's "Your name" at sign-in.
+    adminLoginName: (env.ADMIN_LOGIN_NAME || 'admin').trim(),
     // Off by default: only the admin adds accounts. Set to true to let anyone sign up.
     allowRegistration: env.ALLOW_REGISTRATION === 'true',
     secureCookies: env.SECURE_COOKIES ? env.SECURE_COOKIES === 'true' : production,
@@ -42,7 +44,8 @@ function loadConfig(env = process.env) {
 // owner-only. Setting ADMIN_PASSWORD_RESET=true resets the admin password to ADMIN_PASSWORD
 // on the next start (for when you've forgotten it).
 function ensureAdmin(db, config, log = console.log) {
-  const byUsername = db.prepare('SELECT id, username FROM users WHERE username = ?').get(config.adminUsername);
+  // Usernames are unique ignoring case; the stored case is updated to match ADMIN_USERNAME.
+  const byUsername = db.prepare('SELECT id, username FROM users WHERE username = ? COLLATE NOCASE AND company_id IS NULL').get(config.adminUsername);
   const byEmail = config.adminEmail ? db.prepare('SELECT id, username FROM users WHERE email = ?').get(config.adminEmail) : null;
   let admin = byUsername || byEmail;
   if (config.adminPassword && config.adminPassword.length < 6) throw new Error('ADMIN_PASSWORD must be at least 6 characters.');
@@ -50,13 +53,13 @@ function ensureAdmin(db, config, log = console.log) {
     log('Warning: ADMIN_PASSWORD is short. A longer password (10+ characters) is much harder to guess.');
   }
   if (!admin && config.adminPassword) {
-    const info = db.prepare("INSERT INTO users (username, email, name, agency_name, password_hash) VALUES (?, ?, 'Administrator', ?, ?)")
-      .run(config.adminUsername, config.adminEmail || null, config.appName, auth.hashPassword(config.adminPassword));
+    const info = db.prepare("INSERT INTO users (username, login_name, email, name, agency_name, password_hash) VALUES (?, ?, ?, 'Administrator', ?, ?)")
+      .run(config.adminUsername, config.adminLoginName, config.adminEmail || null, config.appName, auth.hashPassword(config.adminPassword));
     admin = { id: Number(info.lastInsertRowid), username: config.adminUsername };
-    log(`Created admin account: username ${config.adminUsername}.`);
-  } else if (admin && !byUsername) {
-    // Found by email: give it the configured username.
-    db.prepare('UPDATE users SET username = ? WHERE id = ?').run(config.adminUsername, admin.id);
+    log(`Created admin account: username ${config.adminUsername}, name ${config.adminLoginName}.`);
+  } else if (admin) {
+    // Keep the stored username (including its capitals) and sign-in name in line with the settings.
+    db.prepare('UPDATE users SET username = ?, login_name = ? WHERE id = ?').run(config.adminUsername, config.adminLoginName, admin.id);
   }
   if (admin && config.adminPasswordReset && config.adminPassword) {
     db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(auth.hashPassword(config.adminPassword), admin.id);
