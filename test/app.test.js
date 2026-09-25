@@ -640,7 +640,7 @@ test('account details: companies can only view them; the admin edits them', asyn
   await admin.login('admin', 'owner-password-123');
   r = await admin.get(`/admin/users/${u.id}`);
   assert.match(r.text, /Account details/);
-  r = await admin.post(`/admin/users/${u.id}/details`, { name: 'Robin Hart', agency_name: 'After Lets', email: 'robin@after.example.com', phone: '0117 000 1111', address: '1 Quay St', username: 'hacked', password: 'hacked-pass' });
+  r = await admin.post(`/admin/users/${u.id}/details`, { name: 'Robin Hart', agency_name: 'After Lets', email: 'robin@after.example.com', phone: '0117 000 1111', address: '1 Quay St', password: 'hacked-pass' });
   assert.match(decodeURIComponent(r.location), /Account details saved/);
   const after = db.prepare('SELECT * FROM users WHERE id = ?').get(u.id);
   assert.equal(after.agency_name, 'After Lets');
@@ -923,4 +923,26 @@ test('encrypted backups: unreadable without the password, restorable with it', a
   const restored = openDatabase(path.join(target, 'nexus.db'));
   assert.ok(restored.prepare("SELECT 1 FROM users WHERE username = 'admin'").get());
   restored.close();
+});
+
+test('admin can fix a company username\'s capitals; people follow', async () => {
+  const admin = new Client();
+  await admin.login('admin', 'owner-password-123');
+  await admin.get('/admin/users/new');
+  let r = await admin.post('/admin/users', { agency_name: 'Capital Lets', name: 'Theo Grey', username: 'capitallets', login_name: 'Theo', password: 'Sample-Pass-9!' });
+  const id = Number(r.location.match(/users\/(\d+)/)[1]);
+  await admin.get(`/admin/users/${id}`);
+  await admin.post(`/admin/users/${id}/people`, { name: 'Ann', login_name: 'Ann', password: 'anns-pass-1' });
+  assert.equal((await new Client().post('/login', { login: 'CapitalLets', member: 'Theo', password: 'Sample-Pass-9!' })).status, 401);
+
+  await admin.get(`/admin/users/${id}`);
+  r = await admin.post(`/admin/users/${id}/details`, { username: 'CapitalLets', login_name: 'Theo', name: 'Theo Grey', agency_name: 'Capital Lets' });
+  assert.match(decodeURIComponent(r.location), /Account details saved/);
+  assert.equal((await new Client().post('/login', { login: 'CapitalLets', member: 'Theo', password: 'Sample-Pass-9!' })).location, '/app');
+  assert.equal((await new Client().post('/login', { login: 'CapitalLets', member: 'Ann', password: 'anns-pass-1' })).location, '/app');
+  assert.equal((await new Client().post('/login', { login: 'capitallets', member: 'Theo', password: 'Sample-Pass-9!' })).status, 401);
+
+  // Can't take another company's username.
+  r = await admin.post(`/admin/users/${id}/details`, { username: 'eurostars', login_name: 'Theo', name: 'Theo Grey', agency_name: 'Capital Lets' });
+  assert.match(decodeURIComponent(r.location), /That username is taken/);
 });

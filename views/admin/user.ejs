@@ -130,13 +130,20 @@
 
 <section class="card" id="details">
   <h2>Account details</h2>
-  <p class="muted small">Only you can change these. The username <code><%= u.username %></code> stays the same; use Reset password below to change the password.</p>
+  <p class="muted small">Only you can change these. Use Reset password below to change the password.</p>
   <form method="post" action="/admin/users/<%= u.id %>/details" class="form-grid">
     <%- include('../partials/csrf') %>
     <div class="field">
       <label for="d-agency_name">Company name <span class="req">*</span></label>
       <input id="d-agency_name" name="agency_name" value="<%= u.agency_name %>" required>
     </div>
+    <% if (!u.is_admin) { %>
+    <div class="field">
+      <label for="d-username">Username <span class="req">*</span></label>
+      <input id="d-username" name="username" value="<%= u.username %>" required maxlength="30" autocomplete="off" autocapitalize="none" spellcheck="false">
+      <div class="help">What everyone at this company types as the username. Capitals count.</div>
+    </div>
+    <% } %>
     <div class="field">
       <label for="d-login_name">Contact's sign-in name <span class="req">*</span></label>
       <input id="d-login_name" name="login_name" value="<%= u.login_name || '' %>" required maxlength="30" autocomplete="off" autocapitalize="none" spellcheck="false">

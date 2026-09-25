@@ -126,8 +126,16 @@ module.exports = function adminRoutes(db, config) {
       name: text('name', 200), agency_name: text('agency_name', 200),
       email: text('email', 254).toLowerCase(), phone: text('phone', 50), address: text('address', 1000),
       login_name: text('login_name', 60) || u.login_name,
+      username: text('username', 60) || u.username,
     };
     let error = '';
+    // The username can be changed too (e.g. to fix its capitals); it stays unique ignoring case.
+    if (!USERNAME_RE.test(values.username)) error = 'The username must be 3–30 letters, numbers, dots, dashes or underscores.';
+    else if (RESERVED_USERNAMES.has(values.username.toLowerCase()) || values.username.toLowerCase() === config.adminUsername.toLowerCase()
+      || db.prepare('SELECT 1 FROM users WHERE username = ? COLLATE NOCASE AND id != ? AND (company_id IS NULL OR company_id != ?)').get(values.username, u.id, u.id)) {
+      error = 'That username is taken.';
+    }
+    if (error) return res.redirect(`/admin/users/${u.id}?error=${encodeURIComponent(error)}#details`);
     if (!LOGIN_NAME_RE.test(values.login_name || '')) error = 'The sign-in name must be 1–30 letters, numbers, dashes or underscores.';
     else if (db.prepare('SELECT 1 FROM users WHERE company_id = ? AND login_name = ? COLLATE NOCASE').get(u.id, values.login_name)) error = `Someone else at ${u.agency_name} already uses the name "${values.login_name}".`;
     else if (!values.name) error = 'Enter the contact name.';
@@ -135,8 +143,10 @@ module.exports = function adminRoutes(db, config) {
     else if (values.email && !EMAIL_RE.test(values.email)) error = 'Enter a valid email address, or leave it blank.';
     else if (values.email && db.prepare('SELECT 1 FROM users WHERE email = ? AND id != ?').get(values.email, u.id)) error = 'Another account already uses this email.';
     if (error) return res.redirect(`/admin/users/${u.id}?error=${encodeURIComponent(error)}#details`);
-    db.prepare('UPDATE users SET name = ?, agency_name = ?, email = ?, phone = ?, address = ?, login_name = ? WHERE id = ?')
-      .run(values.name, values.agency_name, values.email || null, values.phone || null, values.address || null, values.login_name, u.id);
+    db.prepare('UPDATE users SET name = ?, agency_name = ?, email = ?, phone = ?, address = ?, login_name = ?, username = ? WHERE id = ?')
+      .run(values.name, values.agency_name, values.email || null, values.phone || null, values.address || null, values.login_name, values.username, u.id);
+    // People inside the company carry the company username in their own record.
+    db.prepare("UPDATE users SET username = ? || '.' || login_name WHERE company_id = ?").run(values.username, u.id);
     res.redirect(`/admin/users/${u.id}?flash=${encodeURIComponent('Account details saved.')}#details`);
   });
 
