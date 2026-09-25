@@ -625,6 +625,8 @@ test('councils link to properties, and through them to landlords and tenants', a
   const list = (await c.get('/app/properties')).text;
   assert.match(list, /<th[^>]*>Council<\/th>\s*<th[^>]*>Town \/ city<\/th>/, 'Council sits left of Town / city');
   assert.doesNotMatch(list, /<th[^>]*>Postcode<\/th>/, 'Council replaces Postcode in the list');
+  assert.match(list, /<th[^>]*>Property name<\/th>/);
+  assert.doesNotMatch(list, /<th[^>]*>Address<\/th>/, 'Property name replaces Address');
   assert.match(list, /Bristol City Council/);
   const rail = (await c.get('/app')).text.match(/<nav class="rail"[\s\S]*?<\/nav>/)[0];
   // [0] is the menu's own label ("Main"); the first button follows it.

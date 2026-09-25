@@ -35,7 +35,7 @@ const ENTITIES = {
     order: 'address_line1 COLLATE NOCASE',
     fields: [
       { name: 'council_id', label: 'Council', type: 'ref', ref: 'councils', help: 'The local authority for this address.' },
-      { name: 'address_line1', label: 'Address', type: 'text', required: true },
+      { name: 'address_line1', label: 'Property name', type: 'text', required: true },
       { name: 'town', label: 'Town / city', type: 'text' },
       { name: 'postcode', label: 'Postcode', type: 'text' },
       { name: 'landlord_id', label: 'Landlord', type: 'ref', ref: 'landlords' },
