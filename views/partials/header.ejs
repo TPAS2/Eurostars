@@ -40,7 +40,6 @@
     </nav>
     <div class="rail rail-me">
       <a class="rail-btn avatar <%= s === 'account' ? 'active' : '' %>" href="/app/account" data-tip="My account · <%= user.name %>" aria-label="My account" <%- s === 'account' ? 'aria-current="page"' : '' %>><%= initials %></a>
-      <a class="rail-btn" href="/app/export" data-tip="Download my data" aria-label="Download my data"><%- include('icon', { name: 'download' }) %></a>
       <form method="post" action="/logout">
         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
         <button class="rail-btn" type="submit" data-tip="Sign out" aria-label="Sign out"><%- include('icon', { name: 'signout' }) %></button>

@@ -7,6 +7,7 @@
   </div>
   <% if (!isSelf) { %>
   <div class="actions">
+    <a class="btn" href="/admin/users/<%= u.id %>/export">Download data</a>
     <% if (u.status === 'active') { %>
       <form method="post" action="/admin/users/<%= u.id %>/logout"><%- include('../partials/csrf') %><button class="btn" type="submit">Sign out everywhere</button></form>
       <form method="post" action="/admin/users/<%= u.id %>/suspend" data-confirm="Suspend @<%= u.username %>? They will be signed out and unable to log in."><%- include('../partials/csrf') %><button class="btn danger" type="submit">Suspend</button></form>

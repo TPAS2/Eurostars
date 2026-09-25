@@ -220,6 +220,23 @@ module.exports = function adminRoutes(db, config) {
     res.redirect(`/admin/users/${m.company_id}?flash=${encodeURIComponent(`${done} ${m.name}.`)}#people`);
   });
 
+  // Everything one agency has stored, as a JSON file (admin only).
+  router.get('/users/:id/export', (req, res) => {
+    const u = target(req, res);
+    if (!u) return;
+    const tables = ['landlords', 'properties', 'tenants', 'tenancies', 'councils', 'maintenance_jobs', 'compliance_items', 'transactions', 'invoices', 'monthly_statements'];
+    const data = {
+      exported_at: new Date().toISOString(),
+      account: db.prepare('SELECT id, username, login_name, email, phone, address, name, agency_name, created_at FROM users WHERE id = ?').get(u.id),
+      people: db.prepare('SELECT id, login_name, name, email, status, created_at, last_login_at FROM users WHERE company_id = ? ORDER BY id').all(u.id),
+    };
+    for (const t of tables) data[t] = db.prepare(`SELECT * FROM ${t} WHERE account_id = ? ORDER BY id`).all(u.id);
+    const safeName = String(u.username).replace(/[^A-Za-z0-9._-]/g, '_');
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="nexus-${safeName}-${fmt.today()}.json"`);
+    res.send(JSON.stringify(data, null, 2));
+  });
+
   router.get('/users/:id', (req, res) => {
     const u = target(req, res);
     if (!u) return;

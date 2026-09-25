@@ -46,6 +46,7 @@ function describe(db, req) {
       if (parts[1] === 'security') return { action: 'viewed', text: 'Viewed security settings' };
       if (parts[1] === 'users.csv') return { action: 'downloaded', text: 'Downloaded the user list' };
       if (parts[2] === 'new') return { action: 'viewed', text: 'Opened Add account' };
+      if (parts[3] === 'export') return { action: 'downloaded', text: `Downloaded all data for ${who}` };
       if (target) return { action: 'viewed', text: `Viewed account ${who}` };
       return { action: 'viewed', text: 'Viewed the admin panel' };
     }
@@ -72,7 +73,6 @@ function describe(db, req) {
 
   // Sections with their own routes.
   if (section === 'account') return { action: 'viewed', text: 'Viewed my account' };
-  if (section === 'export') return { action: 'downloaded', text: 'Downloaded all their data' };
   if (section === 'statements') return { action: 'viewed', text: 'Viewed landlord statements' };
   if (section === 'rent' && post) return { action: 'created', text: `Raised rent for ${req.body.month || 'a month'}` };
   if (section === 'monthly') {

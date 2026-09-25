@@ -419,10 +419,17 @@ test('monthly job fills in last month only where missing', async () => {
   assert.equal(await runMonthlyJob(db, null, { today: '2026-09-02', log: () => {} }), 0, 'second run has nothing to do');
 });
 
-test('agency data export', async () => {
+test('agency data export: only the admin can download it', async () => {
   const c = await registerAndLogin('export@example.com', 'Export Lets');
   await c.post('/app/landlords', { name: 'Exported Landlord' });
-  const r = await c.get('/app/export');
+  assert.equal((await c.get('/app/export')).status, 404, 'companies have no export');
+  assert.doesNotMatch((await c.get('/app')).text, /Download my data/);
+  const id = db.prepare("SELECT id FROM users WHERE username = 'export'").get().id;
+  assert.equal((await c.get(`/admin/users/${id}/export`)).status, 404);
+  const admin = new Client();
+  await admin.login('admin', 'owner-password-123');
+  assert.match((await admin.get(`/admin/users/${id}`)).text, /href="\/admin\/users\/\d+\/export">Download data/);
+  const r = await admin.get(`/admin/users/${id}/export`);
   const data = JSON.parse(r.text);
   assert.equal(data.account.email, 'export@example.com');
   assert.equal(data.landlords.length, 1);

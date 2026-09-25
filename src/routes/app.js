@@ -334,21 +334,6 @@ module.exports = function appRoutes(db) {
     res.render('account', { title: 'My account', section: 'account', acct });
   });
 
-  // ---------- export: everything this agency has stored, as JSON ----------
-
-  router.get('/export', (req, res) => {
-    const a = req.user.id;
-    const tables = ['landlords', 'properties', 'tenants', 'tenancies', 'maintenance_jobs', 'compliance_items', 'transactions', 'invoices', 'monthly_statements'];
-    const data = {
-      exported_at: new Date().toISOString(),
-      account: db.prepare('SELECT id, username, email, name, agency_name, created_at FROM users WHERE id = ?').get(a),
-    };
-    for (const t of tables) data[t] = db.prepare(`SELECT * FROM ${t} WHERE account_id = ? ORDER BY id`).all(a);
-    res.setHeader('Content-Type', 'application/json; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="nexus-export-${fmt.today()}.json"`);
-    res.send(JSON.stringify(data, null, 2));
-  });
-
   // ---------- add a tenant to a property (tenant + tenancy in one step) ----------
 
   const TENANT_FIELDS = ENTITIES.tenants.fields.filter((f) => f.name !== 'notes');
