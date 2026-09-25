@@ -503,7 +503,7 @@ test('create account with a username and password (email optional)', async () =>
   await withEmail.post('/register', { username: 'mailtest', name: 'M', agency_name: 'M', email: 'mail@test.com', password: 'password-1234', password_confirm: 'password-1234' });
   assert.equal((await new Client().post('/login', { login: 'mail@test.com', member: 'main', password: 'password-1234' })).status, 401);
   assert.equal((await new Client().login('mailtest', 'password-1234', 'M')).location, '/app');
-  assert.match((await new Client().get('/login')).text, />Username <input/);
+  assert.match((await new Client().get('/login')).text, />Agency <input/);
 });
 
 test('older databases get usernames when upgraded', () => {

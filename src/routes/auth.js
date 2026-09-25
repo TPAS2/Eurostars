@@ -39,7 +39,7 @@ module.exports = function authRoutes(db, config) {
     const who = `${login} / ${member}`;
     const fail = (status, error) => res.status(status).render('login', { title: 'Sign in', error, login, member, allowRegistration: config.allowRegistration });
     if (loginLimited(`${ip}|${who}`)) return fail(429, 'Too many attempts. Please wait 15 minutes and try again.');
-    if (!login || !member || !password) return fail(422, 'Enter your username, your name and your password.');
+    if (!login || !member || !password) return fail(422, 'Enter your agency, your name and your password.');
     const company = findCompany.get(login);
     // The company's own row is its main login (and the admin's login); everyone else is a
     // person inside a company.
@@ -47,7 +47,7 @@ module.exports = function authRoutes(db, config) {
     const ok = auth.verifyPassword(password, user ? user.password_hash : auth.DUMMY_HASH) && !!user;
     if (!ok) {
       logEvent.run(user ? user.id : null, who, 0, ip, ua);
-      return fail(401, 'Incorrect username, name or password.');
+      return fail(401, 'Incorrect agency, name or password.');
     }
     if (user.status !== 'active' || company.status !== 'active') {
       logEvent.run(user.id, who, 0, ip, ua);
