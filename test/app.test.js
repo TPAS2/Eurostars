@@ -960,3 +960,16 @@ test('admin can fix a company username\'s capitals; people follow', async () => 
   r = await admin.post(`/admin/users/${id}/details`, { username: 'eurostars', login_name: 'Theo', name: 'Theo Grey', agency_name: 'Capital Lets' });
   assert.match(decodeURIComponent(r.location), /That username is taken/);
 });
+
+test('councils list shows how many properties each has, and which', async () => {
+  const c = await registerAndLogin('council-list@example.com', 'List Lets');
+  let r = await c.post('/app/councils', { name: 'Leeds City Council', council_tax_phone: '0113 222 4404' });
+  const leeds = String(idFrom(r.location));
+  await c.post('/app/councils', { name: 'Empty Council' });
+  for (const a of ['1 A Street', '2 B Street', '3 C Street', '4 D Street']) await c.post('/app/properties', { address_line1: a, council_id: leeds, status: 'let' });
+  r = await c.get('/app/councils');
+  assert.match(r.text, /<th[^>]*>Properties<\/th>/);
+  assert.doesNotMatch(r.text, /<th[^>]*>(Council tax phone|Council tax email|Licensing email)/, 'only name and properties in the list');
+  assert.match(r.text, /Leeds City Council[\s\S]*?4 · 1 A Street, 2 B Street, 3 C Street \+1 more/);
+  assert.match(r.text, /Empty Council[\s\S]*?None yet/);
+});

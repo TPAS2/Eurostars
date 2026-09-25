@@ -73,7 +73,9 @@ const ENTITIES = {
       { name: 'address', label: 'Address', type: 'textarea' },
       { name: 'notes', label: 'Notes', type: 'textarea' },
     ],
-    columns: ['name', 'council_tax_phone', 'council_tax_email', 'licensing_email'],
+    columns: ['name', 'properties'],
+    // Columns worked out when listing rather than stored on the record.
+    computed: { properties: { label: 'Properties' } },
     children: [{ entity: 'properties', fk: 'council_id' }],
   },
 
@@ -188,6 +190,7 @@ const REF_LABELS = {
 for (const [key, def] of Object.entries(ENTITIES)) {
   def.key = key;
   def.fieldMap = Object.fromEntries(def.fields.map((f) => [f.name, f]));
+  for (const [name, c] of Object.entries(def.computed || {})) def.fieldMap[name] = { name, label: c.label, type: 'computed' };
 }
 
 module.exports = { ENTITIES, REF_LABELS };

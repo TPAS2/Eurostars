@@ -32,6 +32,7 @@ module.exports = function appRoutes(db) {
   function display(def, field, row, maps) {
     const f = def.fieldMap[field];
     const v = row[field];
+    if (f.type === 'computed') return v || { text: '' };
     if (v === null || v === undefined || v === '') return { text: '' };
     switch (f.type) {
       case 'money': return { text: fmt.money(v), num: true };
@@ -410,6 +411,19 @@ module.exports = function appRoutes(db) {
     const truncated = rows.length > LIST_LIMIT;
     if (truncated) rows.pop();
     const maps = refLabelMaps(def, a);
+    if (def.key === 'councils') {
+      // How many properties are in each council, and which ones.
+      const byCouncil = new Map();
+      for (const p of db.prepare("SELECT council_id, address_line1 FROM properties WHERE account_id = ? AND council_id IS NOT NULL ORDER BY address_line1 COLLATE NOCASE").all(a)) {
+        if (!byCouncil.has(p.council_id)) byCouncil.set(p.council_id, []);
+        byCouncil.get(p.council_id).push(p.address_line1);
+      }
+      for (const row of rows) {
+        const list = byCouncil.get(row.id) || [];
+        const shown = list.slice(0, 3).join(', ') + (list.length > 3 ? ` +${list.length - 3} more` : '');
+        row.properties = { text: list.length ? `${list.length} · ${shown}` : 'None yet', count: list.length };
+      }
+    }
     res.render('list', { title: def.plural, section: def.key, def, rows, maps, display, rowTitle, q, searchable: textFields.length > 0, truncated });
   });
 
