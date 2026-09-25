@@ -47,7 +47,7 @@ const ENTITIES = {
       { name: 'status', label: 'Status', type: 'select', options: ['vacant', 'let', 'under offer', 'unavailable'], required: true, default: 'vacant' },
       { name: 'notes', label: 'Notes', type: 'textarea' },
     ],
-    columns: ['address_line1', 'town', 'council_id', 'landlord_id', 'status'],
+    columns: ['address_line1', 'council_id', 'town', 'landlord_id', 'status'],
     children: [
       { entity: 'tenancies', fk: 'property_id' },
       { entity: 'compliance', fk: 'property_id' },

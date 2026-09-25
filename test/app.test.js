@@ -623,7 +623,7 @@ test('councils link to properties, and through them to landlords and tenants', a
   const details = (await c.get(`/app/properties/${propertyId}`)).text.match(/<dl class="details">[\s\S]*?<\/dt>/)[0];
   assert.match(details, /<dt>Council<\/dt>$/, 'Council is the first detail on the property page');
   const list = (await c.get('/app/properties')).text;
-  assert.match(list, /<th[^>]*>Council<\/th>/);
+  assert.match(list, /<th[^>]*>Council<\/th>\s*<th[^>]*>Town \/ city<\/th>/, 'Council sits left of Town / city');
   assert.doesNotMatch(list, /<th[^>]*>Postcode<\/th>/, 'Council replaces Postcode in the list');
   assert.match(list, /Bristol City Council/);
   const rail = (await c.get('/app')).text.match(/<nav class="rail"[\s\S]*?<\/nav>/)[0];
