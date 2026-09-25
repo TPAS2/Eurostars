@@ -30,6 +30,66 @@
   <div class="tile"><span class="label">Activity</span><span class="value sm"><%= extra.transactions %> transactions</span><span class="sub"><%= extra.jobs %> jobs · <%= extra.certificates %> certificates</span></div>
 </section>
 
+<nav class="jump-links" aria-label="On this page">
+  <a href="#details">Account details</a>
+  <a href="#people">People</a>
+  <a href="#reset-password">Reset password</a>
+  <a href="#activity">Activity</a>
+  <a href="#sign-ins">Sign-in history</a>
+</nav>
+
+<section class="card" id="details">
+  <h2>Account details</h2>
+  <p class="muted small">Only you can change these. Use Reset password below to change the password.</p>
+  <form method="post" action="/admin/users/<%= u.id %>/details" class="form-grid">
+    <%- include('../partials/csrf') %>
+    <div class="field">
+      <label for="d-agency_name">Company name <span class="req">*</span></label>
+      <input id="d-agency_name" name="agency_name" value="<%= u.agency_name %>" required>
+    </div>
+    <% if (!u.is_admin) { %>
+    <div class="field">
+      <label for="d-username">Username <span class="req">*</span></label>
+      <input id="d-username" name="username" value="<%= u.username %>" required maxlength="30" autocomplete="off" autocapitalize="none" spellcheck="false">
+      <div class="help">What everyone at this company types as the username. Capitals count.</div>
+    </div>
+    <% } %>
+    <div class="field">
+      <label for="d-login_name">Contact's sign-in name <span class="req">*</span></label>
+      <input id="d-login_name" name="login_name" value="<%= u.login_name || '' %>" required maxlength="30" autocomplete="off" autocapitalize="none" spellcheck="false">
+    </div>
+    <div class="field">
+      <label for="d-name">Contact name <span class="req">*</span></label>
+      <input id="d-name" name="name" value="<%= u.name %>" required>
+    </div>
+    <div class="field">
+      <label for="d-email">Email</label>
+      <input id="d-email" name="email" type="email" value="<%= u.email || '' %>">
+    </div>
+    <div class="field">
+      <label for="d-phone">Phone</label>
+      <input id="d-phone" name="phone" type="tel" value="<%= u.phone || '' %>">
+    </div>
+    <div class="field wide">
+      <label for="d-address">Company address</label>
+      <textarea id="d-address" name="address" rows="3"><%= u.address || '' %></textarea>
+    </div>
+    <div class="form-actions wide"><button class="btn primary" type="submit">Save details</button></div>
+  </form>
+</section>
+
+<section class="card" id="reset-password">
+  <h2>Reset password <span class="muted small">(main login)</span></h2>
+  <p class="muted small">Passwords are stored scrambled, so nobody (not even you) can look one up. If <%= isSelf ? 'you forget yours' : 'they forget theirs' %>, set a new one here<%= isSelf ? '' : ' and tell them what it is' %>.</p>
+  <form method="post" action="/admin/users/<%= u.id %>/password" class="inline-form">
+    <%- include('../partials/csrf') %>
+    <label>New password <input id="new_password" name="password" type="text" minlength="<%= minPassword %>" autocomplete="off" required></label>
+    <button class="btn" type="button" data-generate="#new_password">Suggest one</button>
+    <button class="btn primary" type="submit">Set password</button>
+  </form>
+</section>
+
+
 <section class="card" id="people">
   <div class="card-head">
     <h2>People <span class="count"><%= people.length %></span></h2>
@@ -115,7 +175,7 @@
   </table></div><% } %>
 </section>
 
-<section class="card">
+<section class="card" id="sign-ins">
   <h2>Sign-in history</h2>
   <% if (!logins.length) { %><p class="muted">No sign-ins yet.</p><% } else { %>
   <div class="table-wrap"><table>
@@ -126,57 +186,6 @@
     <% }) %>
     </tbody>
   </table></div><% } %>
-</section>
-
-<section class="card" id="details">
-  <h2>Account details</h2>
-  <p class="muted small">Only you can change these. Use Reset password below to change the password.</p>
-  <form method="post" action="/admin/users/<%= u.id %>/details" class="form-grid">
-    <%- include('../partials/csrf') %>
-    <div class="field">
-      <label for="d-agency_name">Company name <span class="req">*</span></label>
-      <input id="d-agency_name" name="agency_name" value="<%= u.agency_name %>" required>
-    </div>
-    <% if (!u.is_admin) { %>
-    <div class="field">
-      <label for="d-username">Username <span class="req">*</span></label>
-      <input id="d-username" name="username" value="<%= u.username %>" required maxlength="30" autocomplete="off" autocapitalize="none" spellcheck="false">
-      <div class="help">What everyone at this company types as the username. Capitals count.</div>
-    </div>
-    <% } %>
-    <div class="field">
-      <label for="d-login_name">Contact's sign-in name <span class="req">*</span></label>
-      <input id="d-login_name" name="login_name" value="<%= u.login_name || '' %>" required maxlength="30" autocomplete="off" autocapitalize="none" spellcheck="false">
-    </div>
-    <div class="field">
-      <label for="d-name">Contact name <span class="req">*</span></label>
-      <input id="d-name" name="name" value="<%= u.name %>" required>
-    </div>
-    <div class="field">
-      <label for="d-email">Email</label>
-      <input id="d-email" name="email" type="email" value="<%= u.email || '' %>">
-    </div>
-    <div class="field">
-      <label for="d-phone">Phone</label>
-      <input id="d-phone" name="phone" type="tel" value="<%= u.phone || '' %>">
-    </div>
-    <div class="field wide">
-      <label for="d-address">Company address</label>
-      <textarea id="d-address" name="address" rows="3"><%= u.address || '' %></textarea>
-    </div>
-    <div class="form-actions wide"><button class="btn primary" type="submit">Save details</button></div>
-  </form>
-</section>
-
-<section class="card" id="reset-password">
-  <h2>Reset password <span class="muted small">(main login)</span></h2>
-  <p class="muted small">Passwords are stored scrambled, so nobody (not even you) can look one up. If <%= isSelf ? 'you forget yours' : 'they forget theirs' %>, set a new one here<%= isSelf ? '' : ' and tell them what it is' %>.</p>
-  <form method="post" action="/admin/users/<%= u.id %>/password" class="inline-form">
-    <%- include('../partials/csrf') %>
-    <label>New password <input id="new_password" name="password" type="text" minlength="<%= minPassword %>" autocomplete="off" required></label>
-    <button class="btn" type="button" data-generate="#new_password">Suggest one</button>
-    <button class="btn primary" type="submit">Set password</button>
-  </form>
 </section>
 
 <% if (!isSelf) { %>

@@ -364,3 +364,7 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fo
 .recovery h3 { margin-top: 0; }
 .code-list { columns: 2; margin: 0; padding-left: 22px; font-size: 1rem; }
 .code-list li { margin: 4px 0; }
+.jump-links { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 18px; }
+.jump-links a { padding: 6px 12px; border-radius: 99px; background: var(--surface); border: 1px solid var(--border); font-size: .85rem; font-weight: 600; color: var(--text); }
+.jump-links a:hover { border-color: var(--brand); color: var(--brand); text-decoration: none; }
+section[id] { scroll-margin-top: 16px; }
