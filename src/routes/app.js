@@ -264,6 +264,19 @@ module.exports = function appRoutes(db) {
                           AND c2.item_type = c.item_type AND c2.expiry_date > c.expiry_date)
         ORDER BY c.expiry_date LIMIT 20`
     ).all(a, soon);
+    // Notifications: certificates expired or expiring within a month. The 60-day list
+    // below then only shows what's coming up after that.
+    const monthAhead = fmt.addDays(today, 30);
+    const certName = { 'Gas Safety (CP12)': 'Gas certificate', EICR: 'Electrical certificate (EICR)' };
+    const daysBetween = (from, to) => Math.round((Date.parse(to) - Date.parse(from)) / 86400000);
+    const notifications = compliance.filter((c) => c.expiry_date <= monthAhead).map((c) => {
+      const days = daysBetween(today, c.expiry_date);
+      return {
+        ...c, name: certName[c.item_type] || c.item_type, expired: days < 0,
+        when: days < 0 ? `expired ${-days} day${days === -1 ? '' : 's'} ago` : days === 0 ? 'expires today' : `expires in ${days} day${days === 1 ? '' : 's'}`,
+      };
+    });
+    const comingUp = compliance.filter((c) => c.expiry_date > monthAhead);
     const endingTenancies = db.prepare(
       `SELECT ty.id, ty.end_date, p.address_line1, t.name AS tenant_name
          FROM tenancies ty JOIN properties p ON p.id = ty.property_id JOIN tenants t ON t.id = ty.tenant_id
@@ -278,7 +291,7 @@ module.exports = function appRoutes(db) {
         LIMIT 10`
     ).all(a);
     res.render('dashboard', {
-      title: 'Dashboard', section: 'dashboard', stats, arrears: arrears.slice(0, 10), compliance, endingTenancies, jobs,
+      title: 'Dashboard', section: 'dashboard', stats, arrears: arrears.slice(0, 10), compliance: comingUp, notifications, endingTenancies, jobs,
       today, month: today.slice(0, 7), fmt, flash: req.query.flash || '',
     });
   });

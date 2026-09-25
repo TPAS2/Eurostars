@@ -664,3 +664,32 @@ test('property certificates: gas, electrical and insurance with current, previou
   // The three key types aren't repeated in the "Other compliance" list.
   assert.doesNotMatch(r.text.split('id="certificates"')[1].split('</section>').slice(1).join(''), /New Gas Co/);
 });
+
+test('dashboard notifications list certificates expiring within a month', async () => {
+  const fmt = require('../src/format');
+  const c = await registerAndLogin('notify@example.com', 'Notify Lets');
+  let r = await c.get('/app');
+  assert.match(r.text, /Notifications/);
+  assert.match(r.text, /Nothing needs attention/);
+
+  r = await c.post('/app/properties', { address_line1: '2 Dock Lane', status: 'let' });
+  const pid = String(idFrom(r.location));
+  const add = (item_type, days) => c.post('/app/compliance', { property_id: pid, item_type, expiry_date: fmt.addDays(fmt.today(), days) });
+  await add('Gas Safety (CP12)', 12);   // due in 12 days -> notify
+  await add('EICR', -3);                // expired -> notify
+  await add('Insurance', 45);           // 45 days -> "coming up", not a notification
+  await add('EPC', 400);                // far off -> neither
+
+  r = await c.get('/app');
+  const notes = r.text.match(/id="notifications"[\s\S]*?<\/section>/)[0];
+  assert.match(notes, /Gas certificate<\/strong> for <a[^>]*>2 Dock Lane[\s\S]*expires in 12 days/);
+  assert.match(notes, /Electrical certificate \(EICR\)[\s\S]*expired 3 days ago/);
+  assert.doesNotMatch(notes, /Insurance|EPC/);
+  assert.match(notes, /class="count alert-count">2</);
+  assert.match(r.text, /Coming up in 1–2 months[\s\S]*Insurance/);
+
+  // Renewing the gas certificate clears its notification.
+  await add('Gas Safety (CP12)', 365);
+  r = await c.get('/app');
+  assert.doesNotMatch(r.text.match(/id="notifications"[\s\S]*?<\/section>/)[0], /Gas certificate/);
+});

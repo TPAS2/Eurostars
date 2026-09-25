@@ -325,3 +325,17 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fo
 .cert-head .badge { text-transform: none; }
 .cert-history td { white-space: nowrap; }
 .cert-history .table-scroll { overflow-x: auto; }
+
+/* ---------- dashboard notifications ---------- */
+.notifications.has-items { border-left: 4px solid var(--bad); }
+.alert-count { background: var(--bad); color: #fff; }
+.notice-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.notice-list li { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.notice-list li:last-child { border-bottom: 0; }
+.notice-dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+.is-expired .notice-dot { background: var(--bad); }
+.is-expiring .notice-dot { background: var(--warn); }
+.notice-text { flex: 1; min-width: 0; }
+.notice-when { display: block; font-size: .85rem; }
+.is-expired .notice-when { color: var(--bad); font-weight: 600; }
+.is-expiring .notice-when { color: var(--warn); }

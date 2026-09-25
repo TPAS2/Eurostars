@@ -12,6 +12,29 @@
 </header>
 <% if (flash) { %><div class="notice ok"><%= flash %></div><% } %>
 
+<section class="card notifications <%= notifications.length ? 'has-items' : '' %>" id="notifications">
+  <div class="card-head">
+    <h2>Notifications <% if (notifications.length) { %><span class="count alert-count"><%= notifications.length %></span><% } %></h2>
+    <span class="muted small">Certificates and insurance expiring within a month</span>
+  </div>
+  <% if (!notifications.length) { %>
+    <p class="muted">Nothing needs attention. Everything is in date for at least the next month.</p>
+  <% } else { %>
+  <ul class="notice-list">
+    <% notifications.forEach(n => { %>
+    <li class="<%= n.expired ? 'is-expired' : 'is-expiring' %>">
+      <span class="notice-dot" aria-hidden="true"></span>
+      <div class="notice-text">
+        <strong><%= n.name %></strong> for <a href="/app/properties/<%= n.property_id %>#certificates"><%= n.address_line1 %></a>
+        <span class="notice-when"><%= n.when %> (<%= fmt.ukDate(n.expiry_date) %>)</span>
+      </div>
+      <a class="btn small" href="/app/compliance/new?property_id=<%= n.property_id %>&item_type=<%= encodeURIComponent(n.item_type) %>">Add new</a>
+    </li>
+    <% }) %>
+  </ul>
+  <% } %>
+</section>
+
 <section class="tiles">
   <a class="tile" href="/app/properties"><span class="label">Properties</span><span class="value"><%= stats.properties %></span><span class="sub"><%= stats.let %> let · <%= stats.vacant %> vacant</span></a>
   <a class="tile" href="/app/landlords"><span class="label">Landlords</span><span class="value"><%= stats.landlords %></span><span class="sub"><%= stats.tenants %> tenants</span></a>
@@ -44,8 +67,8 @@
   </section>
 
   <section class="card">
-    <h2>Compliance due in 60 days</h2>
-    <% if (!compliance.length) { %><p class="muted">Nothing expiring soon.</p><% } else { %>
+    <h2>Coming up in 1–2 months</h2>
+    <% if (!compliance.length) { %><p class="muted">Nothing else due in the next two months.</p><% } else { %>
     <table><thead><tr><th>Certificate</th><th>Property</th><th>Expires</th></tr></thead><tbody>
     <% compliance.forEach(c => { const expired = c.expiry_date < today; %><tr><td><a href="/app/compliance/<%= c.id %>"><%= c.item_type %></a></td><td><a href="/app/properties/<%= c.property_id %>"><%= c.address_line1 %></a></td><td><span class="badge <%= expired ? 'bad' : 'warn' %>"><%= expired ? 'Expired ' : '' %><%= fmt.ukDate(c.expiry_date) %></span></td></tr><% }) %>
     </tbody></table><% } %>
