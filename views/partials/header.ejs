@@ -18,7 +18,7 @@
   // The admin runs the software rather than letting properties, so only gets the owner pages.
   // The logo button at the top goes to the dashboard (or, for the admin, the admin panel).
   const groups = user.is_admin ? [
-    [['backups', '/admin/backups', 'Backups'], ['security', '/admin/security', 'Security']],
+    [['accounts', '/admin/accounts', 'Account details'], ['backups', '/admin/backups', 'Backups'], ['security', '/admin/security', 'Security']],
   ] : [
     [['councils', '/app/councils', 'Councils']],
     [['landlords', '/app/landlords', 'Landlords'], ['properties', '/app/properties', 'Properties'], ['tenants', '/app/tenants', 'Tenants'], ['tenancies', '/app/tenancies', 'Tenancies']],

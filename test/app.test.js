@@ -303,7 +303,8 @@ test('admin panel: lists all users, suspend, reactivate, delete', async () => {
   assert.match(r.text, /class="rail-btn brand-btn[^"]*" href="\/admin"[^>]*aria-label="Admin panel"/);
   assert.doesNotMatch(rail, /aria-label="Dashboard"|aria-label="Admin panel"/);
   assert.equal((await admin.get('/app')).location, '/admin');
-  const details = r.text.match(/id="account-details"[\s\S]*?<\/section>/)[0];
+  assert.match(rail, /href="\/admin\/accounts"[^>]*aria-label="Account details"/, 'Account details has its own menu button');
+  const details = (await admin.get('/admin/accounts')).text.match(/id="account-details"[\s\S]*?<\/section>/)[0];
   assert.match(details, /<code>suspend-me<\/code><\/td>\s*<td><code>Test<\/code>/, 'username and sign-in name listed');
   assert.doesNotMatch(details, /password-1234|scrypt\$/, 'no passwords or hashes shown');
   assert.match(rail, /aria-label="Backups"/);
@@ -806,9 +807,8 @@ test('several people at one company share its username, each with their own name
   assert.match(r.text, /id="people"[\s\S]*John Price[\s\S]*<code>john<\/code>/);
   assert.match(r.text, /id="activity"[\s\S]*John Price[\s\S]*Added landlord: Shared Landlord/);
   r = await admin.get('/admin');
-  const usersTable = r.text.split('id="account-details"')[0];
-  assert.equal((usersTable.match(/<code>eurostars<\/code><\/td>/g) || []).length, 1, 'company listed once in the users table');
-  const details = r.text.match(/id="account-details"[\s\S]*?<\/section>/)[0];
+  assert.equal((r.text.match(/<code>eurostars<\/code><\/td>/g) || []).length, 1, 'company listed once in the users table');
+  const details = (await admin.get('/admin/accounts')).text.match(/id="account-details"[\s\S]*?<\/section>/)[0];
   for (const n of ['main', 'john', 'amy']) assert.match(details, new RegExp(`<code>eurostars</code></td>\\s*<td><code>${n}</code>`), `login ${n} listed`);
 
   // Suspending one person only blocks them; suspending the company blocks everyone.

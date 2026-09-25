@@ -42,6 +42,8 @@ function describe(db, req) {
       if (parts.length === 1) return { action: 'viewed', text: 'Viewed the admin panel' };
       if (parts[1] === 'backups' && parts[2]) return { action: 'downloaded', text: 'Downloaded a backup' };
       if (parts[1] === 'backups') return { action: 'viewed', text: 'Viewed backups' };
+      if (parts[1] === 'accounts') return { action: 'viewed', text: 'Viewed account details' };
+      if (parts[1] === 'security') return { action: 'viewed', text: 'Viewed security settings' };
       if (parts[1] === 'users.csv') return { action: 'downloaded', text: 'Downloaded the user list' };
       if (parts[2] === 'new') return { action: 'viewed', text: 'Opened Add account' };
       if (target) return { action: 'viewed', text: `Viewed account ${who}` };

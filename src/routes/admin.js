@@ -72,7 +72,13 @@ module.exports = function adminRoutes(db, config) {
          FROM activity_log a JOIN users u ON u.id = a.user_id JOIN users c ON c.id = COALESCE(u.company_id, u.id)
         WHERE a.user_id != ? ORDER BY a.id DESC LIMIT 25`
     ).all(req.user.id);
-    // Every login at every agency: what they type to sign in (passwords can't be shown).
+    res.render('admin/index', { title: 'Admin', section: 'admin', users, totals, signups, recentLogins, recentActivity, q, status, fmt, flash: req.query.flash || '' });
+  });
+
+  // ---------- account details: every login at every agency ----------
+
+  router.get('/accounts', (req, res) => {
+    // What each person types to sign in. Passwords are hashed and can't be shown.
     const logins = db.prepare(
       `SELECT m.id, m.name, m.login_name, m.status, m.last_login_at, m.company_id IS NULL AS is_main,
               c.id AS company_id, c.username, c.agency_name, c.status AS company_status
@@ -80,7 +86,7 @@ module.exports = function adminRoutes(db, config) {
         WHERE c.is_admin = 0
         ORDER BY c.agency_name COLLATE NOCASE, m.company_id IS NOT NULL, m.name COLLATE NOCASE`
     ).all();
-    res.render('admin/index', { title: 'Admin', section: 'admin', users, totals, signups, recentLogins, recentActivity, logins, q, status, fmt, flash: req.query.flash || '' });
+    res.render('admin/accounts', { title: 'Account details', section: 'accounts', logins, fmt });
   });
 
   function target(req, res) {
