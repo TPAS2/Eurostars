@@ -24,12 +24,12 @@ const db = openDatabase(config.dbFile);
 const username = rawUsername.trim();
 const existing = db.prepare('SELECT id FROM users WHERE username = ? COLLATE NOCASE AND company_id IS NULL').get(username);
 if (existing) {
-  db.prepare("UPDATE users SET username = ?, password_hash = ?, status = 'active' WHERE id = ?").run(username, hashPassword(password), existing.id);
+  db.prepare("UPDATE users SET username = ?, login_name = ?, password_hash = ?, status = 'active' WHERE id = ?").run(username, config.adminLoginName, hashPassword(password), existing.id);
   db.prepare('DELETE FROM sessions WHERE user_id = ?').run(existing.id);
   console.log(`Password reset for ${username}.`);
 } else {
-  db.prepare("INSERT INTO users (username, name, agency_name, password_hash) VALUES (?, 'Administrator', ?, ?)")
-    .run(username, config.appName, hashPassword(password));
+  db.prepare("INSERT INTO users (username, login_name, name, agency_name, password_hash) VALUES (?, ?, ?, ?, ?)")
+    .run(username, config.adminLoginName, config.adminLoginName, config.appName, hashPassword(password));
   console.log(`Created admin account ${username}.`);
 }
 if (config.adminUsername !== username) {
