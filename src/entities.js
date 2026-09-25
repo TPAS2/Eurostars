@@ -41,6 +41,10 @@ const ENTITIES = {
       { name: 'property_type', label: 'Type', type: 'select', options: ['House', 'Flat', 'HMO', 'Bungalow', 'Studio', 'Commercial', 'Other'] },
       { name: 'bedrooms', label: 'Bedrooms', type: 'integer' },
       { name: 'management_fee_pct', label: 'Management fee %', type: 'number', help: 'Deducted automatically from rent received.' },
+      { name: 'council_id', label: 'Council', type: 'ref', ref: 'councils', help: 'The local authority for this address.' },
+      { name: 'council_tax_band', label: 'Council tax band', type: 'select', options: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'Exempt'] },
+      { name: 'council_tax_account', label: 'Council tax account no.', type: 'text' },
+      { name: 'council_tax_payer', label: 'Council tax paid by', type: 'select', options: ['Tenant', 'Landlord', 'Agent'] },
       { name: 'status', label: 'Status', type: 'select', options: ['vacant', 'let', 'under offer', 'unavailable'], required: true, default: 'vacant' },
       { name: 'notes', label: 'Notes', type: 'textarea' },
     ],
@@ -51,6 +55,26 @@ const ENTITIES = {
       { entity: 'maintenance', fk: 'property_id' },
       { entity: 'transactions', fk: 'property_id' },
     ],
+  },
+
+  councils: {
+    table: 'councils',
+    singular: 'Council',
+    plural: 'Councils',
+    titleField: 'name',
+    order: 'name COLLATE NOCASE',
+    fields: [
+      { name: 'name', label: 'Council', type: 'text', required: true },
+      { name: 'council_tax_phone', label: 'Council tax phone', type: 'tel' },
+      { name: 'council_tax_email', label: 'Council tax email', type: 'email' },
+      { name: 'licensing_email', label: 'Licensing email (HMO / selective)', type: 'email' },
+      { name: 'environmental_phone', label: 'Environmental health phone', type: 'tel' },
+      { name: 'website', label: 'Website', type: 'text' },
+      { name: 'address', label: 'Address', type: 'textarea' },
+      { name: 'notes', label: 'Notes', type: 'textarea' },
+    ],
+    columns: ['name', 'council_tax_phone', 'council_tax_email', 'licensing_email'],
+    children: [{ entity: 'properties', fk: 'council_id' }],
   },
 
   tenants: {
@@ -152,6 +176,7 @@ const REF_LABELS = {
   landlords: { from: 'landlords l', label: 'l.name', alias: 'l' },
   properties: { from: 'properties p', label: PROPERTY_LABEL, alias: 'p' },
   tenants: { from: 'tenants t', label: 't.name', alias: 't' },
+  councils: { from: 'councils c', label: 'c.name', alias: 'c' },
   tenancies: {
     from: 'tenancies ty JOIN properties p ON p.id = ty.property_id JOIN tenants t ON t.id = ty.tenant_id',
     label: "p.address_line1 || ' — ' || t.name || ' (' || ty.start_date || ')'",

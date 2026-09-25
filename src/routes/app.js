@@ -162,6 +162,49 @@ module.exports = function appRoutes(db) {
     return row || null;
   }
 
+  // Council links that run through properties: a council's landlords and tenants, and the
+  // councils a landlord or tenant is connected to.
+  function relatedLists(def, row, a) {
+    const link = (entity, id, text) => ({ text, href: `/app/${entity}/${id}` });
+    if (def.key === 'councils') {
+      const landlords = db.prepare(
+        `SELECT l.id, l.name, l.phone, GROUP_CONCAT(p.address_line1, '; ') AS props
+           FROM properties p JOIN landlords l ON l.id = p.landlord_id
+          WHERE p.account_id = ? AND p.council_id = ? GROUP BY l.id ORDER BY l.name COLLATE NOCASE`
+      ).all(a, row.id);
+      const tenants = db.prepare(
+        `SELECT t.id, t.name, t.phone, p.id AS property_id, p.address_line1, p.council_tax_band, p.council_tax_payer
+           FROM tenancies ty JOIN properties p ON p.id = ty.property_id JOIN tenants t ON t.id = ty.tenant_id
+          WHERE ty.account_id = ? AND p.council_id = ? AND ty.status = 'active' ORDER BY t.name COLLATE NOCASE`
+      ).all(a, row.id);
+      return [
+        { title: 'Landlords in this council', empty: 'No landlords with properties here yet.', headers: ['Landlord', 'Phone', 'Properties'],
+          rows: landlords.map((l) => [link('landlords', l.id, l.name), { text: l.phone || '' }, { text: l.props }]) },
+        { title: 'Current tenants in this council', empty: 'No current tenants here.', headers: ['Tenant', 'Phone', 'Property', 'Council tax'],
+          rows: tenants.map((t) => [link('tenants', t.id, t.name), { text: t.phone || '' }, link('properties', t.property_id, t.address_line1),
+            { text: [t.council_tax_band && `Band ${t.council_tax_band}`, t.council_tax_payer && `paid by ${t.council_tax_payer.toLowerCase()}`].filter(Boolean).join(', ') }]) },
+      ];
+    }
+    const councilsVia = (sql, ...params) => db.prepare(sql).all(...params);
+    if (def.key === 'landlords') {
+      const rows = councilsVia(
+        `SELECT c.id, c.name, COUNT(p.id) AS n FROM properties p JOIN councils c ON c.id = p.council_id
+          WHERE p.account_id = ? AND p.landlord_id = ? GROUP BY c.id ORDER BY c.name COLLATE NOCASE`, a, row.id);
+      return [{ title: 'Councils', empty: 'None of this landlord\'s properties has a council set yet.', headers: ['Council', 'Properties'],
+        rows: rows.map((c) => [link('councils', c.id, c.name), { text: String(c.n), num: true }]) }];
+    }
+    if (def.key === 'tenants') {
+      const rows = councilsVia(
+        `SELECT DISTINCT c.id, c.name, c.council_tax_phone, p.id AS property_id, p.address_line1, p.council_tax_band, p.council_tax_account
+           FROM tenancies ty JOIN properties p ON p.id = ty.property_id JOIN councils c ON c.id = p.council_id
+          WHERE ty.account_id = ? AND ty.tenant_id = ? ORDER BY c.name COLLATE NOCASE`, a, row.id);
+      return [{ title: 'Councils', empty: 'None of this tenant\'s properties has a council set yet.', headers: ['Council', 'Council tax phone', 'Property', 'Band', 'Account no.'],
+        rows: rows.map((c) => [link('councils', c.id, c.name), { text: c.council_tax_phone || '' }, link('properties', c.property_id, c.address_line1),
+          { text: c.council_tax_band || '' }, { text: c.council_tax_account || '' }]) }];
+    }
+    return [];
+  }
+
   // ---------- dashboard ----------
 
   router.get('/', (req, res) => {
@@ -387,7 +430,7 @@ module.exports = function appRoutes(db) {
       const fk = def.key === 'maintenance' ? 'maintenance_job_id' : 'property_id';
       invoices = db.prepare(`SELECT * FROM invoices WHERE account_id = ? AND ${fk} = ? ORDER BY status = 'paid', due_date`).all(a, row.id);
     }
-    res.render('show', { title: rowTitle(def, row, maps), section: def.key, def, row, maps, display, rowTitle, children, extra, invoices, fmt, today: fmt.today() });
+    res.render('show', { title: rowTitle(def, row, maps), section: def.key, def, row, maps, display, rowTitle, children, extra, invoices, related: relatedLists(def, row, a), fmt, today: fmt.today() });
   });
 
   router.get('/:entity/:id/edit', (req, res) => {

@@ -65,6 +65,21 @@ CREATE TABLE IF NOT EXISTS properties (
   created_at          TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Local authorities: council tax, licensing (HMO / selective) and environmental health contacts.
+CREATE TABLE IF NOT EXISTS councils (
+  id                   INTEGER PRIMARY KEY,
+  account_id           INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name                 TEXT NOT NULL,
+  council_tax_phone    TEXT,
+  council_tax_email    TEXT,
+  licensing_email      TEXT,
+  environmental_phone  TEXT,
+  website              TEXT,
+  address              TEXT,
+  notes                TEXT,
+  created_at           TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS tenants (
   id          INTEGER PRIMARY KEY,
   account_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -187,6 +202,7 @@ CREATE TABLE IF NOT EXISTS monthly_statements (
 CREATE INDEX IF NOT EXISTS idx_invoices_account   ON invoices(account_id, status);
 CREATE INDEX IF NOT EXISTS idx_landlords_account  ON landlords(account_id);
 CREATE INDEX IF NOT EXISTS idx_properties_account  ON properties(account_id);
+CREATE INDEX IF NOT EXISTS idx_councils_account    ON councils(account_id);
 CREATE INDEX IF NOT EXISTS idx_tenants_account     ON tenants(account_id);
 CREATE INDEX IF NOT EXISTS idx_tenancies_account   ON tenancies(account_id);
 CREATE INDEX IF NOT EXISTS idx_maint_account       ON maintenance_jobs(account_id);
@@ -202,7 +218,17 @@ function openDatabase(file) {
   db.exec('PRAGMA journal_mode = WAL;');
   migrateUsersToUsernames(db);
   db.exec(SCHEMA);
+  // Columns added after the first release.
+  addColumnIfMissing(db, 'properties', 'council_id', 'INTEGER REFERENCES councils(id) ON DELETE SET NULL');
+  addColumnIfMissing(db, 'properties', 'council_tax_band', 'TEXT');
+  addColumnIfMissing(db, 'properties', 'council_tax_account', 'TEXT');
+  addColumnIfMissing(db, 'properties', 'council_tax_payer', 'TEXT');
   return db;
+}
+
+function addColumnIfMissing(db, table, column, type) {
+  const cols = db.prepare(`SELECT name FROM pragma_table_info('${table}')`).all().map((c) => c.name);
+  if (!cols.includes(column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);
 }
 
 const USERNAME_RE = /^[a-z0-9][a-z0-9._-]{2,29}$/;

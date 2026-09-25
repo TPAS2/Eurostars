@@ -563,3 +563,38 @@ test('admin account is set by username, and its password can be reset on restart
   assert.ok(verifyPassword('Changed99', db3.prepare('SELECT password_hash FROM users WHERE id = ?').get(row.id).password_hash));
   assert.throws(() => ensureAdmin(openDatabase(':memory:'), { ...cfg, adminPassword: 'abc' }, () => {}), /at least 6/);
 });
+
+test('councils link to properties, and through them to landlords and tenants', async () => {
+  const c = await registerAndLogin('councils@example.com', 'Council Lets');
+  let r = await c.post('/app/councils', { name: 'Bristol City Council', council_tax_phone: '0117 922 2900', licensing_email: 'private.housing@bristol.gov.uk' });
+  assert.equal(r.status, 302, r.text);
+  const councilId = idFrom(r.location);
+  r = await c.post('/app/landlords', { name: 'Olive Grant' });
+  const landlordId = idFrom(r.location);
+
+  // "+ Add property in this council" pre-selects the council.
+  r = await c.get(`/app/properties/new?council_id=${councilId}`);
+  assert.match(r.text, new RegExp(`<option value="${councilId}" selected>Bristol City Council`));
+  r = await c.post('/app/properties', { address_line1: '9 Cotham Hill', landlord_id: landlordId, council_id: councilId, council_tax_band: 'C', council_tax_account: 'CT-55501', council_tax_payer: 'Tenant', status: 'vacant' });
+  const propertyId = idFrom(r.location);
+  r = await c.post(`/app/properties/${propertyId}/add-tenant`, { tenant_mode: 'new', name: 'Iris Moss', booking_date: '2026-09-01', start_date: '2026-09-10', rent_pence: '1100', rent_frequency: 'monthly', status: 'active' });
+  const tenantId = db.prepare('SELECT tenant_id FROM tenancies WHERE id = ?').get(idFrom(r.location)).tenant_id;
+
+  const council = await c.get(`/app/councils/${councilId}`);
+  assert.match(council.text, /Properties in this council/);
+  assert.match(council.text, /9 Cotham Hill/);
+  assert.match(council.text, /Landlords in this council[\s\S]*Olive Grant/);
+  assert.match(council.text, /Current tenants in this council[\s\S]*Iris Moss[\s\S]*Band C, paid by tenant/);
+  assert.match((await c.get(`/app/landlords/${landlordId}`)).text, /Councils[\s\S]*Bristol City Council/);
+  assert.match((await c.get(`/app/tenants/${tenantId}`)).text, /Councils[\s\S]*Bristol City Council[\s\S]*CT-55501/);
+  assert.match((await c.get(`/app/properties/${propertyId}`)).text, /href="\/app\/councils\/\d+">Bristol City Council/);
+  const rail = (await c.get('/app')).text.match(/<nav class="rail"[\s\S]*?<\/nav>/)[0];
+  // [0] is the menu's own label ("Main"); the first button follows it.
+  assert.equal(rail.match(/aria-label="([^"]+)"/g)[1], 'aria-label="Councils"', 'Councils is the first menu button');
+
+  // Another company can't see or link to this council.
+  const other = await registerAndLogin('councils-other@example.com', 'Other Lets');
+  assert.equal((await other.get(`/app/councils/${councilId}`)).status, 404);
+  r = await other.post('/app/properties', { address_line1: 'X', council_id: councilId, status: 'vacant' });
+  assert.equal(r.status, 422);
+});

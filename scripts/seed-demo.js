@@ -94,9 +94,17 @@ function seedAgency(p, lastLoginHoursAgo) {
 
   const landlords = p.landlords.map(([name, email, phone, address]) =>
     ins('INSERT INTO landlords (account_id, name, email, phone, address) VALUES (?, ?, ?, ?, ?)', a, name, email, phone, address));
-  const props = p.properties.map(([l, addr, town, pc, type, beds, fee]) => ins(
-    "INSERT INTO properties (account_id, landlord_id, address_line1, town, postcode, property_type, bedrooms, management_fee_pct, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'vacant')",
-    a, landlords[l], addr, town, pc, type, beds, fee));
+  // Councils, matched to properties by town.
+  const councils = {
+    Bristol: ins(`INSERT INTO councils (account_id, name, council_tax_phone, council_tax_email, licensing_email, environmental_phone, website, address)
+                  VALUES (?, 'Bristol City Council', '0117 922 2900', 'council.tax@bristol.example.gov.uk', 'private.housing@bristol.example.gov.uk', '0117 922 2500', 'www.bristol.gov.uk', 'City Hall\nCollege Green\nBristol\nBS1 5TR')`, a),
+    Bath: ins(`INSERT INTO councils (account_id, name, council_tax_phone, council_tax_email, licensing_email, environmental_phone, website, address)
+               VALUES (?, 'Bath & North East Somerset Council', '01225 477 000', 'council_tax@bathnes.example.gov.uk', 'hmo@bathnes.example.gov.uk', '01225 477 508', 'www.bathnes.gov.uk', 'Lewis House\nManvers Street\nBath\nBA1 1JG')`, a),
+  };
+  const bands = ['B', 'D', 'E', 'A', 'C', 'B'];
+  const props = p.properties.map(([l, addr, town, pc, type, beds, fee], i) => ins(
+    "INSERT INTO properties (account_id, landlord_id, address_line1, town, postcode, property_type, bedrooms, management_fee_pct, status, council_id, council_tax_band, council_tax_account, council_tax_payer) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'vacant', ?, ?, ?, ?)",
+    a, landlords[l], addr, town, pc, type, beds, fee, councils[town] || null, bands[i % bands.length], `CT-${40211 + i * 137}`, type === 'HMO' ? 'Landlord' : 'Tenant'));
   const tenants = p.tenants.map(([name, email, phone]) =>
     ins('INSERT INTO tenants (account_id, name, email, phone) VALUES (?, ?, ?, ?)', a, name, email, phone));
   const ty = p.tenancies.map(([pi, ti, rent, booking, start, end, dep]) => {

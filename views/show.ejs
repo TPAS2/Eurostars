@@ -7,6 +7,7 @@
   <div class="actions">
     <% if (def.key === 'properties') { %><a class="btn primary" href="/app/properties/<%= row.id %>/add-tenant">+ Add tenant</a><% } %>
     <% if (def.key === 'landlords') { %><a class="btn primary" href="/app/properties/new?landlord_id=<%= row.id %>">+ Add property</a><% } %>
+    <% if (def.key === 'councils') { %><a class="btn primary" href="/app/properties/new?council_id=<%= row.id %>">+ Add property in this council</a><% } %>
     <% if (def.key === 'maintenance') { %><a class="btn primary" href="/app/invoices/new?maintenance_job_id=<%= row.id %>">+ Upload invoice</a><% } %>
     <% if (def.key === 'tenancies') { %><a class="btn primary" href="/app/transactions/new?txn_type=rent_received&tenancy_id=<%= row.id %>">Record rent received</a><% } %>
     <a class="btn" href="/app/<%= def.key %>/<%= row.id %>/edit">Edit</a>
@@ -41,10 +42,24 @@
 </section>
 <% } %>
 
+<% related.forEach(r => { %>
+<section class="card">
+  <div class="card-head"><h2><%= r.title %> <span class="count"><%= r.rows.length %></span></h2></div>
+  <% if (!r.rows.length) { %><p class="muted"><%= r.empty %></p><% } else { %>
+  <div class="table-wrap"><table>
+    <thead><tr><% r.headers.forEach(h => { %><th><%= h %></th><% }) %></tr></thead>
+    <tbody>
+    <% r.rows.forEach(cells => { %><tr><% cells.forEach(c => { %><td class="<%= c.num ? 'num' : '' %>"><% if (c.href) { %><a href="<%= c.href %>"><%= c.text %></a><% } else { %><%= c.text %><% } %></td><% }) %></tr><% }) %>
+    </tbody>
+  </table></div>
+  <% } %>
+</section>
+<% }) %>
+
 <% children.forEach(c => { %>
 <section class="card">
   <div class="card-head">
-    <h2><%= def.key === 'landlords' && c.def.key === 'properties' ? 'Properties owned' : c.def.plural %> <span class="count"><%= c.rows.length %></span></h2>
+    <h2><%= def.key === 'landlords' && c.def.key === 'properties' ? 'Properties owned' : def.key === 'councils' && c.def.key === 'properties' ? 'Properties in this council' : c.def.plural %> <span class="count"><%= c.rows.length %></span></h2>
     <% if (def.key === 'properties' && c.def.key === 'tenancies') { %>
       <a class="btn small" href="/app/properties/<%= row.id %>/add-tenant">+ Add tenant</a>
     <% } else { %>

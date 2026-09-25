@@ -20,6 +20,7 @@
   const groups = user.is_admin ? [
     [['admin', '/admin', 'Admin panel'], ['backups', '/admin/backups', 'Backups']],
   ] : [
+    [['councils', '/app/councils', 'Councils']],
     [['landlords', '/app/landlords', 'Landlords'], ['properties', '/app/properties', 'Properties'], ['tenants', '/app/tenants', 'Tenants'], ['tenancies', '/app/tenancies', 'Tenancies']],
     [['maintenance', '/app/maintenance', 'Maintenance'], ['invoices', '/app/invoices', 'Invoices'], ['compliance', '/app/compliance', 'Compliance']],
     [['transactions', '/app/transactions', 'Transactions'], ['monthly', '/app/monthly', 'Monthly statements'], ['statements', '/app/statements', 'Statement by date range']],
