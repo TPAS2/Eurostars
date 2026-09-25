@@ -620,6 +620,12 @@ test('councils link to properties, and through them to landlords and tenants', a
   assert.match((await c.get(`/app/landlords/${landlordId}`)).text, /Councils[\s\S]*Bristol City Council/);
   assert.match((await c.get(`/app/tenants/${tenantId}`)).text, /Councils[\s\S]*Bristol City Council[\s\S]*CT-55501/);
   assert.match((await c.get(`/app/properties/${propertyId}`)).text, /href="\/app\/councils\/\d+">Bristol City Council/);
+  const details = (await c.get(`/app/properties/${propertyId}`)).text.match(/<dl class="details">[\s\S]*?<\/dt>/)[0];
+  assert.match(details, /<dt>Council<\/dt>$/, 'Council is the first detail on the property page');
+  const list = (await c.get('/app/properties')).text;
+  assert.match(list, /<th[^>]*>Council<\/th>/);
+  assert.doesNotMatch(list, /<th[^>]*>Postcode<\/th>/, 'Council replaces Postcode in the list');
+  assert.match(list, /Bristol City Council/);
   const rail = (await c.get('/app')).text.match(/<nav class="rail"[\s\S]*?<\/nav>/)[0];
   // [0] is the menu's own label ("Main"); the first button follows it.
   assert.equal(rail.match(/aria-label="([^"]+)"/g)[1], 'aria-label="Councils"', 'Councils is the first menu button');

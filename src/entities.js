@@ -34,6 +34,7 @@ const ENTITIES = {
     titleField: 'address_line1',
     order: 'address_line1 COLLATE NOCASE',
     fields: [
+      { name: 'council_id', label: 'Council', type: 'ref', ref: 'councils', help: 'The local authority for this address.' },
       { name: 'address_line1', label: 'Address', type: 'text', required: true },
       { name: 'town', label: 'Town / city', type: 'text' },
       { name: 'postcode', label: 'Postcode', type: 'text' },
@@ -41,13 +42,12 @@ const ENTITIES = {
       { name: 'property_type', label: 'Type', type: 'select', options: ['House', 'Flat', 'HMO', 'Bungalow', 'Studio', 'Commercial', 'Other'] },
       { name: 'bedrooms', label: 'Bedrooms', type: 'integer' },
       { name: 'management_fee_pct', label: 'Management fee %', type: 'number', help: 'Deducted automatically from rent received.' },
-      { name: 'council_id', label: 'Council', type: 'ref', ref: 'councils', help: 'The local authority for this address.' },
       { name: 'council_tax_account', label: 'Council tax account no.', type: 'text' },
       { name: 'council_tax_payer', label: 'Council tax paid by', type: 'select', options: ['Tenant', 'Landlord', 'Agent'] },
       { name: 'status', label: 'Status', type: 'select', options: ['vacant', 'let', 'under offer', 'unavailable'], required: true, default: 'vacant' },
       { name: 'notes', label: 'Notes', type: 'textarea' },
     ],
-    columns: ['address_line1', 'town', 'postcode', 'landlord_id', 'status'],
+    columns: ['address_line1', 'town', 'council_id', 'landlord_id', 'status'],
     children: [
       { entity: 'tenancies', fk: 'property_id' },
       { entity: 'compliance', fk: 'property_id' },
