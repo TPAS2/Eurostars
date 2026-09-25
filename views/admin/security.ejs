@@ -1,0 +1,76 @@
+<%- include('../partials/header') %>
+<header class="page-head">
+  <div>
+    <h1>Security</h1>
+    <p class="muted">Protect your admin account with a code from your phone, and check your backups are encrypted.</p>
+  </div>
+</header>
+<% if (flash) { %><div class="notice ok"><%= flash %></div><% } %>
+<% if (error) { %><div class="notice err"><%= error %></div><% } %>
+
+<section class="card" id="setup">
+  <div class="card-head">
+    <h2>Two-step login</h2>
+    <span class="badge <%= u.totp_enabled ? 's-active' : 'bad' %>"><%= u.totp_enabled ? 'On' : 'Off' %></span>
+  </div>
+
+  <% if (newCodes) { %>
+    <div class="recovery">
+      <h3>Your recovery codes</h3>
+      <p>If you lose your phone, each of these codes gets you in <strong>once</strong>. Write them down or save them in a password manager now. <strong>They won't be shown again.</strong></p>
+      <ol class="code-list"><% newCodes.forEach(c => { %><li><code><%= c %></code></li><% }) %></ol>
+    </div>
+  <% } %>
+
+  <% if (u.totp_enabled) { %>
+    <p>When you sign in, you'll be asked for the 6-digit code from your authenticator app after your password. <%= recoveryLeft %> recovery code<%= recoveryLeft === 1 ? '' : 's' %> left.</p>
+    <form method="post" action="/admin/security/recovery" class="inline-form">
+      <%- include('../partials/csrf') %>
+      <label>Code from your app <input name="code" inputmode="numeric" maxlength="6" autocomplete="one-time-code" required></label>
+      <button class="btn" type="submit">Make new recovery codes</button>
+    </form>
+    <details class="spaced">
+      <summary class="small">Switch two-step login off</summary>
+      <form method="post" action="/admin/security/disable" class="inline-form spaced">
+        <%- include('../partials/csrf') %>
+        <label>Your password <input name="password" type="password" autocomplete="current-password" required></label>
+        <button class="btn danger" type="submit">Switch off</button>
+      </form>
+    </details>
+  <% } else if (secret) { %>
+    <ol class="steps">
+      <li>Install an authenticator app on your phone, e.g. <strong>Google Authenticator</strong>, <strong>Microsoft Authenticator</strong> or <strong>Authy</strong>.</li>
+      <li>In the app, add an account and scan this QR code:
+        <div class="qr"><img src="<%= qr %>" alt="QR code to add Nexus to your authenticator app" width="200" height="200"></div>
+        <span class="muted small">Can't scan it? Type this key instead: <code class="secret"><%= secret.match(/.{1,4}/g).join(' ') %></code></span>
+      </li>
+      <li>Type the 6-digit code the app shows:
+        <form method="post" action="/admin/security/enable" class="inline-form spaced">
+          <%- include('../partials/csrf') %>
+          <input name="code" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="123456" required>
+          <button class="btn primary" type="submit">Switch on two-step login</button>
+        </form>
+      </li>
+    </ol>
+  <% } else { %>
+    <p>At the moment, anyone who learns your password can sign in as admin. With two-step login, they'd also need your phone.</p>
+    <form method="post" action="/admin/security/setup">
+      <%- include('../partials/csrf') %>
+      <button class="btn primary" type="submit">Set up two-step login</button>
+    </form>
+  <% } %>
+  <p class="muted small spaced">Lost your phone and your recovery codes? In Render, add the environment variable <code>ADMIN_2FA_RESET</code> = <code>true</code> and save. After the restart, sign in with your password, delete that variable, and set two-step login up again.</p>
+</section>
+
+<section class="card">
+  <div class="card-head">
+    <h2>Backup encryption</h2>
+    <span class="badge <%= backupEncrypted ? 's-active' : 'bad' %>"><%= backupEncrypted ? 'On' : 'Off' %></span>
+  </div>
+  <% if (backupEncrypted) { %>
+    <p>New backups are encrypted (AES-256). Without your backup password, a backup file can't be opened, even if someone gets hold of it.</p>
+  <% } else { %>
+    <p>Backups are <strong>not</strong> encrypted: anyone with a backup file can read all your clients' data. To switch encryption on, add the environment variable <code>BACKUP_PASSWORD</code> in Render with a long password only you know, and save. <strong>Keep that password safe:</strong> without it, encrypted backups can't be restored.</p>
+  <% } %>
+</section>
+<%- include('../partials/footer') %>

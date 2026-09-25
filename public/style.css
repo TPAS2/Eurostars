@@ -355,3 +355,12 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fo
 .person-menu[open] .person-actions { display: flex; }
 .person-actions { display: none; flex-direction: column; gap: 8px; padding: 10px 0 0; }
 .person-actions input { width: 150px; }
+
+/* ---------- security page ---------- */
+.qr { margin: 10px 0; }
+.qr img { background: #fff; padding: 8px; border-radius: 8px; border: 1px solid var(--border); max-width: 100%; height: auto; }
+.secret { letter-spacing: .06em; }
+.recovery { background: var(--warn-soft); border-radius: 8px; padding: 14px 16px; margin-bottom: 14px; }
+.recovery h3 { margin-top: 0; }
+.code-list { columns: 2; margin: 0; padding-left: 22px; font-size: 1rem; }
+.code-list li { margin: 4px 0; }

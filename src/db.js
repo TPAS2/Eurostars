@@ -29,6 +29,14 @@ CREATE TABLE IF NOT EXISTS sessions (
   expires_at  TEXT NOT NULL
 );
 
+-- Password checked, waiting for the two-step code.
+CREATE TABLE IF NOT EXISTS login_challenges (
+  token_hash  TEXT PRIMARY KEY,
+  user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  attempts    INTEGER NOT NULL DEFAULT 0,
+  expires_at  TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS login_events (
   id          INTEGER PRIMARY KEY,
   user_id     INTEGER REFERENCES users(id) ON DELETE CASCADE,
@@ -241,6 +249,11 @@ function openDatabase(file) {
   // Every login needs a name, including each company's main login: their own first name.
   const unnamed = db.prepare("SELECT id, name FROM users WHERE company_id IS NULL AND is_admin = 0 AND (login_name IS NULL OR login_name = 'main')").all();
   for (const u of unnamed) db.prepare('UPDATE users SET login_name = ? WHERE id = ?').run(signInNameFrom(u.name), u.id);
+  // Two-step login (authenticator app codes).
+  addColumnIfMissing(db, 'users', 'totp_secret', 'TEXT');
+  addColumnIfMissing(db, 'users', 'totp_enabled', 'INTEGER NOT NULL DEFAULT 0');
+  addColumnIfMissing(db, 'users', 'totp_last_step', 'INTEGER NOT NULL DEFAULT -1');
+  addColumnIfMissing(db, 'users', 'totp_recovery', 'TEXT');
   addColumnIfMissing(db, 'users', 'phone', 'TEXT');
   addColumnIfMissing(db, 'users', 'address', 'TEXT');
   addColumnIfMissing(db, 'properties', 'council_id', 'INTEGER REFERENCES councils(id) ON DELETE SET NULL');

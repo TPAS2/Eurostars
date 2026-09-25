@@ -1,6 +1,7 @@
 'use strict';
 
-// Usage (with the server stopped): npm run restore-backup -- path/to/nexus-backup-....tar.gz
+// Usage (with the server stopped): npm run restore-backup -- path/to/nexus-backup-....tar.gz[.enc]
+// Encrypted backups (.enc) need the backup password: set BACKUP_PASSWORD, or you'll be asked.
 // The current database and uploads are moved to data/pre-restore-<time>/ first, never deleted.
 
 const fs = require('node:fs');
@@ -8,7 +9,9 @@ const os = require('node:os');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
 const { DatabaseSync } = require('node:sqlite');
+const readline = require('node:readline/promises');
 const { loadConfig } = require('../src/server');
+const { isEncrypted, decryptFile } = require('../src/backup');
 
 const archive = process.argv[2];
 if (!archive || !fs.existsSync(archive)) {
@@ -18,8 +21,21 @@ if (!archive || !fs.existsSync(archive)) {
 
 const config = loadConfig();
 const work = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-restore-'));
+(async () => {
 try {
-  execFileSync('tar', ['-xzf', path.resolve(archive), '-C', work], { stdio: 'inherit' });
+  let tarFile = path.resolve(archive);
+  if (isEncrypted(tarFile)) {
+    let password = process.env.BACKUP_PASSWORD;
+    if (!password) {
+      const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+      password = await rl.question('Backup password: ');
+      rl.close();
+    }
+    const plain = path.join(work, 'backup.tar.gz');
+    await decryptFile(tarFile, plain, password);
+    tarFile = plain;
+  }
+  execFileSync('tar', ['-xzf', tarFile, '-C', work], { stdio: 'inherit' });
   // Backups made before the rename to Nexus call the database letwise.db.
   const restoredDb = ['nexus.db', 'letwise.db'].map((f) => path.join(work, f)).find((f) => fs.existsSync(f));
   if (!restoredDb) throw new Error('This file does not look like a Nexus backup (no database inside).');
@@ -60,3 +76,4 @@ try {
 } finally {
   fs.rmSync(work, { recursive: true, force: true });
 }
+})();

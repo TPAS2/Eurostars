@@ -53,6 +53,11 @@ The admin signs in with `ADMIN_USERNAME` (e.g. `TPAS2`), the name `ADMIN_LOGIN_N
 
 Everyone at the company sees the same data, and the activity log shows who did what. From the People section you can reset a person's password, suspend them or remove them without affecting anyone else. Suspending the company suspends everyone in it.
 
+## Security
+
+- **Two-step login for the admin:** in the admin panel, open **Security → Set up two-step login**, scan the QR code with an authenticator app (Google Authenticator, Microsoft Authenticator, Authy) and enter the code. After that, signing in as admin needs the 6-digit code from the app as well as the password. Save the 8 recovery codes it shows. Lost the phone and the codes? Set `ADMIN_2FA_RESET=true` in Render, sign in with your password, then remove it.
+- **Encrypted backups:** set `BACKUP_PASSWORD` in Render. Backups are then encrypted with AES-256 (`.tar.gz.enc`), and the restore command asks for that password. Keep it somewhere safe.
+
 ## Forgotten passwords
 
 Passwords are stored scrambled (hashed), so nobody can look one up, including the admin.
@@ -89,7 +94,7 @@ Backups are:
 **To restore**, stop the server, then run:
 
 ```bash
-npm run restore-backup -- data/backups/nexus-backup-2026-09-24T02-00-00Z.tar.gz
+npm run restore-backup -- data/backups/nexus-backup-2026-09-24T02-00-00Z.tar.gz.enc
 ```
 
 The current data is moved to `data/pre-restore-…/` first, so a restore never deletes anything. The backup is also a normal tar archive (`tar -xzf file.tar.gz`), so you can open it without this app.

@@ -7,8 +7,65 @@ const fs = require('node:fs');
 const path = require('node:path');
 const zlib = require('node:zlib');
 const { once } = require('node:events');
+const crypto = require('node:crypto');
+const { pipeline } = require('node:stream/promises');
 
-const NAME_RE = /^(?:nexus|letwise)-backup-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}Z(-\d+)?\.tar\.gz$/;
+const NAME_RE = /^(?:nexus|letwise)-backup-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}Z(-\d+)?\.tar\.gz(\.enc)?$/;
+
+// ---- encryption: AES-256-GCM with a key made from BACKUP_PASSWORD (scrypt) ----
+// File layout: "NEXUSENC1" | salt (16) | iv (12) | encrypted .tar.gz | auth tag (16)
+const MAGIC = Buffer.from('NEXUSENC1');
+const SCRYPT = { N: 2 ** 15, r: 8, p: 1, maxmem: 64 * 1024 * 1024 };
+
+function backupKey(password, salt) {
+  return crypto.scryptSync(String(password), salt, 32, SCRYPT);
+}
+
+async function encryptFile(src, dest, password) {
+  const salt = crypto.randomBytes(16);
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', backupKey(password, salt), iv);
+  const out = fs.createWriteStream(dest, { flags: 'wx', mode: 0o600 });
+  out.write(Buffer.concat([MAGIC, salt, iv]));
+  await pipeline(fs.createReadStream(src), cipher, out, { end: false });
+  await new Promise((resolve, reject) => out.end(cipher.getAuthTag(), (err) => (err ? reject(err) : resolve())));
+}
+
+function isEncrypted(file) {
+  const fd = fs.openSync(file, 'r');
+  try {
+    const head = Buffer.alloc(MAGIC.length);
+    fs.readSync(fd, head, 0, MAGIC.length, 0);
+    return head.equals(MAGIC);
+  } finally { fs.closeSync(fd); }
+}
+
+// Decrypts to dest. Throws "Wrong backup password" if the password (or file) is wrong.
+async function decryptFile(src, dest, password) {
+  const size = fs.statSync(src).size;
+  const headerLen = MAGIC.length + 16 + 12;
+  const fd = fs.openSync(src, 'r');
+  const header = Buffer.alloc(headerLen);
+  const tag = Buffer.alloc(16);
+  try {
+    fs.readSync(fd, header, 0, headerLen, 0);
+    fs.readSync(fd, tag, 0, 16, size - 16);
+  } finally { fs.closeSync(fd); }
+  if (!header.subarray(0, MAGIC.length).equals(MAGIC)) throw new Error('This is not an encrypted Nexus backup.');
+  const salt = header.subarray(MAGIC.length, MAGIC.length + 16);
+  const iv = header.subarray(MAGIC.length + 16, headerLen);
+  const decipher = crypto.createDecipheriv('aes-256-gcm', backupKey(password, salt), iv);
+  decipher.setAuthTag(tag);
+  const tmp = `${dest}.partial`;
+  try {
+    await pipeline(fs.createReadStream(src, { start: headerLen, end: size - 17 }), decipher, fs.createWriteStream(tmp, { mode: 0o600 }));
+    fs.renameSync(tmp, dest);
+  } catch (err) {
+    fs.rmSync(tmp, { force: true });
+    if (/authenticate/i.test(err.message)) throw new Error('Wrong backup password (or the file is damaged).');
+    throw err;
+  }
+}
 
 // ---- minimal ustar writer ----
 
@@ -74,9 +131,12 @@ function stamp(date = new Date()) {
 // Create a backup and prune old ones. Returns { name, file, size }.
 async function createBackup(db, config, { reason = 'manual' } = {}) {
   fs.mkdirSync(config.backupDir, { recursive: true, mode: 0o700 });
-  let name = `nexus-backup-${stamp()}.tar.gz`;
-  for (let i = 1; fs.existsSync(path.join(config.backupDir, name)); i++) name = `nexus-backup-${stamp()}-${i}.tar.gz`;
+  // With BACKUP_PASSWORD set, backups are encrypted and end in .tar.gz.enc.
+  const ext = config.backupPassword ? '.tar.gz.enc' : '.tar.gz';
+  let name = `nexus-backup-${stamp()}${ext}`;
+  for (let i = 1; fs.existsSync(path.join(config.backupDir, name)); i++) name = `nexus-backup-${stamp()}-${i}${ext}`;
   const file = path.join(config.backupDir, name);
+  const plainFile = config.backupPassword ? path.join(config.backupDir, `.plain-${process.pid}-${Date.now()}.tar.gz`) : file;
 
   // VACUUM INTO produces a consistent copy even while the app is serving requests.
   const tmpDb = path.join(config.backupDir, `.snapshot-${process.pid}-${Date.now()}.db`);
@@ -100,16 +160,19 @@ async function createBackup(db, config, { reason = 'manual' } = {}) {
     };
     const uploads = walk(config.uploadDir);
     manifest.counts.uploaded_files = uploads.length;
-    await writeTarGz(file, [
+    manifest.encrypted = !!config.backupPassword;
+    await writeTarGz(plainFile, [
       { name: 'manifest.json', data: Buffer.from(JSON.stringify(manifest, null, 2)) },
       { name: 'nexus.db', file: tmpDb },
       ...uploads.map((u) => ({ name: `uploads/${u.rel}`, file: u.full, mtime: fs.statSync(u.full).mtimeMs })),
     ]);
+    if (config.backupPassword) await encryptFile(plainFile, file, config.backupPassword);
   } catch (err) {
     fs.rmSync(file, { force: true });
     throw err;
   } finally {
     fs.rmSync(tmpDb, { force: true });
+    if (plainFile !== file) fs.rmSync(plainFile, { force: true });
   }
 
   // Optional second copy, e.g. a mounted network drive or a cloud-synced folder.
@@ -165,4 +228,4 @@ function scheduleBackups(db, config, log = console.log) {
   setInterval(tick, Math.min(everyMs, 3600 * 1000)).unref();
 }
 
-module.exports = { createBackup, listBackups, backupPath, scheduleBackups, writeTarGz };
+module.exports = { createBackup, listBackups, backupPath, scheduleBackups, writeTarGz, encryptFile, decryptFile, isEncrypted };

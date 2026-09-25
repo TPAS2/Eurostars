@@ -12,6 +12,7 @@
 <% if (flash) { %><div class="notice ok"><%= flash %></div><% } %>
 <% if (error) { %><div class="notice err"><%= error %></div><% } %>
 
+<% if (!config.backupPassword) { %><div class="notice err">Backups are not encrypted. Set <code>BACKUP_PASSWORD</code> in Render to encrypt them. See <a href="/admin/security">Security</a>.</div><% } %>
 <section class="tiles">
   <div class="tile"><span class="label">Automatic backups</span><span class="value sm"><%= config.autoBackups ? `Every ${config.backupIntervalHours} h` : 'Off' %></span><span class="sub">Keeping the latest <%= config.backupKeep %></span></div>
   <div class="tile"><span class="label">Latest backup</span><span class="value sm"><%= backups[0] ? fmt.ukDateTime(backups[0].created.toISOString().replace('T', ' ')) : 'None yet' %></span><span class="sub"><%= backups.length %> stored</span></div>
@@ -25,7 +26,7 @@
     <thead><tr><th>Backup</th><th>Created (UTC)</th><th class="num">Size</th><th></th></tr></thead>
     <tbody>
     <% backups.forEach(b => { %>
-      <tr><td><code><%= b.name %></code></td><td><%= fmt.ukDateTime(b.created.toISOString().replace('T', ' ')) %></td>
+      <tr><td><code><%= b.name %></code> <% if (b.name.endsWith('.enc')) { %><span class="badge s-active">encrypted</span><% } else { %><span class="badge bad">not encrypted</span><% } %></td><td><%= fmt.ukDateTime(b.created.toISOString().replace('T', ' ')) %></td>
       <td class="num"><%= b.size > 1048576 ? (b.size / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(b.size / 1024)) + ' KB' %></td>
       <td class="num"><a class="btn small" href="/admin/backups/<%= encodeURIComponent(b.name) %>">Download</a></td></tr>
     <% }) %>

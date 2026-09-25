@@ -51,13 +51,13 @@ function createSession(db, res, userId, secure) {
     `INSERT INTO sessions (token_hash, user_id, csrf_token, expires_at)
      VALUES (?, ?, ?, datetime('now', ?))`
   ).run(sha256(token), userId, csrf, `+${SESSION_DAYS} days`);
-  res.setHeader('Set-Cookie', sessionCookie(token, SESSION_DAYS * 86400, secure));
+  res.append('Set-Cookie', sessionCookie(token, SESSION_DAYS * 86400, secure));
 }
 
 function destroySession(db, req, res, secure) {
   const token = parseCookies(req.headers.cookie)[SESSION_COOKIE];
   if (token) db.prepare('DELETE FROM sessions WHERE token_hash = ?').run(sha256(token));
-  res.setHeader('Set-Cookie', sessionCookie('', 0, secure));
+  res.append('Set-Cookie', sessionCookie('', 0, secure));
 }
 
 // Attaches req.user and req.csrfToken when a valid session cookie is present.
@@ -76,6 +76,7 @@ function loadSession(db) {
       const row = lookup.get(sha256(token));
       if (row && row.status === 'active') {
         req.csrfToken = row.csrf_token;
+        req.sessionTokenHash = sha256(token);
         req.user = { ...row, is_admin: row.is_admin === 1 };
         delete req.user.csrf_token;
       }

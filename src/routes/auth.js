@@ -1,7 +1,9 @@
 'use strict';
 
 const express = require('express');
+const crypto = require('node:crypto');
 const auth = require('../auth');
+const totp = require('../totp');
 const activity = require('../activity');
 const { USERNAME_RE, signInNameFrom } = require('../db');
 
@@ -9,7 +11,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 module.exports = function authRoutes(db, config) {
   const router = express.Router();
-  const loginLimited = auth.rateLimiter({ windowMs: 15 * 60 * 1000, max: 10 });
+  const loginLimited = auth.rateLimiter({ windowMs: 15 * 60 * 1000, max: config.loginAttemptsPer15Min || 10 });
   const registerLimited = auth.rateLimiter({ windowMs: 60 * 60 * 1000, max: config.registrationsPerHour || 10 });
 
   const logEvent = db.prepare('INSERT INTO login_events (user_id, email, success, ip, user_agent) VALUES (?, ?, ?, ?, ?)');
@@ -51,6 +53,77 @@ module.exports = function authRoutes(db, config) {
       logEvent.run(user.id, who, 0, ip, ua);
       return fail(403, 'This account has been suspended. Please contact your administrator.');
     }
+    if (user.totp_enabled === 1) {
+      // Password is right; now ask for the code from their authenticator app.
+      const token = crypto.randomBytes(32).toString('base64url');
+      db.prepare("DELETE FROM login_challenges WHERE user_id = ? OR expires_at <= datetime('now')").run(user.id);
+      db.prepare("INSERT INTO login_challenges (token_hash, user_id, expires_at) VALUES (?, ?, datetime('now', '+10 minutes'))").run(sha256(token), user.id);
+      res.append('Set-Cookie', challengeCookie(token, 600));
+      return res.redirect('/login/code');
+    }
+    logEvent.run(user.id, who, 1, ip, ua);
+    if (config.activityLog !== false) activity.logSignIn(db, user.id, ip);
+    startSession(user, res);
+    res.redirect(landing({ is_admin: user.is_admin === 1 }));
+  });
+
+  // ---------- two-step login ----------
+
+  const CHALLENGE_COOKIE = 'signin2';
+  const sha256 = (v) => crypto.createHash('sha256').update(v).digest('hex');
+  function challengeCookie(value, maxAge) {
+    const attrs = [`${CHALLENGE_COOKIE}=${value}`, 'Path=/login', 'HttpOnly', 'SameSite=Lax', `Max-Age=${maxAge}`];
+    if (config.secureCookies) attrs.push('Secure');
+    return attrs.join('; ');
+  }
+  function pendingChallenge(req) {
+    const m = String(req.headers.cookie || '').match(new RegExp(`(?:^|;\\s*)${CHALLENGE_COOKIE}=([^;]+)`));
+    if (!m) return null;
+    const row = db.prepare("SELECT * FROM login_challenges WHERE token_hash = ? AND expires_at > datetime('now')").get(sha256(m[1]));
+    return row ? { ...row, token: m[1] } : null;
+  }
+
+  router.get('/login/code', (req, res) => {
+    if (!pendingChallenge(req)) return res.redirect('/login');
+    res.render('login-code', { title: 'Enter your code', error: '' });
+  });
+
+  router.post('/login/code', (req, res) => {
+    const ch = pendingChallenge(req);
+    if (!ch) return res.redirect('/login');
+    const user = db.prepare('SELECT * FROM users WHERE id = ?').get(ch.user_id);
+    const input = String(req.body.code || '').trim();
+    const ip = req.ip;
+    const ua = String(req.headers['user-agent'] || '').slice(0, 300);
+    const who = `${user.username} (two-step code)`;
+    let ok = false;
+    const step = totp.verify(user.totp_secret, input, user.totp_last_step);
+    if (step !== null) {
+      db.prepare('UPDATE users SET totp_last_step = ? WHERE id = ?').run(step, user.id);
+      ok = true;
+    } else {
+      // A recovery code works once.
+      const hashes = JSON.parse(user.totp_recovery || '[]');
+      const i = hashes.indexOf(totp.hashRecoveryCode(input));
+      if (i >= 0 && input.length >= 8) {
+        hashes.splice(i, 1);
+        db.prepare('UPDATE users SET totp_recovery = ? WHERE id = ?').run(JSON.stringify(hashes), user.id);
+        ok = true;
+      }
+    }
+    if (!ok) {
+      logEvent.run(user.id, who, 0, ip, ua);
+      const attempts = ch.attempts + 1;
+      if (attempts >= 5) {
+        db.prepare('DELETE FROM login_challenges WHERE token_hash = ?').run(ch.token_hash);
+        res.append('Set-Cookie', challengeCookie('', 0));
+        return res.status(401).render('login', { title: 'Sign in', error: 'Too many wrong codes. Please sign in again.', login: '', member: '', allowRegistration: config.allowRegistration });
+      }
+      db.prepare('UPDATE login_challenges SET attempts = ? WHERE token_hash = ?').run(attempts, ch.token_hash);
+      return res.status(401).render('login-code', { title: 'Enter your code', error: 'That code isn\'t right. Check your authenticator app and try again.' });
+    }
+    db.prepare('DELETE FROM login_challenges WHERE token_hash = ?').run(ch.token_hash);
+    res.append('Set-Cookie', challengeCookie('', 0));
     logEvent.run(user.id, who, 1, ip, ua);
     if (config.activityLog !== false) activity.logSignIn(db, user.id, ip);
     startSession(user, res);

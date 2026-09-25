@@ -18,6 +18,8 @@ function loadConfig(env = process.env) {
     uploadDir: env.UPLOAD_DIR || path.join(__dirname, '..', 'data', 'uploads'),
     backupDir: env.BACKUP_DIR || path.join(__dirname, '..', 'data', 'backups'),
     backupCopyDir: env.BACKUP_COPY_DIR || '',
+    // Encrypts every backup when set. Keep it safe: it's needed to restore.
+    backupPassword: env.BACKUP_PASSWORD || '',
     backupKeep: Math.max(1, Number(env.BACKUP_KEEP) || 14),
     backupIntervalHours: Math.max(1, Number(env.BACKUP_INTERVAL_HOURS) || 24),
     autoBackups: env.AUTO_BACKUPS !== 'false',
@@ -25,6 +27,7 @@ function loadConfig(env = process.env) {
     adminEmail: (env.ADMIN_EMAIL || '').trim().toLowerCase(),
     adminPassword: env.ADMIN_PASSWORD || '',
     adminPasswordReset: env.ADMIN_PASSWORD_RESET === 'true',
+    admin2faReset: env.ADMIN_2FA_RESET === 'true',
     adminUsername: (env.ADMIN_USERNAME || 'admin').trim(),
     // The admin's "Your name" at sign-in (capitals count).
     adminLoginName: (env.ADMIN_LOGIN_NAME || 'Theo').trim(),
@@ -66,6 +69,10 @@ function ensureAdmin(db, config, log = console.log) {
     db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(auth.hashPassword(config.adminPassword), admin.id);
     db.prepare('DELETE FROM sessions WHERE user_id = ?').run(admin.id);
     log('Admin password reset from ADMIN_PASSWORD. Remove ADMIN_PASSWORD_RESET now.');
+  }
+  if (admin && config.admin2faReset) {
+    db.prepare("UPDATE users SET totp_enabled = 0, totp_secret = NULL, totp_recovery = NULL, totp_last_step = -1 WHERE id = ?").run(admin.id);
+    log('Two-step login switched off for the admin account. Remove ADMIN_2FA_RESET now.');
   }
   db.prepare('UPDATE users SET is_admin = CASE WHEN id = ? THEN 1 ELSE 0 END').run(admin ? admin.id : -1);
   if (admin) db.prepare("UPDATE users SET status = 'active' WHERE id = ?").run(admin.id);

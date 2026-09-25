@@ -1,0 +1,14 @@
+<%- include('partials/header', { bodyClass: 'auth' }) %>
+<div class="card narrow">
+  <a class="brand" href="/login"><span class="logo">N</span><%= appName %></a>
+  <h1>Enter your code</h1>
+  <p class="muted small">Open your authenticator app and type the 6-digit code for <%= appName %>.</p>
+  <% if (error) { %><div class="notice err"><%= error %></div><% } %>
+  <form method="post" action="/login/code" class="stack">
+    <label>Code <input id="code" name="code" required autofocus autocomplete="one-time-code" inputmode="numeric" maxlength="20" spellcheck="false"></label>
+    <button class="btn primary" type="submit">Continue</button>
+  </form>
+  <p class="muted small">Lost your phone? Type one of your recovery codes instead.</p>
+  <p class="muted small"><a href="/login">Back to sign in</a></p>
+</div>
+<%- include('partials/footer') %>

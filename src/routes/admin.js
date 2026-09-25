@@ -5,6 +5,8 @@ const path = require('node:path');
 const express = require('express');
 const fmt = require('../format');
 const backup = require('../backup');
+const totp = require('../totp');
+const QRCode = require('qrcode');
 const auth = require('../auth');
 const { USERNAME_RE, LOGIN_NAME_RE, signInNameFrom } = require('../db');
 
@@ -269,6 +271,75 @@ module.exports = function adminRoutes(db, config) {
     db.prepare('DELETE FROM users WHERE id = ?').run(u.id);
     fs.rmSync(path.join(config.uploadDir, String(u.id)), { recursive: true, force: true });
     res.redirect('/admin?flash=' + encodeURIComponent(`Deleted ${u.username} (${u.agency_name}) and all of their data.`));
+  });
+
+  // ---------- security: two-step login for the admin account ----------
+
+  function me(req) {
+    return db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.person_id);
+  }
+
+  router.get('/security', async (req, res, next) => {
+    try {
+      const u = me(req);
+      let qr = null;
+      if (!u.totp_enabled && u.totp_secret) {
+        const url = totp.otpauthUrl({ secret: u.totp_secret, account: u.username, issuer: config.appName });
+        qr = 'data:image/svg+xml;base64,' + Buffer.from(await QRCode.toString(url, { type: 'svg', margin: 1 })).toString('base64');
+      }
+      res.render('admin/security', {
+        title: 'Security', section: 'security', u, qr, secret: u.totp_enabled ? null : u.totp_secret,
+        recoveryLeft: JSON.parse(u.totp_recovery || '[]').length, newCodes: null,
+        backupEncrypted: !!config.backupPassword, flash: req.query.flash || '', error: req.query.error || '',
+      });
+    } catch (err) { next(err); }
+  });
+
+  // Step 1: make a new secret (not active until a code from the app is confirmed).
+  router.post('/security/setup', (req, res) => {
+    const u = me(req);
+    if (u.totp_enabled) return res.redirect('/admin/security');
+    db.prepare('UPDATE users SET totp_secret = ? WHERE id = ?').run(totp.generateSecret(), u.id);
+    res.redirect('/admin/security#setup');
+  });
+
+  // Step 2: the code from the app proves it's set up; switch on and show recovery codes once.
+  router.post('/security/enable', (req, res) => {
+    const u = me(req);
+    if (u.totp_enabled || !u.totp_secret) return res.redirect('/admin/security');
+    const step = totp.verify(u.totp_secret, req.body.code, -1);
+    if (step === null) return res.redirect('/admin/security?error=' + encodeURIComponent("That code didn't match. Check the app shows Nexus and try the newest code.") + '#setup');
+    const { codes, hashes } = totp.makeRecoveryCodes();
+    db.prepare('UPDATE users SET totp_enabled = 1, totp_last_step = ?, totp_recovery = ? WHERE id = ?').run(step, JSON.stringify(hashes), u.id);
+    // Sign out any other devices so they have to use the code next time.
+    db.prepare('DELETE FROM sessions WHERE user_id = ? AND token_hash != ?').run(u.id, req.sessionTokenHash || '');
+    res.render('admin/security', {
+      title: 'Security', section: 'security', u: me(req), qr: null, secret: null, recoveryLeft: codes.length, newCodes: codes,
+      backupEncrypted: !!config.backupPassword, flash: 'Two-step login is on.', error: '',
+    });
+  });
+
+  router.post('/security/recovery', (req, res) => {
+    const u = me(req);
+    if (!u.totp_enabled) return res.redirect('/admin/security');
+    if (totp.verify(u.totp_secret, req.body.code, u.totp_last_step) === null) {
+      return res.redirect('/admin/security?error=' + encodeURIComponent('Enter a current code from your app to make new recovery codes.'));
+    }
+    const { codes, hashes } = totp.makeRecoveryCodes();
+    db.prepare('UPDATE users SET totp_recovery = ? WHERE id = ?').run(JSON.stringify(hashes), u.id);
+    res.render('admin/security', {
+      title: 'Security', section: 'security', u: me(req), qr: null, secret: null, recoveryLeft: codes.length, newCodes: codes,
+      backupEncrypted: !!config.backupPassword, flash: 'New recovery codes made. The old ones no longer work.', error: '',
+    });
+  });
+
+  router.post('/security/disable', (req, res) => {
+    const u = me(req);
+    if (!auth.verifyPassword(String(req.body.password || ''), u.password_hash)) {
+      return res.redirect('/admin/security?error=' + encodeURIComponent('Your password was wrong, so two-step login is still on.'));
+    }
+    db.prepare("UPDATE users SET totp_enabled = 0, totp_secret = NULL, totp_recovery = NULL, totp_last_step = -1 WHERE id = ?").run(u.id);
+    res.redirect('/admin/security?flash=' + encodeURIComponent('Two-step login is off.'));
   });
 
   // ---------- backups ----------

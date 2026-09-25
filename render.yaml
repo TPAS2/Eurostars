@@ -36,5 +36,8 @@ services:
         sync: false
       - key: ADMIN_EMAIL
         sync: false
+      # Encrypts every backup. Keep it safe: it's needed to restore a backup.
+      - key: BACKUP_PASSWORD
+        sync: false
       - key: ANTHROPIC_API_KEY
         sync: false

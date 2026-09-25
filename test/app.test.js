@@ -16,6 +16,7 @@ const config = {
   backupDir: path.join(tmp, 'backups'),
   backupKeep: 3,
   registrationsPerHour: 1000,
+  loginAttemptsPer15Min: 1000,
   allowRegistration: true, // most tests create accounts through the sign-up page
   adminEmail: 'owner@example.com',
   adminPassword: 'owner-password-123',
@@ -51,8 +52,17 @@ class Client {
       payload = new URLSearchParams({ _csrf: this.csrf, ...body }).toString();
     }
     const res = await fetch(base + url, { method, headers, body: payload, redirect: 'manual' });
-    const set = res.headers.get('set-cookie');
-    if (set) this.cookie = set.split(';')[0];
+    // Keep a small cookie jar: a response can set or clear several cookies.
+    this.jar = this.jar || {};
+    for (const c of res.headers.getSetCookie()) {
+      const [pair, ...attrs] = c.split(';');
+      const i = pair.indexOf('=');
+      const name = pair.slice(0, i).trim();
+      const value = pair.slice(i + 1);
+      if (!value || attrs.some((a) => /max-age=0/i.test(a))) delete this.jar[name];
+      else this.jar[name] = value;
+    }
+    this.cookie = Object.entries(this.jar).map(([k, v]) => `${k}=${v}`).join('; ');
     const text = await res.text();
     const m = text.match(/name="_csrf" value="([^"]+)"/);
     if (m) this.csrf = m[1];
@@ -829,4 +839,88 @@ test('existing "main" logins switch to the contact\'s first name', () => {
   assert.equal(d2.prepare("SELECT login_name FROM users WHERE username = 'acme'").get().login_name, 'Olivia');
   assert.equal(d2.prepare("SELECT login_name FROM users WHERE username = 'odd'").get().login_name, 'User');
   d2.close();
+});
+
+
+test('two-step login for the admin: set up, sign in with a code, recovery codes, reset', async () => {
+  const totp = require('../src/totp');
+  const admin = new Client();
+  await admin.login('admin', 'owner-password-123');
+  let r = await admin.get('/admin/security');
+  assert.match(r.text, /Two-step login[\s\S]*Off/);
+  r = await admin.post('/admin/security/setup', {});
+  r = await admin.get('/admin/security');
+  assert.match(r.text, /<img src="data:image\/svg\+xml;base64,/);
+  const secret = db.prepare("SELECT totp_secret FROM users WHERE username = 'admin'").get().totp_secret;
+  r = await admin.post('/admin/security/enable', { code: '000000' });
+  assert.match(decodeURIComponent(r.location), /didn't match/);
+  r = await admin.post('/admin/security/enable', { code: totp.codeAt(secret, totp.currentStep()) });
+  assert.match(r.text, /Two-step login is on/);
+  const recovery = [...r.text.matchAll(/<li><code>([a-z2-7]{4}-[a-z2-7]{4})<\/code><\/li>/g)].map((m) => m[1]);
+  assert.equal(recovery.length, 8);
+  assert.match((await admin.get('/admin')).text, /Admin panel/, 'this browser stays signed in');
+
+  // Password alone is no longer enough.
+  const c = new Client();
+  r = await c.post('/login', { login: 'admin', member: 'Theo', password: 'owner-password-123' });
+  assert.equal(r.location, '/login/code');
+  assert.equal((await c.get('/admin')).location, '/login', 'not signed in yet');
+  assert.match((await c.get('/login/code')).text, /Enter your code/);
+  r = await c.post('/login/code', { code: '123456' });
+  assert.equal(r.status, 401);
+  // The code that was used to switch it on can't be reused; the next one works.
+  const nextStep = totp.currentStep() + 1;
+  r = await c.post('/login/code', { code: totp.codeAt(secret, nextStep) });
+  assert.equal(r.location, '/admin');
+  assert.equal((await c.get('/admin')).status, 200);
+  const replay = new Client();
+  await replay.post('/login', { login: 'admin', member: 'Theo', password: 'owner-password-123' });
+  assert.equal((await replay.post('/login/code', { code: totp.codeAt(secret, nextStep) })).status, 401, 'a code only works once');
+
+  // A recovery code works once.
+  const rc = new Client();
+  await rc.post('/login', { login: 'admin', member: 'Theo', password: 'owner-password-123' });
+  assert.equal((await rc.post('/login/code', { code: recovery[0] })).location, '/admin');
+  const rc2 = new Client();
+  await rc2.post('/login', { login: 'admin', member: 'Theo', password: 'owner-password-123' });
+  assert.equal((await rc2.post('/login/code', { code: recovery[0] })).status, 401);
+
+  // Five wrong codes and they have to start again.
+  const guesser = new Client();
+  await guesser.post('/login', { login: 'admin', member: 'Theo', password: 'owner-password-123' });
+  for (let i = 0; i < 4; i++) assert.equal((await guesser.post('/login/code', { code: '000001' })).status, 401);
+  r = await guesser.post('/login/code', { code: '000001' });
+  assert.match(r.text, /Too many wrong codes/);
+  assert.equal((await guesser.post('/login/code', { code: totp.codeAt(secret, totp.currentStep()) })).location, '/login');
+
+  // Lost everything: ADMIN_2FA_RESET switches it off on restart.
+  ensureAdmin(db, { ...config, admin2faReset: true }, () => {});
+  const after = new Client();
+  assert.equal((await after.login('admin', 'owner-password-123')).location, '/admin');
+});
+
+test('encrypted backups: unreadable without the password, restorable with it', async () => {
+  const { execFileSync } = require('node:child_process');
+  const { createBackup, decryptFile, isEncrypted } = require('../src/backup');
+  const encConfig = { ...config, backupDir: path.join(tmp, 'enc-backups'), backupPassword: 'correct horse battery staple' };
+  const b = await createBackup(db, encConfig, { reason: 'test' });
+  assert.match(b.name, /\.tar\.gz\.enc$/);
+  assert.ok(isEncrypted(b.file));
+  const head = fs.readFileSync(b.file).subarray(0, 64);
+  assert.ok(!head.includes(Buffer.from([0x1f, 0x8b])), 'not a readable gzip');
+  assert.ok(!fs.readFileSync(b.file).includes(Buffer.from('SQLite format 3')), 'database not visible inside');
+
+  await assert.rejects(decryptFile(b.file, path.join(tmp, 'nope.tar.gz'), 'wrong password'), /Wrong backup password/);
+  assert.ok(!fs.existsSync(path.join(tmp, 'nope.tar.gz')));
+  const plain = path.join(tmp, 'ok.tar.gz');
+  await decryptFile(b.file, plain, 'correct horse battery staple');
+  assert.match(execFileSync('tar', ['-tzf', plain]).toString(), /nexus\.db/);
+
+  // The restore script decrypts with BACKUP_PASSWORD.
+  const target = path.join(tmp, 'restored-enc');
+  const env = { ...process.env, DATABASE_FILE: path.join(target, 'nexus.db'), UPLOAD_DIR: path.join(target, 'uploads'), BACKUP_PASSWORD: 'correct horse battery staple' };
+  execFileSync(process.execPath, ['--disable-warning=ExperimentalWarning', 'scripts/restore-backup.js', b.file], { env, cwd: path.join(__dirname, '..') });
+  const restored = openDatabase(path.join(target, 'nexus.db'));
+  assert.ok(restored.prepare("SELECT 1 FROM users WHERE username = 'admin'").get());
+  restored.close();
 });
