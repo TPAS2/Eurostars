@@ -1034,6 +1034,7 @@ test('councils can have a picture, shown left of the council details and in the 
   r = await c.get(`/app/councils/${id}`);
   assert.match(r.text, new RegExp(`<img src="/app/councils/${id}/photo\\?v=\\d+" alt="Picture of Leeds City Council">`));
   assert.match(r.text, /Change picture/);
+  assert.match(r.text, new RegExp(`<h1 class=with-thumb><img class="title-thumb" src="/app/councils/${id}/photo\\?v=\\d+" alt="">Leeds City Council</h1>`), 'picture left of the council name at the top');
   r = await c.get(`/app/councils/${id}/photo`);
   assert.equal(r.status, 200);
   assert.equal(r.headers.get('content-type'), 'image/png');

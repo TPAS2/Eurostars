@@ -2,7 +2,7 @@
 <header class="page-head">
   <div>
     <a class="crumb" href="/app/<%= def.key %>">← <%= def.plural %></a>
-    <h1><%= title %></h1>
+    <h1<%= photo && photo.v ? ' class=with-thumb' : '' %>><% if (photo && photo.v) { %><img class="title-thumb" src="/app/councils/<%= row.id %>/photo?v=<%= photo.v %>" alt=""><% } %><%= title %></h1>
   </div>
   <div class="actions">
     <% if (def.key === 'properties') { %><a class="btn primary" href="/app/properties/<%= row.id %>/add-tenant">+ Add tenant</a><% } %>
