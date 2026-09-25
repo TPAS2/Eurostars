@@ -408,7 +408,9 @@ module.exports = function appRoutes(db) {
         if (!byCouncil.has(p.council_id)) byCouncil.set(p.council_id, []);
         byCouncil.get(p.council_id).push(p.address_line1);
       }
+      const photos = new Map(db.prepare("SELECT council_id, strftime('%s', updated_at) AS v FROM council_photos WHERE account_id = ?").all(a).map((p) => [p.council_id, p.v]));
       for (const row of rows) {
+        if (photos.has(row.id)) row.photo_v = photos.get(row.id);
         const list = byCouncil.get(row.id) || [];
         const shown = list.slice(0, 3).join(', ') + (list.length > 3 ? ` +${list.length - 3} more` : '');
         row.properties = { text: list.length ? `${list.length} · ${shown}` : 'None yet', count: list.length };
@@ -475,7 +477,10 @@ module.exports = function appRoutes(db) {
       const fk = def.key === 'maintenance' ? 'maintenance_job_id' : 'property_id';
       invoices = db.prepare(`SELECT * FROM invoices WHERE account_id = ? AND ${fk} = ? ORDER BY status = 'paid', due_date`).all(a, row.id);
     }
-    res.render('show', { title: rowTitle(def, row, maps), section: def.key, def, row, maps, display, rowTitle, children, extra, invoices, related: relatedLists(def, row, a), certs, fmt, today: fmt.today() });
+    const photo = def.key === 'councils'
+      ? db.prepare("SELECT strftime('%s', updated_at) AS v FROM council_photos WHERE council_id = ? AND account_id = ?").get(row.id, a) || { v: null }
+      : null;
+    res.render('show', { title: rowTitle(def, row, maps), section: def.key, def, row, maps, display, rowTitle, children, extra, invoices, related: relatedLists(def, row, a), certs, photo, error: req.query.error ? String(req.query.error).slice(0, 200) : null, fmt, today: fmt.today() });
   });
 
   router.get('/:entity/:id/edit', (req, res) => {

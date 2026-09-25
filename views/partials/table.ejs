@@ -11,7 +11,7 @@
     <tr>
     <% def.columns.filter(c => c !== hideField).forEach((c, i) => { const d = display(def, c, row, maps); %>
       <td class="<%= d.num ? 'num' : '' %>">
-        <% if (i === 0) { %><a href="/app/<%= def.key %>/<%= row.id %>"><%= d.text || rowTitle(def, row, maps) %></a>
+        <% if (i === 0) { %><a href="/app/<%= def.key %>/<%= row.id %>"<%= row.photo_v ? ' class=with-thumb' : '' %>><% if (row.photo_v) { %><img class="thumb" src="/app/<%= def.key %>/<%= row.id %>/photo?v=<%= row.photo_v %>" alt=""><% } %><%= d.text || rowTitle(def, row, maps) %></a>
         <% } else if (d.href) { %><a href="<%= d.href %>"><%= d.text %></a>
         <% } else if (d.badge) { %><span class="badge s-<%= String(row[c]).replace(/\W+/g, '-') %>"><%= d.text %></span>
         <% } else { %><%= d.text %><% } %>

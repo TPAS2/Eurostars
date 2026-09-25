@@ -93,6 +93,11 @@ function describe(db, req) {
     if (sub === 'delete') return { action: 'deleted', text: withTitle('Deleted invoice', name) };
     return { action: 'updated', text: withTitle('Edited invoice', name) };
   }
+  if (section === 'councils' && sub === 'photo') {
+    if (!post) return null;
+    const title = recordTitle(db, ENTITIES.councils, id, a);
+    return { action: parts[4] === 'delete' ? 'deleted' : 'updated', text: withTitle(parts[4] === 'delete' ? 'Removed the picture of council' : 'Changed the picture of council', title) };
+  }
   if (section === 'properties' && sub === 'add-tenant') {
     const title = recordTitle(db, ENTITIES.properties, id, a);
     return post ? { action: 'created', text: withTitle('Added a tenant to', title) } : { action: 'viewed', text: withTitle('Opened Add tenant for', title) };

@@ -101,6 +101,15 @@ CREATE TABLE IF NOT EXISTS councils (
   created_at           TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- One picture per council (e.g. its logo), kept in the database so backups include it.
+CREATE TABLE IF NOT EXISTS council_photos (
+  council_id  INTEGER PRIMARY KEY REFERENCES councils(id) ON DELETE CASCADE,
+  account_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  mime        TEXT NOT NULL,
+  data        BLOB NOT NULL,
+  updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS tenants (
   id          INTEGER PRIMARY KEY,
   account_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,

@@ -18,8 +18,33 @@
   </div>
 </header>
 
+<% if (error) { %><div class="notice err"><%= error %></div><% } %>
 <section class="card">
   <% if (extra) { %><div class="callout <%= extra.alert ? 'alert' : '' %>"><span><%= extra.label %></span><strong><%= extra.value %></strong></div><% } %>
+  <% if (photo) { %>
+  <div class="with-photo">
+    <div class="council-photo">
+      <% if (photo.v) { %>
+        <img src="/app/councils/<%= row.id %>/photo?v=<%= photo.v %>" alt="Picture of <%= row.name %>">
+      <% } else { %>
+        <div class="photo-empty" aria-hidden="true"><%= String(row.name || '?').trim().charAt(0).toUpperCase() %></div>
+      <% } %>
+      <form method="post" action="/app/councils/<%= row.id %>/photo" enctype="multipart/form-data" class="photo-upload">
+        <%- include('partials/csrf') %>
+        <label class="btn small">
+          <%= photo.v ? 'Change picture' : 'Add picture' %>
+          <input type="file" name="photo" accept="image/png,image/jpeg,image/webp,image/gif" data-autosubmit hidden>
+        </label>
+        <noscript><button class="btn small" type="submit">Upload</button></noscript>
+      </form>
+      <% if (photo.v) { %>
+      <form method="post" action="/app/councils/<%= row.id %>/photo/delete" data-confirm="Remove this council's picture?">
+        <%- include('partials/csrf') %>
+        <button class="btn small link" type="submit">Remove</button>
+      </form>
+      <% } %>
+    </div>
+  <% } %>
   <dl class="details">
     <% def.fields.forEach(f => { const d = display(def, f.name, row, maps); %>
       <div class="<%= f.type === 'textarea' && !f.inline ? 'wide' : '' %>">
@@ -28,6 +53,7 @@
       </div>
     <% }) %>
   </dl>
+  <% if (photo) { %></div><% } %>
 </section>
 
 <% if (certs) { %>

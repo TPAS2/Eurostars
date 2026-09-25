@@ -187,6 +187,10 @@ document.addEventListener('submit', (e) => {
   }
 
   document.addEventListener('DOMContentLoaded', () => {
+    // A picture is uploaded as soon as one is chosen.
+    document.querySelectorAll('input[type=file][data-autosubmit]').forEach((input) => {
+      input.addEventListener('change', () => { if (input.files.length) input.form.submit(); });
+    });
     document.querySelectorAll('form[data-autosave]').forEach(setupAutosave);
     document.querySelectorAll('form[data-draft]').forEach(setupDraft);
   });

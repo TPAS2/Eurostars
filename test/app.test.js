@@ -632,6 +632,7 @@ test('councils link to properties, and through them to landlords and tenants', a
   const rail = (await c.get('/app')).text.match(/<nav class="rail"[\s\S]*?<\/nav>/)[0];
   // [0] is the menu's own label ("Main"); the first button follows it.
   assert.equal(rail.match(/aria-label="([^"]+)"/g)[1], 'aria-label="Councils"', 'Councils is the first menu button');
+  assert.ok(rail.indexOf('aria-label="Properties"') < rail.indexOf('aria-label="Landlords"'), 'Properties is above Landlords');
 
   // Another company can't see or link to this council.
   const other = await registerAndLogin('councils-other@example.com', 'Other Lets');
@@ -1017,4 +1018,44 @@ test('councils, landlords and properties have a search bar that also matches lin
   assert.doesNotMatch(r.text, /Mill House/);
   r = await c.get('/app/properties?q=nothing-here');
   assert.match(r.text, /No matches/);
+});
+
+test('councils can have a picture, shown left of the council details and in the list', async () => {
+  const c = await registerAndLogin('council-photo@example.com', 'Photo Lets');
+  let r = await c.post('/app/councils', { name: 'Leeds City Council' });
+  const id = idFrom(r.location);
+  r = await c.get(`/app/councils/${id}`);
+  assert.match(r.text, /class="council-photo"[\s\S]*?Add picture/);
+  assert.match(r.text, /class="with-photo">\s*<div class="council-photo">[\s\S]*<dl class="details">\s*<div class="">\s*<dt>Council<\/dt>/, 'picture comes before (left of) Council');
+
+  const png = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(40)]);
+  r = await c.post(`/app/councils/${id}/photo`, { photo: new File([png], 'logo.png') }, { multipart: true });
+  assert.equal(r.location, `/app/councils/${id}`);
+  r = await c.get(`/app/councils/${id}`);
+  assert.match(r.text, new RegExp(`<img src="/app/councils/${id}/photo\\?v=\\d+" alt="Picture of Leeds City Council">`));
+  assert.match(r.text, /Change picture/);
+  r = await c.get(`/app/councils/${id}/photo`);
+  assert.equal(r.status, 200);
+  assert.equal(r.headers.get('content-type'), 'image/png');
+  assert.match((await c.get('/app/councils')).text, new RegExp(`<img class="thumb" src="/app/councils/${id}/photo`));
+
+  // Not an image: refused, and the old picture stays.
+  r = await c.post(`/app/councils/${id}/photo`, { photo: new File(['<svg onload=alert(1)>'], 'x.png') }, { multipart: true });
+  assert.match(decodeURIComponent(r.location), /Upload a PNG, JPG, WebP or GIF picture/);
+  assert.equal((await c.get(`/app/councils/${id}/photo`)).headers.get('content-type'), 'image/png');
+
+  // Other companies can't see or change it.
+  const other = await registerAndLogin('council-photo-2@example.com', 'Other Lets');
+  assert.equal((await other.get(`/app/councils/${id}/photo`)).status, 404);
+  assert.equal((await other.post(`/app/councils/${id}/photo`, { photo: new File([png], 'a.png') }, { multipart: true })).status, 404);
+  assert.equal((await other.post(`/app/councils/${id}/photo/delete`, {})).status, 404);
+
+  r = await c.post(`/app/councils/${id}/photo/delete`, {});
+  assert.equal(r.location, `/app/councils/${id}`);
+  assert.equal((await c.get(`/app/councils/${id}/photo`)).status, 404);
+
+  // Deleting the council removes its picture too.
+  await c.post(`/app/councils/${id}/photo`, { photo: new File([png], 'logo.png') }, { multipart: true });
+  await c.post(`/app/councils/${id}/delete`, {});
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM council_photos WHERE council_id = ?').get(id).n, 0);
 });

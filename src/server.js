@@ -122,6 +122,7 @@ function createApp(config, db, { writer = null } = {}) {
   });
   app.use('/', require('./routes/auth')(db, config));
   app.use('/app/invoices', auth.requireLogin, require('./routes/invoices')(db, config));
+  app.use('/app/councils', auth.requireLogin, require('./routes/councilPhotos')(db));
   app.use(auth.rejectUncheckedMultipart);
   app.use('/app/monthly', auth.requireLogin, require('./routes/monthly')(db, writer));
   app.use('/app', auth.requireLogin, require('./routes/app')(db));
