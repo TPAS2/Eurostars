@@ -88,7 +88,7 @@ nav.rail { flex: 1; }
 .brand-btn { margin-bottom: 4px; }
 .brand-btn:hover, .brand-btn.active { background: transparent; }
 .brand-btn.active .logo { box-shadow: 0 0 0 2px var(--sidebar), 0 0 0 4px #fff; }
-.avatar { background: var(--sidebar-active); color: #fff; font-size: .8rem; font-weight: 700; letter-spacing: .02em; cursor: default; }
+.avatar { background: var(--sidebar-active); color: #fff; font-size: .8rem; font-weight: 700; letter-spacing: .02em; }
 
 /* Hover / focus label for the icon rail (positioned by app.js so it isn't clipped). */
 .rail-tip {
@@ -300,3 +300,5 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fo
 .co-title { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
 .co-name { color: var(--brand); }
 .co-sep { color: var(--muted); font-weight: 400; }
+.login-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 8px; }
+.login-summary div { display: flex; flex-direction: column; gap: 2px; }

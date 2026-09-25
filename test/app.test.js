@@ -461,7 +461,7 @@ test('create account with a username and password (email optional)', async () =>
   assert.match(r.location, /^\/app/, 'signed in straight away');
   r = await c.get(r.location);
   assert.match(r.text, /Welcome to Nexus/);
-  assert.match(r.text, /@harbour\.lets/);
+  assert.match((await c.get('/app/account')).text, /<code>harbour\.lets<\/code>/);
   const u = db.prepare("SELECT * FROM users WHERE username = 'harbour.lets'").get();
   assert.equal(u.email, null);
   assert.equal(u.is_admin, 0);
@@ -597,4 +597,39 @@ test('councils link to properties, and through them to landlords and tenants', a
   assert.equal((await other.get(`/app/councils/${councilId}`)).status, 404);
   r = await other.post('/app/properties', { address_line1: 'X', council_id: councilId, status: 'vacant' });
   assert.equal(r.status, 422);
+});
+
+test('account details: companies can only view them; the admin edits them', async () => {
+  const c = await registerAndLogin('myaccount@example.com', 'Before Lets');
+  let r = await c.get('/app');
+  assert.match(r.text, /class="rail-btn avatar[^"]*" href="\/app\/account"/);
+  r = await c.get('/app/account');
+  assert.equal(r.status, 200);
+  assert.match(r.text, /<code>myaccount<\/code>/);
+  assert.match(r.text, /contact your Nexus administrator/);
+  assert.doesNotMatch(r.text, /<form method="post" action="\/app\/account"/);
+
+  // The company can't change its own details.
+  r = await c.post('/app/account', { name: 'Sneaky', agency_name: 'Sneaky Lets' });
+  assert.equal(r.status, 404);
+  const u = db.prepare("SELECT * FROM users WHERE username = 'myaccount'").get();
+  assert.equal(u.agency_name, 'Before Lets');
+  assert.equal((await c.post(`/admin/users/${u.id}/details`, { name: 'X', agency_name: 'X' })).status, 404);
+
+  // The admin can, but not the username or password.
+  const admin = new Client();
+  await admin.login('admin', 'owner-password-123');
+  r = await admin.get(`/admin/users/${u.id}`);
+  assert.match(r.text, /Account details/);
+  r = await admin.post(`/admin/users/${u.id}/details`, { name: 'Robin Hart', agency_name: 'After Lets', email: 'robin@after.example.com', phone: '0117 000 1111', address: '1 Quay St', username: 'hacked', password: 'hacked-pass' });
+  assert.match(decodeURIComponent(r.location), /Account details saved/);
+  const after = db.prepare('SELECT * FROM users WHERE id = ?').get(u.id);
+  assert.equal(after.agency_name, 'After Lets');
+  assert.equal(after.phone, '0117 000 1111');
+  assert.equal(after.username, 'myaccount');
+  assert.ok(require('../src/auth').verifyPassword('password-1234', after.password_hash));
+  assert.match((await c.get('/app/account')).text, /After Lets[\s\S]*0117 000 1111/);
+
+  r = await admin.post(`/admin/users/${u.id}/details`, { name: '', agency_name: 'After Lets' });
+  assert.match(decodeURIComponent(r.location), /Enter the contact name/);
 });

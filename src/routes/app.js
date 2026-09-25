@@ -283,6 +283,13 @@ module.exports = function appRoutes(db) {
     res.render('statement', { title: 'Landlord statements', section: 'statements', landlords, landlord, statement, balances, from, to, fmt, print: req.query.print === '1' });
   });
 
+  // ---------- my account: read-only; only the admin edits account details ----------
+
+  router.get('/account', (req, res) => {
+    const acct = db.prepare('SELECT id, username, name, agency_name, email, phone, address, is_admin, created_at FROM users WHERE id = ?').get(req.user.id);
+    res.render('account', { title: 'My account', section: 'account', acct });
+  });
+
   // ---------- export: everything this agency has stored, as JSON ----------
 
   router.get('/export', (req, res) => {

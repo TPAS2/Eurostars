@@ -43,6 +43,35 @@
   </table></div><% } %>
 </section>
 
+<section class="card" id="details">
+  <h2>Account details</h2>
+  <p class="muted small">Only you can change these. The username <code><%= u.username %></code> stays the same; use Reset password below to change the password.</p>
+  <form method="post" action="/admin/users/<%= u.id %>/details" class="form-grid">
+    <%- include('../partials/csrf') %>
+    <div class="field">
+      <label for="d-agency_name">Company name <span class="req">*</span></label>
+      <input id="d-agency_name" name="agency_name" value="<%= u.agency_name %>" required>
+    </div>
+    <div class="field">
+      <label for="d-name">Contact name <span class="req">*</span></label>
+      <input id="d-name" name="name" value="<%= u.name %>" required>
+    </div>
+    <div class="field">
+      <label for="d-email">Email</label>
+      <input id="d-email" name="email" type="email" value="<%= u.email || '' %>">
+    </div>
+    <div class="field">
+      <label for="d-phone">Phone</label>
+      <input id="d-phone" name="phone" type="tel" value="<%= u.phone || '' %>">
+    </div>
+    <div class="field wide">
+      <label for="d-address">Company address</label>
+      <textarea id="d-address" name="address" rows="3"><%= u.address || '' %></textarea>
+    </div>
+    <div class="form-actions wide"><button class="btn primary" type="submit">Save details</button></div>
+  </form>
+</section>
+
 <section class="card">
   <h2>Reset password</h2>
   <p class="muted small">Passwords are stored scrambled, so nobody (not even you) can look one up. If <%= isSelf ? 'you forget yours' : 'they forget theirs' %>, set a new one here<%= isSelf ? '' : ' and tell them what it is' %>.</p>

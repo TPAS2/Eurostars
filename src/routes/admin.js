@@ -18,7 +18,7 @@ module.exports = function adminRoutes(db, config) {
   const router = express.Router();
 
   const USAGE_SQL = `
-    SELECT u.id, u.username, u.email, u.name, u.agency_name, u.is_admin, u.status, u.created_at, u.last_login_at, u.login_count,
+    SELECT u.id, u.username, u.email, u.phone, u.address, u.name, u.agency_name, u.is_admin, u.status, u.created_at, u.last_login_at, u.login_count,
            (SELECT COUNT(*) FROM landlords  WHERE account_id = u.id) AS landlords,
            (SELECT COUNT(*) FROM properties WHERE account_id = u.id) AS properties,
            (SELECT COUNT(*) FROM tenants    WHERE account_id = u.id) AS tenants,
@@ -96,6 +96,25 @@ module.exports = function adminRoutes(db, config) {
     const info = db.prepare('INSERT INTO users (username, email, name, agency_name, password_hash) VALUES (?, ?, ?, ?, ?)')
       .run(values.username, values.email || null, values.name, values.agency_name, auth.hashPassword(password));
     res.redirect(`/admin/users/${info.lastInsertRowid}?created=1`);
+  });
+
+  router.post('/users/:id/details', (req, res) => {
+    const u = target(req, res);
+    if (!u) return;
+    const text = (k, max) => String(req.body[k] ?? '').trim().slice(0, max);
+    const values = {
+      name: text('name', 200), agency_name: text('agency_name', 200),
+      email: text('email', 254).toLowerCase(), phone: text('phone', 50), address: text('address', 1000),
+    };
+    let error = '';
+    if (!values.name) error = 'Enter the contact name.';
+    else if (!values.agency_name) error = 'Enter the company name.';
+    else if (values.email && !EMAIL_RE.test(values.email)) error = 'Enter a valid email address, or leave it blank.';
+    else if (values.email && db.prepare('SELECT 1 FROM users WHERE email = ? AND id != ?').get(values.email, u.id)) error = 'Another account already uses this email.';
+    if (error) return res.redirect(`/admin/users/${u.id}?error=${encodeURIComponent(error)}#details`);
+    db.prepare('UPDATE users SET name = ?, agency_name = ?, email = ?, phone = ?, address = ? WHERE id = ?')
+      .run(values.name, values.agency_name, values.email || null, values.phone || null, values.address || null, u.id);
+    res.redirect(`/admin/users/${u.id}?flash=${encodeURIComponent('Account details saved.')}#details`);
   });
 
   router.post('/users/:id/password', (req, res) => {

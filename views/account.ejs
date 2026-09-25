@@ -1,0 +1,25 @@
+<%- include('partials/header') %>
+<header class="page-head">
+  <div>
+    <h1>My account</h1>
+    <p class="muted">
+      <% if (acct.is_admin) { %>You can change these details from your admin panel.
+      <% } else { %>To change any of these details, contact your <%= appName %> administrator.<% } %>
+    </p>
+  </div>
+  <% if (acct.is_admin) { %><div class="actions"><a class="btn primary" href="/admin/users/<%= acct.id %>#details">Edit in admin panel</a></div><% } %>
+</header>
+
+<section class="card">
+  <dl class="details">
+    <div><dt>Username</dt><dd><code><%= acct.username %></code></dd></div>
+    <div><dt>Password</dt><dd>••••••••</dd></div>
+    <div><dt>Account since</dt><dd><%= fmt.ukDate(acct.created_at) %></dd></div>
+    <div><dt>Your name</dt><dd><%= acct.name %></dd></div>
+    <div><dt>Company name</dt><dd><%= acct.agency_name %></dd></div>
+    <div><dt>Email</dt><dd><%= acct.email || '—' %></dd></div>
+    <div><dt>Phone</dt><dd><%= acct.phone || '—' %></dd></div>
+    <div class="wide"><dt>Company address</dt><dd class="pre"><%= acct.address || '—' %></dd></div>
+  </dl>
+</section>
+<%- include('partials/footer') %>
