@@ -162,6 +162,32 @@ module.exports = function appRoutes(db) {
     return row || null;
   }
 
+  // The certificates every let property needs, shown together on the property page.
+  const KEY_CERTS = [
+    { type: 'Gas Safety (CP12)', title: 'Gas certificate', icon: 'gas' },
+    { type: 'EICR', title: 'Electrical certificate (EICR)', icon: 'electric' },
+    { type: 'Insurance', title: 'Insurance', icon: 'insurance' },
+  ];
+
+  function certStatus(expiry, today) {
+    if (expiry < today) return { key: 'expired', label: 'Expired' };
+    if (expiry <= fmt.addDays(today, 30)) return { key: 'expiring', label: 'Expiring soon' };
+    return { key: 'valid', label: 'Valid' };
+  }
+
+  function keyCertificates(a, propertyId) {
+    const today = fmt.today();
+    const rows = db.prepare(
+      `SELECT * FROM compliance_items WHERE account_id = ? AND property_id = ? AND item_type IN (${KEY_CERTS.map(() => '?').join(',')})
+        ORDER BY expiry_date DESC, id DESC`
+    ).all(a, propertyId, ...KEY_CERTS.map((k) => k.type));
+    return KEY_CERTS.map((k) => {
+      const list = rows.filter((r) => r.item_type === k.type);
+      const [current, ...previous] = list;
+      return { ...k, current: current || null, previous, status: current ? certStatus(current.expiry_date, today) : { key: 'missing', label: 'Missing' } };
+    });
+  }
+
   // Council links that run through properties: a council's landlords and tenants, and the
   // councils a landlord or tenant is connected to.
   function relatedLists(def, row, a) {
@@ -405,6 +431,8 @@ module.exports = function appRoutes(db) {
       afterSave(def, a, newId, values);
       return newId;
     });
+    // A new certificate goes back to its property's certificate panel.
+    if (def.key === 'compliance') return res.redirect(`/app/properties/${values.property_id}#certificates`);
     res.redirect(`/app/${def.key}/${id}`);
   });
 
@@ -417,9 +445,12 @@ module.exports = function appRoutes(db) {
     const maps = refLabelMaps(def, a);
     const children = (def.children || []).map((c) => {
       const cdef = ENTITIES[c.entity];
-      const crows = db.prepare(`SELECT * FROM ${cdef.table} WHERE account_id = ? AND ${c.fk} = ? ORDER BY ${cdef.order} LIMIT 100`).all(a, row.id);
-      return { def: cdef, fk: c.fk, rows: crows, maps: refLabelMaps(cdef, a) };
+      let crows = db.prepare(`SELECT * FROM ${cdef.table} WHERE account_id = ? AND ${c.fk} = ? ORDER BY ${cdef.order} LIMIT 100`).all(a, row.id);
+      // On a property, gas, electrical and insurance have their own panel.
+      if (def.key === 'properties' && c.entity === 'compliance') crows = crows.filter((r) => !KEY_CERTS.some((k) => k.type === r.item_type));
+      return { def: cdef, fk: c.fk, rows: crows, maps: refLabelMaps(cdef, a), title: def.key === 'properties' && c.entity === 'compliance' ? 'Other compliance' : null };
     });
+    const certs = def.key === 'properties' ? keyCertificates(a, row.id) : null;
     let extra = null;
     if (def.key === 'tenancies') {
       const r = db.prepare(
@@ -437,7 +468,7 @@ module.exports = function appRoutes(db) {
       const fk = def.key === 'maintenance' ? 'maintenance_job_id' : 'property_id';
       invoices = db.prepare(`SELECT * FROM invoices WHERE account_id = ? AND ${fk} = ? ORDER BY status = 'paid', due_date`).all(a, row.id);
     }
-    res.render('show', { title: rowTitle(def, row, maps), section: def.key, def, row, maps, display, rowTitle, children, extra, invoices, related: relatedLists(def, row, a), fmt, today: fmt.today() });
+    res.render('show', { title: rowTitle(def, row, maps), section: def.key, def, row, maps, display, rowTitle, children, extra, invoices, related: relatedLists(def, row, a), certs, fmt, today: fmt.today() });
   });
 
   router.get('/:entity/:id/edit', (req, res) => {

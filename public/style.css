@@ -302,3 +302,26 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fo
 .co-sep { color: var(--muted); font-weight: 400; }
 .login-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 8px; }
 .login-summary div { display: flex; flex-direction: column; gap: 2px; }
+
+/* ---------- certificates & insurance panel (property page) ---------- */
+.cert-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+.cert { border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; display: flex; flex-direction: column; gap: 10px; align-items: flex-start; border-top-width: 4px; }
+.cert-valid { border-top-color: var(--ok); }
+.cert-expiring { border-top-color: var(--warn); }
+.cert-expired, .cert-missing { border-top-color: var(--bad); }
+.cert-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; width: 100%; }
+.cert-head h3 { margin: 0; font-size: .95rem; }
+.cert-badge-valid { background: var(--ok-soft); color: var(--ok); }
+.cert-badge-expiring { background: var(--warn-soft); color: var(--warn); }
+.cert-badge-expired, .cert-badge-missing { background: var(--bad-soft); color: var(--bad); }
+.cert-facts { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 0; font-size: .9rem; }
+.cert-facts div { display: contents; }
+.cert-facts dt { color: var(--muted); font-size: .8rem; }
+.cert-facts dd { margin: 0; overflow-wrap: anywhere; }
+.cert-history { width: 100%; font-size: .85rem; }
+.cert-history summary { cursor: pointer; color: var(--brand); font-weight: 600; }
+.cert-history table { margin-top: 6px; font-size: .82rem; }
+.cert-history th, .cert-history td { padding: 5px 6px; }
+.cert-head .badge { text-transform: none; }
+.cert-history td { white-space: nowrap; }
+.cert-history .table-scroll { overflow-x: auto; }

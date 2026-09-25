@@ -633,3 +633,34 @@ test('account details: companies can only view them; the admin edits them', asyn
   r = await admin.post(`/admin/users/${u.id}/details`, { name: '', agency_name: 'After Lets' });
   assert.match(decodeURIComponent(r.location), /Enter the contact name/);
 });
+
+test('property certificates: gas, electrical and insurance with current, previous and status', async () => {
+  const c = await registerAndLogin('certs@example.com', 'Cert Lets');
+  let r = await c.post('/app/properties', { address_line1: '4 Canal Walk', status: 'let' });
+  const propertyId = idFrom(r.location);
+
+  r = await c.get(`/app/properties/${propertyId}`);
+  assert.match(r.text, /Certificates &amp; insurance/);
+  for (const title of ['Gas certificate', 'Electrical certificate \\(EICR\\)', 'Insurance']) assert.match(r.text, new RegExp(title));
+  assert.equal((r.text.match(/cert-badge-missing/g) || []).length, 3, 'all three missing to start');
+
+  // "+ Add" pre-fills the property and type, and returns to the panel.
+  r = await c.get(`/app/compliance/new?property_id=${propertyId}&item_type=${encodeURIComponent('Gas Safety (CP12)')}`);
+  assert.match(r.text, /<option value="Gas Safety \(CP12\)" selected>/);
+  const add = (body) => c.post('/app/compliance', { property_id: String(propertyId), ...body });
+  r = await add({ item_type: 'Gas Safety (CP12)', issued_date: '2024-05-01', expiry_date: '2025-05-01', provider: 'Old Gas Co', reference: 'GS-1' });
+  assert.equal(r.location, `/app/properties/${propertyId}#certificates`);
+  await add({ item_type: 'Gas Safety (CP12)', issued_date: '2025-05-01', expiry_date: '2099-05-01', provider: 'New Gas Co', reference: 'GS-2' });
+  await add({ item_type: 'EICR', issued_date: '2020-01-01', expiry_date: '2021-01-01', provider: 'Sparks Ltd' });
+  await add({ item_type: 'Insurance', issued_date: '2026-01-01', expiry_date: require('../src/format').addDays(require('../src/format').today(), 10), provider: 'Homelet', reference: 'POL-77' });
+
+  r = await c.get(`/app/properties/${propertyId}`);
+  const panel = r.text.match(/id="certificates"[\s\S]*?<\/section>/)[0];
+  const box = (title) => panel.split('<div class="cert ').find((b) => b.includes(title));
+  assert.match(box('Gas certificate'), /cert-badge-valid[\s\S]*01\/05\/2099[\s\S]*New Gas Co[\s\S]*Previous \(1\)[\s\S]*Old Gas Co/);
+  assert.match(box('Electrical certificate'), /cert-badge-expired[\s\S]*Sparks Ltd/);
+  assert.match(box('Insurance'), /cert-badge-expiring[\s\S]*Homelet[\s\S]*POL-77/);
+  assert.match(box('Insurance'), /Added<\/dt><dd>\d{2}\/\d{2}\/\d{4}/);
+  // The three key types aren't repeated in the "Other compliance" list.
+  assert.doesNotMatch(r.text.split('id="certificates"')[1].split('</section>').slice(1).join(''), /New Gas Co/);
+});

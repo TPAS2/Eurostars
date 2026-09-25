@@ -78,9 +78,26 @@ const AGENCIES = [
       [2, 'SafeHome Fire', 'SF-0098', 92.5, -20, -6, false],
     ],
     // [property, certificate, issued day, expiry day]
+    // [property, type, issued day, expiry day, provider, reference]
     certs: [
-      [0, 'Gas Safety (CP12)', -340, 25], [0, 'EICR', -700, 1125], [1, 'Gas Safety (CP12)', -380, -15],
-      [2, 'EPC', -1500, 2150], [4, 'HMO licence', -1400, 40], [4, 'Fire risk assessment', -200, 165],
+      [0, 'Gas Safety (CP12)', -1070, -705, 'Bristol Gas Services', 'GS-20931'],
+      [0, 'Gas Safety (CP12)', -705, -340, 'Bristol Gas Services', 'GS-31177'],
+      [0, 'Gas Safety (CP12)', -340, 25, 'Bristol Gas Services', 'GS-40512'],
+      [0, 'EICR', -700, 1125, 'Avon Electrical', 'EICR-8812'],
+      [0, 'Insurance', -120, 245, 'Homelet', 'HL-554201'],
+      [1, 'Gas Safety (CP12)', -745, -380, 'Redland Heating', 'RH-1102'],
+      [1, 'Gas Safety (CP12)', -380, -15, 'Redland Heating', 'RH-2240'],
+      [1, 'EICR', -2100, -275, 'Avon Electrical', 'EICR-2019'],
+      [1, 'Insurance', -300, 65, 'Direct Line for Business', 'DL-99120'],
+      [2, 'Gas Safety (CP12)', -90, 275, 'SW Heating Services', 'SWH-771'],
+      [2, 'EICR', -400, 1425, 'Bath Electrical', 'BE-3301'],
+      [2, 'Insurance', -30, 335, 'Aviva', 'AV-220915'],
+      [2, 'EPC', -1500, 2150, null, null],
+      [3, 'EICR', -800, 1025, 'Avon Electrical', 'EICR-6602'],
+      [4, 'Gas Safety (CP12)', -200, 165, 'SafeHome Gas', 'SH-4410'],
+      [4, 'EICR', -1500, 325, 'Avon Electrical', 'EICR-4101'],
+      [4, 'Insurance', -380, -15, 'Alan Boswell', 'AB-HMO-311'],
+      [4, 'HMO licence', -1400, 40, null, null], [4, 'Fire risk assessment', -200, 165, null, null],
     ],
   },
 ];
@@ -167,8 +184,9 @@ function seedAgency(p, lastLoginHoursAgo) {
     }
   }
 
-  for (const [pi, type, issued, expiry] of p.certs) {
-    ins('INSERT INTO compliance_items (account_id, property_id, item_type, issued_date, expiry_date) VALUES (?, ?, ?, ?, ?)', a, props[pi], type, day(issued), day(expiry));
+  for (const [pi, type, issued, expiry, provider, reference] of p.certs) {
+    ins(`INSERT INTO compliance_items (account_id, property_id, item_type, issued_date, expiry_date, provider, reference, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, a, props[pi], type, day(issued), day(expiry), provider || null, reference || null, `${day(issued + 2)} 10:00:00`);
   }
   db.prepare("INSERT INTO login_events (user_id, email, success, ip, user_agent, created_at) VALUES (?, ?, 1, '81.2.69.142', 'Mozilla/5.0', datetime('now', ?))")
     .run(a, p.username, `-${lastLoginHoursAgo} hours`);

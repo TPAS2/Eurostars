@@ -30,6 +30,48 @@
   </dl>
 </section>
 
+<% if (certs) { %>
+<section class="card" id="certificates">
+  <div class="card-head"><h2>Certificates &amp; insurance</h2></div>
+  <div class="cert-grid">
+    <% certs.forEach(c => { %>
+    <div class="cert cert-<%= c.status.key %>">
+      <div class="cert-head">
+        <h3><%= c.title %></h3>
+        <span class="badge cert-badge-<%= c.status.key %>"><%= c.status.label %></span>
+      </div>
+      <% if (c.current) { %>
+        <dl class="cert-facts">
+          <div><dt>Expires</dt><dd><strong><%= fmt.ukDate(c.current.expiry_date) %></strong></dd></div>
+          <div><dt>Issued</dt><dd><%= c.current.issued_date ? fmt.ukDate(c.current.issued_date) : '—' %></dd></div>
+          <div><dt>Added</dt><dd><%= fmt.ukDate(c.current.created_at) %></dd></div>
+          <% if (c.current.provider) { %><div><dt>Provider</dt><dd><%= c.current.provider %></dd></div><% } %>
+          <% if (c.current.reference) { %><div><dt>No.</dt><dd><%= c.current.reference %></dd></div><% } %>
+        </dl>
+        <a class="small" href="/app/compliance/<%= c.current.id %>">View / edit</a>
+      <% } else { %>
+        <p class="muted small">No <%= c.title.toLowerCase() %> recorded for this property.</p>
+      <% } %>
+      <a class="btn small <%= c.current ? '' : 'primary' %>" href="/app/compliance/new?property_id=<%= row.id %>&item_type=<%= encodeURIComponent(c.type) %>">+ Add <%= c.current ? 'new' : '' %> <%= c.title.split(' (')[0].toLowerCase() %></a>
+      <% if (c.previous.length) { %>
+      <details class="cert-history">
+        <summary>Previous (<%= c.previous.length %>)</summary>
+        <div class="table-scroll"><table>
+          <thead><tr><th>Issued</th><th>Expired</th><th>Provider</th><th>No.</th></tr></thead>
+          <tbody>
+          <% c.previous.forEach(p => { %>
+            <tr data-href="/app/compliance/<%= p.id %>"><td><a href="/app/compliance/<%= p.id %>"><%= p.issued_date ? fmt.ukDate(p.issued_date) : '—' %></a></td><td><%= fmt.ukDate(p.expiry_date) %></td><td><%= p.provider || '' %></td><td><%= p.reference || '' %></td></tr>
+          <% }) %>
+          </tbody>
+        </table></div>
+      </details>
+      <% } %>
+    </div>
+    <% }) %>
+  </div>
+</section>
+<% } %>
+
 <% if (invoices) { const q = def.key === 'maintenance' ? 'maintenance_job_id' : 'property_id'; %>
 <section class="card">
   <div class="card-head">
@@ -59,7 +101,7 @@
 <% children.forEach(c => { %>
 <section class="card">
   <div class="card-head">
-    <h2><%= def.key === 'landlords' && c.def.key === 'properties' ? 'Properties owned' : def.key === 'councils' && c.def.key === 'properties' ? 'Properties in this council' : c.def.plural %> <span class="count"><%= c.rows.length %></span></h2>
+    <h2><%= c.title ? c.title : def.key === 'landlords' && c.def.key === 'properties' ? 'Properties owned' : def.key === 'councils' && c.def.key === 'properties' ? 'Properties in this council' : c.def.plural %> <span class="count"><%= c.rows.length %></span></h2>
     <% if (def.key === 'properties' && c.def.key === 'tenancies') { %>
       <a class="btn small" href="/app/properties/<%= row.id %>/add-tenant">+ Add tenant</a>
     <% } else { %>

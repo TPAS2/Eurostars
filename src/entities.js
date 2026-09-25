@@ -135,20 +135,21 @@ const ENTITIES = {
 
   compliance: {
     table: 'compliance_items',
-    singular: 'Compliance certificate',
+    singular: 'Certificate',
     plural: 'Compliance',
     titleField: 'item_type',
     order: 'expiry_date',
     fields: [
       { name: 'property_id', label: 'Property', type: 'ref', ref: 'properties', required: true },
       { name: 'item_type', label: 'Certificate', type: 'select', required: true,
-        options: ['Gas Safety (CP12)', 'EICR', 'EPC', 'Smoke & CO alarms', 'Legionella risk assessment', 'HMO licence', 'Selective licence', 'PAT test', 'Fire risk assessment', 'Other'] },
-      { name: 'issued_date', label: 'Issued', type: 'date' },
+        options: ['Gas Safety (CP12)', 'EICR', 'Insurance', 'EPC', 'Smoke & CO alarms', 'Legionella risk assessment', 'HMO licence', 'Selective licence', 'PAT test', 'Fire risk assessment', 'Other'] },
+      { name: 'issued_date', label: 'Issued / start date', type: 'date' },
       { name: 'expiry_date', label: 'Expires', type: 'date', required: true },
-      { name: 'reference', label: 'Reference', type: 'text' },
+      { name: 'provider', label: 'Provider', type: 'text', help: 'Gas engineer, electrician or insurer.' },
+      { name: 'reference', label: 'Certificate / policy no.', type: 'text' },
       { name: 'notes', label: 'Notes', type: 'textarea' },
     ],
-    columns: ['item_type', 'property_id', 'issued_date', 'expiry_date'],
+    columns: ['item_type', 'property_id', 'issued_date', 'expiry_date', 'provider'],
   },
 
   transactions: {

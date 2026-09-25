@@ -219,6 +219,7 @@ function openDatabase(file) {
   migrateUsersToUsernames(db);
   db.exec(SCHEMA);
   // Columns added after the first release.
+  addColumnIfMissing(db, 'compliance_items', 'provider', 'TEXT');
   addColumnIfMissing(db, 'users', 'phone', 'TEXT');
   addColumnIfMissing(db, 'users', 'address', 'TEXT');
   addColumnIfMissing(db, 'properties', 'council_id', 'INTEGER REFERENCES councils(id) ON DELETE SET NULL');
