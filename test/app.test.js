@@ -1123,3 +1123,60 @@ test('any invoice can be deleted, from its page or from a list', async () => {
   assert.equal((await other.post(`/app/invoices/${keepId}/delete`, {})).status, 404);
   assert.equal(db.prepare('SELECT COUNT(*) n FROM invoices WHERE id = ?').get(keepId).n, 1);
 });
+
+test('rent roll: every property with rent due, received, deductions and net for a month', async () => {
+  const c = await registerAndLogin('rent-roll@example.com', 'Roll Lets');
+  let r = await c.post('/app/landlords', { name: 'Rita Owner', code: 'RO1' });
+  const rita = idFrom(r.location);
+  r = await c.post('/app/landlords', { name: 'Sam Owner' });
+  const sam = idFrom(r.location);
+  r = await c.post('/app/properties', { address_line1: '1 Elm Row', landlord_id: rita, status: 'vacant', management_fee_pct: '10' });
+  const elm = idFrom(r.location);
+  r = await c.post(`/app/properties/${elm}/add-tenant`, { tenant_mode: 'new', name: 'Tom Tenant', booking_date: '2026-07-01', start_date: '2026-08-01', rent_pence: '1000', rent_frequency: 'monthly', status: 'active' });
+  const tenancy = idFrom(r.location);
+  r = await c.post('/app/properties', { address_line1: '2 Ash Lane', landlord_id: sam, status: 'vacant' });
+  const ash = idFrom(r.location);
+
+  assert.match((await c.get('/app')).text, /aria-label="Rent roll"/, 'in the menu');
+  r = await c.get('/app/rent-roll?month=2026-08');
+  // Raise the month's rent from the rent roll, then come back to it.
+  r = await c.post('/app/rent/raise', { month: '2026-08', back: 'rent-roll' });
+  assert.match(r.location, /^\/app\/rent-roll\?month=2026-08&flash=/);
+  await c.post('/app/transactions', { txn_date: '2026-08-03', txn_type: 'rent_received', tenancy_id: tenancy, amount_pence: '800' });
+  await c.post('/app/transactions', { txn_date: '2026-08-10', txn_type: 'expense', property_id: elm, description: 'Plumber', amount_pence: '50' });
+  await c.post('/app/transactions', { txn_date: '2026-09-02', txn_type: 'expense', property_id: elm, description: 'Next month', amount_pence: '999' });
+
+  const { rentRoll } = require('../src/rentroll');
+  const accountId = db.prepare('SELECT account_id FROM properties WHERE id = ?').get(elm).account_id;
+  const roll = rentRoll(db, accountId, '2026-08');
+  const row = roll.rows.find((x) => x.id === elm);
+  assert.deepEqual(
+    { rent: row.rent, charged: row.charged, received: row.received, fees: row.fees, expenses: row.expenses, net: row.net, outstanding: row.outstanding },
+    { rent: 100000, charged: 100000, received: 80000, fees: 8000, expenses: 5000, net: 67000, outstanding: 20000 }
+  );
+  assert.deepEqual(row.tenants, ['Tom Tenant']);
+  assert.equal(roll.rows.find((x) => x.id === ash).tenants.length, 0, 'vacant property listed too');
+  assert.equal(roll.totals.net, 67000);
+  assert.equal(roll.totals.let, 1);
+
+  r = await c.get('/app/rent-roll?month=2026-08');
+  assert.match(r.text, /August 2026/);
+  assert.match(r.text, /1 Elm Row[\s\S]*?Rita Owner[\s\S]*?RO1[\s\S]*?Tom Tenant[\s\S]*?£1,000\.00[\s\S]*?£800\.00[\s\S]*?−£80\.00[\s\S]*?−£50\.00[\s\S]*?£670\.00[\s\S]*?£200\.00/);
+  assert.match(r.text, /2 Ash Lane[\s\S]*?vacant/);
+  assert.match(r.text, /class="total"[\s\S]*?£670\.00/);
+
+  // Filter to one landlord.
+  r = await c.get(`/app/rent-roll?month=2026-08&landlord_id=${sam}`);
+  assert.match(r.text, /2 Ash Lane/);
+  assert.doesNotMatch(r.text, /1 Elm Row/);
+
+  // Agrees with the monthly statement for the same landlord and month.
+  await c.get('/app/monthly?month=2026-08');
+  await c.post('/app/monthly/generate', { month: '2026-08', landlord_id: String(rita) });
+  assert.equal(db.prepare('SELECT net_pence FROM monthly_statements WHERE landlord_id = ?').get(rita).net_pence, 67000);
+
+  // Other companies' data never shows.
+  const other = await registerAndLogin('rent-roll-2@example.com', 'Other Roll');
+  r = await other.get(`/app/rent-roll?month=2026-08&landlord_id=${rita}`);
+  assert.doesNotMatch(r.text, /Elm Row|Rita Owner/);
+});

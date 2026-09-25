@@ -121,4 +121,4 @@ function landlordStatement(db, accountId, landlordId, from, to) {
   return { opening, closing: running, rows, totals };
 }
 
-module.exports = { resolveLinks, bookManagementFee, raiseMonthlyRent, arrears, clientAccountBalance, landlordStatement, landlordBalanceSql };
+module.exports = { resolveLinks, bookManagementFee, raiseMonthlyRent, monthlyRent, arrears, clientAccountBalance, landlordStatement, landlordBalanceSql };
