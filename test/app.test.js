@@ -616,6 +616,7 @@ test('councils link to properties, and through them to landlords and tenants', a
   assert.match(council.text, /9 Cotham Hill/);
   assert.doesNotMatch(council.text, /Landlords in this council/);
   assert.doesNotMatch(council.text, /Current tenants in this council/);
+  assert.match(council.text, /<dt>Website<\/dt>[\s\S]*?<\/div>\s*<div class="">\s*<dt>Address<\/dt>/, 'Address sits beside Website, not on its own row');
   assert.doesNotMatch((await c.get(`/app/properties/${propertyId}`)).text, /Council tax band/);
   assert.match((await c.get(`/app/landlords/${landlordId}`)).text, /Councils[\s\S]*Bristol City Council/);
   assert.match((await c.get(`/app/tenants/${tenantId}`)).text, /Councils[\s\S]*Bristol City Council[\s\S]*CT-55501/);

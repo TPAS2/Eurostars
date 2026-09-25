@@ -72,8 +72,8 @@ const ENTITIES = {
       { name: 'licensing_email', label: 'Licensing email (HMO / selective)', type: 'email' },
       { name: 'environmental_phone', label: 'Environmental health phone', type: 'tel' },
       { name: 'website', label: 'Website', type: 'text' },
-      { name: 'address', label: 'Address', type: 'textarea' },
-      { name: 'notes', label: 'Notes', type: 'textarea' },
+      { name: 'address', label: 'Address', type: 'textarea', inline: true },
+      { name: 'notes', label: 'Notes', type: 'textarea', inline: true },
     ],
     columns: ['name', 'properties'],
     // Columns worked out when listing rather than stored on the record.
