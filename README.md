@@ -19,7 +19,7 @@ Lettings, property management and client-accounting software for UK letting agen
   - Clicking an invoice lets you pay it. The payment is recorded and charged to the landlord's account.
 - **Compliance.** Tracks gas safety, EICR, EPC, licences and similar certificates, with warnings before they expire.
 - **Autosave.** Edits save as you type. New forms keep a draft in the browser until you submit them.
-- **Data export.** Each agency can download all of its data as JSON.
+- **Data export.** The admin can download any agency's data as JSON from that company's page in the admin panel.
 
 **For you (admin panel)**
 - All users, with sign-up date, last login, number of logins and how much each agency uses the software.
