@@ -60,9 +60,6 @@ module.exports = function adminRoutes(db, config) {
       tenancies: n("SELECT COUNT(*) n FROM tenancies WHERE status = 'active'"),
       failedLogins24h: n("SELECT COUNT(*) n FROM login_events WHERE success = 0 AND created_at >= datetime('now', '-1 day')"),
     };
-    const signups = db.prepare(
-      "SELECT substr(created_at, 1, 7) AS month, COUNT(*) AS n FROM users GROUP BY month ORDER BY month DESC LIMIT 12"
-    ).all().reverse();
     const recentLogins = db.prepare(
       `SELECT e.*, c.agency_name FROM login_events e LEFT JOIN users u ON u.id = e.user_id LEFT JOIN users c ON c.id = COALESCE(u.company_id, u.id)
         ORDER BY e.id DESC LIMIT 15`
@@ -72,7 +69,7 @@ module.exports = function adminRoutes(db, config) {
          FROM activity_log a JOIN users u ON u.id = a.user_id JOIN users c ON c.id = COALESCE(u.company_id, u.id)
         WHERE a.user_id != ? ORDER BY a.id DESC LIMIT 25`
     ).all(req.user.id);
-    res.render('admin/index', { title: 'Admin', section: 'admin', users, totals, signups, recentLogins, recentActivity, q, status, fmt, flash: req.query.flash || '' });
+    res.render('admin/index', { title: 'Admin', section: 'admin', users, totals, recentLogins, recentActivity, q, status, fmt, flash: req.query.flash || '' });
   });
 
   // ---------- account details: every login at every agency ----------

@@ -19,17 +19,6 @@
   <div class="tile <%= totals.failedLogins24h > 20 ? 'alert' : '' %>"><span class="label">Failed logins (24h)</span><span class="value"><%= totals.failedLogins24h %></span><span class="sub">&nbsp;</span></div>
 </section>
 
-<% if (signups.length) { const max = Math.max(...signups.map(s => s.n)); %>
-<section class="card">
-  <h2>Sign-ups by month</h2>
-  <div class="bars">
-    <% signups.forEach(s => { %>
-      <div class="bar" title="<%= s.month %>: <%= s.n %>"><span class="bar-val"><%= s.n %></span><span class="bar-fill" data-h="<%= Math.round((s.n / max) * 100) %>"></span><span class="bar-label"><%= s.month.slice(2) %></span></div>
-    <% }) %>
-  </div>
-</section>
-<% } %>
-
 <section class="card">
   <div class="card-head">
     <h2>Users <span class="count"><%= users.length %></span></h2>
