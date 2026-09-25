@@ -1180,3 +1180,66 @@ test('rent roll: every property with rent due, received, deductions and net for 
   r = await other.get(`/app/rent-roll?month=2026-08&landlord_id=${rita}`);
   assert.doesNotMatch(r.text, /Elm Row|Rita Owner/);
 });
+
+test('signed out after an hour without use, then back to the same page', async () => {
+  const c = await registerAndLogin('idle@example.com', 'Idle Lets');
+  const person = db.prepare("SELECT id FROM users WHERE username = 'idle'").get().id;
+  const ageSession = (mins) => db.prepare("UPDATE sessions SET last_seen_at = datetime('now', ?) WHERE user_id = ?").run(`-${mins} minutes`, person);
+  let r = await c.post('/app/landlords', { name: 'Ivy Idle' });
+  const landlordId = idFrom(r.location);
+
+  // Pages carry the time limit for the browser's timer.
+  assert.match((await c.get('/app')).text, /<body[^>]*data-idle-minutes="60"/);
+  // The ping keeps the session alive while someone is typing.
+  r = await c.get('/session/ping');
+  assert.equal(r.status, 200);
+
+  // 30 minutes idle: still signed in, and using the site resets the clock.
+  ageSession(30);
+  assert.equal((await c.get('/app/landlords')).status, 200);
+  const seen = db.prepare("SELECT last_seen_at > datetime('now', '-1 minute') AS fresh FROM sessions WHERE user_id = ?").get(person);
+  assert.equal(seen.fresh, 1, 'activity refreshes the session');
+
+  // Over an hour idle: signed out, sent to sign in, and brought back to the same page after.
+  ageSession(63);
+  r = await c.get(`/app/landlords/${landlordId}`);
+  assert.equal(r.location, `/login?timeout=1&next=${encodeURIComponent(`/app/landlords/${landlordId}`)}`);
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM sessions WHERE user_id = ?').get(person).n, 0, 'session ended on the server');
+  r = await c.get(r.location);
+  assert.match(r.text, /signed out after 1 hour without activity/);
+  assert.match(r.text, new RegExp(`name="next" value="/app/landlords/${landlordId}"`));
+  r = await c.post('/login', { login: 'idle', member: 'Test', password: 'password-1234', next: `/app/landlords/${landlordId}` });
+  assert.equal(r.location, `/app/landlords/${landlordId}`);
+  await c.get(r.location);
+
+  // Autosave after the session ended gets a 401 (so the page keeps the typing), not a redirect.
+  ageSession(63);
+  r = await c.req('POST', `/app/landlords/${landlordId}`, { name: 'Ivy Idle' });
+  assert.equal(r.status, 302, 'a normal form post goes to sign in');
+  await c.login('idle', 'password-1234');
+  await c.get('/app/landlords');
+  ageSession(63);
+  const res = await fetch(`${base}/app/landlords/${landlordId}`, {
+    method: 'POST', redirect: 'manual',
+    headers: { cookie: c.cookie, 'content-type': 'application/x-www-form-urlencoded', 'X-Autosave': '1' },
+    body: new URLSearchParams({ _csrf: c.csrf, name: 'Ivy Changed' }).toString(),
+  });
+  assert.equal(res.status, 401);
+  assert.deepEqual(await res.json(), { ok: false, signedOut: true });
+  assert.equal(db.prepare('SELECT name FROM landlords WHERE id = ?').get(landlordId).name, 'Ivy Idle', 'nothing saved without a session');
+  assert.equal((await c.get('/session/ping')).status, 401);
+
+  // "next" only ever returns to a page inside the app.
+  for (const bad of ['https://evil.example/', '//evil.example', '/app//evil', '/admin', '/app/../admin', '/app\\evil']) {
+    r = await new Client().post('/login', { login: 'idle', member: 'Test', password: 'password-1234', next: bad });
+    assert.equal(r.location, '/app', `ignores ${bad}`);
+  }
+
+  // Signing out for inactivity from the page.
+  const d = new Client();
+  await d.login('idle', 'password-1234');
+  await d.get('/app/rent-roll');
+  r = await d.post('/logout', { reason: 'idle', next: '/app/rent-roll?month=2026-08' });
+  assert.equal(r.location, `/login?timeout=1&next=${encodeURIComponent('/app/rent-roll?month=2026-08')}`);
+  assert.equal((await d.get('/app')).location, '/login');
+});

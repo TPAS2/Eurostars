@@ -20,9 +20,14 @@ module.exports = function authRoutes(db, config) {
     return user.is_admin ? '/admin' : '/app';
   }
 
+  const loginPage = (req, extra) => ({
+    title: 'Sign in', error: '', login: '', member: '', allowRegistration: config.allowRegistration,
+    next: String(req.body?.next ?? req.query.next ?? '').slice(0, 500), timedOut: false, idleMinutes: config.idleTimeoutMinutes ?? 60, ...extra,
+  });
+
   router.get('/login', (req, res) => {
-    if (req.user) return res.redirect(landing(req.user));
-    res.render('login', { title: 'Sign in', error: '', login: String(req.query.u || '').slice(0, 254), member: '', allowRegistration: config.allowRegistration });
+    if (req.user) return res.redirect(auth.safeNext(req.query.next, req.user.is_admin) || landing(req.user));
+    res.render('login', loginPage(req, { login: String(req.query.u || '').slice(0, 254), timedOut: req.query.timeout === '1' }));
   });
 
   // Everyone signs in with a username, their own name and their password. All three are
@@ -37,7 +42,7 @@ module.exports = function authRoutes(db, config) {
     const ip = req.ip;
     const ua = String(req.headers['user-agent'] || '').slice(0, 300);
     const who = `${login} / ${member}`;
-    const fail = (status, error) => res.status(status).render('login', { title: 'Sign in', error, login, member, allowRegistration: config.allowRegistration });
+    const fail = (status, error) => res.status(status).render('login', loginPage(req, { error, login, member }));
     if (loginLimited(`${ip}|${who}`)) return fail(429, 'Too many attempts. Please wait 15 minutes and try again.');
     if (!login || !member || !password) return fail(422, 'Enter your agency, your name and your password.');
     const company = findCompany.get(login);
@@ -57,14 +62,15 @@ module.exports = function authRoutes(db, config) {
       // Password is right; now ask for the code from their authenticator app.
       const token = crypto.randomBytes(32).toString('base64url');
       db.prepare("DELETE FROM login_challenges WHERE user_id = ? OR expires_at <= datetime('now')").run(user.id);
-      db.prepare("INSERT INTO login_challenges (token_hash, user_id, expires_at) VALUES (?, ?, datetime('now', '+10 minutes'))").run(sha256(token), user.id);
+      db.prepare("INSERT INTO login_challenges (token_hash, user_id, expires_at, next_url) VALUES (?, ?, datetime('now', '+10 minutes'), ?)")
+        .run(sha256(token), user.id, auth.safeNext(req.body.next, user.is_admin === 1));
       res.append('Set-Cookie', challengeCookie(token, 600));
       return res.redirect('/login/code');
     }
     logEvent.run(user.id, who, 1, ip, ua);
     if (config.activityLog !== false) activity.logSignIn(db, user.id, ip);
     startSession(user, res);
-    res.redirect(landing({ is_admin: user.is_admin === 1 }));
+    res.redirect(auth.safeNext(req.body.next, user.is_admin === 1) || landing({ is_admin: user.is_admin === 1 }));
   });
 
   // ---------- two-step login ----------
@@ -117,7 +123,7 @@ module.exports = function authRoutes(db, config) {
       if (attempts >= 5) {
         db.prepare('DELETE FROM login_challenges WHERE token_hash = ?').run(ch.token_hash);
         res.append('Set-Cookie', challengeCookie('', 0));
-        return res.status(401).render('login', { title: 'Sign in', error: 'Too many wrong codes. Please sign in again.', login: '', member: '', allowRegistration: config.allowRegistration });
+        return res.status(401).render('login', loginPage(req, { error: 'Too many wrong codes. Please sign in again.', next: ch.next_url || '' }));
       }
       db.prepare('UPDATE login_challenges SET attempts = ? WHERE token_hash = ?').run(attempts, ch.token_hash);
       return res.status(401).render('login-code', { title: 'Enter your code', error: 'That code isn\'t right. Check your authenticator app and try again.' });
@@ -127,7 +133,7 @@ module.exports = function authRoutes(db, config) {
     logEvent.run(user.id, who, 1, ip, ua);
     if (config.activityLog !== false) activity.logSignIn(db, user.id, ip);
     startSession(user, res);
-    res.redirect(landing({ is_admin: user.is_admin === 1 }));
+    res.redirect(auth.safeNext(ch.next_url, user.is_admin === 1) || landing({ is_admin: user.is_admin === 1 }));
   });
 
   function startSession(user, res) {
@@ -182,8 +188,23 @@ module.exports = function authRoutes(db, config) {
   });
 
   router.post('/logout', (req, res) => {
+    const isAdmin = !!(req.user && req.user.is_admin);
     auth.destroySession(db, req, res, config.secureCookies);
+    // Signed out for inactivity: say so, and return to the same page after signing back in.
+    if (req.body.reason === 'idle') {
+      const params = new URLSearchParams({ timeout: '1' });
+      const next = auth.safeNext(req.body.next, isAdmin);
+      if (next) params.set('next', next);
+      return res.redirect(`/login?${params}`);
+    }
     res.redirect('/login');
+  });
+
+  // The page pings this while someone is using it, so typing without saving still counts as activity.
+  router.get('/session/ping', (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    if (!req.user) return res.status(401).json({ ok: false, signedOut: true });
+    res.json({ ok: true });
   });
 
   return router;

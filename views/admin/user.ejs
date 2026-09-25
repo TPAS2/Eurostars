@@ -195,7 +195,7 @@
   <p>Permanently deletes this user and <strong>all</strong> of their landlords, properties, tenants and accounts. This can't be undone.</p>
   <form method="post" action="/admin/users/<%= u.id %>/delete" class="inline-form">
     <%- include('../partials/csrf') %>
-    <label>Type the username <strong><%= u.username %></strong> to confirm <input id="confirm_username" name="confirm_username" autocomplete="off" autocapitalize="none" required></label>
+    <label>Type the username <strong><%= u.username %></strong> to confirm <input id="confirm_username" name="confirm_username" data-no-keep autocomplete="off" autocapitalize="none" required></label>
     <button class="btn danger" type="submit">Delete permanently</button>
   </form>
 </section>

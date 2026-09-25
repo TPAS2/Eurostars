@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="/static/style.css">
   <script src="/static/app.js" defer></script>
 </head>
-<body class="<%= typeof bodyClass !== 'undefined' ? bodyClass : '' %>">
+<body class="<%= typeof bodyClass !== 'undefined' ? bodyClass : '' %>"<% if (user && typeof idleMinutes !== 'undefined' && idleMinutes > 0) { %> data-idle-minutes="<%= idleMinutes %>"<% } %>>
 <% if (user) {
   const s = typeof section !== 'undefined' ? section : '';
   const initials = String(user.name || user.username).split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase();
@@ -40,7 +40,7 @@
     </nav>
     <div class="rail rail-me">
       <a class="rail-btn avatar <%= s === 'account' ? 'active' : '' %>" href="/app/account" data-tip="My account · <%= user.name %>" aria-label="My account" <%- s === 'account' ? 'aria-current="page"' : '' %>><%= initials %></a>
-      <form method="post" action="/logout">
+      <form method="post" action="/logout" id="signout-form">
         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
         <button class="rail-btn" type="submit" data-tip="Sign out" aria-label="Sign out"><%- include('icon', { name: 'signout' }) %></button>
       </form>

@@ -48,8 +48,8 @@ function createSession(db, res, userId, secure) {
   const token = crypto.randomBytes(32).toString('base64url');
   const csrf = crypto.randomBytes(24).toString('base64url');
   db.prepare(
-    `INSERT INTO sessions (token_hash, user_id, csrf_token, expires_at)
-     VALUES (?, ?, ?, datetime('now', ?))`
+    `INSERT INTO sessions (token_hash, user_id, csrf_token, expires_at, last_seen_at)
+     VALUES (?, ?, ?, datetime('now', ?), datetime('now'))`
   ).run(sha256(token), userId, csrf, `+${SESSION_DAYS} days`);
   res.append('Set-Cookie', sessionCookie(token, SESSION_DAYS * 86400, secure));
 }
@@ -60,40 +60,82 @@ function destroySession(db, req, res, secure) {
   res.append('Set-Cookie', sessionCookie('', 0, secure));
 }
 
+// The browser signs people out after this long without activity and pings while they're
+// active; the server allows a couple of minutes' grace for pings in flight.
+const IDLE_GRACE_MINUTES = 2;
+
 // Attaches req.user and req.csrfToken when a valid session cookie is present.
-function loadSession(db) {
+// A session unused for longer than idleMinutes is ended (req.sessionExpired is then set).
+function loadSession(db, { idleMinutes = 60, secure = false } = {}) {
+  const idleLimit = `-${idleMinutes + IDLE_GRACE_MINUTES} minutes`;
   // req.user.id is the company (every record is scoped to it); req.user.person_id is the
   // person signed in, who may be the company's main login or one of its people.
   const lookup = db.prepare(
     `SELECT c.id AS id, u.id AS person_id, c.username, u.login_name, u.email, u.name, c.agency_name, u.is_admin,
-            CASE WHEN u.status = 'active' AND c.status = 'active' THEN 'active' ELSE 'suspended' END AS status, s.csrf_token
+            CASE WHEN u.status = 'active' AND c.status = 'active' THEN 'active' ELSE 'suspended' END AS status, s.csrf_token,
+            (s.last_seen_at IS NOT NULL AND s.last_seen_at <= datetime('now', ?)) AS idle,
+            (s.last_seen_at IS NULL OR s.last_seen_at <= datetime('now', '-30 seconds')) AS stale
        FROM sessions s JOIN users u ON u.id = s.user_id JOIN users c ON c.id = COALESCE(u.company_id, u.id)
       WHERE s.token_hash = ? AND s.expires_at > datetime('now')`
   );
+  const touch = db.prepare("UPDATE sessions SET last_seen_at = datetime('now') WHERE token_hash = ?");
+  const end = db.prepare('DELETE FROM sessions WHERE token_hash = ?');
   return (req, res, next) => {
     const token = parseCookies(req.headers.cookie)[SESSION_COOKIE];
     if (token) {
-      const row = lookup.get(sha256(token));
-      if (row && row.status === 'active') {
+      const hash = sha256(token);
+      const row = lookup.get(idleMinutes > 0 ? idleLimit : '+1 day', hash);
+      if (row && row.idle) {
+        end.run(hash);
+        res.append('Set-Cookie', sessionCookie('', 0, secure));
+        req.sessionExpired = true;
+      } else if (row && row.status === 'active') {
+        if (row.stale) touch.run(hash);
         req.csrfToken = row.csrf_token;
-        req.sessionTokenHash = sha256(token);
+        req.sessionTokenHash = hash;
         req.user = { ...row, is_admin: row.is_admin === 1 };
         delete req.user.csrf_token;
+        delete req.user.idle;
+        delete req.user.stale;
       }
     }
+    res.locals.idleMinutes = idleMinutes;
     res.locals.user = req.user || null;
     res.locals.csrfToken = req.csrfToken || '';
     next();
   };
 }
 
+// Where to send someone who isn't signed in: back to this page once they have.
+// Autosave and other background requests get a 401 instead, so the page can keep their input.
+function toLogin(req, res) {
+  if (req.get('X-Autosave') === '1' || req.accepts(['html', 'json']) === 'json') {
+    return res.status(401).json({ ok: false, signedOut: true });
+  }
+  const params = new URLSearchParams();
+  if (req.sessionExpired) params.set('timeout', '1');
+  // The dashboard is where signing in lands anyway, so only other pages are remembered.
+  if (req.method === 'GET' && !['/app', '/admin'].includes(req.originalUrl)) params.set('next', req.originalUrl.slice(0, 500));
+  const q = params.toString();
+  return res.redirect(`/login${q ? `?${q}` : ''}`);
+}
+
+// Only pages inside the app are allowed as a place to return to after signing in.
+function safeNext(next, isAdmin) {
+  const n = String(next || '');
+  const area = isAdmin ? '/admin' : '/app';
+  if (n.length > 500 || !(n === area || n.startsWith(`${area}/`) || n.startsWith(`${area}?`))) return null;
+  if (/[\\\s]|\/\/|\/\.\.?(\/|$|\?)/.test(n)) return null;
+  return n;
+}
+
 function requireLogin(req, res, next) {
-  if (!req.user) return res.redirect('/login');
+  if (!req.user) return toLogin(req, res);
   next();
 }
 
 function requireAdmin(req, res, next) {
-  if (!req.user) return res.redirect('/login');
+  if (!req.user) return toLogin(req, res);
   // Hide the admin area's existence from everyone else.
   if (!req.user.is_admin) return res.status(404).render('error', { title: 'Not found', message: 'Page not found.' });
   next();
@@ -153,6 +195,7 @@ module.exports = {
   loadSession,
   requireLogin,
   requireAdmin,
+  safeNext,
   verifyCsrf,
   checkCsrfAfterUpload,
   rejectUncheckedMultipart,

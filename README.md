@@ -41,6 +41,8 @@ npm start                   # http://localhost:3000
 
 Sign in with `ADMIN_USERNAME` and `ADMIN_PASSWORD` to reach the admin panel. Public sign-up is off: you add each company's login from **Admin panel → Add account**, and can reset anyone's password from their page there. (Set `ALLOW_REGISTRATION=true` to let companies sign themselves up instead.)
 
+Anyone who doesn't use the site for an hour is signed out (change with `IDLE_TIMEOUT_MINUTES`; `0` turns it off). A warning shows five minutes before. Nothing typed is lost: edits are saved first, and anything not yet saved is kept in the browser and put back after signing in again, on the same page.
+
 
 ## Several people at one company
 

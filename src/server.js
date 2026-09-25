@@ -38,6 +38,8 @@ function loadConfig(env = process.env) {
     autoMonthlyStatements: env.AUTO_MONTHLY_STATEMENTS !== 'false',
     // Record what users view and change for the admin panel's activity log.
     activityLog: env.ACTIVITY_LOG !== 'false',
+    // Sign people out after this many minutes without using the site (0 turns it off).
+    idleTimeoutMinutes: env.IDLE_TIMEOUT_MINUTES === undefined ? 60 : Math.max(0, Number(env.IDLE_TIMEOUT_MINUTES) || 0),
   };
 }
 
@@ -112,7 +114,7 @@ function createApp(config, db, { writer = null } = {}) {
     next();
   });
 
-  app.use(auth.loadSession(db));
+  app.use(auth.loadSession(db, { idleMinutes: config.idleTimeoutMinutes ?? 60, secure: config.secureCookies }));
   app.use(auth.verifyCsrf);
   if (config.activityLog !== false) app.use(activity.middleware(db));
 
