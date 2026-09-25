@@ -2,12 +2,20 @@
 <header class="page-head">
   <h1><%= def.plural %></h1>
   <div class="actions">
-    <% if (searchable) { %>
+    <% if (searchable && !def.searchBar) { %>
     <form method="get" class="search"><input type="search" name="q" value="<%= q %>" placeholder="Search <%= def.plural.toLowerCase() %>…"></form>
     <% } %>
     <a class="btn primary" href="/app/<%= def.key %>/new">+ Add <%= def.singular.toLowerCase() %></a>
   </div>
 </header>
+<% if (searchable && def.searchBar) { %>
+<form method="get" class="search-bar" role="search">
+  <input type="search" name="q" value="<%= q %>" placeholder="Search <%= def.plural.toLowerCase() %>…" aria-label="Search <%= def.plural.toLowerCase() %>">
+  <button class="btn primary" type="submit">Search</button>
+  <% if (q) { %><a class="btn" href="/app/<%= def.key %>">Clear</a><% } %>
+</form>
+<% if (q) { %><p class="muted small search-count"><%= rows.length %><%= truncated ? '+' : '' %> result<%= rows.length === 1 ? '' : 's' %> for “<%= q %>”</p><% } %>
+<% } %>
 <section class="card">
   <% if (!rows.length) { %>
     <p class="muted"><%= q ? 'No matches.' : `No ${def.plural.toLowerCase()} yet.` %></p>

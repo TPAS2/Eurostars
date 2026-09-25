@@ -181,6 +181,9 @@ legend { font-weight: 700; padding: 0 6px; }
 .inline-form label input, .inline-form label select { margin-top: 4px; font-weight: 400; }
 .inline-form input, .inline-form select { width: auto; }
 .search input { min-width: 240px; }
+.search-bar { display: flex; gap: 8px; margin: 0 0 16px; }
+.search-bar input { flex: 1; min-width: 0; font-size: 1rem; padding: 10px 14px; }
+.search-count { margin: -8px 0 12px; }
 
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;

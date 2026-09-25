@@ -982,3 +982,38 @@ test('councils list shows how many properties each has, and which', async () => 
   assert.match(r.text, /Leeds City Council[\s\S]*?4 · 1 A Street, 2 B Street, 3 C Street \+1 more/);
   assert.match(r.text, /Empty Council[\s\S]*?None yet/);
 });
+
+test('councils, landlords and properties have a search bar that also matches linked names', async () => {
+  const c = await registerAndLogin('search-bar@example.com', 'Search Lets');
+  let r = await c.post('/app/councils', { name: 'Leeds City Council' });
+  const leeds = String(idFrom(r.location));
+  await c.post('/app/councils', { name: 'York Council' });
+  r = await c.post('/app/landlords', { name: 'Olive Grant' });
+  const olive = String(idFrom(r.location));
+  await c.post('/app/landlords', { name: 'Ben Hart' });
+  await c.post('/app/properties', { address_line1: 'Rose Cottage', council_id: leeds, landlord_id: olive, status: 'let' });
+  await c.post('/app/properties', { address_line1: 'Mill House', status: 'vacant' });
+
+  for (const section of ['councils', 'landlords', 'properties']) {
+    assert.match((await c.get(`/app/${section}`)).text, /<form method="get" class="search-bar"/, `${section} has a search bar`);
+  }
+  r = await c.get('/app/councils?q=york');
+  assert.match(r.text, /York Council/);
+  assert.doesNotMatch(r.text, /Leeds City Council/);
+  assert.match(r.text, /1 result for/);
+  r = await c.get('/app/landlords?q=olive');
+  assert.match(r.text, /Olive Grant/);
+  assert.doesNotMatch(r.text, /Ben Hart/);
+  r = await c.get('/app/properties?q=mill');
+  assert.match(r.text, /Mill House/);
+  assert.doesNotMatch(r.text, /Rose Cottage/);
+  // Searching a council or landlord name finds their properties.
+  r = await c.get('/app/properties?q=leeds');
+  assert.match(r.text, /Rose Cottage/);
+  assert.doesNotMatch(r.text, /Mill House/);
+  r = await c.get('/app/properties?q=Olive');
+  assert.match(r.text, /Rose Cottage/);
+  assert.doesNotMatch(r.text, /Mill House/);
+  r = await c.get('/app/properties?q=nothing-here');
+  assert.match(r.text, /No matches/);
+});

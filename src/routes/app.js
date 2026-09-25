@@ -404,8 +404,16 @@ module.exports = function appRoutes(db) {
     let where = 'account_id = ?';
     const params = [a];
     if (q && textFields.length) {
-      where += ` AND (${textFields.map((f) => `${f} LIKE ?`).join(' OR ')})`;
-      for (let i = 0; i < textFields.length; i++) params.push(`%${q}%`);
+      const like = `%${q}%`;
+      const terms = textFields.map((f) => { params.push(like); return `${f} LIKE ?`; });
+      // Also match the names of linked records, e.g. a property's landlord or council.
+      for (const f of def.fields) {
+        const ref = f.type === 'ref' && ENTITIES[f.ref];
+        if (!ref || !ref.titleField) continue;
+        terms.push(`${f.name} IN (SELECT id FROM ${ref.table} WHERE account_id = ? AND ${ref.titleField} LIKE ?)`);
+        params.push(a, like);
+      }
+      where += ` AND (${terms.join(' OR ')})`;
     }
     const rows = db.prepare(`SELECT * FROM ${def.table} WHERE ${where} ORDER BY ${def.order} LIMIT ${LIST_LIMIT + 1}`).all(...params);
     const truncated = rows.length > LIST_LIMIT;

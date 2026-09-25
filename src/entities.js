@@ -13,6 +13,7 @@ const ENTITIES = {
     plural: 'Landlords',
     titleField: 'name',
     order: 'name COLLATE NOCASE',
+    searchBar: true,
     fields: [
       { name: 'name', label: 'Name', type: 'text', required: true },
       { name: 'email', label: 'Email', type: 'email' },
@@ -33,6 +34,7 @@ const ENTITIES = {
     plural: 'Properties',
     titleField: 'address_line1',
     order: 'address_line1 COLLATE NOCASE',
+    searchBar: true,
     fields: [
       { name: 'council_id', label: 'Council', type: 'ref', ref: 'councils', help: 'The local authority for this address.' },
       { name: 'address_line1', label: 'Property name', type: 'text', required: true },
@@ -62,6 +64,7 @@ const ENTITIES = {
     plural: 'Councils',
     titleField: 'name',
     order: 'name COLLATE NOCASE',
+    searchBar: true,
     fields: [
       { name: 'name', label: 'Council', type: 'text', required: true },
       { name: 'council_tax_phone', label: 'Council tax phone', type: 'tel' },
