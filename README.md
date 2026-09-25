@@ -41,7 +41,6 @@ npm start                   # http://localhost:3000
 
 Sign in with `ADMIN_USERNAME` and `ADMIN_PASSWORD` to reach the admin panel. Public sign-up is off: you add each company's login from **Admin panel → Add account**, and can reset anyone's password from their page there. (Set `ALLOW_REGISTRATION=true` to let companies sign themselves up instead.)
 
-To try it with realistic sample data, run `npm run seed-demo`, then sign in as `harbour` / `demo-password-123`.
 
 ## Several people at one company
 
@@ -92,18 +91,6 @@ npm run restore-backup -- data/backups/nexus-backup-2026-09-24T02-00-00Z.tar.gz
 ```
 
 The current data is moved to `data/pre-restore-…/` first, so a restore never deletes anything. The backup is also a normal tar archive (`tar -xzf file.tar.gz`), so you can open it without this app.
-
-## Online preview (GitHub Pages)
-
-`docs/index.html` is a read-only copy of the app for showing people. It opens on the sign-in page, and each login shows only that company's pages:
-
-| Username | Password | Shows |
-|---|---|---|
-| `harbour` | `demo-password-123` | Harbour Lettings (sample data), main login |
-| `harbour` + name `john` | `john-password-123` | John Price at Harbour Lettings |
-| Your admin username | Your admin password | The admin panel (built in from `PREVIEW_ACCOUNTS`, never stored in the repo) |
-
-To rebuild it: run the app with demo data (`npm run seed-demo`, then `npm start`), then run `PREVIEW_ACCOUNTS='harbour:demo-password-123,YOURNAME:YOURPASSWORD' node scripts/build-preview.js http://localhost:3000`. It's static, so the sign-in only keeps casual visitors out; never build it from real data.
 
 ## Deploying
 
