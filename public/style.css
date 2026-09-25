@@ -197,6 +197,8 @@ legend { font-weight: 700; padding: 0 6px; }
 .btn.primary:hover { filter: brightness(1.08); }
 .btn.danger { color: var(--bad); border-color: var(--bad); }
 .btn.danger:hover { background: var(--bad-soft); }
+.row-actions { white-space: nowrap; }
+.row-actions form { display: inline; margin: 0 0 0 4px; }
 .btn.small { padding: 5px 10px; font-size: .82rem; }
 
 .notice { padding: 10px 14px; border-radius: 8px; margin-bottom: 14px; font-size: .92rem; }

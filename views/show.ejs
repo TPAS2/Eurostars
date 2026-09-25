@@ -19,6 +19,7 @@
 </header>
 
 <% if (error) { %><div class="notice err"><%= error %></div><% } %>
+<% if (flash) { %><div class="notice ok"><%= flash %></div><% } %>
 <section class="card">
   <% if (extra) { %><div class="callout <%= extra.alert ? 'alert' : '' %>"><span><%= extra.label %></span><strong><%= extra.value %></strong></div><% } %>
   <% if (photo) { %>
@@ -105,7 +106,7 @@
     <a class="btn small" href="/app/invoices/new?<%= q %>=<%= row.id %>">+ Upload invoice</a>
   </div>
   <% if (!invoices.length) { %><p class="muted">No invoices yet.</p><% } else { %>
-    <%- include('invoices/table', { invoices, showProperty: false }) %>
+    <%- include('invoices/table', { invoices, showProperty: false, backTo: `/app/${def.key}/${row.id}` }) %>
   <% } %>
 </section>
 <% } %>

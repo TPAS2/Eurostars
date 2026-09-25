@@ -6,6 +6,7 @@
   </div>
   <div class="actions"><a class="btn primary" href="/app/invoices/new">+ Upload invoice</a></div>
 </header>
+<% if (flash) { %><div class="notice ok"><%= flash %></div><% } %>
 
 <section class="tiles">
   <a class="tile <%= totals.unpaid_n ? 'warn' : '' %>" href="/app/invoices?status=unpaid"><span class="label">Unpaid</span><span class="value"><%= fmt.money(totals.unpaid) %></span><span class="sub"><%= totals.unpaid_n %> invoice<%= totals.unpaid_n === 1 ? '' : 's' %></span></a>
@@ -19,7 +20,7 @@
     <% }) %>
   </nav>
   <% if (!invoices.length) { %><p class="muted">No invoices here.</p><% } else { %>
-    <%- include('table', { invoices, showProperty: true }) %>
+    <%- include('table', { invoices, showProperty: true, backTo: '/app/invoices' }) %>
   <% } %>
 </section>
 <%- include('../partials/footer') %>

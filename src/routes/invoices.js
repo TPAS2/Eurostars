@@ -133,7 +133,7 @@ module.exports = function invoiceRoutes(db, config) {
               COUNT(CASE WHEN status = 'unpaid' AND due_date < ? THEN 1 END) AS overdue_n
          FROM invoices WHERE account_id = ?`
     ).get(today, today, a);
-    res.render('invoices/list', { title: 'Invoices', section: 'invoices', invoices, totals, status, today, fmt });
+    res.render('invoices/list', { title: 'Invoices', section: 'invoices', invoices, totals, status, today, fmt, flash: String(req.query.flash || '').slice(0, 200) });
   });
 
   // ---------- upload / edit ----------
@@ -208,10 +208,17 @@ module.exports = function invoiceRoutes(db, config) {
   router.post('/:id/delete', (req, res) => {
     const inv = loadInvoice(req, res);
     if (!inv) return;
-    if (inv.status === 'paid') return res.redirect(`/app/invoices/${inv.id}?error=` + encodeURIComponent('Undo the payment before deleting a paid invoice.'));
-    db.prepare('DELETE FROM invoices WHERE id = ? AND account_id = ?').run(inv.id, req.user.id);
-    removeFile(req.user.id, inv.file_name);
-    res.redirect('/app/invoices');
+    const a = req.user.id;
+    transaction(db, () => {
+      // A paid invoice's landlord charge goes with it, so the landlord's balance stays right.
+      if (inv.payment_txn_id) db.prepare('DELETE FROM transactions WHERE id = ? AND account_id = ?').run(inv.payment_txn_id, a);
+      db.prepare('DELETE FROM invoices WHERE id = ? AND account_id = ?').run(inv.id, a);
+    });
+    removeFile(a, inv.file_name);
+    // Back to the page the delete came from (e.g. a property), otherwise the invoices list.
+    const back = String(req.body.back || '');
+    const safeBack = /^\/app\/[a-z]+(\/\d+)?$/.test(back) && back !== `/app/invoices/${inv.id}` ? back : '/app/invoices';
+    res.redirect(safeBack + '?flash=' + encodeURIComponent(`Deleted invoice from ${inv.supplier}.`));
   });
 
   // ---------- the document ----------

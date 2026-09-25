@@ -480,7 +480,7 @@ module.exports = function appRoutes(db) {
     const photo = def.key === 'councils'
       ? db.prepare("SELECT strftime('%s', updated_at) AS v FROM council_photos WHERE council_id = ? AND account_id = ?").get(row.id, a) || { v: null }
       : null;
-    res.render('show', { title: rowTitle(def, row, maps), section: def.key, def, row, maps, display, rowTitle, children, extra, invoices, related: relatedLists(def, row, a), certs, photo, error: req.query.error ? String(req.query.error).slice(0, 200) : null, fmt, today: fmt.today() });
+    res.render('show', { title: rowTitle(def, row, maps), section: def.key, def, row, maps, display, rowTitle, children, extra, invoices, related: relatedLists(def, row, a), certs, photo, error: req.query.error ? String(req.query.error).slice(0, 200) : null, flash: req.query.flash ? String(req.query.flash).slice(0, 200) : null, fmt, today: fmt.today() });
   });
 
   router.get('/:entity/:id/edit', (req, res) => {

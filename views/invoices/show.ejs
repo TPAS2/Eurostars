@@ -11,11 +11,9 @@
   </div>
   <div class="actions">
     <a class="btn" href="/app/invoices/<%= inv.id %>/edit">Edit</a>
-    <% if (inv.status !== 'paid') { %>
-    <form method="post" action="/app/invoices/<%= inv.id %>/delete" data-confirm="Delete this invoice and its file?">
+    <form method="post" action="/app/invoices/<%= inv.id %>/delete" data-confirm="<%= inv.status === 'paid' && inv.payment_txn_id ? 'Delete this paid invoice and its file? The charge to the landlord will be removed too.' : 'Delete this invoice and its file?' %>">
       <%- include('../partials/csrf') %><button class="btn danger" type="submit">Delete</button>
     </form>
-    <% } %>
   </div>
 </header>
 <% if (flash) { %><div class="notice ok"><%= flash %></div><% } %>

@@ -1,4 +1,4 @@
-<%# locals: invoices, showProperty, today %>
+<%# locals: invoices, showProperty, today, backTo %>
 <div class="table-wrap">
 <table class="clickable">
   <thead><tr><th>Supplier</th><th>Invoice no.</th><% if (showProperty) { %><th>Property / job</th><% } %><th>Due</th><th class="num">Amount</th><th>Status</th><th></th></tr></thead>
@@ -15,7 +15,14 @@
         <% } else if (overdue) { %><span class="badge bad">overdue</span>
         <% } else { %><span class="badge warn">unpaid</span><% } %>
       </td>
-      <td class="num"><% if (i.status === 'unpaid') { %><a class="btn small primary" href="/app/invoices/<%= i.id %>#pay">Pay</a><% } %></td>
+      <td class="num row-actions">
+        <% if (i.status === 'unpaid') { %><a class="btn small primary" href="/app/invoices/<%= i.id %>#pay">Pay</a><% } %>
+        <form method="post" action="/app/invoices/<%= i.id %>/delete" data-confirm="Delete the invoice from <%= i.supplier %> (<%= fmt.money(i.amount_pence) %>)?<%= i.payment_txn_id ? ' The charge to the landlord will be removed too.' : '' %>">
+          <%- include('../partials/csrf') %>
+          <input type="hidden" name="back" value="<%= backTo || '/app/invoices' %>">
+          <button class="btn small danger" type="submit">Delete</button>
+        </form>
+      </td>
     </tr>
   <% }) %>
   </tbody>

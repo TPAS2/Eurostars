@@ -1073,3 +1073,53 @@ test('landlords have a code, shown right of the name in the list and on their pa
   assert.match(r.text, /<dt>Name<\/dt>[\s\S]*?<dt>Landlord code<\/dt>/);
   assert.match((await c.get('/app/landlords?q=LL001')).text, /Olive Grant/, 'searchable by code');
 });
+
+test('any invoice can be deleted, from its page or from a list', async () => {
+  const c = await registerAndLogin('invoice-delete@example.com', 'Delete Lets');
+  let r = await c.post('/app/landlords', { name: 'Dee Owner' });
+  const landlordId = idFrom(r.location);
+  r = await c.post('/app/properties', { address_line1: '3 Quay Street', landlord_id: landlordId, status: 'let' });
+  const propertyId = idFrom(r.location);
+  const upload = async (supplier) => {
+    const pdf = new File([Buffer.from('%PDF-1.4\n%x\n')], 'i.pdf');
+    const res = await c.post('/app/invoices', { supplier, amount: '50.00', property_id: String(propertyId), file: pdf }, { multipart: true });
+    return idFrom(res.location);
+  };
+
+  // A paid invoice: deleting it also removes the charge to the landlord and the stored file.
+  const paidId = await upload('Paid Plumbing');
+  await c.post(`/app/invoices/${paidId}/pay`, { paid_date: '2026-09-10', payment_method: 'Card', charge_landlord: '1' });
+  const paid = db.prepare('SELECT * FROM invoices WHERE id = ?').get(paidId);
+  assert.ok(paid.payment_txn_id);
+  const file = path.join(config.uploadDir, String(paid.account_id), paid.file_name);
+  assert.ok(fs.existsSync(file));
+  r = await c.get(`/app/invoices/${paidId}`);
+  assert.match(r.text, /The charge to the landlord will be removed too[\s\S]*?>Delete<\/button>/, 'paid invoices have a Delete button');
+  r = await c.post(`/app/invoices/${paidId}/delete`, {});
+  assert.equal(r.location, '/app/invoices?flash=' + encodeURIComponent('Deleted invoice from Paid Plumbing.'));
+  assert.match((await c.get(r.location)).text, /Deleted invoice from Paid Plumbing/);
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM invoices WHERE id = ?').get(paidId).n, 0);
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM transactions WHERE id = ?').get(paid.payment_txn_id).n, 0);
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  assert.ok(!fs.existsSync(file), 'the uploaded file is removed');
+
+  // From the property page's list: back to the property afterwards.
+  const unpaidId = await upload('Roof Repairs');
+  r = await c.get(`/app/properties/${propertyId}`);
+  assert.match(r.text, new RegExp(`action="/app/invoices/${unpaidId}/delete"[\\s\\S]*?name="back" value="/app/properties/${propertyId}"`));
+  assert.match((await c.get('/app/invoices')).text, new RegExp(`action="/app/invoices/${unpaidId}/delete"`), 'the invoices list has Delete too');
+  r = await c.post(`/app/invoices/${unpaidId}/delete`, { back: `/app/properties/${propertyId}` });
+  assert.match(r.location, new RegExp(`^/app/properties/${propertyId}\\?flash=`));
+  assert.match((await c.get(r.location)).text, /Deleted invoice from Roof Repairs/);
+
+  // "back" can't send people elsewhere.
+  const otherId = await upload('Gutter Co');
+  r = await c.post(`/app/invoices/${otherId}/delete`, { back: 'https://evil.example/' });
+  assert.match(r.location, /^\/app\/invoices\?/);
+
+  // Another company can't delete it.
+  const keepId = await upload('Keep Ltd');
+  const other = await registerAndLogin('invoice-delete-2@example.com', 'Other Lets');
+  assert.equal((await other.post(`/app/invoices/${keepId}/delete`, {})).status, 404);
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM invoices WHERE id = ?').get(keepId).n, 1);
+});
