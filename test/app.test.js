@@ -60,8 +60,8 @@ class Client {
   }
   get(url) { return this.req('GET', url); }
   post(url, body, opts) { return this.req('POST', url, body, opts); }
-  // Every sign-in needs a name: 'admin' for the admin, 'main' for a company's main login.
-  async login(login, password, member = login === 'admin' ? 'admin' : 'main') {
+  // Company sign-ins need a name ('main' for a company's main login); the admin's doesn't.
+  async login(login, password, member = login === 'admin' ? '' : 'main') {
     const r = await this.post('/login', { login, member, password });
     if (r.location) await this.get(r.location);
     return r;
@@ -110,9 +110,9 @@ test('registration validates input and never grants admin', async () => {
 
 test('wrong password is rejected and logged', async () => {
   const c = new Client();
-  const r = await c.post('/login', { login: 'admin', member: 'admin', password: 'nope' });
+  const r = await c.post('/login', { login: 'admin', password: 'nope' });
   assert.equal(r.status, 401);
-  const ev = db.prepare('SELECT * FROM login_events WHERE email = ? AND success = 0').get('admin / admin');
+  const ev = db.prepare('SELECT * FROM login_events WHERE email = ? AND success = 0').get('admin');
   assert.ok(ev);
 });
 
@@ -566,10 +566,9 @@ test('admin account is set by username, and its password can be reset on restart
   ensureAdmin(db3, { ...cfg, adminPassword: 'Changed99', adminPasswordReset: true }, () => {});
   assert.ok(verifyPassword('Changed99', db3.prepare('SELECT password_hash FROM users WHERE id = ?').get(row.id).password_hash));
   assert.throws(() => ensureAdmin(openDatabase(':memory:'), { ...cfg, adminPassword: 'abc' }, () => {}), /at least 6/);
-  // Capitals in ADMIN_USERNAME are kept (so the admin must type them), and the admin's name is set.
-  ensureAdmin(db3, { ...cfg, adminUsername: 'TPAS2', adminLoginName: 'admin' }, () => {});
-  const upper = db3.prepare('SELECT username, login_name FROM users WHERE id = ?').get(row.id);
-  assert.deepEqual({ ...upper }, { username: 'TPAS2', login_name: 'admin' });
+  // Capitals in ADMIN_USERNAME are kept, so the admin must type them.
+  ensureAdmin(db3, { ...cfg, adminUsername: 'TPAS2' }, () => {});
+  assert.equal(db3.prepare('SELECT username FROM users WHERE id = ?').get(row.id).username, 'TPAS2');
 });
 
 test('councils link to properties, and through them to landlords and tenants', async () => {
@@ -762,6 +761,11 @@ test('several people at one company share its username, each with their own name
   for (const blank of [{ login: '', member: 'john', password: 'johns-pass-1' }, { login: 'eurostars', member: '', password: 'johns-pass-1' }, { login: 'eurostars', member: 'john', password: '' }]) {
     assert.equal((await john.post('/login', blank)).status, 422, `blank box refused: ${JSON.stringify(blank)}`);
   }
+  // The admin signs in with just username and password.
+  assert.equal((await new Client().post('/login', { login: 'admin', password: 'owner-password-123' })).location, '/admin');
+  const wrongCase = await new Client().post('/login', { login: 'ADMIN', password: 'owner-password-123' });
+  assert.ok(wrongCase.status >= 400 && !wrongCase.location, 'capitals count for the admin too');
+  assert.equal((await new Client().post('/login', { login: 'admin', password: '' })).status, 422);
   assert.equal((await john.post('/login', { login: 'EUROSTARS', member: 'JOHN', password: 'johns-pass-1' })).status, 401, 'capitals count');
   assert.equal((await john.post('/login', { login: 'eurostars', member: 'main', password: 'johns-pass-1' })).status, 401, "John's password doesn't open the main login");
   r = await john.post('/login', { login: 'eurostars', member: 'john', password: 'johns-pass-1' });

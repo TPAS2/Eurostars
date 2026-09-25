@@ -49,7 +49,7 @@ Each company has one username (e.g. `eurostars`). In the admin panel, open the c
 - **Your name:** their own name, e.g. `john`. A company's main login uses the name set when the company was added (`main` unless you chose another); change it under **Account details**.
 - **Password:** their own
 
-The admin signs in with `ADMIN_USERNAME` (e.g. `TPAS2`), the name `ADMIN_LOGIN_NAME` (default `admin`) and `ADMIN_PASSWORD`.
+The admin signs in with just `ADMIN_USERNAME` (e.g. `TPAS2`) and `ADMIN_PASSWORD`, leaving **Your name** empty.
 
 Everyone at the company sees the same data, and the activity log shows who did what. From the People section you can reset a person's password, suspend them or remove them without affecting anyone else. Suspending the company suspends everyone in it.
 

@@ -5,7 +5,7 @@
   <% if (error) { %><div class="notice err"><%= error %></div><% } %>
   <form method="post" action="/login" class="stack">
     <label>Username <input id="login" name="login" value="<%= login %>" required autofocus autocomplete="username" autocapitalize="none" spellcheck="false"></label>
-    <label>Your name <input id="member" name="member" value="<%= typeof member !== 'undefined' ? member : '' %>" required autocomplete="off" autocapitalize="none" spellcheck="false"></label>
+    <label>Your name <input id="member" name="member" value="<%= typeof member !== 'undefined' ? member : '' %>" autocomplete="off" autocapitalize="none" spellcheck="false"></label>
     <label>Password <input id="password" type="password" name="password" required autocomplete="current-password"></label>
     <button class="btn primary" type="submit">Sign in</button>
   </form>

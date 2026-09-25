@@ -239,7 +239,7 @@ function openDatabase(file) {
   addColumnIfMissing(db, 'users', 'login_name', 'TEXT');
   db.exec('CREATE INDEX IF NOT EXISTS idx_users_company ON users(company_id)');
   // Every login needs a name now, including each company's main login.
-  db.exec("UPDATE users SET login_name = CASE WHEN is_admin = 1 THEN 'admin' ELSE 'main' END WHERE company_id IS NULL AND login_name IS NULL");
+  db.exec("UPDATE users SET login_name = 'main' WHERE company_id IS NULL AND login_name IS NULL AND is_admin = 0");
   addColumnIfMissing(db, 'users', 'phone', 'TEXT');
   addColumnIfMissing(db, 'users', 'address', 'TEXT');
   addColumnIfMissing(db, 'properties', 'council_id', 'INTEGER REFERENCES councils(id) ON DELETE SET NULL');

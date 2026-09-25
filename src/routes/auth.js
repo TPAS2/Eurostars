@@ -23,8 +23,8 @@ module.exports = function authRoutes(db, config) {
     res.render('login', { title: 'Sign in', error: '', login: String(req.query.u || '').slice(0, 254), member: '', allowRegistration: config.allowRegistration });
   });
 
-  // Sign in with the company username, the person's own name and their password. All three
-  // are required and must match exactly, including capital letters.
+  // Companies sign in with their username, the person's own name and their password; the
+  // admin with just username and password. Everything must match exactly, including capitals.
   const findCompany = db.prepare('SELECT * FROM users WHERE username = ? COLLATE BINARY AND company_id IS NULL');
   const findPerson = db.prepare('SELECT * FROM users WHERE company_id = ? AND login_name = ? COLLATE BINARY');
 
@@ -34,13 +34,16 @@ module.exports = function authRoutes(db, config) {
     const password = String(req.body.password || '');
     const ip = req.ip;
     const ua = String(req.headers['user-agent'] || '').slice(0, 300);
-    const who = `${login} / ${member}`;
+    const who = member ? `${login} / ${member}` : login;
     const fail = (status, error) => res.status(status).render('login', { title: 'Sign in', error, login, member, allowRegistration: config.allowRegistration });
     if (loginLimited(`${ip}|${who}`)) return fail(429, 'Too many attempts. Please wait 15 minutes and try again.');
-    if (!login || !member || !password) return fail(422, 'Enter your username, your name and your password.');
+    if (!login || !password) return fail(422, 'Enter your username and password.');
     const company = findCompany.get(login);
-    // The company's own row is its main login; everyone else is a person inside it.
-    const user = !company ? null : company.login_name === member ? company : findPerson.get(company.id, member);
+    const isAdmin = company && company.is_admin === 1;
+    if (!member && !isAdmin) return fail(422, 'Enter your name as well as your username and password.');
+    // The admin needs no name. For companies, the company's own row is its main login and
+    // everyone else is a person inside it.
+    const user = !company ? null : isAdmin ? company : company.login_name === member ? company : findPerson.get(company.id, member);
     const ok = auth.verifyPassword(password, user ? user.password_hash : auth.DUMMY_HASH) && !!user;
     if (!ok) {
       logEvent.run(user ? user.id : null, who, 0, ip, ua);
