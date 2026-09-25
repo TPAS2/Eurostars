@@ -69,6 +69,32 @@
   </div>
 </section>
 
+<section class="card" id="account-details">
+  <div class="card-head">
+    <h2>Account details <span class="count"><%= logins.length %></span></h2>
+    <a class="btn small primary" href="/admin/users/new">+ Add account</a>
+  </div>
+  <p class="muted small">Every login at every agency and what they type to sign in. Capitals count. Passwords are stored scrambled so they can't be shown here, not even to you: to give someone a new one, use <strong>Reset</strong>.</p>
+  <% if (!logins.length) { %><p class="muted">No agency accounts yet.</p><% } else { %>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Agency</th><th>Username</th><th>Your name</th><th>Person</th><th>Password</th><th>Last login</th><th>Status</th></tr></thead>
+    <tbody>
+    <% logins.forEach(l => { const active = l.status === 'active' && l.company_status === 'active'; %>
+      <tr>
+        <td><a href="/admin/users/<%= l.company_id %>"><%= l.agency_name %></a></td>
+        <td><code><%= l.username %></code></td>
+        <td><code><%= l.login_name %></code></td>
+        <td><%= l.name %><% if (l.is_main) { %> <span class="badge">main contact</span><% } %></td>
+        <td><span class="muted">••••••••</span> <a class="small" href="/admin/users/<%= l.company_id %><%= l.is_main ? '#reset-password' : '#people' %>">Reset</a></td>
+        <td class="nowrap"><%= fmt.ukDateTime(l.last_login_at) %></td>
+        <td><span class="badge <%= active ? 's-active' : 's-suspended' %>"><%= active ? 'active' : 'suspended' %></span></td>
+      </tr>
+    <% }) %>
+    </tbody>
+  </table></div>
+  <% } %>
+</section>
+
 <section class="card">
   <h2>Recent activity</h2>
   <p class="muted small">What your users have been doing (your own actions aren't listed here). Click a user for their full history.</p>
