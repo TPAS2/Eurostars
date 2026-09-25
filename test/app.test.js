@@ -614,8 +614,8 @@ test('councils link to properties, and through them to landlords and tenants', a
   const council = await c.get(`/app/councils/${councilId}`);
   assert.match(council.text, /Properties in this council/);
   assert.match(council.text, /9 Cotham Hill/);
-  assert.match(council.text, /Landlords in this council[\s\S]*Olive Grant/);
-  assert.match(council.text, /Current tenants in this council[\s\S]*Iris Moss[\s\S]*Paid by tenant/);
+  assert.doesNotMatch(council.text, /Landlords in this council/);
+  assert.doesNotMatch(council.text, /Current tenants in this council/);
   assert.doesNotMatch((await c.get(`/app/properties/${propertyId}`)).text, /Council tax band/);
   assert.match((await c.get(`/app/landlords/${landlordId}`)).text, /Councils[\s\S]*Bristol City Council/);
   assert.match((await c.get(`/app/tenants/${tenantId}`)).text, /Councils[\s\S]*Bristol City Council[\s\S]*CT-55501/);

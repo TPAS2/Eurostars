@@ -189,29 +189,11 @@ module.exports = function appRoutes(db) {
     });
   }
 
-  // Council links that run through properties: a council's landlords and tenants, and the
-  // councils a landlord or tenant is connected to.
+  // Council links that run through properties: the councils a landlord or tenant is connected to.
   function relatedLists(def, row, a) {
     const link = (entity, id, text) => ({ text, href: `/app/${entity}/${id}` });
-    if (def.key === 'councils') {
-      const landlords = db.prepare(
-        `SELECT l.id, l.name, l.phone, GROUP_CONCAT(p.address_line1, '; ') AS props
-           FROM properties p JOIN landlords l ON l.id = p.landlord_id
-          WHERE p.account_id = ? AND p.council_id = ? GROUP BY l.id ORDER BY l.name COLLATE NOCASE`
-      ).all(a, row.id);
-      const tenants = db.prepare(
-        `SELECT t.id, t.name, t.phone, p.id AS property_id, p.address_line1, p.council_tax_payer
-           FROM tenancies ty JOIN properties p ON p.id = ty.property_id JOIN tenants t ON t.id = ty.tenant_id
-          WHERE ty.account_id = ? AND p.council_id = ? AND ty.status = 'active' ORDER BY t.name COLLATE NOCASE`
-      ).all(a, row.id);
-      return [
-        { title: 'Landlords in this council', empty: 'No landlords with properties here yet.', headers: ['Landlord', 'Phone', 'Properties'],
-          rows: landlords.map((l) => [link('landlords', l.id, l.name), { text: l.phone || '' }, { text: l.props }]) },
-        { title: 'Current tenants in this council', empty: 'No current tenants here.', headers: ['Tenant', 'Phone', 'Property', 'Council tax'],
-          rows: tenants.map((t) => [link('tenants', t.id, t.name), { text: t.phone || '' }, link('properties', t.property_id, t.address_line1),
-            { text: t.council_tax_payer ? `Paid by ${t.council_tax_payer.toLowerCase()}` : '' }]) },
-      ];
-    }
+    // A council's page lists just its properties (as a child list), nothing else.
+    if (def.key === 'councils') return [];
     const councilsVia = (sql, ...params) => db.prepare(sql).all(...params);
     if (def.key === 'landlords') {
       const rows = councilsVia(
