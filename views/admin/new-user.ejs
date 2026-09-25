@@ -26,9 +26,9 @@
       <% if (errors.username) { %><div class="field-err"><%= errors.username %></div><% } else { %><div class="help">The company's username. Capitals count: they must type it exactly.</div><% } %>
     </div>
     <div class="field">
-      <label for="login_name">Main login's name <span class="req">*</span></label>
-      <input id="login_name" name="login_name" value="<%= values.login_name || '' %>" required maxlength="30" autocomplete="off" autocapitalize="none" spellcheck="false">
-      <% if (errors.login_name) { %><div class="field-err"><%= errors.login_name %></div><% } else { %><div class="help">What the main login types in "Your name". You can add more people later.</div><% } %>
+      <label for="login_name">Their sign-in name</label>
+      <input id="login_name" name="login_name" value="<%= values.login_name || '' %>" maxlength="30" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="e.g. Sam">
+      <% if (errors.login_name) { %><div class="field-err"><%= errors.login_name %></div><% } else { %><div class="help">What the contact types in "Your name". Leave blank to use their first name. Capitals count.</div><% } %>
     </div>
     <div class="field">
       <label for="password">Password <span class="req">*</span></label>

@@ -46,7 +46,7 @@ Sign in with `ADMIN_USERNAME` and `ADMIN_PASSWORD` to reach the admin panel. Pub
 
 Each company has one username (e.g. `eurostars`). In the admin panel, open the company and use **People → Add a person** to give someone their own sign-in name (e.g. `john`) and password. Everyone signs in with all three boxes filled in, typed exactly (capitals count):
 - **Username:** the company's username, e.g. `eurostars`
-- **Your name:** their own name, e.g. `john`. A company's main login uses the name set when the company was added (`main` unless you chose another); change it under **Account details**.
+- **Your name:** their own name, e.g. `john`. A company's main contact uses the sign-in name set when the company was added (their first name unless you chose another); change it under **Account details**.
 - **Password:** their own
 
 The admin signs in with `ADMIN_USERNAME` (e.g. `TPAS2`), the name `ADMIN_LOGIN_NAME` (e.g. `Theo`) and `ADMIN_PASSWORD`.

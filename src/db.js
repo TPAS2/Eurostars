@@ -238,8 +238,9 @@ function openDatabase(file) {
   addColumnIfMissing(db, 'users', 'company_id', 'INTEGER REFERENCES users(id) ON DELETE CASCADE');
   addColumnIfMissing(db, 'users', 'login_name', 'TEXT');
   db.exec('CREATE INDEX IF NOT EXISTS idx_users_company ON users(company_id)');
-  // Every login needs a name now, including each company's main login.
-  db.exec("UPDATE users SET login_name = 'main' WHERE company_id IS NULL AND login_name IS NULL AND is_admin = 0");
+  // Every login needs a name, including each company's main login: their own first name.
+  const unnamed = db.prepare("SELECT id, name FROM users WHERE company_id IS NULL AND is_admin = 0 AND (login_name IS NULL OR login_name = 'main')").all();
+  for (const u of unnamed) db.prepare('UPDATE users SET login_name = ? WHERE id = ?').run(signInNameFrom(u.name), u.id);
   addColumnIfMissing(db, 'users', 'phone', 'TEXT');
   addColumnIfMissing(db, 'users', 'address', 'TEXT');
   addColumnIfMissing(db, 'properties', 'council_id', 'INTEGER REFERENCES councils(id) ON DELETE SET NULL');
@@ -258,6 +259,12 @@ function addColumnIfMissing(db, table, column, type) {
 const LOGIN_NAME_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,29}$/;
 
 // Case is kept and must be typed exactly at sign-in; uniqueness ignores case.
+// A sign-in name made from someone's name: their first name, letters and digits only.
+function signInNameFrom(fullName) {
+  const first = String(fullName || '').trim().split(/\s+/)[0].replace(/[^A-Za-z0-9_-]/g, '').slice(0, 30);
+  return LOGIN_NAME_RE.test(first) ? first : 'User';
+}
+
 const USERNAME_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{2,29}$/;
 
 // Turn any string into a valid username that `isTaken` says is free.
@@ -312,4 +319,4 @@ function transaction(db, fn) {
   }
 }
 
-module.exports = { openDatabase, transaction, uniqueUsername, USERNAME_RE, LOGIN_NAME_RE };
+module.exports = { openDatabase, transaction, uniqueUsername, signInNameFrom, USERNAME_RE, LOGIN_NAME_RE };

@@ -6,7 +6,7 @@ const express = require('express');
 const fmt = require('../format');
 const backup = require('../backup');
 const auth = require('../auth');
-const { USERNAME_RE, LOGIN_NAME_RE } = require('../db');
+const { USERNAME_RE, LOGIN_NAME_RE, signInNameFrom } = require('../db');
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const RESERVED_USERNAMES = new Set(['admin', 'administrator', 'root', 'support', 'letwise', 'nexus', 'system']);
@@ -83,7 +83,7 @@ module.exports = function adminRoutes(db, config) {
   // ---------- adding accounts (only the admin can) ----------
 
   router.get('/users/new', (req, res) => {
-    res.render('admin/new-user', { title: 'Add account', section: 'admin', values: { login_name: 'main' }, errors: {}, minPassword: MIN_PASSWORD });
+    res.render('admin/new-user', { title: 'Add account', section: 'admin', values: {}, errors: {}, minPassword: MIN_PASSWORD });
   });
 
   router.post('/users', (req, res) => {
@@ -94,6 +94,8 @@ module.exports = function adminRoutes(db, config) {
       login_name: String(req.body.login_name || '').trim().slice(0, 60),
       email: String(req.body.email || '').trim().toLowerCase().slice(0, 254),
     };
+    // Blank sign-in name: use their first name.
+    if (!values.login_name && values.name) values.login_name = signInNameFrom(values.name);
     const password = String(req.body.password || '');
     const errors = {};
     if (!values.agency_name) errors.agency_name = 'Enter the company name.';

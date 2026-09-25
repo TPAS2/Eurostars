@@ -3,7 +3,7 @@
 const express = require('express');
 const auth = require('../auth');
 const activity = require('../activity');
-const { USERNAME_RE } = require('../db');
+const { USERNAME_RE, signInNameFrom } = require('../db');
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -100,8 +100,8 @@ module.exports = function authRoutes(db, config) {
     if (registerLimited(req.ip)) errors.form = 'Too many sign-ups from your network. Please try again later.';
     if (Object.keys(errors).length) return res.status(422).render('register', { title: 'Create account', errors, values });
     // is_admin is never set here: the admin account comes only from ADMIN_EMAIL / create-admin.
-    const info = db.prepare("INSERT INTO users (username, login_name, email, name, agency_name, password_hash) VALUES (?, 'main', ?, ?, ?, ?)")
-      .run(values.username, values.email || null, values.name, values.agency_name, auth.hashPassword(password));
+    const info = db.prepare('INSERT INTO users (username, login_name, email, name, agency_name, password_hash) VALUES (?, ?, ?, ?, ?, ?)')
+      .run(values.username, signInNameFrom(values.name), values.email || null, values.name, values.agency_name, auth.hashPassword(password));
     const user = db.prepare('SELECT * FROM users WHERE id = ?').get(Number(info.lastInsertRowid));
     logEvent.run(user.id, user.username, 1, req.ip, String(req.headers['user-agent'] || '').slice(0, 300));
     startSession(user, res);
