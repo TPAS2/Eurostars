@@ -16,9 +16,9 @@
   const s = typeof section !== 'undefined' ? section : '';
   const initials = String(user.name || user.username).split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase();
   // The admin runs the software rather than letting properties, so only gets the owner pages.
-  // The logo button at the top is the way to the dashboard.
+  // The logo button at the top goes to the dashboard (or, for the admin, the admin panel).
   const groups = user.is_admin ? [
-    [['admin', '/admin', 'Admin panel'], ['backups', '/admin/backups', 'Backups'], ['security', '/admin/security', 'Security']],
+    [['backups', '/admin/backups', 'Backups'], ['security', '/admin/security', 'Security']],
   ] : [
     [['councils', '/app/councils', 'Councils']],
     [['landlords', '/app/landlords', 'Landlords'], ['properties', '/app/properties', 'Properties'], ['tenants', '/app/tenants', 'Tenants'], ['tenancies', '/app/tenancies', 'Tenancies']],
@@ -28,7 +28,8 @@
 %>
 <div class="shell">
   <aside class="sidebar">
-    <a class="rail-btn brand-btn <%= s === 'dashboard' ? 'active' : '' %>" href="/app" data-tip="Dashboard · <%= user.agency_name %>" aria-label="Dashboard" <%- s === 'dashboard' ? 'aria-current="page"' : '' %>><span class="logo">N</span></a>
+    <% const home = user.is_admin ? { href: '/admin', label: 'Admin panel', tip: 'Admin panel', on: s === 'admin' } : { href: '/app', label: 'Dashboard', tip: `Dashboard · ${user.agency_name}`, on: s === 'dashboard' }; %>
+    <a class="rail-btn brand-btn <%= home.on ? 'active' : '' %>" href="<%= home.href %>" data-tip="<%= home.tip %>" aria-label="<%= home.label %>" <%- home.on ? 'aria-current="page"' : '' %>><span class="logo">N</span></a>
     <nav class="rail" aria-label="Main">
       <% groups.forEach((g, gi) => { %>
         <% if (gi) { %><span class="rail-sep" aria-hidden="true"></span><% } %>

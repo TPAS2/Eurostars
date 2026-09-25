@@ -234,6 +234,7 @@ module.exports = function appRoutes(db) {
   // ---------- dashboard ----------
 
   router.get('/', (req, res) => {
+    if (req.user.is_admin) return res.redirect('/admin');
     const a = req.user.id;
     const today = fmt.today();
     const soon = fmt.addDays(today, 60);
