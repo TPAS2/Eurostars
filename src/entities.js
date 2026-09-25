@@ -16,12 +16,13 @@ const ENTITIES = {
     searchBar: true,
     fields: [
       { name: 'name', label: 'Name', type: 'text', required: true },
+      { name: 'code', label: 'Landlord code', type: 'text', help: 'Your own reference for this landlord, e.g. LL001.' },
       { name: 'email', label: 'Email', type: 'email' },
       { name: 'phone', label: 'Phone', type: 'tel' },
       { name: 'address', label: 'Correspondence address', type: 'textarea' },
       { name: 'notes', label: 'Notes', type: 'textarea' },
     ],
-    columns: ['name', 'email', 'phone'],
+    columns: ['name', 'code', 'email', 'phone'],
     children: [
       { entity: 'properties', fk: 'landlord_id' },
       { entity: 'transactions', fk: 'landlord_id' },

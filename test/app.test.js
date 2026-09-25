@@ -1060,3 +1060,16 @@ test('councils can have a picture, shown left of the council details and in the 
   await c.post(`/app/councils/${id}/delete`, {});
   assert.equal(db.prepare('SELECT COUNT(*) n FROM council_photos WHERE council_id = ?').get(id).n, 0);
 });
+
+test('landlords have a code, shown right of the name in the list and on their page', async () => {
+  const c = await registerAndLogin('landlord-code@example.com', 'Code Lets');
+  let r = await c.post('/app/landlords', { name: 'Olive Grant', code: 'LL001', email: 'olive@example.com' });
+  const id = idFrom(r.location);
+  r = await c.get('/app/landlords');
+  assert.match(r.text, /<th[^>]*>Name<\/th>\s*<th[^>]*>Landlord code<\/th>/, 'code column sits right of Name');
+  assert.match(r.text, /Olive Grant<\/a>[\s\S]*?<td[^>]*>\s*LL001\s*<\/td>/);
+  r = await c.get(`/app/landlords/${id}`);
+  assert.match(r.text, /<h1>Olive Grant <span class="code-chip" title="Landlord code">LL001<\/span><\/h1>/);
+  assert.match(r.text, /<dt>Name<\/dt>[\s\S]*?<dt>Landlord code<\/dt>/);
+  assert.match((await c.get('/app/landlords?q=LL001')).text, /Olive Grant/, 'searchable by code');
+});

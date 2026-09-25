@@ -219,6 +219,7 @@ legend { font-weight: 700; padding: 0 6px; }
 .btn.link:hover { color: var(--bad); }
 a.with-thumb, h1.with-thumb { display: inline-flex; align-items: center; gap: 10px; }
 h1.with-thumb { display: flex; }
+.code-chip { display: inline-block; margin-left: 10px; padding: 2px 10px; border-radius: 6px; background: var(--brand-soft); color: var(--brand); font-size: .95rem; font-weight: 700; vertical-align: middle; letter-spacing: .02em; }
 img.title-thumb { width: 44px; height: 44px; border-radius: 8px; object-fit: contain; background: var(--surface-2); border: 1px solid var(--border); flex: none; }
 img.thumb { width: 36px; height: 36px; border-radius: 6px; object-fit: contain; background: var(--surface-2); border: 1px solid var(--border); flex: none; }
 .callout { display: flex; justify-content: space-between; align-items: center; background: var(--ok-soft); color: var(--ok); padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; }
