@@ -693,3 +693,44 @@ test('dashboard notifications list certificates expiring within a month', async 
   r = await c.get('/app');
   assert.doesNotMatch(r.text.match(/id="notifications"[\s\S]*?<\/section>/)[0], /Gas certificate/);
 });
+
+test('activity log: the admin sees each user\'s sign-ins, page views and changes', async () => {
+  const c = await registerAndLogin('tracked@example.com', 'Tracked Lets');
+  const uid = db.prepare("SELECT id FROM users WHERE username = 'tracked'").get().id;
+  await c.login('tracked', 'password-1234');
+  await c.get('/app/landlords');
+  let r = await c.post('/app/landlords', { name: 'Martha Quinn' });
+  const lid = idFrom(r.location);
+  await c.get(`/app/landlords/${lid}`);
+  // Autosave while typing: several saves, one "Edited" entry.
+  await c.get(`/app/landlords/${lid}/edit`);
+  for (const phone of ['0', '01', '011']) {
+    await fetch(`${base}/app/landlords/${lid}`, { method: 'POST', headers: { cookie: c.cookie, 'content-type': 'application/x-www-form-urlencoded', 'x-autosave': '1' },
+      body: new URLSearchParams({ _csrf: c.csrf, name: 'Martha Quinn', phone }).toString() });
+  }
+  await c.post(`/app/landlords/${lid}/delete`, {});
+  await c.post('/app/landlords', { name: '' }); // failed attempt: not logged
+
+  const rows = db.prepare('SELECT action, summary FROM activity_log WHERE user_id = ? ORDER BY id').all(uid).map((x) => `${x.action}: ${x.summary}`);
+  for (const expected of ['signed in: Signed in', 'viewed: Viewed landlords', 'created: Added landlord: Martha Quinn',
+    'viewed: Viewed landlord: Martha Quinn', 'updated: Edited landlord: Martha Quinn', 'deleted: Deleted landlord: Martha Quinn']) {
+    assert.ok(rows.includes(expected), `missing "${expected}" in ${JSON.stringify(rows)}`);
+  }
+  assert.equal(rows.filter((x) => x.startsWith('updated:')).length, 1, 'autosave keystrokes collapse into one entry');
+  assert.ok(!rows.some((x) => x === 'created: Added landlord'), 'failed saves are not logged');
+
+  const admin = new Client();
+  await admin.login('admin', 'owner-password-123');
+  r = await admin.get('/admin');
+  assert.match(r.text, /<th>Last active<\/th>/);
+  assert.match(r.text, /Recent activity[\s\S]*<code>tracked<\/code>[\s\S]*Deleted landlord: Martha Quinn/);
+  r = await admin.get(`/admin/users/${uid}`);
+  assert.match(r.text, /id="activity"[\s\S]*Added landlord: Martha Quinn/);
+  r = await admin.get(`/admin/users/${uid}?activity=changes`);
+  const changes = r.text.match(/id="activity"[\s\S]*?<\/section>/)[0];
+  assert.match(changes, /Deleted landlord/);
+  assert.doesNotMatch(changes, /Viewed landlords/);
+
+  // Companies can't see anyone's activity.
+  assert.equal((await c.get(`/admin/users/${uid}`)).status, 404);
+});

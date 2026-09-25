@@ -24,7 +24,10 @@ module.exports = function adminRoutes(db, config) {
            (SELECT COUNT(*) FROM tenants    WHERE account_id = u.id) AS tenants,
            (SELECT COUNT(*) FROM tenancies  WHERE account_id = u.id AND status = 'active') AS active_tenancies,
            (SELECT COUNT(*) FROM invoices   WHERE account_id = u.id) AS invoices,
-           (SELECT COUNT(*) FROM sessions   WHERE user_id = u.id AND expires_at > datetime('now')) AS live_sessions
+           (SELECT COUNT(*) FROM sessions   WHERE user_id = u.id AND expires_at > datetime('now')) AS live_sessions,
+           (SELECT MAX(created_at) FROM activity_log WHERE user_id = u.id) AS last_active,
+           (SELECT COUNT(*) FROM activity_log WHERE user_id = u.id AND action IN ('created', 'updated', 'deleted', 'downloaded') AND created_at >= datetime('now', '-7 days')) AS changes_7d,
+           (SELECT COUNT(*) FROM activity_log WHERE user_id = u.id AND created_at >= datetime('now', '-7 days')) AS actions_7d
       FROM users u`;
 
   router.get('/', (req, res) => {
@@ -56,7 +59,11 @@ module.exports = function adminRoutes(db, config) {
       `SELECT e.*, u.agency_name FROM login_events e LEFT JOIN users u ON u.id = e.user_id
         ORDER BY e.id DESC LIMIT 15`
     ).all();
-    res.render('admin/index', { title: 'Admin', section: 'admin', users, totals, signups, recentLogins, q, status, fmt, flash: req.query.flash || '' });
+    const recentActivity = db.prepare(
+      `SELECT a.*, u.username, u.agency_name FROM activity_log a JOIN users u ON u.id = a.user_id
+        WHERE a.user_id != ? ORDER BY a.id DESC LIMIT 25`
+    ).all(req.user.id);
+    res.render('admin/index', { title: 'Admin', section: 'admin', users, totals, signups, recentLogins, recentActivity, q, status, fmt, flash: req.query.flash || '' });
   });
 
   function target(req, res) {
@@ -133,6 +140,11 @@ module.exports = function adminRoutes(db, config) {
     const u = target(req, res);
     if (!u) return;
     const logins = db.prepare('SELECT * FROM login_events WHERE user_id = ? ORDER BY id DESC LIMIT 50').all(u.id);
+    const activityFilter = req.query.activity === 'changes' ? 'changes' : 'all';
+    const activityRows = db.prepare(
+      `SELECT * FROM activity_log WHERE user_id = ? ${activityFilter === 'changes' ? "AND action IN ('created', 'updated', 'deleted', 'downloaded')" : ''}
+        ORDER BY id DESC LIMIT 300`
+    ).all(u.id);
     const extra = db.prepare(
       `SELECT (SELECT COUNT(*) FROM maintenance_jobs WHERE account_id = ?) AS jobs,
               (SELECT COUNT(*) FROM compliance_items WHERE account_id = ?) AS certificates,
@@ -140,7 +152,7 @@ module.exports = function adminRoutes(db, config) {
               (SELECT MAX(created_at) FROM transactions WHERE account_id = ?) AS last_txn`
     ).get(u.id, u.id, u.id, u.id);
     res.render('admin/user', {
-      title: u.agency_name, section: 'admin', u, logins, extra, fmt, isSelf: u.id === req.user.id,
+      title: u.agency_name, section: 'admin', u, logins, extra, fmt, isSelf: u.id === req.user.id, activityRows, activityFilter,
       created: req.query.created === '1', flash: req.query.flash || '', error: req.query.error || '', minPassword: MIN_PASSWORD,
     });
   });

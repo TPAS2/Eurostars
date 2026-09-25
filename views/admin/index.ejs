@@ -45,14 +45,17 @@
   </div>
   <div class="table-wrap">
   <table>
-    <thead><tr><th>User</th><th>Agency</th><th>Joined</th><th>Last login</th><th class="num">Logins</th><th class="num">Landlords</th><th class="num">Properties</th><th class="num">Tenancies</th><th>Status</th></tr></thead>
+    <thead><tr><th>User</th><th>Username</th><th>Agency</th><th>Joined</th><th>Last login</th><th>Last active</th><th class="num">Actions (7 days)</th><th class="num">Logins</th><th class="num">Landlords</th><th class="num">Properties</th><th class="num">Tenancies</th><th>Status</th></tr></thead>
     <tbody>
     <% users.forEach(u => { %>
       <tr>
-        <td><a href="/admin/users/<%= u.id %>"><strong><%= u.name %></strong></a><div class="muted small">@<%= u.username %><%= u.email ? ' · ' + u.email : '' %></div></td>
+        <td><a href="/admin/users/<%= u.id %>"><strong><%= u.name %></strong></a><% if (u.email) { %><div class="muted small"><%= u.email %></div><% } %></td>
+        <td><code><%= u.username %></code></td>
         <td><%= u.agency_name %><% if (u.is_admin) { %> <span class="badge s-admin">you</span><% } %></td>
         <td><%= fmt.ukDate(u.created_at) %></td>
         <td><%= fmt.ukDateTime(u.last_login_at) %><% if (u.live_sessions) { %> <span class="dot" title="Has a live session"></span><% } %></td>
+        <td><%= u.last_active ? fmt.ukDateTime(u.last_active) : 'No activity' %></td>
+        <td class="num"><%= u.actions_7d %><% if (u.changes_7d) { %><div class="muted small"><%= u.changes_7d %> change<%= u.changes_7d === 1 ? '' : 's' %></div><% } %></td>
         <td class="num"><%= u.login_count %></td>
         <td class="num"><%= u.landlords %></td>
         <td class="num"><%= u.properties %></td>
@@ -63,6 +66,21 @@
     </tbody>
   </table>
   </div>
+</section>
+
+<section class="card">
+  <h2>Recent activity</h2>
+  <p class="muted small">What your users have been doing (your own actions aren't listed here). Click a user for their full history.</p>
+  <% if (!recentActivity.length) { %><p class="muted">No activity yet.</p><% } else { %>
+  <div class="table-wrap"><table>
+    <thead><tr><th>When</th><th>User</th><th>Activity</th></tr></thead>
+    <tbody>
+    <% recentActivity.forEach(e => { %>
+      <tr><td class="nowrap"><%= fmt.ukDateTime(e.created_at) %></td><td><a href="/admin/users/<%= e.user_id %>"><code><%= e.username %></code></a><div class="muted small"><%= e.agency_name %></div></td>
+      <td><span class="act act-<%= e.action.replace(/\s+/g, '-') %>"><%= e.action %></span> <%= e.summary %></td></tr>
+    <% }) %>
+    </tbody>
+  </table></div><% } %>
 </section>
 
 <section class="card">

@@ -339,3 +339,13 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fo
 .notice-when { display: block; font-size: .85rem; }
 .is-expired .notice-when { color: var(--bad); font-weight: 600; }
 .is-expiring .notice-when { color: var(--warn); }
+
+/* ---------- activity log (admin) ---------- */
+.nowrap { white-space: nowrap; }
+.act { display: inline-block; font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; padding: 1px 7px; border-radius: 99px; margin-right: 6px; background: var(--surface-2); color: var(--muted); }
+.act-created { background: var(--ok-soft); color: var(--ok); }
+.act-updated { background: var(--brand-soft); color: var(--brand); }
+.act-deleted { background: var(--bad-soft); color: var(--bad); }
+.act-signed-in, .act-signed-out, .act-downloaded { background: var(--warn-soft); color: var(--warn); }
+.activity-scroll { max-height: 480px; overflow-y: auto; }
+.tabs.compact { margin: 0; border-bottom: 0; }

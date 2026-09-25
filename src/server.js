@@ -8,6 +8,7 @@ const fmt = require('./format');
 const { createStatementWriter } = require('./ai');
 const { runMonthlyJob } = require('./statements');
 const { scheduleBackups } = require('./backup');
+const activity = require('./activity');
 
 function loadConfig(env = process.env) {
   const production = env.NODE_ENV === 'production';
@@ -30,6 +31,8 @@ function loadConfig(env = process.env) {
     secureCookies: env.SECURE_COOKIES ? env.SECURE_COOKIES === 'true' : production,
     trustProxy: env.TRUST_PROXY === 'true',
     autoMonthlyStatements: env.AUTO_MONTHLY_STATEMENTS !== 'false',
+    // Record what users view and change for the admin panel's activity log.
+    activityLog: env.ACTIVITY_LOG !== 'false',
   };
 }
 
@@ -100,6 +103,7 @@ function createApp(config, db, { writer = null } = {}) {
 
   app.use(auth.loadSession(db));
   app.use(auth.verifyCsrf);
+  if (config.activityLog !== false) app.use(activity.middleware(db));
 
   app.get('/', (req, res) => {
     if (req.user) return res.redirect(req.user.is_admin ? '/admin' : '/app');
@@ -131,6 +135,9 @@ if (require.main === module) {
     console.log(`${config.appName} running on http://localhost:${config.port}`);
   });
   if (config.autoBackups) scheduleBackups(db, config);
+  // Keep the activity log to the last six months.
+  activity.prune(db);
+  setInterval(() => activity.prune(db), 24 * 60 * 60 * 1000).unref();
   // Last month's statements are produced automatically once the month ends.
   if (config.autoMonthlyStatements) {
     const run = () => runMonthlyJob(db, writer).catch((err) => console.error('Monthly statement job failed:', err));

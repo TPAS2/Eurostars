@@ -39,6 +39,19 @@ CREATE TABLE IF NOT EXISTS login_events (
   created_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- What each signed-in person viewed and changed, for the admin panel.
+CREATE TABLE IF NOT EXISTS activity_log (
+  id          INTEGER PRIMARY KEY,
+  user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  action      TEXT NOT NULL,          -- viewed | created | updated | deleted | downloaded | signed in | signed out
+  summary     TEXT NOT NULL,
+  path        TEXT,
+  ip          TEXT,
+  created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_activity_user ON activity_log(user_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_activity_time ON activity_log(created_at);
+
 CREATE TABLE IF NOT EXISTS landlords (
   id          INTEGER PRIMARY KEY,
   account_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,

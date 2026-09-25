@@ -190,6 +190,30 @@ function seedAgency(p, lastLoginHoursAgo) {
   }
   db.prepare("INSERT INTO login_events (user_id, email, success, ip, user_agent, created_at) VALUES (?, ?, 1, '81.2.69.142', 'Mozilla/5.0', datetime('now', ?))")
     .run(a, p.username, `-${lastLoginHoursAgo} hours`);
+  // A few days of typical activity for the admin panel's activity log.
+  const act = db.prepare("INSERT INTO activity_log (user_id, action, summary, path, ip, created_at) VALUES (?, ?, ?, ?, '81.2.69.142', datetime('now', ?))");
+  const addr = p.properties.map((x) => x[1]);
+  [
+    [4 * 24 + 6, 'signed in', 'Signed in', '/login'],
+    [4 * 24 + 6, 'viewed', 'Viewed the dashboard', '/app'],
+    [4 * 24 + 5, 'created', `Raised rent for ${month(0)}`, '/app/rent/raise'],
+    [3 * 24 + 3, 'signed in', 'Signed in', '/login'],
+    [3 * 24 + 3, 'viewed', `Viewed property: ${addr[0]}`, '/app/properties/1'],
+    [3 * 24 + 2, 'created', 'Added certificate: Gas Safety (CP12)', '/app/compliance'],
+    [2 * 24 + 4, 'signed in', 'Signed in', '/login'],
+    [2 * 24 + 4, 'viewed', 'Viewed invoices', '/app/invoices'],
+    [2 * 24 + 3, 'created', 'Uploaded invoice: SW Heating Services', '/app/invoices'],
+    [2 * 24 + 1, 'updated', `Edited property: ${addr[2]}`, '/app/properties/3'],
+    [26, 'signed in', 'Signed in', '/login'],
+    [26, 'viewed', 'Viewed monthly statements', '/app/monthly'],
+    [25, 'created', `Generated monthly statements for ${month(-1)}`, '/app/monthly/generate'],
+    [24, 'downloaded', 'Downloaded all their data', '/app/export'],
+    [3, 'signed in', 'Signed in', '/login'],
+    [3, 'viewed', 'Viewed the dashboard', '/app'],
+    [2.5, 'viewed', 'Viewed tenants', '/app/tenants'],
+    [2.2, 'updated', 'Edited tenant: Sophie Turner', '/app/tenants/4'],
+    [2, 'created', 'Added maintenance job: Garden fence panel blown down', '/app/maintenance'],
+  ].forEach(([hoursAgo, action, summary, path]) => act.run(a, action, summary, path, `-${Math.round(hoursAgo * 60)} minutes`));
   return a;
 }
 

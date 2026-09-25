@@ -30,6 +30,28 @@
   <div class="tile"><span class="label">Activity</span><span class="value sm"><%= extra.transactions %> transactions</span><span class="sub"><%= extra.jobs %> jobs · <%= extra.certificates %> certificates</span></div>
 </section>
 
+<section class="card" id="activity">
+  <div class="card-head">
+    <h2>Activity <span class="count"><%= activityRows.length %><%= activityRows.length === 300 ? '+' : '' %></span></h2>
+    <nav class="tabs compact">
+      <a href="/admin/users/<%= u.id %>#activity" class="<%= activityFilter === 'all' ? 'active' : '' %>">Everything</a>
+      <a href="/admin/users/<%= u.id %>?activity=changes#activity" class="<%= activityFilter === 'changes' ? 'active' : '' %>">Changes only</a>
+    </nav>
+  </div>
+  <p class="muted small">Pages <%= isSelf ? 'you' : 'they' %> opened and changes <%= isSelf ? 'you' : 'they' %> made, newest first. Kept for 6 months.</p>
+  <% if (!activityRows.length) { %><p class="muted">No activity recorded yet.</p><% } else { %>
+  <div class="table-wrap activity-scroll"><table>
+    <thead><tr><th>When</th><th>Activity</th><th>IP</th></tr></thead>
+    <tbody>
+    <% activityRows.forEach(e => { %>
+      <tr><td class="nowrap"><%= fmt.ukDateTime(e.created_at) %></td>
+      <td><span class="act act-<%= e.action.replace(/\s+/g, '-') %>"><%= e.action %></span> <%= e.summary %></td>
+      <td class="muted small"><%= e.ip %></td></tr>
+    <% }) %>
+    </tbody>
+  </table></div><% } %>
+</section>
+
 <section class="card">
   <h2>Sign-in history</h2>
   <% if (!logins.length) { %><p class="muted">No sign-ins yet.</p><% } else { %>

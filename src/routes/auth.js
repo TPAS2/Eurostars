@@ -2,6 +2,7 @@
 
 const express = require('express');
 const auth = require('../auth');
+const activity = require('../activity');
 const { USERNAME_RE } = require('../db');
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -41,6 +42,7 @@ module.exports = function authRoutes(db, config) {
       return fail(403, 'This account has been suspended. Please contact support.');
     }
     logEvent.run(user.id, login, 1, ip, ua);
+    if (config.activityLog !== false) activity.logSignIn(db, user.id, ip);
     startSession(user, res);
     res.redirect(landing({ is_admin: user.is_admin === 1 }));
   });
