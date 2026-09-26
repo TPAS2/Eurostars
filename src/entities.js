@@ -71,8 +71,6 @@ const ENTITIES = {
       { name: 'name', label: 'Council', type: 'text', required: true },
       { name: 'council_tax_phone', label: 'Council tax phone', type: 'tel' },
       { name: 'council_tax_email', label: 'Council tax email', type: 'email' },
-      { name: 'licensing_email', label: 'Licensing email (HMO / selective)', type: 'email' },
-      { name: 'environmental_phone', label: 'Environmental health phone', type: 'tel' },
       { name: 'website', label: 'Website', type: 'text' },
       { name: 'address', label: 'Address', type: 'textarea', inline: true },
       { name: 'notes', label: 'Notes', type: 'textarea', inline: true },
