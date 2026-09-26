@@ -5,6 +5,7 @@ const { ENTITIES, REF_LABELS } = require('../entities');
 const { transaction } = require('../db');
 const ledger = require('../ledger');
 const reconcile = require('../reconcile');
+const { INVOICE_LIST_SQL, statementLink } = require('../invoiceSql');
 const statements = require('../statements');
 const fmt = require('../format');
 
@@ -565,7 +566,7 @@ module.exports = function appRoutes(db) {
     let invoices = null;
     if (def.key === 'maintenance' || def.key === 'properties') {
       const fk = def.key === 'maintenance' ? 'maintenance_job_id' : 'property_id';
-      invoices = db.prepare(`SELECT * FROM invoices WHERE account_id = ? AND ${fk} = ? ORDER BY status = 'paid', due_date`).all(a, row.id);
+      invoices = db.prepare(`${INVOICE_LIST_SQL} WHERE i.account_id = ? AND i.${fk} = ? ORDER BY i.status = 'paid', i.due_date`).all(a, row.id);
     }
     // On a tenant's page: their current tenancy (or tenancies), with its council, property and agreement.
     let tenantBoxes = null;
@@ -588,7 +589,7 @@ module.exports = function appRoutes(db) {
     const photo = def.key === 'councils'
       ? db.prepare("SELECT strftime('%s', updated_at) AS v FROM council_photos WHERE council_id = ? AND account_id = ?").get(row.id, a) || { v: null }
       : null;
-    res.render('show', { title: rowTitle(def, row, maps), section: def.key, def, row, maps, display, rowTitle, children, extra, invoices, related: relatedLists(def, row, a), certs, photo, tenantBoxes, error: req.query.error ? String(req.query.error).slice(0, 200) : null, flash: req.query.flash ? String(req.query.flash).slice(0, 200) : null, fmt, today: fmt.today() });
+    res.render('show', { title: rowTitle(def, row, maps), section: def.key, def, row, maps, display, rowTitle, children, extra, invoices, related: relatedLists(def, row, a), certs, photo, tenantBoxes, statementLink, error: req.query.error ? String(req.query.error).slice(0, 200) : null, flash: req.query.flash ? String(req.query.flash).slice(0, 200) : null, fmt, today: fmt.today() });
   });
 
   router.get('/:entity/:id/edit', (req, res) => {

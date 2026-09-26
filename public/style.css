@@ -508,3 +508,8 @@ form.inline { display: inline-flex; margin: 0; }
 
 .month-pick input.month-big { font-size: 1.35rem; font-weight: 800; padding: 10px 18px; min-width: 240px; text-align: center; border: 2px solid var(--brand); border-radius: 10px; color: var(--text); background: var(--surface); cursor: pointer; }
 .month-back { text-align: center; margin: -8px 0 16px; font-size: .9rem; }
+
+/* Invoices: deducted from the landlord? */
+.yes-no { display: inline-block; font-weight: 800; font-size: .8rem; padding: 2px 9px; border-radius: 99px; }
+.yes-no.yes { background: var(--ok-soft); color: var(--ok); }
+.yes-no.no { background: var(--bad-soft); color: var(--bad); }

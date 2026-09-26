@@ -50,7 +50,7 @@
       <dl class="details">
         <div><dt>Method</dt><dd><%= inv.payment_method %></dd></div>
         <div><dt>Reference</dt><dd><%= inv.payment_reference || '—' %></dd></div>
-        <div><dt>Client account</dt><dd><% if (inv.payment_txn_id) { %><a href="/app/transactions/<%= inv.payment_txn_id %>">Charged to landlord</a><% } else { %>Not charged to a landlord<% } %></dd></div>
+        <div><dt>Deducted from landlord</dt><dd><% if (deduction && deduction.deduction_id) { %><span class="yes-no yes">Yes</span> <%= deduction.deducted_landlord || '' %> · <a href="<%= statementLink(deduction) %>">View statement</a> · <a href="/app/transactions/<%= inv.payment_txn_id %>">Transaction</a><% } else { %><span class="yes-no no">No</span> not charged to a landlord<% } %></dd></div>
       </dl>
       <form method="post" action="/app/invoices/<%= inv.id %>/unpay" data-confirm="Undo this payment? The invoice will go back to unpaid and the landlord charge will be removed." class="spaced">
         <%- include('../partials/csrf') %><button class="btn small" type="submit">Undo payment</button>

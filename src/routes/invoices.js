@@ -9,6 +9,7 @@ const auth = require('../auth');
 const { transaction } = require('../db');
 const ledger = require('../ledger');
 const fmt = require('../format');
+const { INVOICE_LIST_SQL, statementLink } = require('../invoiceSql');
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
 const PAYMENT_METHODS = ['Bank transfer', 'Card', 'Cheque', 'Cash', 'Direct debit', 'Other'];
@@ -127,8 +128,7 @@ module.exports = function invoiceRoutes(db, config) {
     if (status === 'paid') where += " AND i.status = 'paid'";
     if (status === 'overdue') { where += " AND i.status = 'unpaid' AND i.due_date < ?"; params.push(today); }
     const invoices = db.prepare(
-      `SELECT i.*, p.address_line1, m.title AS job_title
-         FROM invoices i LEFT JOIN properties p ON p.id = i.property_id LEFT JOIN maintenance_jobs m ON m.id = i.maintenance_job_id
+      `${INVOICE_LIST_SQL}
         WHERE ${where}
         ORDER BY i.status = 'paid', COALESCE(i.due_date, i.invoice_date, i.created_at) LIMIT 500`
     ).all(...params);
@@ -141,7 +141,7 @@ module.exports = function invoiceRoutes(db, config) {
     ).get(today, today, a);
     const shift = (by) => { const [y, m] = (month === 'all' ? thisMonth : month).split('-').map(Number); return new Date(Date.UTC(y, m - 1 + by, 1)).toISOString().slice(0, 7); };
     res.render('invoices/list', {
-      title: 'Invoices', section: 'invoices', invoices, totals, status, today, fmt, flash: String(req.query.flash || '').slice(0, 200),
+      title: 'Invoices', section: 'invoices', invoices, statementLink, totals, status, today, fmt, flash: String(req.query.flash || '').slice(0, 200),
       month, prev: shift(-1), next: shift(1), thisMonth, monthLabel: month === 'all' ? 'All months' : require('../statements').monthLabel(month),
     });
   });
@@ -182,8 +182,9 @@ module.exports = function invoiceRoutes(db, config) {
     const property = inv.property_id ? owned('properties', inv.property_id, a) : null;
     const landlord = property && property.landlord_id ? owned('landlords', property.landlord_id, a) : null;
     const job = inv.maintenance_job_id ? owned('maintenance_jobs', inv.maintenance_job_id, a) : null;
+    const deduction = db.prepare(`${INVOICE_LIST_SQL} WHERE i.id = ? AND i.account_id = ?`).get(inv.id, a);
     res.render('invoices/show', {
-      title: `Invoice ${inv.invoice_number || '#' + inv.id}`, section: 'invoices', inv, property, landlord, job,
+      title: `Invoice ${inv.invoice_number || '#' + inv.id}`, section: 'invoices', inv, property, landlord, job, deduction, statementLink,
       methods: PAYMENT_METHODS, today: fmt.today(), fmt, error: req.query.error || '', flash: req.query.flash || '',
     });
   });

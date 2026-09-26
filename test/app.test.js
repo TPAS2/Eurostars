@@ -1646,3 +1646,34 @@ test('invoices have a month switcher', async () => {
   assert.match(r.text, /Unpaid · all months[\s\S]*?£30\.00/);
   assert.match((await c.get('/app/invoices?status=overdue')).text, /July Plumbing/, 'overdue with no month shows every month');
 });
+
+test('invoices link to their property and show whether they were deducted, with the statement', async () => {
+  const c = await registerAndLogin('inv-deduct@example.com', 'Deduct Lets');
+  let r = await c.post('/app/landlords', { name: 'Dora Deduct' });
+  const dora = idFrom(r.location);
+  r = await c.post('/app/properties', { address_line1: '4 Drain Lane', landlord_id: String(dora), status: 'let' });
+  const prop = idFrom(r.location);
+  const pdf = () => new File([Buffer.from('%PDF-1.4\n%x\n')], 'i.pdf');
+  await c.get('/app/invoices/new');
+  const charged = idFrom((await c.post('/app/invoices', { supplier: 'Drain Co', amount: '120', invoice_date: '2026-08-02', property_id: String(prop), file: pdf() }, { multipart: true })).location);
+  const notCharged = idFrom((await c.post('/app/invoices', { supplier: 'Paint Co', amount: '40', invoice_date: '2026-08-03', property_id: String(prop), file: pdf() }, { multipart: true })).location);
+  await c.get(`/app/invoices/${charged}`);
+  await c.post(`/app/invoices/${charged}/pay`, { paid_date: '2026-08-10', payment_method: 'Bank transfer', charge_landlord: '1' });
+  await c.post(`/app/invoices/${notCharged}/pay`, { paid_date: '2026-08-11', payment_method: 'Card' });
+
+  r = await c.get('/app/invoices?month=2026-08');
+  assert.match(r.text, /<th>Deducted<\/th>/);
+  assert.match(r.text, new RegExp(`Drain Co[\\s\\S]*?<a href="/app/properties/${prop}">4 Drain Lane</a>[\\s\\S]*?yes-no yes">Yes[\\s\\S]*?href="/app/statements\\?landlord_id=${dora}&amp;from=2026-08-01&amp;to=2026-08-31"[^>]*>View statement`));
+  assert.match(r.text, /Paint Co[\s\S]*?yes-no no">No/);
+  // Once the month's statement is made, the link goes to it, and it shows the deduction.
+  await c.get('/app/monthly?month=2026-08');
+  await c.post('/app/monthly/generate', { month: '2026-08', landlord_id: String(dora) });
+  const statementId = db.prepare('SELECT id FROM monthly_statements WHERE landlord_id = ?').get(dora).id;
+  r = await c.get('/app/invoices?month=2026-08');
+  assert.match(r.text, new RegExp(`href="/app/monthly/${statementId}"[^>]*>View statement`));
+  assert.match((await c.get(`/app/monthly/${statementId}`)).text, /Drain Co[\s\S]*?£120\.00/);
+  // Also on the property's page and the invoice's own page.
+  assert.match((await c.get(`/app/properties/${prop}`)).text, /Drain Co[\s\S]*?yes-no yes">Yes/);
+  assert.match((await c.get(`/app/invoices/${charged}`)).text, /Deducted from landlord[\s\S]*?yes-no yes">Yes<\/span> Dora Deduct/);
+  assert.match((await c.get(`/app/invoices/${notCharged}`)).text, /Deducted from landlord[\s\S]*?yes-no no">No/);
+});
