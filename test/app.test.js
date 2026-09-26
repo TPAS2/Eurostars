@@ -1368,3 +1368,36 @@ test('mailer: needs a sender and a provider, and refuses bad addresses', async (
   for (const bad of ['', 'a@b', 'a b@c.com', 'a@b.com, c@d.com', 'x@y.com\r\nBcc: z@z.com']) assert.ok(!isEmail(bad), bad);
   await assert.rejects(createMailer({ smtpHost: 'h', emailFrom: 's@example.com' }).send({ to: 'bad', subject: 's', text: 't' }), /Not a valid email/);
 });
+
+test('landlords have a statement type (Email or Cheque); cheque landlords are left out of the email run', async () => {
+  const c = await registerAndLogin('statement-type@example.com', 'Type Lets');
+  let r = await c.get('/app/landlords/new');
+  assert.match(r.text, /<label for="f-statement_type">Statement type[\s\S]*?<option value="Email" selected>Email<\/option><option value="Cheque" >Cheque<\/option>/);
+  assert.match(r.text, /class="field  row-start">\s*<label for="f-address">Correspondence address[\s\S]*?class="field  ">\s*<label for="f-notes">Notes/, 'Notes sits beside the address');
+  r = await c.post('/app/landlords', { name: 'Eve Email', email: 'eve@example.com' });
+  const eve = idFrom(r.location);
+  assert.equal(db.prepare('SELECT statement_type FROM landlords WHERE id = ?').get(eve).statement_type, 'Email', 'Email by default');
+  r = await c.post('/app/landlords', { name: 'Chad Cheque', email: 'chad@example.com', statement_type: 'Cheque' });
+  const chad = idFrom(r.location);
+  r = await c.post('/app/landlords', { name: 'X', statement_type: 'Carrier pigeon' });
+  assert.equal(r.status, 422);
+  assert.match(r.text, /Choose a valid statement type/);
+
+  r = await c.get('/app/landlords');
+  assert.match(r.text, /<th[^>]*>Statement type<\/th>/);
+  assert.match(r.text, /Chad Cheque[\s\S]*?Cheque/);
+  r = await c.get(`/app/landlords/${chad}`);
+  assert.match(r.text, /<dt>Statement type<\/dt>[\s\S]*?Cheque/);
+
+  await c.get('/app/rent-run?month=2026-08');
+  await c.post('/app/monthly/calculate', { month: '2026-08' });
+  await c.get('/app/rent-run?month=2026-08');
+  sentMail.length = 0;
+  r = await c.post('/app/monthly/email', { month: '2026-08' });
+  assert.deepEqual(sentMail.map((m) => m.to), ['eve@example.com'], 'only Email landlords are emailed');
+  assert.match(decodeURIComponent(r.location.replace(/\+/g, ' ')), /Left out 1 landlord paid by cheque \(print their statements\): Chad Cheque/);
+  r = await c.get('/app/rent-run?month=2026-08');
+  assert.match(r.text, /<th>Statement type<\/th>/);
+  assert.match(r.text, /Chad Cheque[\s\S]*?badge warn">Cheque[\s\S]*?Print statement/);
+  assert.match(r.text, /1 paid by cheque is left out/);
+});

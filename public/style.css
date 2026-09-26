@@ -211,6 +211,7 @@ legend { font-weight: 700; padding: 0 6px; }
 .details dt { font-size: .75rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 600; }
 .details dd { margin: 2px 0 0; overflow-wrap: anywhere; }
 .details .wide { grid-column: 1 / -1; }
+.row-start { grid-column-start: 1; }
 .with-photo { display: flex; gap: 24px; align-items: flex-start; }
 .with-photo > .details { flex: 1; min-width: 0; }
 .council-photo { flex: none; width: 128px; display: flex; flex-direction: column; align-items: center; gap: 8px; }

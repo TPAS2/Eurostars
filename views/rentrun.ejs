@@ -11,7 +11,7 @@
 </header>
 <% if (flash) { %><div class="notice ok"><%= flash %></div><% } %>
 <% if (error) { %><div class="notice err"><%= error %></div><% } %>
-<% const withEmail = rows.filter(r => r.email).length; const emailed = rows.filter(r => r.emailed_at).length; const generated = rows.filter(r => r.id).length; %>
+<% const byEmail = rows.filter(r => r.statement_type !== 'Cheque'); const byCheque = rows.length - byEmail.length; const withEmail = byEmail.filter(r => r.email).length; const emailed = rows.filter(r => r.emailed_at).length; const generated = rows.filter(r => r.id).length; %>
 
 <section class="card" id="month-end">
   <div class="card-head"><h2><%= monthLabel %></h2></div>
@@ -25,7 +25,7 @@
     </li>
     <li>
       <div><strong>Email landlords</strong><p class="muted small">
-        Sends each landlord their <%= monthLabel %> statement. <%= withEmail %> of <%= rows.length %> landlord<%= rows.length === 1 ? ' has an' : 's have an' %> email address<%= emailed ? ` · ${emailed} already emailed` : '' %>.
+        Sends each landlord whose statement type is Email their <%= monthLabel %> statement. <%= withEmail %> of <%= byEmail.length %> ha<%= byEmail.length === 1 ? 's' : 've' %> an email address<%= emailed ? ` · ${emailed} already emailed` : '' %>.<% if (byCheque) { %> <%= byCheque %> paid by cheque <%= byCheque === 1 ? 'is' : 'are' %> left out: print their statements below.<% } %>
         <% if (!emailEnabled) { %><br><strong class="warn-text">Email isn't set up yet.</strong> Your administrator needs to add the email settings.<% } %>
       </p></div>
       <form method="post" action="/app/monthly/email" data-busy="Sending emails…" data-confirm="Email <%= monthLabel %> statements to <%= withEmail %> landlord<%= withEmail === 1 ? '' : 's' %>?">
@@ -59,12 +59,13 @@
   </div>
   <% if (!rows.length) { %><p class="muted">Add landlords to start your rent run.</p><% } else { %>
   <div class="table-wrap"><table>
-    <thead><tr><th>Landlord</th><th>Email</th><th class="num">Rent received</th><th class="num">Deductions</th><th class="num">Net</th><th class="num">Held</th><th>Statement emailed</th><th></th></tr></thead>
+    <thead><tr><th>Landlord</th><th>Statement type</th><th>Email</th><th class="num">Rent received</th><th class="num">Deductions</th><th class="num">Net</th><th class="num">Held</th><th>Statement emailed</th><th></th></tr></thead>
     <tbody>
     <% rows.forEach(r => { %>
       <tr>
         <td><% if (r.id) { %><a href="/app/monthly/<%= r.id %>"><strong><%= r.name %></strong></a><% } else { %><a href="/app/landlords/<%= r.landlord_id %>"><%= r.name %></a><% } %></td>
-        <td class="small"><%= r.email || '' %><% if (!r.email) { %><a class="muted" href="/app/landlords/<%= r.landlord_id %>/edit">Add email</a><% } %></td>
+        <td><span class="badge <%= r.statement_type === 'Cheque' ? 'warn' : 's-admin' %>"><%= r.statement_type || 'Email' %></span></td>
+        <td class="small"><%= r.email || '' %><% if (!r.email && r.statement_type !== 'Cheque') { %><a class="muted" href="/app/landlords/<%= r.landlord_id %>/edit">Add email</a><% } %></td>
         <% if (r.id) { %>
           <td class="num"><%= fmt.money(r.rent_pence) %></td>
           <td class="num"><%= r.fees_pence + r.expenses_pence ? '−' + fmt.money(r.fees_pence + r.expenses_pence) : '—' %></td>
@@ -73,9 +74,10 @@
         <% } else { %>
           <td colspan="4" class="muted">Not calculated yet</td>
         <% } %>
-        <td class="small"><% if (r.emailed_at) { %><span class="badge s-active">sent</span> <span class="muted"><%= fmt.ukDateTime(r.emailed_at) %></span><% } else { %><span class="muted">Not yet</span><% } %></td>
+        <td class="small"><% if (r.statement_type === 'Cheque' && !r.emailed_at) { %><span class="muted">By cheque</span><% } else if (r.emailed_at) { %><span class="badge s-active">sent</span> <span class="muted"><%= fmt.ukDateTime(r.emailed_at) %></span><% } else { %><span class="muted">Not yet</span><% } %></td>
         <td class="num row-actions">
-          <% if (emailEnabled && r.email) { %>
+          <% if (r.statement_type === 'Cheque' && r.id) { %><a class="btn small" href="/app/monthly/<%= r.id %>">Print statement</a><% } %>
+          <% if (emailEnabled && r.email && r.statement_type !== 'Cheque') { %>
           <form method="post" action="/app/monthly/email" data-busy="Sending…" data-confirm="Email the <%= monthLabel %> statement to <%= r.name %> (<%= r.email %>)?">
             <%- include('partials/csrf') %>
             <input type="hidden" name="month" value="<%= month %>">

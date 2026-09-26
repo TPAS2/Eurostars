@@ -1,5 +1,5 @@
 <%# locals: f, value, error, opts %>
-<div class="field <%= f.type === 'textarea' ? 'wide' : '' %>">
+<div class="field <%= f.type === 'textarea' && !f.inline ? 'wide' : '' %> <%= f.startRow ? 'row-start' : '' %>">
   <label for="f-<%= f.name %>"><%= f.label %><% if (f.required) { %> <span class="req">*</span><% } %></label>
   <% const v = value === null || value === undefined ? '' : value; %>
   <% if (f.type === 'textarea') { %>

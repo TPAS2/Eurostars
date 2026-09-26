@@ -54,7 +54,7 @@ module.exports = function monthlyRoutes(db, writer, mailer = { enabled: false })
     const a = req.user.id;
     const month = st.isMonth(req.query.month) ? String(req.query.month) : st.previousMonth();
     const rows = db.prepare(
-      `SELECT l.id AS landlord_id, l.name, l.email, s.id, s.rent_pence, s.fees_pence, s.expenses_pence, s.net_pence,
+      `SELECT l.id AS landlord_id, l.name, l.email, l.statement_type, s.id, s.rent_pence, s.fees_pence, s.expenses_pence, s.net_pence,
               s.closing_pence, s.emailed_at, s.emailed_to
          FROM landlords l
          LEFT JOIN monthly_statements s ON s.landlord_id = l.id AND s.account_id = l.account_id AND s.month = ?
@@ -96,7 +96,7 @@ module.exports = function monthlyRoutes(db, writer, mailer = { enabled: false })
     if (!mailer.enabled) return backTo(res, month, { error: 'Email isn’t set up yet, so nothing was sent. Ask your administrator to add the email settings.' });
     const one = req.body.landlord_id ? Number(req.body.landlord_id) : null;
     const skipSent = !one && req.body.skip_sent === '1';
-    const landlords = db.prepare(`SELECT id, name, email FROM landlords WHERE account_id = ?${one ? ' AND id = ?' : ''} ORDER BY name COLLATE NOCASE`)
+    const landlords = db.prepare(`SELECT id, name, email, statement_type FROM landlords WHERE account_id = ?${one ? ' AND id = ?' : ''} ORDER BY name COLLATE NOCASE`)
       .all(...(one ? [a, one] : [a]));
     if (one && !landlords.length) return backTo(res, month, { error: 'Landlord not found.' });
     const agency = db.prepare('SELECT agency_name, email FROM users WHERE id = ?').get(a);
@@ -105,7 +105,10 @@ module.exports = function monthlyRoutes(db, writer, mailer = { enabled: false })
     const noEmail = [];
     const already = [];
     const failed = [];
+    const byCheque = [];
     for (const l of landlords) {
+      // Cheque landlords get a printed statement, so they're left out of the email run.
+      if (!one && l.statement_type === 'Cheque') { byCheque.push(l.name); continue; }
       if (!isEmail(l.email)) { noEmail.push(l.name); continue; }
       let s = db.prepare('SELECT * FROM monthly_statements WHERE account_id = ? AND landlord_id = ? AND month = ?').get(a, l.id, month);
       if (s && skipSent && s.emailed_at) { already.push(l.name); continue; }
@@ -125,6 +128,7 @@ module.exports = function monthlyRoutes(db, writer, mailer = { enabled: false })
     }
     const parts = [`Emailed ${plural(sent.length, 'landlord')} their ${st.monthLabel(month)} statement.`];
     if (already.length) parts.push(`Skipped ${plural(already.length, 'landlord')} already emailed.`);
+    if (byCheque.length) parts.push(`Left out ${plural(byCheque.length, 'landlord')} paid by cheque (print their statements): ${listNames(byCheque)}.`);
     if (noEmail.length) parts.push(`No email address for: ${listNames(noEmail)}.`);
     const error = failed.length ? `Couldn’t email: ${listNames(failed)}.` : null;
     backTo(res, month, { flash: parts.join(' '), error });

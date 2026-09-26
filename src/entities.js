@@ -17,12 +17,13 @@ const ENTITIES = {
     fields: [
       { name: 'name', label: 'Name', type: 'text', required: true },
       { name: 'code', label: 'Landlord code', type: 'text', help: 'Your own reference for this landlord, e.g. LL001.' },
+      { name: 'statement_type', label: 'Statement type', type: 'select', options: ['Email', 'Cheque'], required: true, default: 'Email', help: 'Email: their statement is emailed in the rent run. Cheque: their statement is printed and sent with a cheque.' },
       { name: 'email', label: 'Email', type: 'email' },
       { name: 'phone', label: 'Phone', type: 'tel' },
-      { name: 'address', label: 'Correspondence address', type: 'textarea' },
-      { name: 'notes', label: 'Notes', type: 'textarea' },
+      { name: 'address', label: 'Correspondence address', type: 'textarea', inline: true, startRow: true },
+      { name: 'notes', label: 'Notes', type: 'textarea', inline: true },
     ],
-    columns: ['name', 'code', 'email', 'phone'],
+    columns: ['name', 'code', 'statement_type', 'email', 'phone'],
     children: [
       { entity: 'properties', fk: 'landlord_id' },
       { entity: 'transactions', fk: 'landlord_id' },

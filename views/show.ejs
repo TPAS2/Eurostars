@@ -48,7 +48,7 @@
   <% } %>
   <dl class="details">
     <% def.fields.forEach(f => { const d = display(def, f.name, row, maps); %>
-      <div class="<%= f.type === 'textarea' && !f.inline ? 'wide' : '' %>">
+      <div class="<%= f.type === 'textarea' && !f.inline ? 'wide' : '' %><%= f.startRow ? ' row-start' : '' %>">
         <dt><%= f.label %></dt>
         <dd><% if (!d.text) { %><span class="muted">—</span><% } else if (d.href) { %><a href="<%= d.href %>"><%= d.text %></a><% } else if (d.badge) { %><span class="badge s-<%= String(row[f.name]).replace(/\W+/g, '-') %>"><%= d.text %></span><% } else { %><span class="pre"><%= d.text %></span><% } %></dd>
       </div>

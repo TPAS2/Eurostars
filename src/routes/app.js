@@ -60,6 +60,8 @@ module.exports = function appRoutes(db) {
     const errors = {};
     for (const f of def.fields) {
       let raw = body[f.name];
+      // A dropdown left out of the submission entirely takes its default (e.g. Statement type: Email).
+      if (raw === undefined && f.type === 'select' && f.default !== undefined) raw = f.default;
       raw = raw === undefined || raw === null ? '' : String(raw).trim();
       if (raw === '') {
         if (f.required) errors[f.name] = `${f.label} is required.`;
