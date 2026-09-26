@@ -13,15 +13,12 @@ const INVOICE_LIST_SQL = `
     LEFT JOIN landlords l ON l.id = tx.landlord_id
     LEFT JOIN monthly_statements ms ON ms.account_id = i.account_id AND ms.landlord_id = tx.landlord_id AND ms.month = substr(tx.txn_date, 1, 7)`;
 
-// Where to check the deduction: the month's statement if it has been made, otherwise the
-// landlord's statement for that month's dates.
+// Where to check the deduction: that month's statement, or (if it hasn't been made yet) that
+// month's statements page, where it can be generated.
 function statementLink(inv) {
   if (!inv.deduction_id || !inv.deducted_landlord_id) return null;
   if (inv.statement_id) return `/app/monthly/${inv.statement_id}`;
-  const month = inv.deducted_on.slice(0, 7);
-  const [y, m] = month.split('-').map(Number);
-  const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
-  return `/app/statements?landlord_id=${inv.deducted_landlord_id}&from=${month}-01&to=${month}-${String(last).padStart(2, '0')}`;
+  return `/app/monthly?month=${inv.deducted_on.slice(0, 7)}`;
 }
 
 module.exports = { INVOICE_LIST_SQL, statementLink };

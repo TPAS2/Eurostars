@@ -210,8 +210,10 @@ test('full lettings workflow: landlord → property → tenant → rent → fee 
   // Pay the landlord and check the statement balances.
   r = await c.post('/app/transactions', { txn_date: '2026-09-05', txn_type: 'landlord_payment', landlord_id: landlordId, amount_pence: '800' });
   assert.equal(r.status, 302, r.text);
-  r = await c.get(`/app/statements?landlord_id=${landlordId}&from=2026-09-01&to=2026-09-30`);
-  assert.match(r.text, /Closing balance[\s\S]*£100\.00/);
+  await c.get('/app/monthly?month=2026-09');
+  await c.post('/app/monthly/generate', { month: '2026-09', landlord_id: String(landlordId) });
+  assert.equal(db.prepare("SELECT closing_pence FROM monthly_statements WHERE landlord_id = ? AND month = '2026-09'").get(landlordId).closing_pence, 10000);
+  assert.equal((await c.get('/app/statements')).status, 404, 'statement by date range is gone');
 
   r = await c.get(`/app/tenancies/${tenancyId}`);
   assert.match(r.text, /in credit/);
@@ -1368,8 +1370,8 @@ test('the admin chooses which tabs each person sees; hidden tabs are blocked', a
   assert.match(r.text, new RegExp(`action="/admin/users/${companyId}/tabs/${ada}"`));
   // Ada only gets Properties, Tenants and Repairs.
   r = await admin.post(`/admin/users/${companyId}/tabs/${ada}`, { tabs: ['properties', 'tenants', 'maintenance'] });
-  assert.match(decodeURIComponent(r.location), /Ada Assistant now sees 3 of 13 tabs/);
-  assert.match((await admin.get(`/admin/users/${companyId}`)).text, /3 of 13 tabs/);
+  assert.match(decodeURIComponent(r.location), /Ada Assistant now sees 3 of 12 tabs/);
+  assert.match((await admin.get(`/admin/users/${companyId}`)).text, /3 of 12 tabs/);
 
   const c = new Client();
   await c.login('tabs-co', 'adas-pass-123', 'ada');
@@ -1389,7 +1391,7 @@ test('the admin chooses which tabs each person sees; hidden tabs are blocked', a
   // The main login still sees everything; ticking all tabs gives Ada everything back.
   assert.equal((await boss.get('/app/landlords')).status, 200);
   await admin.get(`/admin/users/${companyId}`);
-  await admin.post(`/admin/users/${companyId}/tabs/${ada}`, { tabs: ['councils', 'councilrec', 'properties', 'landlords', 'tenants', 'tenancies', 'maintenance', 'invoices', 'compliance', 'rentrun', 'transactions', 'monthly', 'statements'] });
+  await admin.post(`/admin/users/${companyId}/tabs/${ada}`, { tabs: ['councils', 'councilrec', 'properties', 'landlords', 'tenants', 'tenancies', 'maintenance', 'invoices', 'compliance', 'rentrun', 'transactions', 'monthly'] });
   assert.equal(db.prepare('SELECT hidden_tabs FROM users WHERE id = ?').get(ada).hidden_tabs, null);
   assert.equal((await c.get('/app/landlords')).status, 200);
 
@@ -1487,11 +1489,11 @@ test('admin Tab access page: every person against every tab, saved in one go', a
   assert.match(r.text, /Grid Lets[\s\S]*?Test User[\s\S]*?main login[\s\S]*?Bea Clerk/);
   assert.match(r.text, new RegExp(`name="t_${bea}" value="councilrec" checked`));
   // Bea: only Rent run and Monthly statements. The main login (companyId) keeps everything.
-  const all = ['councils', 'councilrec', 'properties', 'landlords', 'tenants', 'tenancies', 'maintenance', 'invoices', 'compliance', 'rentrun', 'transactions', 'monthly', 'statements'];
+  const all = ['councils', 'councilrec', 'properties', 'landlords', 'tenants', 'tenancies', 'maintenance', 'invoices', 'compliance', 'rentrun', 'transactions', 'monthly'];
   r = await admin.post('/admin/access', { company: String(companyId), people: [String(companyId), String(bea)], [`t_${companyId}`]: all, [`t_${bea}`]: ['rentrun', 'monthly'] });
   assert.match(decodeURIComponent(r.location), /Saved tab access for 2 people/);
   assert.equal(db.prepare('SELECT hidden_tabs FROM users WHERE id = ?').get(companyId).hidden_tabs, null);
-  assert.deepEqual(JSON.parse(db.prepare('SELECT hidden_tabs FROM users WHERE id = ?').get(bea).hidden_tabs).length, 11);
+  assert.deepEqual(JSON.parse(db.prepare('SELECT hidden_tabs FROM users WHERE id = ?').get(bea).hidden_tabs).length, 10);
 
   const c = new Client();
   await c.login('grid-co', 'beas-pass-123', 'bea');
@@ -1663,7 +1665,7 @@ test('invoices link to their property and show whether they were deducted, with 
 
   r = await c.get('/app/invoices?month=2026-08');
   assert.match(r.text, /<th>Deducted<\/th>/);
-  assert.match(r.text, new RegExp(`Drain Co[\\s\\S]*?<a href="/app/properties/${prop}">4 Drain Lane</a>[\\s\\S]*?yes-no yes">Yes[\\s\\S]*?href="/app/statements\\?landlord_id=${dora}&amp;from=2026-08-01&amp;to=2026-08-31"[^>]*>View statement`));
+  assert.match(r.text, new RegExp(`Drain Co[\\s\\S]*?<a href="/app/properties/${prop}">4 Drain Lane</a>[\\s\\S]*?yes-no yes">Yes[\\s\\S]*?href="/app/monthly\\?month=2026-08"[^>]*>View statement`));
   assert.match(r.text, /Paint Co[\s\S]*?yes-no no">No/);
   // Once the month's statement is made, the link goes to it, and it shows the deduction.
   await c.get('/app/monthly?month=2026-08');

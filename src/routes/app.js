@@ -379,25 +379,6 @@ module.exports = function appRoutes(db) {
   });
 
 
-  // ---------- landlord statements ----------
-
-  router.get('/statements', (req, res) => {
-    const a = req.user.id;
-    const landlords = refOptions('landlords', a);
-    const today = fmt.today();
-    const from = fmt.isIsoDate(String(req.query.from || '')) ? req.query.from : `${today.slice(0, 7)}-01`;
-    const to = fmt.isIsoDate(String(req.query.to || '')) ? req.query.to : today;
-    const landlordId = Number(req.query.landlord_id);
-    const landlord = Number.isInteger(landlordId) ? db.prepare('SELECT * FROM landlords WHERE id = ? AND account_id = ?').get(landlordId, a) : null;
-    const statement = landlord ? ledger.landlordStatement(db, a, landlord.id, from, to) : null;
-    const balances = db.prepare(
-      `SELECT l.id, l.name, COALESCE(${ledger.landlordBalanceSql('tx')}, 0) AS balance
-         FROM landlords l LEFT JOIN transactions tx ON tx.landlord_id = l.id AND tx.account_id = l.account_id
-        WHERE l.account_id = ? GROUP BY l.id ORDER BY l.name COLLATE NOCASE`
-    ).all(a);
-    res.render('statement', { title: 'Landlord statements', section: 'statements', landlords, landlord, statement, balances, from, to, fmt, print: req.query.print === '1' });
-  });
-
   // ---------- my account: read-only; only the admin edits account details ----------
 
   router.get('/account', (req, res) => {

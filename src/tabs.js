@@ -18,7 +18,6 @@ const TABS = [
   // Not in the menu, but the pages behind Record rent received / Record payment / Pay landlord.
   { key: 'transactions', label: 'Recording payments', paths: ['/app/transactions'] },
   { key: 'monthly', label: 'Monthly statements', paths: ['/app/monthly'] },
-  { key: 'statements', label: 'Statement by date range', paths: ['/app/statements'] },
 ];
 const KEYS = new Set(TABS.map((t) => t.key));
 
