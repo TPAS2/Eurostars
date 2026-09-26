@@ -487,3 +487,4 @@ table.list-councils { table-layout: fixed; }
 table.list-councils th:first-child { width: 34%; }
 table.list-councils th:nth-child(n+2) { width: 22%; }
 table.list-councils td { overflow-wrap: anywhere; vertical-align: middle; }
+table.list-councils th:nth-child(n+2), table.list-councils td:nth-child(n+2) { text-align: center; }
