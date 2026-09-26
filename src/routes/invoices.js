@@ -115,8 +115,14 @@ module.exports = function invoiceRoutes(db, config) {
     const a = req.user.id;
     const status = ['unpaid', 'paid', 'overdue'].includes(req.query.status) ? req.query.status : 'all';
     const today = fmt.today();
+    // One month at a time (by invoice date, else due date), or every month.
+    const thisMonth = today.slice(0, 7);
+    // Links to unpaid/overdue without a month (e.g. from the dashboard) show every month, so nothing owed is hidden.
+    const month = req.query.month === 'all' ? 'all' : /^\d{4}-(0[1-9]|1[0-2])$/.test(String(req.query.month || '')) ? String(req.query.month)
+      : ['unpaid', 'overdue'].includes(status) ? 'all' : thisMonth;
     let where = 'i.account_id = ?';
     const params = [a];
+    if (month !== 'all') { where += " AND substr(COALESCE(i.invoice_date, i.due_date, i.created_at), 1, 7) = ?"; params.push(month); }
     if (status === 'unpaid') where += " AND i.status = 'unpaid'";
     if (status === 'paid') where += " AND i.status = 'paid'";
     if (status === 'overdue') { where += " AND i.status = 'unpaid' AND i.due_date < ?"; params.push(today); }
@@ -133,7 +139,11 @@ module.exports = function invoiceRoutes(db, config) {
               COUNT(CASE WHEN status = 'unpaid' AND due_date < ? THEN 1 END) AS overdue_n
          FROM invoices WHERE account_id = ?`
     ).get(today, today, a);
-    res.render('invoices/list', { title: 'Invoices', section: 'invoices', invoices, totals, status, today, fmt, flash: String(req.query.flash || '').slice(0, 200) });
+    const shift = (by) => { const [y, m] = (month === 'all' ? thisMonth : month).split('-').map(Number); return new Date(Date.UTC(y, m - 1 + by, 1)).toISOString().slice(0, 7); };
+    res.render('invoices/list', {
+      title: 'Invoices', section: 'invoices', invoices, totals, status, today, fmt, flash: String(req.query.flash || '').slice(0, 200),
+      month, prev: shift(-1), next: shift(1), thisMonth, monthLabel: month === 'all' ? 'All months' : require('../statements').monthLabel(month),
+    });
   });
 
   // ---------- upload / edit ----------

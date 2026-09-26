@@ -1621,3 +1621,28 @@ test('rent run step 5: payment instruction template and a filled-in instruction 
   assert.equal((await other.get('/app/rent-run/template')).status, 404);
   assert.doesNotMatch((await other.get('/app/rent-run/instruction?month=2026-08')).text, /Pay Lets Client Account|P Paid/);
 });
+
+test('invoices have a month switcher', async () => {
+  const c = await registerAndLogin('inv-month@example.com', 'Inv Month Lets');
+  const pdf = () => new File([Buffer.from('%PDF-1.4\n%x\n')], 'i.pdf');
+  await c.get('/app/invoices/new');
+  await c.post('/app/invoices', { supplier: 'July Plumbing', amount: '10', invoice_date: '2026-07-10', due_date: '2026-07-20', file: pdf() }, { multipart: true });
+  await c.post('/app/invoices', { supplier: 'August Roofing', amount: '20', invoice_date: '2026-08-05', due_date: '2026-08-30', file: pdf() }, { multipart: true });
+
+  let r = await c.get('/app/invoices?month=2026-08');
+  assert.match(r.text, /href="\/app\/invoices\?month=2026-07">‹ Previous month/);
+  assert.match(r.text, /href="\/app\/invoices\?month=2026-09">Next month ›/);
+  assert.match(r.text, /name="month" value="2026-08"/);
+  assert.match(r.text, /August Roofing/);
+  assert.doesNotMatch(r.text, /July Plumbing/);
+  assert.match((await c.get('/app/invoices?month=2026-07')).text, /July Plumbing/);
+  r = await c.get('/app/invoices?month=all');
+  assert.match(r.text, /July Plumbing[\s\S]*?August Roofing|August Roofing[\s\S]*?July Plumbing/);
+  // Tabs keep the month; the unpaid/overdue boxes cover every month.
+  r = await c.get('/app/invoices?month=2026-08&status=unpaid');
+  assert.match(r.text, /August Roofing/);
+  assert.doesNotMatch(r.text, /July Plumbing/);
+  assert.match(r.text, /href="\/app\/invoices\?month=2026-08&amp;status=paid"/);
+  assert.match(r.text, /Unpaid · all months[\s\S]*?£30\.00/);
+  assert.match((await c.get('/app/invoices?status=overdue')).text, /July Plumbing/, 'overdue with no month shows every month');
+});

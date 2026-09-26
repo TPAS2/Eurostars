@@ -1,0 +1,19 @@
+<%# locals: base (page path), month ('YYYY-MM' or 'all'), prev, next, thisMonth, keep (other query params, object), allowAll %>
+<% const q = (m) => { const p = new URLSearchParams(Object.assign({}, typeof keep !== 'undefined' ? keep : {}, { month: m })); return `${base}?${p}`; }; %>
+<% const isAll = month === 'all'; %>
+<nav class="month-nav" aria-label="Choose month">
+  <% if (!isAll) { %><a class="btn" href="<%= q(prev) %>">‹ Previous month</a><% } %>
+  <form method="get" data-autogo class="month-pick" action="<%= base %>">
+    <% Object.entries(typeof keep !== 'undefined' ? keep : {}).forEach(([k, v]) => { %><input type="hidden" name="<%= k %>" value="<%= v %>"><% }) %>
+    <input type="month" name="month" value="<%= isAll ? '' : month %>" aria-label="Month" class="month-big">
+    <noscript><button class="btn" type="submit">Go</button></noscript>
+  </form>
+  <% if (!isAll) { %><a class="btn" href="<%= q(next) %>">Next month ›</a><% } %>
+</nav>
+<p class="month-back">
+  <% if (isAll) { %>Showing all months · <a href="<%= q(thisMonth) %>">Show this month</a>
+  <% } else { %>
+    <% if (month !== thisMonth) { %><a href="<%= q(thisMonth) %>">Back to this month</a><% } %>
+    <% if (typeof allowAll !== 'undefined' && allowAll) { %><%= month !== thisMonth ? ' · ' : '' %><a href="<%= q('all') %>">All months</a><% } %>
+  <% } %>
+</p>

@@ -7,19 +7,20 @@
   <div class="actions"><a class="btn primary" href="/app/invoices/new">+ Upload invoice</a></div>
 </header>
 <% if (flash) { %><div class="notice ok"><%= flash %></div><% } %>
+<%- include('../partials/month-nav', { base: '/app/invoices', keep: status === 'all' ? {} : { status }, allowAll: true }) %>
 
 <section class="tiles">
-  <a class="tile <%= totals.unpaid_n ? 'warn' : '' %>" href="/app/invoices?status=unpaid"><span class="label">Unpaid</span><span class="value"><%= fmt.money(totals.unpaid) %></span><span class="sub"><%= totals.unpaid_n %> invoice<%= totals.unpaid_n === 1 ? '' : 's' %></span></a>
-  <a class="tile <%= totals.overdue_n ? 'alert' : '' %>" href="/app/invoices?status=overdue"><span class="label">Overdue</span><span class="value"><%= fmt.money(totals.overdue) %></span><span class="sub"><%= totals.overdue_n %> invoice<%= totals.overdue_n === 1 ? '' : 's' %></span></a>
+  <a class="tile <%= totals.unpaid_n ? 'warn' : '' %>" href="/app/invoices?status=unpaid&month=all"><span class="label">Unpaid · all months</span><span class="value"><%= fmt.money(totals.unpaid) %></span><span class="sub"><%= totals.unpaid_n %> invoice<%= totals.unpaid_n === 1 ? '' : 's' %></span></a>
+  <a class="tile <%= totals.overdue_n ? 'alert' : '' %>" href="/app/invoices?status=overdue&month=all"><span class="label">Overdue · all months</span><span class="value"><%= fmt.money(totals.overdue) %></span><span class="sub"><%= totals.overdue_n %> invoice<%= totals.overdue_n === 1 ? '' : 's' %></span></a>
 </section>
 
 <section class="card">
   <nav class="tabs">
     <% [['all', 'All'], ['unpaid', 'Unpaid'], ['overdue', 'Overdue'], ['paid', 'Paid']].forEach(([k, label]) => { %>
-      <a href="/app/invoices<%= k === 'all' ? '' : '?status=' + k %>" class="<%= status === k ? 'active' : '' %>"><%= label %></a>
+      <a href="/app/invoices?<%= new URLSearchParams(Object.assign({ month }, k === 'all' ? {} : { status: k })) %>" class="<%= status === k ? 'active' : '' %>"><%= label %></a>
     <% }) %>
   </nav>
-  <% if (!invoices.length) { %><p class="muted">No invoices here.</p><% } else { %>
+  <% if (!invoices.length) { %><p class="muted">No invoices <%= month === 'all' ? 'here' : 'for ' + monthLabel %>.</p><% } else { %>
     <%- include('table', { invoices, showProperty: true, backTo: '/app/invoices' }) %>
   <% } %>
 </section>
