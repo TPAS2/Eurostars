@@ -481,3 +481,9 @@ dl.mini dd { margin: 0; overflow-wrap: anywhere; }
 .money-cell input::placeholder { color: var(--text); opacity: .55; }
 .money-cell .field-err { text-align: left; font-size: .75rem; }
 .strong { font-weight: 700; }
+
+/* Councils list: the council name, then three equal columns. */
+table.list-councils { table-layout: fixed; }
+table.list-councils th:first-child { width: 34%; }
+table.list-councils th:nth-child(n+2) { width: 22%; }
+table.list-councils td { overflow-wrap: anywhere; vertical-align: middle; }

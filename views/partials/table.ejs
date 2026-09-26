@@ -1,6 +1,6 @@
 <%# locals: def, rows, maps, display, rowTitle, hideField %>
 <div class="table-wrap">
-<table>
+<table class="list-<%= def.key %>">
   <thead><tr>
   <% def.columns.filter(c => c !== hideField).forEach(c => { const f = def.fieldMap[c]; %>
     <th class="<%= ['money','number','integer'].includes(f.type) || f.num ? 'num' : '' %>"><%= f.label.replace(' (£)', '') %></th>

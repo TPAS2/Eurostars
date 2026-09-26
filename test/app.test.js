@@ -998,8 +998,8 @@ test('councils list shows how many properties each has, and which', async () => 
   assert.match(r.text, /<th[^>]*>Council<\/th>\s*<th[^>]*>Properties<\/th>\s*<th[^>]*>Email<\/th>\s*<th[^>]*>Phone number<\/th>/, 'name, property amount, email, phone');
   const page = (await c.get(`/app/councils/${leeds}`)).text + (await c.get(`/app/councils/${leeds}/edit`)).text;
   assert.doesNotMatch(page, /Licensing email|Environmental health phone/, 'those two fields are gone');
-  assert.match(r.text, /Leeds City Council<\/a>\s*<\/td>\s*<td class="num">\s*4\s*<\/td>[\s\S]*?0113 222 4404/);
-  assert.match(r.text, /Empty Council<\/a>\s*<\/td>\s*<td class="num">\s*0\s*<\/td>/);
+  assert.match(r.text, /Leeds City Council<\/a>\s*<\/td>\s*<td class="">\s*4\s*<\/td>[\s\S]*?0113 222 4404/);
+  assert.match(r.text, /Empty Council<\/a>\s*<\/td>\s*<td class="">\s*0\s*<\/td>/);
 });
 
 test('councils, landlords and properties have a search bar that also matches linked names', async () => {

@@ -76,7 +76,7 @@ const ENTITIES = {
     ],
     columns: ['name', 'properties', 'council_tax_email', 'council_tax_phone'],
     // Columns worked out when listing rather than stored on the record.
-    computed: { properties: { label: 'Properties', num: true } },
+    computed: { properties: { label: 'Properties' } },
     children: [{ entity: 'properties', fk: 'council_id' }],
   },
 

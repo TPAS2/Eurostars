@@ -493,7 +493,7 @@ module.exports = function appRoutes(db) {
       for (const row of rows) {
         if (photos.has(row.id)) row.photo_v = photos.get(row.id);
         const list = byCouncil.get(row.id) || [];
-        row.properties = { text: String(list.length), num: true, count: list.length };
+        row.properties = { text: String(list.length), count: list.length };
       }
     }
     res.render('list', { title: def.plural, section: def.key, def, rows, maps, display, rowTitle, q, searchable: textFields.length > 0, truncated });
