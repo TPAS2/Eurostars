@@ -11,12 +11,10 @@ const TABS = [
   { key: 'landlords', label: 'Landlords', paths: ['/app/landlords'] },
   { key: 'tenants', label: 'Tenants', paths: ['/app/tenants'] },
   { key: 'tenancies', label: 'Tenancies', paths: ['/app/tenancies'] },
-  { key: 'maintenance', label: 'Repairs (maintenance)', paths: ['/app/maintenance'] },
+  { key: 'maintenance', label: 'Maintenance', paths: ['/app/maintenance'] },
   { key: 'invoices', label: 'Invoices', paths: ['/app/invoices'] },
   { key: 'compliance', label: 'Compliance', paths: ['/app/compliance'] },
   { key: 'rentrun', label: 'Rent run', paths: ['/app/rent-run', '/app/monthly/calculate', '/app/monthly/email', '/app/monthly/report'] },
-  // Not in the menu, but the pages behind Record rent received / Record payment / Pay landlord.
-  { key: 'transactions', label: 'Recording payments', paths: ['/app/transactions'] },
   { key: 'monthly', label: 'Monthly statements', paths: ['/app/monthly'] },
 ];
 const KEYS = new Set(TABS.map((t) => t.key));

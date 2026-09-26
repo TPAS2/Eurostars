@@ -1370,8 +1370,8 @@ test('the admin chooses which tabs each person sees; hidden tabs are blocked', a
   assert.match(r.text, new RegExp(`action="/admin/users/${companyId}/tabs/${ada}"`));
   // Ada only gets Properties, Tenants and Repairs.
   r = await admin.post(`/admin/users/${companyId}/tabs/${ada}`, { tabs: ['properties', 'tenants', 'maintenance'] });
-  assert.match(decodeURIComponent(r.location), /Ada Assistant now sees 3 of 12 tabs/);
-  assert.match((await admin.get(`/admin/users/${companyId}`)).text, /3 of 12 tabs/);
+  assert.match(decodeURIComponent(r.location), /Ada Assistant now sees 3 of 11 tabs/);
+  assert.match((await admin.get(`/admin/users/${companyId}`)).text, /3 of 11 tabs/);
 
   const c = new Client();
   await c.login('tabs-co', 'adas-pass-123', 'ada');
@@ -1383,7 +1383,7 @@ test('the admin chooses which tabs each person sees; hidden tabs are blocked', a
     r = await c.get(blocked);
     assert.equal(r.status, 403, blocked);
   }
-  assert.match((await c.get('/app/transactions')).text, /isn’t available on your login/);
+  assert.match((await c.get('/app/tenancies')).text, /isn’t available on your login/);
   r = await c.post('/app/landlords', { name: 'Sneaky' });
   assert.equal(r.status, 403, 'changes are blocked too');
   assert.equal(db.prepare("SELECT COUNT(*) n FROM landlords WHERE name = 'Sneaky'").get().n, 0);
@@ -1391,7 +1391,7 @@ test('the admin chooses which tabs each person sees; hidden tabs are blocked', a
   // The main login still sees everything; ticking all tabs gives Ada everything back.
   assert.equal((await boss.get('/app/landlords')).status, 200);
   await admin.get(`/admin/users/${companyId}`);
-  await admin.post(`/admin/users/${companyId}/tabs/${ada}`, { tabs: ['councils', 'councilrec', 'properties', 'landlords', 'tenants', 'tenancies', 'maintenance', 'invoices', 'compliance', 'rentrun', 'transactions', 'monthly'] });
+  await admin.post(`/admin/users/${companyId}/tabs/${ada}`, { tabs: ['councils', 'councilrec', 'properties', 'landlords', 'tenants', 'tenancies', 'maintenance', 'invoices', 'compliance', 'rentrun', 'monthly'] });
   assert.equal(db.prepare('SELECT hidden_tabs FROM users WHERE id = ?').get(ada).hidden_tabs, null);
   assert.equal((await c.get('/app/landlords')).status, 200);
 
@@ -1489,11 +1489,11 @@ test('admin Tab access page: every person against every tab, saved in one go', a
   assert.match(r.text, /Grid Lets[\s\S]*?Test User[\s\S]*?main login[\s\S]*?Bea Clerk/);
   assert.match(r.text, new RegExp(`name="t_${bea}" value="councilrec" checked`));
   // Bea: only Rent run and Monthly statements. The main login (companyId) keeps everything.
-  const all = ['councils', 'councilrec', 'properties', 'landlords', 'tenants', 'tenancies', 'maintenance', 'invoices', 'compliance', 'rentrun', 'transactions', 'monthly'];
+  const all = ['councils', 'councilrec', 'properties', 'landlords', 'tenants', 'tenancies', 'maintenance', 'invoices', 'compliance', 'rentrun', 'monthly'];
   r = await admin.post('/admin/access', { company: String(companyId), people: [String(companyId), String(bea)], [`t_${companyId}`]: all, [`t_${bea}`]: ['rentrun', 'monthly'] });
   assert.match(decodeURIComponent(r.location), /Saved tab access for 2 people/);
   assert.equal(db.prepare('SELECT hidden_tabs FROM users WHERE id = ?').get(companyId).hidden_tabs, null);
-  assert.deepEqual(JSON.parse(db.prepare('SELECT hidden_tabs FROM users WHERE id = ?').get(bea).hidden_tabs).length, 10);
+  assert.deepEqual(JSON.parse(db.prepare('SELECT hidden_tabs FROM users WHERE id = ?').get(bea).hidden_tabs).length, 9);
 
   const c = new Client();
   await c.login('grid-co', 'beas-pass-123', 'bea');
@@ -1685,4 +1685,12 @@ test('Transactions is not in the menu, but recording payments still works', asyn
   const rail = (await c.get('/app')).text.match(/<nav class="rail"[\s\S]*?<\/nav>/)[0];
   assert.doesNotMatch(rail, /aria-label="Transactions"/);
   assert.equal((await c.get('/app/transactions/new?txn_type=rent_received')).status, 200);
+});
+
+test('Tab access uses the same names as the menu', async () => {
+  const { TABS } = require('../src/tabs');
+  const c = await registerAndLogin('tab-names@example.com', 'Tab Names Lets');
+  const rail = (await c.get('/app')).text.match(/<nav class="rail"[\s\S]*?<\/nav>/)[0];
+  const menu = [...rail.matchAll(/aria-label="([^"]+)"/g)].map((m) => m[1]).slice(1);
+  assert.deepEqual(TABS.map((t) => t.label), menu);
 });
