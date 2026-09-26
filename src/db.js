@@ -112,6 +112,25 @@ CREATE TABLE IF NOT EXISTS tenancy_agreements (
   uploaded_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Each company's payment instruction template (e.g. the Metro Bank form), as uploaded.
+CREATE TABLE IF NOT EXISTS payment_templates (
+  account_id   INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  filename     TEXT NOT NULL,
+  mime         TEXT NOT NULL,
+  size         INTEGER NOT NULL,
+  data         BLOB NOT NULL,
+  uploaded_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- A filled-in payment instruction for a month's rent run (JSON of the form's contents).
+CREATE TABLE IF NOT EXISTS payment_instructions (
+  account_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  month       TEXT NOT NULL,
+  data_json   TEXT NOT NULL,
+  updated_at  TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (account_id, month)
+);
+
 -- Notes on each council's reconciliation, one per council per month, plus any amounts typed in
 -- on the page (which replace the calculated money owed / money in when set).
 CREATE TABLE IF NOT EXISTS council_rec_notes (
@@ -295,6 +314,9 @@ function openDatabase(file) {
   addColumnIfMissing(db, 'landlords', 'statement_type', "TEXT NOT NULL DEFAULT 'Email'");
   addColumnIfMissing(db, 'sessions', 'last_seen_at', 'TEXT');
   addColumnIfMissing(db, 'users', 'hidden_tabs', 'TEXT');
+  addColumnIfMissing(db, 'landlords', 'bank_account_name', 'TEXT');
+  addColumnIfMissing(db, 'landlords', 'bank_sort_code', 'TEXT');
+  addColumnIfMissing(db, 'landlords', 'bank_account_number', 'TEXT');
   addColumnIfMissing(db, 'council_rec_notes', 'owed_pence', 'INTEGER');
   addColumnIfMissing(db, 'council_rec_notes', 'received_pence', 'INTEGER');
   addColumnIfMissing(db, 'monthly_statements', 'emailed_at', 'TEXT');

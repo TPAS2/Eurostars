@@ -2,7 +2,7 @@
 <header class="page-head">
   <div>
     <h1>Rent run</h1>
-    <p class="muted">Month end in four steps: calculate the rents, email every landlord their statement, check the report, and email it.</p>
+    <p class="muted">Month end in five steps: calculate the rents, email every landlord their statement, check the report, email it, and the payment instruction to pay the landlords.</p>
   </div>
   <form method="get" data-autogo class="inline-form">
     <input type="month" name="month" value="<%= month %>" aria-label="Month">
@@ -49,6 +49,30 @@
         <button class="btn primary" type="submit" <%= emailEnabled && generated ? '' : 'disabled' %>>Email report</button>
       </form>
     </li>
+    <li id="payment-instruction">
+      <div><strong>Payment instruction (Metro Bank)</strong><p class="muted small">
+        Pay the landlords their money. Save your bank's blank form as a template to download or print as it is, or fill in the instruction here from this month's landlord balances and print that.
+        <% if (template) { %><br>Template: <strong><%= template.filename %></strong> <span class="muted">· saved <%= fmt.ukDateTime(template.uploaded_at) %></span><% } else { %><br><span class="muted">No template saved yet.</span><% } %>
+      </p></div>
+      <div class="step-actions">
+        <% if (template) { %>
+          <a class="btn" href="/app/rent-run/template?download=1">Download template</a>
+          <button class="btn" type="button" data-print-frame="/app/rent-run/template">Print template</button>
+        <% } %>
+        <form method="post" action="/app/rent-run/template" enctype="multipart/form-data" class="inline">
+          <%- include('partials/csrf') %><input type="hidden" name="month" value="<%= month %>">
+          <label class="btn"><%= template ? 'Replace template' : 'Save template' %><input type="file" name="template" accept="application/pdf,image/png,image/jpeg" data-autosubmit hidden></label>
+          <noscript><button class="btn" type="submit">Upload</button></noscript>
+        </form>
+        <a class="btn primary" href="/app/rent-run/instruction?month=<%= month %>">Fill in &amp; print</a>
+        <% if (template) { %>
+        <form method="post" action="/app/rent-run/template/delete" class="inline" data-confirm="Remove the saved template?">
+          <%- include('partials/csrf') %><input type="hidden" name="month" value="<%= month %>">
+          <button class="btn small link" type="submit">Remove template</button>
+        </form>
+        <% } %>
+      </div>
+    </li>
   </ol>
 </section>
 
@@ -57,7 +81,7 @@
     <h2>Landlords</h2>
   </div>
   <% if (!rows.length) { %><p class="muted">Add landlords to start your rent run.</p><% } else { %>
-  <div class="table-wrap"><table>
+  <div class="table-wrap"><table class="centered">
     <thead><tr><th>Landlord</th><th>Statement type</th><th>Email</th><th class="num">Rent received</th><th class="num">Deductions</th><th class="num">Net</th><th class="num">Held</th><th>Statement emailed</th><th></th></tr></thead>
     <tbody>
     <% rows.forEach(r => { %>

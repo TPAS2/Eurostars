@@ -312,6 +312,21 @@ const DRAFT_DAYS = 7;
       all.addEventListener('change', () => boxes.forEach((b) => { b.checked = all.checked; }));
       boxes.forEach((b) => b.addEventListener('change', () => { all.checked = boxes.every((x) => x.checked); }));
     });
+    // Print a file (e.g. the saved payment template) without leaving the page.
+    document.querySelectorAll('[data-print-frame]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const old = document.getElementById('print-frame');
+        if (old) old.remove();
+        const frame = document.createElement('iframe');
+        frame.id = 'print-frame';
+        frame.hidden = true;
+        frame.src = btn.dataset.printFrame;
+        frame.addEventListener('load', () => {
+          try { frame.contentWindow.focus(); frame.contentWindow.print(); } catch { window.open(btn.dataset.printFrame, '_blank'); }
+        });
+        document.body.appendChild(frame);
+      });
+    });
     // Month pickers (and their filters) go straight to the chosen month; no button needed.
     document.querySelectorAll('form[data-autogo]').forEach((form) => {
       form.addEventListener('change', (e) => {

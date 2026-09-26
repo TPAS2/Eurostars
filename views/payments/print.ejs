@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= title %> · <%= appName %></title>
+  <link rel="stylesheet" href="/static/print-instruction.css">
+  <script src="/static/app.js" defer></script>
+</head>
+<body class="instruction-print">
+  <div class="toolbar no-print">
+    <a href="/app/rent-run/instruction?month=<%= month %>">← Back to edit</a>
+    <button type="button" data-print>Print</button>
+  </div>
+  <main class="sheet">
+    <header>
+      <div>
+        <div class="bank">Metro Bank</div>
+        <h1>Payment instruction</h1>
+      </div>
+      <div class="meta">
+        <div><span>From</span><strong><%= agencyName %></strong></div>
+        <div><span>For</span><strong>Rent · <%= monthLabel %></strong></div>
+        <div><span>Payment date</span><strong><%= data.payment_date ? fmt.ukDate(data.payment_date) : '________________' %></strong></div>
+      </div>
+    </header>
+
+    <section class="from">
+      <h2>Account to pay from</h2>
+      <table><tr>
+        <td><span>Account name</span><%= data.from_name || '' %></td>
+        <td><span>Sort code</span><%= data.from_sort_code || '' %></td>
+        <td><span>Account number</span><%= data.from_account_number || '' %></td>
+      </tr></table>
+    </section>
+
+    <section>
+      <h2>Payments (<%= payees.length %>)</h2>
+      <table class="payees">
+        <thead><tr><th>#</th><th>Payee (account name)</th><th>Sort code</th><th>Account number</th><th>Reference</th><th class="num">Amount</th></tr></thead>
+        <tbody>
+        <% payees.forEach((p, i) => { %>
+          <tr><td><%= i + 1 %></td><td><%= p.name %></td><td><%= p.sort_code %></td><td><%= p.account_number %></td><td><%= p.reference %></td><td class="num"><%= fmt.money(fmt.parseMoney(p.amount) || 0) %></td></tr>
+        <% }) %>
+        <% if (!payees.length) { %><tr><td colspan="6">No payments ticked.</td></tr><% } %>
+        </tbody>
+        <tfoot><tr><td colspan="5">Total</td><td class="num"><%= fmt.money(total) %></td></tr></tfoot>
+      </table>
+    </section>
+
+    <% if (data.notes) { %><section><h2>Notes</h2><p class="notes"><%= data.notes %></p></section><% } %>
+
+    <section class="sign">
+      <h2>Authorisation</h2>
+      <p>Please make the payments above from the account shown.</p>
+      <div class="sigs">
+        <div><div class="line"></div><span>Signature</span><strong><%= data.signatory_1 || '' %></strong><span>Date</span><div class="line short"></div></div>
+        <div><div class="line"></div><span>Signature</span><strong><%= data.signatory_2 || '' %></strong><span>Date</span><div class="line short"></div></div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

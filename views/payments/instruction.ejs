@@ -1,0 +1,62 @@
+<%- include('../partials/header') %>
+<header class="page-head">
+  <div>
+    <a class="crumb" href="/app/rent-run?month=<%= month %>#payment-instruction">← Rent run</a>
+    <h1>Payment instruction</h1>
+    <p class="muted"><%= monthLabel %> · who to pay, from which account, then print it for signing.</p>
+  </div>
+  <div class="actions">
+    <form method="post" action="/app/rent-run/instruction/refresh" data-confirm="Replace the payee list with this month's landlord balances? Your 'paying from' details are kept.">
+      <%- include('../partials/csrf') %><input type="hidden" name="month" value="<%= month %>">
+      <button class="btn" type="submit">Refresh from statements</button>
+    </form>
+  </div>
+</header>
+<% if (flash) { %><div class="notice <%= errors.length ? 'warn' : 'ok' %>"><%= flash %><% if (errors.length) { %><ul><% errors.forEach(e => { %><li><%= e %></li><% }) %></ul><% } %></div><% } %>
+
+<form method="post" action="/app/rent-run/instruction" class="card instruction-form" data-no-keep>
+  <%- include('../partials/csrf') %>
+  <input type="hidden" name="month" value="<%= month %>">
+
+  <h2>Paying from</h2>
+  <div class="form-grid three">
+    <div class="field"><label for="from_name">Account name</label><input id="from_name" name="from_name" value="<%= data.from_name %>" placeholder="e.g. Eurostars Client Account"></div>
+    <div class="field"><label for="from_sort">Sort code</label><input id="from_sort" name="from_sort_code" value="<%= data.from_sort_code %>" placeholder="12-34-56" inputmode="numeric"></div>
+    <div class="field"><label for="from_acc">Account number</label><input id="from_acc" name="from_account_number" value="<%= data.from_account_number %>" placeholder="12345678" inputmode="numeric"></div>
+    <div class="field"><label for="pay_date">Payment date</label><input id="pay_date" type="date" name="payment_date" value="<%= data.payment_date %>"></div>
+  </div>
+
+  <h2 class="spaced">Payments</h2>
+  <p class="muted small">Landlords paid by bank (statement type Email) with money held for <%= monthLabel %>, using the bank details on each landlord. Untick anyone not being paid; edit anything; add rows at the bottom.</p>
+  <div class="table-wrap"><table class="payee-table">
+    <thead><tr><th>Pay</th><th>Payee (account name)</th><th>Sort code</th><th>Account number</th><th class="num">Amount (£)</th><th>Reference</th></tr></thead>
+    <tbody>
+    <% const rows = data.payees.concat(Array.from({ length: 3 }, () => ({ include: false, name: '', sort_code: '', account_number: '', amount: '', reference: '' }))); %>
+    <% rows.forEach((p, i) => { %>
+      <tr>
+        <td><input type="checkbox" name="p_include" value="<%= i %>" <%= p.include ? 'checked' : '' %> aria-label="Pay this row"><input type="hidden" name="p_landlord" value="<%= p.landlord_id || '' %>"></td>
+        <td><input name="p_name" value="<%= p.name %>" maxlength="60" aria-label="Payee"><% if (p.landlord_id && !p.account_number) { %><div class="small"><a href="/app/landlords/<%= p.landlord_id %>/edit">Add bank details to landlord</a></div><% } %></td>
+        <td><input name="p_sort" value="<%= p.sort_code %>" maxlength="12" aria-label="Sort code" class="w-sort"></td>
+        <td><input name="p_account" value="<%= p.account_number %>" maxlength="12" aria-label="Account number" class="w-acc"></td>
+        <td class="num"><input name="p_amount" value="<%= p.amount %>" inputmode="decimal" aria-label="Amount" class="w-amt"></td>
+        <td><input name="p_ref" value="<%= p.reference %>" maxlength="18" aria-label="Reference" class="w-ref"></td>
+      </tr>
+    <% }) %>
+    </tbody>
+    <tfoot><tr class="total"><td colspan="4">Total to pay (ticked rows)</td><td class="num"><%= fmt.money(total) %></td><td></td></tr></tfoot>
+  </table></div>
+
+  <h2 class="spaced">Authorisation</h2>
+  <div class="form-grid three">
+    <div class="field"><label for="sig1">Authorised signatory 1</label><input id="sig1" name="signatory_1" value="<%= data.signatory_1 %>"></div>
+    <div class="field"><label for="sig2">Authorised signatory 2</label><input id="sig2" name="signatory_2" value="<%= data.signatory_2 %>"></div>
+    <div class="field wide"><label for="notes">Notes for the bank</label><textarea id="notes" name="notes" rows="2"><%= data.notes %></textarea></div>
+  </div>
+
+  <div class="form-actions">
+    <button class="btn" type="submit" name="then" value="save">Save</button>
+    <button class="btn primary" type="submit" name="then" value="print">Save and print</button>
+    <% if (data.saved_at) { %><span class="muted small">Last saved <%= data.saved_at === 'now' ? 'just now' : fmt.ukDateTime(data.saved_at) %></span><% } %>
+  </div>
+</form>
+<%- include('../partials/footer') %>

@@ -1552,3 +1552,72 @@ test('tenant page: a second box with the council, property and tenancy agreement
   r = await c.post(`/app/tenancies/${tenancy}/agreement/delete`, { back: 'https://evil.example/' });
   assert.equal(r.location, `/app/tenancies/${tenancy}#tenancy-${tenancy}`);
 });
+
+test('rent run step 5: payment instruction template and a filled-in instruction to print', async () => {
+  const c = await registerAndLogin('pay-instr@example.com', 'Pay Lets');
+  let r = await c.post('/app/landlords', { name: 'Paula Paid', code: 'PP1', bank_account_name: 'P Paid', bank_sort_code: '12 34 56', bank_account_number: '12345678' });
+  const paula = idFrom(r.location);
+  assert.deepEqual({ ...db.prepare('SELECT bank_sort_code, bank_account_number FROM landlords WHERE id = ?').get(paula) }, { bank_sort_code: '12-34-56', bank_account_number: '12345678' });
+  r = await c.post('/app/landlords', { name: 'Bad Bank', bank_sort_code: '12', bank_account_number: 'abc' });
+  assert.equal(r.status, 422);
+  assert.match(r.text, /6-digit sort code/);
+  assert.match(r.text, /8-digit account number/);
+  r = await c.post('/app/landlords', { name: 'Cheque Charlie', statement_type: 'Cheque' });
+  const charlie = idFrom(r.location);
+  for (const [ll, addr] of [[paula, '1 Pay Street'], [charlie, '2 Pay Street']]) {
+    const p = idFrom((await c.post('/app/properties', { address_line1: addr, landlord_id: String(ll), status: 'vacant' })).location);
+    const t = idFrom((await c.post(`/app/properties/${p}/add-tenant`, { tenant_mode: 'new', name: `T ${addr}`, booking_date: '2026-07-01', start_date: '2026-08-01', rent_pence: '1000', rent_frequency: 'monthly', status: 'active' })).location);
+    await c.post('/app/transactions', { txn_date: '2026-08-03', txn_type: 'rent_received', tenancy_id: t, amount_pence: '1000' });
+  }
+  await c.get('/app/rent-run?month=2026-08');
+  await c.post('/app/monthly/calculate', { month: '2026-08' });
+
+  r = await c.get('/app/rent-run?month=2026-08');
+  assert.match(r.text, /id="payment-instruction"[\s\S]*?Payment instruction \(Metro Bank\)[\s\S]*?No template saved yet[\s\S]*?Save template[\s\S]*?Fill in &amp; print/);
+  assert.match(r.text, /<table class="centered">/, 'landlords table is centred');
+
+  // Save the blank template, then download / print it.
+  const pdf = new File([Buffer.from('%PDF-1.4\n%metro form\n')], 'Metro payment instruction.pdf');
+  r = await c.post('/app/rent-run/template', { template: pdf, month: '2026-08' }, { multipart: true });
+  assert.match(decodeURIComponent(r.location.replace(/\+/g, ' ')), /Saved Metro payment instruction\.pdf as your payment instruction template/);
+  r = await c.get('/app/rent-run?month=2026-08');
+  assert.match(r.text, /Download template[\s\S]*?data-print-frame="\/app\/rent-run\/template"[\s\S]*?Replace template/);
+  r = await c.get('/app/rent-run/template?download=1');
+  assert.equal(r.status, 200);
+  assert.equal(r.headers.get('content-type'), 'application/pdf');
+  assert.match(r.headers.get('content-disposition'), /attachment; filename="Metro payment instruction\.pdf"/);
+  r = await c.get('/app/rent-run/template');
+  assert.equal(r.headers.get('x-frame-options'), 'SAMEORIGIN', 'can be framed by the site so it can be printed');
+  r = await c.post('/app/rent-run/template', { template: new File(['<script>'], 'x.pdf'), month: '2026-08' }, { multipart: true });
+  assert.match(decodeURIComponent(r.location.replace(/\+/g, ' ')), /PDF, JPG or PNG/);
+
+  // Fill in: bank-paid landlords with money held, using their bank details; cheque landlords left out.
+  r = await c.get('/app/rent-run/instruction?month=2026-08');
+  assert.match(r.text, /name="p_name" value="P Paid"[\s\S]*?value="12-34-56"[\s\S]*?value="12345678"[\s\S]*?name="p_amount" value="1000\.00"[\s\S]*?value="PP1 Rent Aug 26"/);
+  assert.doesNotMatch(r.text, /Cheque Charlie/);
+  r = await c.post('/app/rent-run/instruction', {
+    month: '2026-08', from_name: 'Pay Lets Client Account', from_sort_code: '23-05-80', from_account_number: '87654321', payment_date: '2026-09-01',
+    signatory_1: 'Theo', signatory_2: '', notes: '',
+    p_include: ['0'], p_landlord: [String(paula), ''], p_name: ['P Paid', 'Extra Person'], p_sort: ['12-34-56', ''], p_account: ['12345678', ''], p_amount: ['1000.00', '50'], p_ref: ['PP1 Rent Aug', 'x'],
+    then: 'print',
+  });
+  assert.equal(r.location, '/app/rent-run/instruction/print?month=2026-08');
+  r = await c.get(r.location);
+  assert.match(r.text, /Metro Bank[\s\S]*?Payment instruction[\s\S]*?Pay Lets[\s\S]*?01\/09\/2026/);
+  assert.match(r.text, /Pay Lets Client Account[\s\S]*?23-05-80[\s\S]*?87654321/);
+  assert.match(r.text, /P Paid<\/td><td>12-34-56<\/td><td>12345678<\/td><td>PP1 Rent Aug<\/td><td class="num">£1,000\.00/);
+  assert.doesNotMatch(r.text, /Extra Person/, 'unticked rows are not printed');
+  assert.match(r.text, /Total<\/td><td class="num">£1,000\.00/);
+  // Saved: reopening keeps what was typed; a new month remembers "paying from".
+  assert.match((await c.get('/app/rent-run/instruction?month=2026-08')).text, /value="Pay Lets Client Account"[\s\S]*?Extra Person/);
+  assert.match((await c.get('/app/rent-run/instruction?month=2026-09')).text, /value="Pay Lets Client Account"/);
+  // Missing bank details on a ticked row are flagged.
+  r = await c.post('/app/rent-run/instruction', { month: '2026-08', p_include: ['0'], p_landlord: [''], p_name: ['No Details'], p_sort: [''], p_account: [''], p_amount: [''], p_ref: [''] });
+  assert.equal(r.status, 422);
+  assert.match(r.text, /No Details: sort code should be 6 digits[\s\S]*?account number should be 8 digits[\s\S]*?enter the amount/);
+
+  // Private to the company.
+  const other = await registerAndLogin('pay-instr-2@example.com', 'Other Pay');
+  assert.equal((await other.get('/app/rent-run/template')).status, 404);
+  assert.doesNotMatch((await other.get('/app/rent-run/instruction?month=2026-08')).text, /Pay Lets Client Account|P Paid/);
+});

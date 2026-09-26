@@ -61,8 +61,9 @@ module.exports = function monthlyRoutes(db, writer, mailer = { enabled: false })
         WHERE l.account_id = ? ORDER BY l.name COLLATE NOCASE`
     ).all(month, a);
     const me = db.prepare('SELECT COALESCE(m.email, c.email) AS email FROM users m JOIN users c ON c.id = COALESCE(m.company_id, m.id) WHERE m.id = ?').get(req.user.person_id);
+    const template = db.prepare('SELECT filename, uploaded_at FROM payment_templates WHERE account_id = ?').get(a) || null;
     res.render('rentrun', {
-      title: 'Rent run', section: 'rentrun', month, monthLabel: st.monthLabel(month), rows,
+      title: 'Rent run', section: 'rentrun', month, monthLabel: st.monthLabel(month), rows, template,
       emailEnabled: mailer.enabled, reportTo: (me && me.email) || '', fmt,
       flash: String(req.query.flash || '').slice(0, 1000), error: String(req.query.error || '').slice(0, 1000),
     });

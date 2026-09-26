@@ -488,3 +488,20 @@ table.list-councils th:first-child { width: 34%; }
 table.list-councils th:nth-child(n+2) { width: 22%; }
 table.list-councils td { overflow-wrap: anywhere; vertical-align: middle; }
 table.list-councils th:nth-child(n+2), table.list-councils td:nth-child(n+2) { text-align: center; }
+
+/* Rent run landlords table: every column centred. */
+table.centered th, table.centered td { text-align: center; }
+form.inline { display: inline-flex; margin: 0; }
+.step-actions label.btn { cursor: pointer; }
+/* Payment instruction form */
+.instruction-form h2 { margin-top: 0; }
+.instruction-form h2.spaced { margin-top: 22px; }
+.form-grid.three { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+.payee-table input { width: 100%; min-width: 0; padding: 6px 8px; }
+.payee-table input[type=checkbox] { width: 18px; height: 18px; }
+.payee-table .w-sort { width: 100px; } .payee-table .w-acc { width: 110px; } .payee-table .w-amt { width: 110px; text-align: right; } .payee-table .w-ref { width: 170px; }
+
+/* Council reconciliation: everything centred, including the boxes. */
+.rec-table.centered .money-cell input { text-align: center; }
+.rec-table.centered .money-cell .field, .rec-table.centered .rec-notes .field { display: flex; justify-content: center; }
+.rec-table.centered .rec-notes textarea { text-align: center; }

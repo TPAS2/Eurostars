@@ -111,6 +111,16 @@ module.exports = function appRoutes(db) {
         }
         default:
           values[f.name] = raw;
+          // UK bank details: stored in a standard form so payment instructions print cleanly.
+          if (f.pattern === 'sortcode') {
+            const digits = raw.replace(/[\s-]/g, '');
+            if (!/^\d{6}$/.test(digits)) errors[f.name] = 'Enter a 6-digit sort code, like 12-34-56.';
+            else values[f.name] = `${digits.slice(0, 2)}-${digits.slice(2, 4)}-${digits.slice(4)}`;
+          } else if (f.pattern === 'accountnumber') {
+            const digits = raw.replace(/\s/g, '');
+            if (!/^\d{8}$/.test(digits)) errors[f.name] = 'Enter an 8-digit account number.';
+            else values[f.name] = digits;
+          }
       }
     }
     if (def.key === 'tenancies' && values.start_date && values.end_date && values.end_date < values.start_date) {

@@ -78,7 +78,18 @@ function describe(db, req) {
   if (section === 'account') return { action: 'viewed', text: 'Viewed my account' };
   if (section === 'statements') return { action: 'viewed', text: 'Viewed landlord statements' };
   if (section === 'council-reconciliation') return post ? { action: 'updated', text: `Updated council reconciliation notes for ${req.body.month || ''}`.trim(), autosave: req.get('X-Autosave') === '1' } : { action: 'viewed', text: 'Viewed council reconciliation' };
-  if (section === 'rent-run') return { action: 'viewed', text: 'Viewed the rent run' };
+  if (section === 'rent-run') {
+    const m = /^\d{4}-\d{2}$/.test(String(req.body.month || req.query.month || '')) ? ` for ${req.body.month || req.query.month}` : '';
+    if (idPart === 'template') {
+      if (!post) return { action: req.query.download === '1' ? 'downloaded' : 'viewed', text: 'Opened the payment instruction template' };
+      return sub === 'delete' ? { action: 'deleted', text: 'Removed the payment instruction template' } : { action: 'updated', text: 'Saved a payment instruction template' };
+    }
+    if (idPart === 'instruction') {
+      if (post) return { action: 'updated', text: sub === 'refresh' ? `Refreshed the payment instruction${m}` : `Saved the payment instruction${m}` };
+      return { action: 'viewed', text: sub === 'print' ? `Printed the payment instruction${m}` : `Opened the payment instruction${m}` };
+    }
+    return { action: 'viewed', text: 'Viewed the rent run' };
+  }
   if (section === 'rent' && post) return { action: 'created', text: `Raised rent for ${req.body.month || 'a month'}` };
   if (section === 'monthly') {
     const m = /^\d{4}-\d{2}$/.test(String(req.body.month || req.query.month || '')) ? String(req.body.month || req.query.month) : '';
