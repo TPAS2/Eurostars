@@ -10,13 +10,12 @@
 <nav class="month-nav" aria-label="Choose month">
   <a class="btn" href="/app/council-reconciliation?month=<%= prev %>">‹ Previous month</a>
   <form method="get" data-autogo class="month-pick">
-    <label for="rec-month" class="month-label"><%= monthLabel %></label>
-    <input id="rec-month" type="month" name="month" value="<%= month %>" aria-label="Month">
+    <input id="rec-month" type="month" name="month" value="<%= month %>" aria-label="Month" class="month-big">
     <noscript><button class="btn" type="submit">Go</button></noscript>
   </form>
   <a class="btn" href="/app/council-reconciliation?month=<%= next %>">Next month ›</a>
-  <% if (month !== thisMonth) { %><a class="btn" href="/app/council-reconciliation?month=<%= thisMonth %>">This month</a><% } %>
 </nav>
+<% if (month !== thisMonth) { %><p class="month-back"><a href="/app/council-reconciliation?month=<%= thisMonth %>">Back to this month</a></p><% } %>
 
 <section class="card">
   <% if (!rec.rows.length) { %>

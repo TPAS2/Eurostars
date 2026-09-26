@@ -438,7 +438,7 @@ tr.subtotal td { font-weight: 600; background: var(--surface-2); }
 .tab-grid label.check { font-weight: 500; }
 
 /* Council reconciliation */
-.month-nav { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0 0 18px; }
+.month-nav { display: flex; align-items: center; justify-content: center; gap: 14px; flex-wrap: wrap; margin: 0 0 18px; }
 .month-pick { display: flex; align-items: center; gap: 8px; margin: 0; }
 .month-label { font-size: 1.25rem; font-weight: 800; min-width: 170px; text-align: center; }
 .month-pick input[type=month] { width: auto; }
@@ -505,3 +505,6 @@ form.inline { display: inline-flex; margin: 0; }
 .rec-table.centered .money-cell input { text-align: center; }
 .rec-table.centered .money-cell .field, .rec-table.centered .rec-notes .field { display: flex; justify-content: center; }
 .rec-table.centered .rec-notes textarea { text-align: center; }
+
+.month-pick input.month-big { font-size: 1.35rem; font-weight: 800; padding: 10px 18px; min-width: 240px; text-align: center; border: 2px solid var(--brand); border-radius: 10px; color: var(--text); background: var(--surface); cursor: pointer; }
+.month-back { text-align: center; margin: -8px 0 16px; font-size: .9rem; }
