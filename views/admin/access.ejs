@@ -1,0 +1,51 @@
+<%- include('../partials/header') %>
+<header class="page-head">
+  <div>
+    <h1>Tab access</h1>
+    <p class="muted">Tick the tabs each person can see. Unticked tabs are removed from their menu and blocked. Everyone always has the dashboard and their account page.</p>
+  </div>
+  <form method="get" class="inline-form" data-autogo>
+    <select name="company" aria-label="Company">
+      <option value="">All companies</option>
+      <% companies.forEach(c => { %><option value="<%= c.id %>" <%= company === c.id ? 'selected' : '' %>><%= c.agency_name %> (<%= c.username %>)</option><% }) %>
+    </select>
+    <noscript><button class="btn" type="submit">Show</button></noscript>
+  </form>
+</header>
+<% if (flash) { %><div class="notice ok"><%= flash %></div><% } %>
+
+<section class="card">
+  <% if (!people.length) { %><p class="muted">No company logins yet.</p><% } else { %>
+  <form method="post" action="/admin/access" data-no-keep class="access-form">
+    <%- include('../partials/csrf') %>
+    <input type="hidden" name="company" value="<%= company || '' %>">
+    <div class="table-wrap"><table class="access-grid">
+      <thead><tr>
+        <th>Person</th>
+        <% tabs.forEach(t => { %><th class="tab-col"><span><%= t.label %></span></th><% }) %>
+        <th class="tab-col"><span>All</span></th>
+      </tr></thead>
+      <tbody>
+      <% let lastCompany = null; people.forEach(m => { %>
+        <% if (m.cid !== lastCompany) { lastCompany = m.cid; %>
+        <tr class="company-row"><td colspan="<%= tabs.length + 2 %>"><a href="/admin/users/<%= m.cid %>#people"><strong><%= m.agency_name %></strong></a> <span class="muted small">username <code><%= m.username %></code></span></td></tr>
+        <% } %>
+        <tr data-access-row>
+          <td>
+            <input type="hidden" name="people" value="<%= m.id %>">
+            <strong><%= m.name %></strong><% if (!m.company_id) { %> <span class="badge plain">main login</span><% } %><% if (m.status !== 'active') { %> <span class="badge s-suspended"><%= m.status %></span><% } %>
+            <div class="muted small">signs in as <%= m.login_name %></div>
+          </td>
+          <% tabs.forEach(t => { %>
+          <td class="tab-col"><input type="checkbox" name="t_<%= m.id %>" value="<%= t.key %>" <%= m.hidden.includes(t.key) ? '' : 'checked' %> aria-label="<%= m.name %> can see <%= t.label %>"></td>
+          <% }) %>
+          <td class="tab-col"><input type="checkbox" data-access-all aria-label="All tabs for <%= m.name %>" <%= m.hidden.length ? '' : 'checked' %>></td>
+        </tr>
+      <% }) %>
+      </tbody>
+    </table></div>
+    <div class="form-actions"><button class="btn primary" type="submit">Save tab access</button></div>
+  </form>
+  <% } %>
+</section>
+<%- include('../partials/footer') %>

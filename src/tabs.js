@@ -15,7 +15,6 @@ const TABS = [
   { key: 'invoices', label: 'Invoices', paths: ['/app/invoices'] },
   { key: 'compliance', label: 'Compliance', paths: ['/app/compliance'] },
   { key: 'rentrun', label: 'Rent run', paths: ['/app/rent-run', '/app/monthly/calculate', '/app/monthly/email', '/app/monthly/report'] },
-  { key: 'rentroll', label: 'Rent roll', paths: ['/app/rent-roll'] },
   { key: 'transactions', label: 'Payments (transactions)', paths: ['/app/transactions'] },
   { key: 'monthly', label: 'Monthly statements', paths: ['/app/monthly'] },
   { key: 'statements', label: 'Statement by date range', paths: ['/app/statements'] },

@@ -96,7 +96,7 @@ nav.rail { flex: 1; }
 .rail-btn:hover, .rail-btn:focus-visible { background: var(--sidebar-active); border-color: #6b7a96; color: #fff; text-decoration: none; }
 .rail-btn:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .rail-btn.active { background: var(--brand-rail); border-color: #fff; color: #fff; box-shadow: 0 0 0 1px #fff; }
-/* Council reconciliation stands out in red. */
+/* Council reconciliation and the rent run stand out in red. */
 .rail-btn.rail-red { color: #ff6b6b; border-color: #c43b3b; background: #3a1418; }
 .rail-btn.rail-red:hover, .rail-btn.rail-red:focus-visible { color: #fff; border-color: #ff6b6b; background: #5a1c22; }
 .rail-btn.rail-red.active { background: #d92d2d; border-color: #fff; color: #fff; }
@@ -451,3 +451,11 @@ tr.subtotal td { font-weight: 600; background: var(--surface-2); }
 .rec-notes .save-status { display: block; min-height: 1em; }
 .bad-text { color: var(--bad); }
 .ok-text { color: var(--ok); }
+
+/* Admin tab access grid */
+.access-grid th.tab-col { vertical-align: bottom; text-align: center; padding: 6px 4px; }
+.access-grid th.tab-col span { writing-mode: vertical-rl; transform: rotate(180deg); white-space: nowrap; font-size: .72rem; display: inline-block; text-transform: none; letter-spacing: 0; }
+.access-grid td.tab-col { text-align: center; padding: 6px 4px; }
+.access-grid td.tab-col input { width: 18px; height: 18px; margin: 0; cursor: pointer; }
+.access-grid tr.company-row td { background: var(--surface-2); padding-top: 12px; }
+.access-grid tbody tr[data-access-row]:hover td { background: var(--brand-soft); }

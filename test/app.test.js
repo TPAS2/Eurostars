@@ -1137,62 +1137,6 @@ test('any invoice can be deleted, from its page or from a list', async () => {
   assert.equal(db.prepare('SELECT COUNT(*) n FROM invoices WHERE id = ?').get(keepId).n, 1);
 });
 
-test('rent roll: every property with rent due, received, deductions and net for a month', async () => {
-  const c = await registerAndLogin('rent-roll@example.com', 'Roll Lets');
-  let r = await c.post('/app/landlords', { name: 'Rita Owner', code: 'RO1' });
-  const rita = idFrom(r.location);
-  r = await c.post('/app/landlords', { name: 'Sam Owner' });
-  const sam = idFrom(r.location);
-  r = await c.post('/app/properties', { address_line1: '1 Elm Row', landlord_id: rita, status: 'vacant', management_fee_pct: '10' });
-  const elm = idFrom(r.location);
-  r = await c.post(`/app/properties/${elm}/add-tenant`, { tenant_mode: 'new', name: 'Tom Tenant', booking_date: '2026-07-01', start_date: '2026-08-01', rent_pence: '1000', rent_frequency: 'monthly', status: 'active' });
-  const tenancy = idFrom(r.location);
-  r = await c.post('/app/properties', { address_line1: '2 Ash Lane', landlord_id: sam, status: 'vacant' });
-  const ash = idFrom(r.location);
-
-  assert.match((await c.get('/app')).text, /aria-label="Rent roll"/, 'in the menu');
-  r = await c.get('/app/rent-roll?month=2026-08');
-  // Raise the month's rent from the rent roll, then come back to it.
-  r = await c.post('/app/rent/raise', { month: '2026-08', back: 'rent-roll' });
-  assert.match(r.location, /^\/app\/rent-roll\?month=2026-08&flash=/);
-  await c.post('/app/transactions', { txn_date: '2026-08-03', txn_type: 'rent_received', tenancy_id: tenancy, amount_pence: '800' });
-  await c.post('/app/transactions', { txn_date: '2026-08-10', txn_type: 'expense', property_id: elm, description: 'Plumber', amount_pence: '50' });
-  await c.post('/app/transactions', { txn_date: '2026-09-02', txn_type: 'expense', property_id: elm, description: 'Next month', amount_pence: '999' });
-
-  const { rentRoll } = require('../src/rentroll');
-  const accountId = db.prepare('SELECT account_id FROM properties WHERE id = ?').get(elm).account_id;
-  const roll = rentRoll(db, accountId, '2026-08');
-  const row = roll.rows.find((x) => x.id === elm);
-  assert.deepEqual(
-    { rent: row.rent, charged: row.charged, received: row.received, fees: row.fees, expenses: row.expenses, net: row.net, outstanding: row.outstanding },
-    { rent: 100000, charged: 100000, received: 80000, fees: 8000, expenses: 5000, net: 67000, outstanding: 20000 }
-  );
-  assert.deepEqual(row.tenants, ['Tom Tenant']);
-  assert.equal(roll.rows.find((x) => x.id === ash).tenants.length, 0, 'vacant property listed too');
-  assert.equal(roll.totals.net, 67000);
-  assert.equal(roll.totals.let, 1);
-
-  r = await c.get('/app/rent-roll?month=2026-08');
-  assert.match(r.text, /August 2026/);
-  assert.match(r.text, /1 Elm Row[\s\S]*?Rita Owner[\s\S]*?RO1[\s\S]*?Tom Tenant[\s\S]*?£1,000\.00[\s\S]*?£800\.00[\s\S]*?−£80\.00[\s\S]*?−£50\.00[\s\S]*?£670\.00[\s\S]*?£200\.00/);
-  assert.match(r.text, /2 Ash Lane[\s\S]*?vacant/);
-  assert.match(r.text, /class="total"[\s\S]*?£670\.00/);
-
-  // Filter to one landlord.
-  r = await c.get(`/app/rent-roll?month=2026-08&landlord_id=${sam}`);
-  assert.match(r.text, /2 Ash Lane/);
-  assert.doesNotMatch(r.text, /1 Elm Row/);
-
-  // Agrees with the monthly statement for the same landlord and month.
-  await c.get('/app/monthly?month=2026-08');
-  await c.post('/app/monthly/generate', { month: '2026-08', landlord_id: String(rita) });
-  assert.equal(db.prepare('SELECT net_pence FROM monthly_statements WHERE landlord_id = ?').get(rita).net_pence, 67000);
-
-  // Other companies' data never shows.
-  const other = await registerAndLogin('rent-roll-2@example.com', 'Other Roll');
-  r = await other.get(`/app/rent-roll?month=2026-08&landlord_id=${rita}`);
-  assert.doesNotMatch(r.text, /Elm Row|Rita Owner/);
-});
 
 test('signed out after an hour without use, then back to the same page', async () => {
   const c = await registerAndLogin('idle@example.com', 'Idle Lets');
@@ -1251,9 +1195,9 @@ test('signed out after an hour without use, then back to the same page', async (
   // Signing out for inactivity from the page.
   const d = new Client();
   await d.login('idle', 'password-1234');
-  await d.get('/app/rent-roll');
-  r = await d.post('/logout', { reason: 'idle', next: '/app/rent-roll?month=2026-08' });
-  assert.equal(r.location, `/login?timeout=1&next=${encodeURIComponent('/app/rent-roll?month=2026-08')}`);
+  await d.get('/app/rent-run');
+  r = await d.post('/logout', { reason: 'idle', next: '/app/rent-run?month=2026-08' });
+  assert.equal(r.location, `/login?timeout=1&next=${encodeURIComponent('/app/rent-run?month=2026-08')}`);
   assert.equal((await d.get('/app')).location, '/login');
 });
 
@@ -1405,37 +1349,6 @@ test('landlords have a statement type (Email or Cheque); cheque landlords are le
   assert.match(r.text, /1 paid by cheque is left out/);
 });
 
-test('rent roll shows which council pays each property and what each council still owes', async () => {
-  const c = await registerAndLogin('council-rent@example.com', 'Council Rent Lets');
-  let r = await c.post('/app/councils', { name: 'Leeds City Council' });
-  const leeds = idFrom(r.location);
-  r = await c.post('/app/councils', { name: 'York Council' });
-  const york = idFrom(r.location);
-  const addLet = async (addr, council, rent) => {
-    const p = idFrom((await c.post('/app/properties', { address_line1: addr, council_id: String(council), status: 'vacant' })).location);
-    const t = idFrom((await c.post(`/app/properties/${p}/add-tenant`, { tenant_mode: 'new', name: `T ${addr}`, booking_date: '2026-07-01', start_date: '2026-08-01', rent_pence: rent, rent_frequency: 'monthly', status: 'active' })).location);
-    return t;
-  };
-  const t1 = await addLet('1 Leeds Road', leeds, '500');
-  const t2 = await addLet('2 Leeds Road', leeds, '600');
-  const t3 = await addLet('3 York Way', york, '700');
-  await c.get('/app/rent-roll?month=2026-08');
-  await c.post('/app/rent/raise', { month: '2026-08', back: 'rent-roll' });
-  await c.post('/app/transactions', { txn_date: '2026-08-05', txn_type: 'rent_received', tenancy_id: t1, amount_pence: '500' });
-  await c.post('/app/transactions', { txn_date: '2026-08-05', txn_type: 'rent_received', tenancy_id: t2, amount_pence: '200' });
-  await c.post('/app/transactions', { txn_date: '2026-08-05', txn_type: 'rent_received', tenancy_id: t3, amount_pence: '700' });
-
-  r = await c.get('/app/rent-roll?month=2026-08');
-  assert.match(r.text, /Still owed by councils[\s\S]*?£400\.00/);
-  assert.match(r.text, /By council[\s\S]*?Leeds City Council[\s\S]*?£1,100\.00[\s\S]*?£700\.00[\s\S]*?£400\.00[\s\S]*?Not paid for 1 property/);
-  assert.match(r.text, /York Council[\s\S]*?Paid in full/);
-  assert.match(r.text, /1 Leeds Road[\s\S]*?Leeds City Council[\s\S]*?badge s-active">Paid/);
-  assert.match(r.text, /2 Leeds Road[\s\S]*?Part paid · £400\.00 owed/);
-  // Filter to one council.
-  r = await c.get(`/app/rent-roll?month=2026-08&council_id=${york}`);
-  assert.match(r.text, /3 York Way/);
-  assert.doesNotMatch(r.text, /1 Leeds Road/);
-});
 
 test('the admin chooses which tabs each person sees; hidden tabs are blocked', async () => {
   const boss = await registerAndLogin('tabs-co@example.com', 'Tabs Lets');
@@ -1451,8 +1364,8 @@ test('the admin chooses which tabs each person sees; hidden tabs are blocked', a
   assert.match(r.text, new RegExp(`action="/admin/users/${companyId}/tabs/${ada}"`));
   // Ada only gets Properties, Tenants and Repairs.
   r = await admin.post(`/admin/users/${companyId}/tabs/${ada}`, { tabs: ['properties', 'tenants', 'maintenance'] });
-  assert.match(decodeURIComponent(r.location), /Ada Assistant now sees 3 of 14 tabs/);
-  assert.match((await admin.get(`/admin/users/${companyId}`)).text, /3 of 14 tabs/);
+  assert.match(decodeURIComponent(r.location), /Ada Assistant now sees 3 of 13 tabs/);
+  assert.match((await admin.get(`/admin/users/${companyId}`)).text, /3 of 13 tabs/);
 
   const c = new Client();
   await c.login('tabs-co', 'adas-pass-123', 'ada');
@@ -1460,11 +1373,11 @@ test('the admin chooses which tabs each person sees; hidden tabs are blocked', a
   const labels = [...rail.matchAll(/aria-label="([^"]+)"/g)].map((m) => m[1]).slice(1);
   assert.deepEqual(labels, ['Properties', 'Tenants', 'Maintenance']);
   assert.equal((await c.get('/app/properties')).status, 200);
-  for (const blocked of ['/app/landlords', '/app/landlords/new', '/app/rent-run', '/app/monthly/report.csv?month=2026-08', '/app/invoices', '/app/councils']) {
+  for (const blocked of ['/app/landlords', '/app/landlords/new', '/app/rent-run', '/app/monthly/report.csv?month=2026-08', '/app/invoices', '/app/councils', '/app/council-reconciliation']) {
     r = await c.get(blocked);
     assert.equal(r.status, 403, blocked);
   }
-  assert.match((await c.get('/app/rent-roll')).text, /isn’t available on your login/);
+  assert.match((await c.get('/app/transactions')).text, /isn’t available on your login/);
   r = await c.post('/app/landlords', { name: 'Sneaky' });
   assert.equal(r.status, 403, 'changes are blocked too');
   assert.equal(db.prepare("SELECT COUNT(*) n FROM landlords WHERE name = 'Sneaky'").get().n, 0);
@@ -1472,7 +1385,7 @@ test('the admin chooses which tabs each person sees; hidden tabs are blocked', a
   // The main login still sees everything; ticking all tabs gives Ada everything back.
   assert.equal((await boss.get('/app/landlords')).status, 200);
   await admin.get(`/admin/users/${companyId}`);
-  await admin.post(`/admin/users/${companyId}/tabs/${ada}`, { tabs: ['councils', 'councilrec', 'properties', 'landlords', 'tenants', 'tenancies', 'maintenance', 'invoices', 'compliance', 'rentrun', 'rentroll', 'transactions', 'monthly', 'statements'] });
+  await admin.post(`/admin/users/${companyId}/tabs/${ada}`, { tabs: ['councils', 'councilrec', 'properties', 'landlords', 'tenants', 'tenancies', 'maintenance', 'invoices', 'compliance', 'rentrun', 'transactions', 'monthly', 'statements'] });
   assert.equal(db.prepare('SELECT hidden_tabs FROM users WHERE id = ?').get(ada).hidden_tabs, null);
   assert.equal((await c.get('/app/landlords')).status, 200);
 
@@ -1502,6 +1415,7 @@ test('council reconciliation: every council, money owed and in, notes, totals, m
   await c.post('/app/transactions', { txn_date: '2026-08-06', txn_type: 'rent_received', tenancy_id: t1, amount_pence: '500' });
 
   assert.match((await c.get('/app')).text, /class="rail-btn  rail-red" href="\/app\/council-reconciliation"/, 'red button in the menu');
+  assert.match((await c.get('/app')).text, /class="rail-btn  rail-red" href="\/app\/rent-run"/, 'rent run is red too');
   r = await c.get('/app/council-reconciliation?month=2026-08');
   assert.match(r.text, /‹ Previous month<\/a>/);
   assert.match(r.text, /href="\/app\/council-reconciliation\?month=2026-07">‹ Previous month/);
@@ -1529,4 +1443,38 @@ test('council reconciliation: every council, money owed and in, notes, totals, m
   const other = await registerAndLogin('council-rec-2@example.com', 'Other Rec');
   r = await other.post('/app/council-reconciliation/notes', { council_id: String(quiet), month: '2026-08', notes: 'x' });
   assert.equal(r.status, 404);
+});
+
+test('admin Tab access page: every person against every tab, saved in one go', async () => {
+  await registerAndLogin('grid-co@example.com', 'Grid Lets');
+  const companyId = db.prepare("SELECT id FROM users WHERE username = 'grid-co'").get().id;
+  const admin = new Client();
+  await admin.login('admin', 'owner-password-123');
+  await admin.get(`/admin/users/${companyId}`);
+  await admin.post(`/admin/users/${companyId}/people`, { name: 'Bea Clerk', login_name: 'bea', password: 'beas-pass-123' });
+  const bea = db.prepare("SELECT id FROM users WHERE company_id = ? AND login_name = 'bea'").get(companyId).id;
+
+  assert.match((await admin.get('/admin')).text, /aria-label="Tab access"/, 'in the admin menu');
+  let r = await admin.get(`/admin/access?company=${companyId}`);
+  assert.match(r.text, /Grid Lets[\s\S]*?Test User[\s\S]*?main login[\s\S]*?Bea Clerk/);
+  assert.match(r.text, new RegExp(`name="t_${bea}" value="councilrec" checked`));
+  // Bea: only Rent run and Monthly statements. The main login (companyId) keeps everything.
+  const all = ['councils', 'councilrec', 'properties', 'landlords', 'tenants', 'tenancies', 'maintenance', 'invoices', 'compliance', 'rentrun', 'transactions', 'monthly', 'statements'];
+  r = await admin.post('/admin/access', { company: String(companyId), people: [String(companyId), String(bea)], [`t_${companyId}`]: all, [`t_${bea}`]: ['rentrun', 'monthly'] });
+  assert.match(decodeURIComponent(r.location), /Saved tab access for 2 people/);
+  assert.equal(db.prepare('SELECT hidden_tabs FROM users WHERE id = ?').get(companyId).hidden_tabs, null);
+  assert.deepEqual(JSON.parse(db.prepare('SELECT hidden_tabs FROM users WHERE id = ?').get(bea).hidden_tabs).length, 11);
+
+  const c = new Client();
+  await c.login('grid-co', 'beas-pass-123', 'bea');
+  const rail = (await c.get('/app')).text.match(/<nav class="rail"[\s\S]*?<\/nav>/)[0];
+  assert.deepEqual([...rail.matchAll(/aria-label="([^"]+)"/g)].map((m) => m[1]).slice(1), ['Rent run', 'Monthly statements']);
+  assert.equal((await c.get('/app/properties')).status, 403);
+
+  // Only the admin can use it; the admin's own login can't be restricted.
+  assert.equal((await c.get('/admin/access')).status, 404);
+  const adminId = db.prepare('SELECT id FROM users WHERE is_admin = 1').get().id;
+  await admin.get('/admin/access');
+  await admin.post('/admin/access', { people: [String(adminId)], [`t_${adminId}`]: [] });
+  assert.equal(db.prepare('SELECT hidden_tabs FROM users WHERE id = ?').get(adminId).hidden_tabs, null);
 });

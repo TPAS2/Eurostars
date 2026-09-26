@@ -291,6 +291,13 @@ const DRAFT_DAYS = 7;
   }
 
   document.addEventListener('DOMContentLoaded', () => {
+    // Tab access grid: the "All" box ticks or clears a whole row, and follows the row's boxes.
+    document.querySelectorAll('tr[data-access-row]').forEach((row) => {
+      const all = row.querySelector('[data-access-all]');
+      const boxes = [...row.querySelectorAll('input[type=checkbox]:not([data-access-all])')];
+      all.addEventListener('change', () => boxes.forEach((b) => { b.checked = all.checked; }));
+      boxes.forEach((b) => b.addEventListener('change', () => { all.checked = boxes.every((x) => x.checked); }));
+    });
     // Month pickers (and their filters) go straight to the chosen month; no button needed.
     document.querySelectorAll('form[data-autogo]').forEach((form) => {
       form.addEventListener('change', (e) => {

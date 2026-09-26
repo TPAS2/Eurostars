@@ -43,6 +43,7 @@ function describe(db, req) {
       if (parts[1] === 'backups' && parts[2]) return { action: 'downloaded', text: 'Downloaded a backup' };
       if (parts[1] === 'backups') return { action: 'viewed', text: 'Viewed backups' };
       if (parts[1] === 'accounts') return { action: 'viewed', text: 'Viewed account details' };
+      if (parts[1] === 'access') return { action: 'viewed', text: 'Viewed tab access' };
       if (parts[1] === 'security') return { action: 'viewed', text: 'Viewed security settings' };
       if (parts[1] === 'users.csv') return { action: 'downloaded', text: 'Downloaded the user list' };
       if (parts[2] === 'new') return { action: 'viewed', text: 'Opened Add account' };
@@ -60,6 +61,7 @@ function describe(db, req) {
     if (parts[1] === 'users' && parts[3] === 'people') return { action: 'created', text: `Added ${String(req.body.name || 'a person').trim()} to ${who}` };
     if (parts[1] === 'users' && parts.length === 2) return { action: 'created', text: `Created account @${String(req.body.username || '').trim()}` };
     if (parts[1] === 'backups') return { action: 'created', text: 'Made a backup' };
+    if (parts[1] === 'access') return { action: 'updated', text: 'Changed which tabs people can see' };
     if (parts[3] === 'tabs') return { action: 'updated', text: `Changed which tabs a person sees at ${who}` };
     const verb = { details: 'Saved details for', password: 'Reset password for', suspend: 'Suspended', activate: 'Reactivated', logout: 'Signed out everywhere', delete: 'Deleted account' }[parts[3]];
     if (verb) return { action: parts[3] === 'delete' ? 'deleted' : 'updated', text: `${verb} ${who}` };
@@ -77,7 +79,6 @@ function describe(db, req) {
   if (section === 'statements') return { action: 'viewed', text: 'Viewed landlord statements' };
   if (section === 'council-reconciliation') return post ? { action: 'updated', text: `Updated council reconciliation notes for ${req.body.month || ''}`.trim(), autosave: req.get('X-Autosave') === '1' } : { action: 'viewed', text: 'Viewed council reconciliation' };
   if (section === 'rent-run') return { action: 'viewed', text: 'Viewed the rent run' };
-  if (section === 'rent-roll') return { action: 'viewed', text: `Viewed the rent roll for ${/^\d{4}-\d{2}$/.test(String(req.query.month || '')) ? req.query.month : 'this month'}` };
   if (section === 'rent' && post) return { action: 'created', text: `Raised rent for ${req.body.month || 'a month'}` };
   if (section === 'monthly') {
     const m = /^\d{4}-\d{2}$/.test(String(req.body.month || req.query.month || '')) ? String(req.body.month || req.query.month) : '';

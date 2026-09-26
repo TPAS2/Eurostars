@@ -221,6 +221,35 @@ module.exports = function adminRoutes(db, config) {
     res.redirect(`/admin/users/${m.company_id}?flash=${encodeURIComponent(`${done} ${m.name}.`)}#people`);
   });
 
+  // Tab access: every person at every company against every tab, in one grid.
+  router.get('/access', (req, res) => {
+    const companyId = Number(req.query.company);
+    const people = db.prepare(
+      `SELECT m.id, m.name, m.login_name, m.status, m.hidden_tabs, m.company_id, c.id AS cid, c.username, c.agency_name
+         FROM users m JOIN users c ON c.id = COALESCE(m.company_id, m.id)
+        WHERE c.is_admin = 0 ${Number.isInteger(companyId) && companyId > 0 ? 'AND c.id = ' + companyId : ''}
+        ORDER BY c.agency_name COLLATE NOCASE, c.id, m.company_id IS NOT NULL, m.name COLLATE NOCASE`
+    ).all().map((m) => ({ ...m, hidden: tabs.parseHidden(m.hidden_tabs) }));
+    const companies = db.prepare('SELECT id, agency_name, username FROM users WHERE company_id IS NULL AND is_admin = 0 ORDER BY agency_name COLLATE NOCASE').all();
+    res.render('admin/access', {
+      title: 'Tab access', section: 'access', people, companies, company: Number.isInteger(companyId) ? companyId : 0, tabs: tabs.TABS,
+      flash: String(req.query.flash || '').slice(0, 300),
+    });
+  });
+
+  router.post('/access', (req, res) => {
+    const ids = [].concat(req.body.people || []).map(Number).filter(Number.isInteger);
+    const update = db.prepare('UPDATE users SET hidden_tabs = ? WHERE id = ? AND is_admin = 0');
+    let changed = 0;
+    for (const id of ids) {
+      const chosen = new Set([].concat(req.body[`t_${id}`] || []).map(String));
+      const hidden = tabs.TABS.map((t) => t.key).filter((k) => !chosen.has(k));
+      changed += update.run(hidden.length ? JSON.stringify(hidden) : null, id).changes;
+    }
+    const back = Number(req.body.company) > 0 ? `company=${Number(req.body.company)}&` : '';
+    res.redirect(`/admin/access?${back}flash=${encodeURIComponent(`Saved tab access for ${changed} ${changed === 1 ? 'person' : 'people'}.`)}`);
+  });
+
   // Which tabs one person at a company sees. Anything left unticked is hidden and blocked for them.
   router.post('/users/:id/tabs/:pid', (req, res) => {
     const u = target(req, res);

@@ -4,7 +4,6 @@ const express = require('express');
 const { ENTITIES, REF_LABELS } = require('../entities');
 const { transaction } = require('../db');
 const ledger = require('../ledger');
-const { rentRoll } = require('../rentroll');
 const reconcile = require('../reconcile');
 const statements = require('../statements');
 const fmt = require('../format');
@@ -290,7 +289,6 @@ module.exports = function appRoutes(db) {
     if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) return res.redirect('/app?flash=' + encodeURIComponent('Choose a valid month.'));
     const n = transaction(db, () => ledger.raiseMonthlyRent(db, req.user.id, month));
     const msg = encodeURIComponent(`Raised ${n} rent charge${n === 1 ? '' : 's'} for ${month}.`);
-    if (req.body.back === 'rent-roll') return res.redirect(`/app/rent-roll?month=${month}&flash=${msg}`);
     res.redirect('/app?flash=' + msg);
   });
 
@@ -337,23 +335,6 @@ module.exports = function appRoutes(db) {
     res.redirect(`/app/council-reconciliation?month=${month}`);
   });
 
-  // ---------- rent roll: every property's rent and deductions for a month ----------
-
-  router.get('/rent-roll', (req, res) => {
-    const a = req.user.id;
-    const month = statements.isMonth(req.query.month) ? String(req.query.month) : fmt.today().slice(0, 7);
-    const landlordId = Number(req.query.landlord_id);
-    const landlord = Number.isInteger(landlordId) && landlordId > 0
-      ? db.prepare('SELECT id, name FROM landlords WHERE id = ? AND account_id = ?').get(landlordId, a) : null;
-    const councilId = Number(req.query.council_id);
-    const council = Number.isInteger(councilId) && councilId > 0
-      ? db.prepare('SELECT id, name FROM councils WHERE id = ? AND account_id = ?').get(councilId, a) : null;
-    const roll = rentRoll(db, a, month, landlord ? landlord.id : null, council ? council.id : null);
-    res.render('rentroll', {
-      title: 'Rent roll', section: 'rentroll', month, monthLabel: statements.monthLabel(month), landlord, council,
-      landlords: refOptions('landlords', a), councils: refOptions('councils', a), roll, fmt, flash: String(req.query.flash || '').slice(0, 200),
-    });
-  });
 
   // ---------- landlord statements ----------
 
