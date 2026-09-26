@@ -59,7 +59,10 @@ class Client {
       for (const [k, v] of Object.entries({ _csrf: this.csrf, ...body })) payload.append(k, v);
     } else if (body) {
       headers['content-type'] = 'application/x-www-form-urlencoded';
-      payload = new URLSearchParams({ _csrf: this.csrf, ...body }).toString();
+      // Lists are sent as repeated fields, the way a browser sends ticked checkboxes.
+      const params = new URLSearchParams();
+      for (const [k, v] of Object.entries({ _csrf: this.csrf, ...body })) [].concat(v).forEach((x) => params.append(k, x));
+      payload = params.toString();
     }
     const res = await fetch(base + url, { method, headers, body: payload, redirect: 'manual' });
     // Keep a small cookie jar: a response can set or clear several cookies.
@@ -1432,4 +1435,52 @@ test('rent roll shows which council pays each property and what each council sti
   r = await c.get(`/app/rent-roll?month=2026-08&council_id=${york}`);
   assert.match(r.text, /3 York Way/);
   assert.doesNotMatch(r.text, /1 Leeds Road/);
+});
+
+test('the admin chooses which tabs each person sees; hidden tabs are blocked', async () => {
+  const boss = await registerAndLogin('tabs-co@example.com', 'Tabs Lets');
+  const companyId = db.prepare("SELECT id FROM users WHERE username = 'tabs-co'").get().id;
+  const admin = new Client();
+  await admin.login('admin', 'owner-password-123');
+  await admin.get(`/admin/users/${companyId}`);
+  await admin.post(`/admin/users/${companyId}/people`, { name: 'Ada Assistant', login_name: 'ada', password: 'adas-pass-123' });
+  const ada = db.prepare("SELECT id FROM users WHERE company_id = ? AND login_name = 'ada'").get(companyId).id;
+
+  let r = await admin.get(`/admin/users/${companyId}`);
+  assert.match(r.text, /Ada Assistant[\s\S]*?All tabs/);
+  assert.match(r.text, new RegExp(`action="/admin/users/${companyId}/tabs/${ada}"`));
+  // Ada only gets Properties, Tenants and Repairs.
+  r = await admin.post(`/admin/users/${companyId}/tabs/${ada}`, { tabs: ['properties', 'tenants', 'maintenance'] });
+  assert.match(decodeURIComponent(r.location), /Ada Assistant now sees 3 of 13 tabs/);
+  assert.match((await admin.get(`/admin/users/${companyId}`)).text, /3 of 13 tabs/);
+
+  const c = new Client();
+  await c.login('tabs-co', 'adas-pass-123', 'ada');
+  const rail = (await c.get('/app')).text.match(/<nav class="rail"[\s\S]*?<\/nav>/)[0];
+  const labels = [...rail.matchAll(/aria-label="([^"]+)"/g)].map((m) => m[1]).slice(1);
+  assert.deepEqual(labels, ['Properties', 'Tenants', 'Maintenance']);
+  assert.equal((await c.get('/app/properties')).status, 200);
+  for (const blocked of ['/app/landlords', '/app/landlords/new', '/app/rent-run', '/app/monthly/report.csv?month=2026-08', '/app/invoices', '/app/councils']) {
+    r = await c.get(blocked);
+    assert.equal(r.status, 403, blocked);
+  }
+  assert.match((await c.get('/app/rent-roll')).text, /isn’t available on your login/);
+  r = await c.post('/app/landlords', { name: 'Sneaky' });
+  assert.equal(r.status, 403, 'changes are blocked too');
+  assert.equal(db.prepare("SELECT COUNT(*) n FROM landlords WHERE name = 'Sneaky'").get().n, 0);
+
+  // The main login still sees everything; ticking all tabs gives Ada everything back.
+  assert.equal((await boss.get('/app/landlords')).status, 200);
+  await admin.get(`/admin/users/${companyId}`);
+  await admin.post(`/admin/users/${companyId}/tabs/${ada}`, { tabs: ['councils', 'properties', 'landlords', 'tenants', 'tenancies', 'maintenance', 'invoices', 'compliance', 'rentrun', 'rentroll', 'transactions', 'monthly', 'statements'] });
+  assert.equal(db.prepare('SELECT hidden_tabs FROM users WHERE id = ?').get(ada).hidden_tabs, null);
+  assert.equal((await c.get('/app/landlords')).status, 200);
+
+  // Only the admin can change tabs, and only for people in that company.
+  assert.equal((await boss.post(`/admin/users/${companyId}/tabs/${ada}`, { tabs: ['properties'] })).status, 404);
+  const other = await registerAndLogin('tabs-other@example.com', 'Other Tabs');
+  const otherId = db.prepare("SELECT id FROM users WHERE username = 'tabs-other'").get().id;
+  await admin.get(`/admin/users/${otherId}`);
+  assert.equal((await admin.post(`/admin/users/${otherId}/tabs/${ada}`, { tabs: 'properties' })).status, 404);
+  assert.ok(other);
 });

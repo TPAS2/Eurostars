@@ -272,6 +272,7 @@ function openDatabase(file) {
   addColumnIfMissing(db, 'landlords', 'code', 'TEXT');
   addColumnIfMissing(db, 'landlords', 'statement_type', "TEXT NOT NULL DEFAULT 'Email'");
   addColumnIfMissing(db, 'sessions', 'last_seen_at', 'TEXT');
+  addColumnIfMissing(db, 'users', 'hidden_tabs', 'TEXT');
   addColumnIfMissing(db, 'monthly_statements', 'emailed_at', 'TEXT');
   addColumnIfMissing(db, 'monthly_statements', 'emailed_to', 'TEXT');
   addColumnIfMissing(db, 'login_challenges', 'next_url', 'TEXT');

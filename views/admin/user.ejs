@@ -97,12 +97,14 @@
   </div>
   <p class="muted small">Everyone who can sign in to <strong><%= u.agency_name %></strong>. They all type the username <code><%= u.username %></code> exactly as shown (capitals count), then their own name and password. They see the same company data.</p>
   <div class="table-wrap"><table>
-    <thead><tr><th>Person</th><th>Signs in with</th><th>Last login</th><th>Last active</th><th>Status</th><th></th></tr></thead>
+    <thead><tr><th>Person</th><th>Signs in with</th><th>Tabs</th><th>Last login</th><th>Last active</th><th>Status</th><th></th></tr></thead>
     <tbody>
     <% people.forEach(m => { const main = !m.company_id; %>
       <tr>
         <td><strong><%= m.name %></strong><% if (main) { %> <span class="badge">main login</span><% } %></td>
         <td><code><%= u.username %></code> + <code><%= m.login_name %></code></td>
+        <% const hiddenTabs = parseHidden(m.hidden_tabs); %>
+        <td><% if (!hiddenTabs.length) { %>All tabs<% } else { %><span class="badge warn plain"><%= tabs.length - hiddenTabs.length %> of <%= tabs.length %> tabs</span><% } %></td>
         <td><%= fmt.ukDateTime(m.last_login_at) %></td>
         <td><% if (m.last_active) { %><a href="/admin/users/<%= u.id %>?person=<%= m.id %>#activity"><%= fmt.ukDateTime(m.last_active) %></a><% } else { %>No activity<% } %></td>
         <td><span class="badge s-<%= m.status %>"><%= m.status %></span></td>
@@ -111,6 +113,15 @@
           <details class="person-menu">
             <summary class="btn small">Manage</summary>
             <div class="person-actions">
+              <form method="post" action="/admin/users/<%= u.id %>/tabs/<%= m.id %>" class="tab-picker" data-no-keep>
+                <%- include('../partials/csrf') %>
+                <strong class="small">Tabs <%= m.name %> can see</strong>
+                <div class="tab-grid">
+                  <% tabs.forEach(t => { %><label class="check small"><input type="checkbox" name="tabs" value="<%= t.key %>" <%= hiddenTabs.includes(t.key) ? '' : 'checked' %>> <%= t.label %></label><% }) %>
+                </div>
+                <p class="muted small">Unticked tabs are removed from their menu and blocked. The dashboard and their account page are always there.</p>
+                <button class="btn small primary" type="submit">Save tabs</button>
+              </form>
               <form method="post" action="/admin/people/<%= m.id %>/password" class="inline-form">
                 <%- include('../partials/csrf') %>
                 <input id="pw-<%= m.id %>" name="password" type="text" minlength="<%= minPassword %>" placeholder="New password" autocomplete="off" required>
@@ -123,7 +134,23 @@
               </div>
             </div>
           </details>
-          <% } else { %><a class="small" href="#reset-password">Reset password below</a><% } %>
+          <% } else { %>
+          <details class="person-menu">
+            <summary class="btn small">Manage</summary>
+            <div class="person-actions">
+              <form method="post" action="/admin/users/<%= u.id %>/tabs/<%= m.id %>" class="tab-picker" data-no-keep>
+                <%- include('../partials/csrf') %>
+                <strong class="small">Tabs <%= m.name %> can see</strong>
+                <div class="tab-grid">
+                  <% tabs.forEach(t => { %><label class="check small"><input type="checkbox" name="tabs" value="<%= t.key %>" <%= hiddenTabs.includes(t.key) ? '' : 'checked' %>> <%= t.label %></label><% }) %>
+                </div>
+                <p class="muted small">Unticked tabs are removed from their menu and blocked. The dashboard and their account page are always there.</p>
+                <button class="btn small primary" type="submit">Save tabs</button>
+              </form>
+              <a class="small" href="#reset-password">Reset password below</a>
+            </div>
+          </details>
+          <% } %>
         </td>
       </tr>
     <% }) %>

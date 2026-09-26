@@ -1,6 +1,7 @@
 'use strict';
 
 const crypto = require('node:crypto');
+const { parseHidden } = require('./tabs');
 
 const SESSION_COOKIE = 'sid';
 const SESSION_DAYS = 7;
@@ -71,7 +72,7 @@ function loadSession(db, { idleMinutes = 60, secure = false } = {}) {
   // req.user.id is the company (every record is scoped to it); req.user.person_id is the
   // person signed in, who may be the company's main login or one of its people.
   const lookup = db.prepare(
-    `SELECT c.id AS id, u.id AS person_id, c.username, u.login_name, u.email, u.name, c.agency_name, u.is_admin,
+    `SELECT c.id AS id, u.id AS person_id, c.username, u.login_name, u.email, u.name, c.agency_name, u.is_admin, u.hidden_tabs,
             CASE WHEN u.status = 'active' AND c.status = 'active' THEN 'active' ELSE 'suspended' END AS status, s.csrf_token,
             (s.last_seen_at IS NOT NULL AND s.last_seen_at <= datetime('now', ?)) AS idle,
             (s.last_seen_at IS NULL OR s.last_seen_at <= datetime('now', '-30 seconds')) AS stale
@@ -93,7 +94,7 @@ function loadSession(db, { idleMinutes = 60, secure = false } = {}) {
         if (row.stale) touch.run(hash);
         req.csrfToken = row.csrf_token;
         req.sessionTokenHash = hash;
-        req.user = { ...row, is_admin: row.is_admin === 1 };
+        req.user = { ...row, is_admin: row.is_admin === 1, hidden_tabs: row.is_admin === 1 ? [] : parseHidden(row.hidden_tabs) };
         delete req.user.csrf_token;
         delete req.user.idle;
         delete req.user.stale;

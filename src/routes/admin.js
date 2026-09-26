@@ -8,6 +8,7 @@ const backup = require('../backup');
 const totp = require('../totp');
 const QRCode = require('qrcode');
 const auth = require('../auth');
+const tabs = require('../tabs');
 const { USERNAME_RE, LOGIN_NAME_RE, signInNameFrom } = require('../db');
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -220,6 +221,20 @@ module.exports = function adminRoutes(db, config) {
     res.redirect(`/admin/users/${m.company_id}?flash=${encodeURIComponent(`${done} ${m.name}.`)}#people`);
   });
 
+  // Which tabs one person at a company sees. Anything left unticked is hidden and blocked for them.
+  router.post('/users/:id/tabs/:pid', (req, res) => {
+    const u = target(req, res);
+    if (!u) return;
+    const pid = Number(req.params.pid);
+    const m = Number.isInteger(pid) && db.prepare('SELECT id, name FROM users WHERE id = ? AND (id = ? OR company_id = ?)').get(pid, u.id, u.id);
+    if (!m) return res.status(404).render('error', { title: 'Not found', message: 'No such person.' });
+    const chosen = new Set([].concat(req.body.tabs || []).map(String));
+    const hidden = tabs.TABS.map((t) => t.key).filter((k) => !chosen.has(k));
+    db.prepare('UPDATE users SET hidden_tabs = ? WHERE id = ?').run(hidden.length ? JSON.stringify(hidden) : null, m.id);
+    const shown = tabs.TABS.length - hidden.length;
+    res.redirect(`/admin/users/${u.id}?flash=${encodeURIComponent(`${m.name} now sees ${shown === tabs.TABS.length ? 'all tabs' : `${shown} of ${tabs.TABS.length} tabs`}.`)}#people`);
+  });
+
   // Everything one agency has stored, as a JSON file (admin only).
   router.get('/users/:id/export', (req, res) => {
     const u = target(req, res);
@@ -263,7 +278,7 @@ module.exports = function adminRoutes(db, config) {
               (SELECT COUNT(*) FROM transactions WHERE account_id = ?) AS transactions,
               (SELECT MAX(created_at) FROM transactions WHERE account_id = ?) AS last_txn`
     ).get(u.id, u.id, u.id, u.id);
-    res.render('admin/user', {
+    res.render('admin/user', { tabs: tabs.TABS, parseHidden: tabs.parseHidden,
       title: u.agency_name, section: 'admin', u, logins, extra, fmt, isSelf: u.id === req.user.id, activityRows, activityFilter,
       people, personFilter: Number.isInteger(who) && who > 0 ? who : null,
       created: req.query.created === '1', flash: req.query.flash || '', error: req.query.error || '', minPassword: MIN_PASSWORD,

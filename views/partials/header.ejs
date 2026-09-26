@@ -18,31 +18,31 @@
   // The admin runs the software rather than letting properties, so only gets the owner pages.
   // The logo button at the top goes to the dashboard (or, for the admin, the admin panel).
   const groups = user.is_admin ? [
-    [['accounts', '/admin/accounts', 'Account details', 'Accounts'], ['backups', '/admin/backups', 'Backups'], ['security', '/admin/security', 'Security']],
+    [['accounts', '/admin/accounts', 'Account details'], ['backups', '/admin/backups', 'Backups'], ['security', '/admin/security', 'Security']],
   ] : [
     [['councils', '/app/councils', 'Councils']],
     [['properties', '/app/properties', 'Properties'], ['landlords', '/app/landlords', 'Landlords'], ['tenants', '/app/tenants', 'Tenants'], ['tenancies', '/app/tenancies', 'Tenancies']],
-    [['maintenance', '/app/maintenance', 'Maintenance', 'Repairs'], ['invoices', '/app/invoices', 'Invoices'], ['compliance', '/app/compliance', 'Compliance']],
-    [['rentrun', '/app/rent-run', 'Rent run'], ['rentroll', '/app/rent-roll', 'Rent roll'], ['transactions', '/app/transactions', 'Transactions', 'Payments'], ['monthly', '/app/monthly', 'Monthly statements', 'Monthly'], ['statements', '/app/statements', 'Statement by date range', 'Statements']],
+    [['maintenance', '/app/maintenance', 'Maintenance'], ['invoices', '/app/invoices', 'Invoices'], ['compliance', '/app/compliance', 'Compliance']],
+    [['rentrun', '/app/rent-run', 'Rent run'], ['rentroll', '/app/rent-roll', 'Rent roll'], ['transactions', '/app/transactions', 'Transactions'], ['monthly', '/app/monthly', 'Monthly statements'], ['statements', '/app/statements', 'Statement by date range']],
   ];
 %>
 <div class="shell">
   <aside class="sidebar">
     <% const home = user.is_admin ? { href: '/admin', label: 'Admin panel', tip: 'Admin panel', on: s === 'admin' } : { href: '/app', label: 'Dashboard', tip: `Dashboard · ${user.agency_name}`, on: s === 'dashboard' }; %>
-    <a class="rail-btn brand-btn <%= home.on ? 'active' : '' %>" href="<%= home.href %>" data-tip="<%= home.tip %>" aria-label="<%= home.label %>" <%- home.on ? 'aria-current="page"' : '' %>><span class="logo">N</span><span class="rail-label" aria-hidden="true"><%= user.is_admin ? 'Admin' : 'Home' %></span></a>
+    <a class="rail-btn brand-btn <%= home.on ? 'active' : '' %>" href="<%= home.href %>" data-tip="<%= home.tip %>" aria-label="<%= home.label %>" <%- home.on ? 'aria-current="page"' : '' %>><span class="logo">N</span></a>
     <nav class="rail" aria-label="Main">
-      <% groups.forEach((g, gi) => { %>
+      <% groups.filter(g => g.some(([key]) => !(user.hidden_tabs || []).includes(key))).forEach((g, gi) => { %>
         <% if (gi) { %><span class="rail-sep" aria-hidden="true"></span><% } %>
-        <% g.forEach(([key, href, label, short]) => { %>
-          <a class="rail-btn <%= s === key ? 'active' : '' %>" href="<%= href %>" data-tip="<%= label %>" aria-label="<%= label %>" <%- s === key ? 'aria-current="page"' : '' %>><%- include('icon', { name: key }) %><span class="rail-label" aria-hidden="true"><%= short || label %></span></a>
+        <% g.filter(([key]) => !(user.hidden_tabs || []).includes(key)).forEach(([key, href, label]) => { %>
+          <a class="rail-btn <%= s === key ? 'active' : '' %>" href="<%= href %>" data-tip="<%= label %>" aria-label="<%= label %>" <%- s === key ? 'aria-current="page"' : '' %>><%- include('icon', { name: key }) %></a>
         <% }) %>
       <% }) %>
     </nav>
     <div class="rail rail-me">
-      <a class="rail-btn avatar <%= s === 'account' ? 'active' : '' %>" href="/app/account" data-tip="My account · <%= user.name %>" aria-label="My account" <%- s === 'account' ? 'aria-current="page"' : '' %>><span class="avatar-initials"><%= initials %></span><span class="rail-label" aria-hidden="true">Account</span></a>
+      <a class="rail-btn avatar <%= s === 'account' ? 'active' : '' %>" href="/app/account" data-tip="My account · <%= user.name %>" aria-label="My account" <%- s === 'account' ? 'aria-current="page"' : '' %>><span class="avatar-initials"><%= initials %></span></a>
       <form method="post" action="/logout" id="signout-form">
         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-        <button class="rail-btn" type="submit" data-tip="Sign out" aria-label="Sign out"><%- include('icon', { name: 'signout' }) %><span class="rail-label" aria-hidden="true">Sign out</span></button>
+        <button class="rail-btn" type="submit" data-tip="Sign out" aria-label="Sign out"><%- include('icon', { name: 'signout' }) %></button>
       </form>
     </div>
   </aside>

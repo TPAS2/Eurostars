@@ -5,6 +5,7 @@ const express = require('express');
 const { openDatabase } = require('./db');
 const auth = require('./auth');
 const { createMailer } = require('./mailer');
+const tabs = require('./tabs');
 const fmt = require('./format');
 const { createStatementWriter } = require('./ai');
 const { runMonthlyJob } = require('./statements');
@@ -127,6 +128,8 @@ function createApp(config, db, { writer = null, mailer = null } = {}) {
   app.use(auth.loadSession(db, { idleMinutes: config.idleTimeoutMinutes ?? 60, secure: config.secureCookies }));
   app.use(auth.verifyCsrf);
   if (config.activityLog !== false) app.use(activity.middleware(db));
+  // Tabs the admin has hidden from a person are blocked for them, not just left out of the menu.
+  app.use('/app', tabs.guard);
 
   app.get('/', (req, res) => {
     if (req.user) return res.redirect(req.user.is_admin ? '/admin' : '/app');

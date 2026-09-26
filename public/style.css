@@ -71,7 +71,7 @@ h3 { font-size: 1rem; margin: 0 0 .4rem; }
 .pre { white-space: pre-wrap; }
 
 /* ---------- layout ---------- */
-.shell { display: grid; grid-template-columns: 96px 1fr; min-height: 100vh; background: linear-gradient(to right, var(--sidebar) 96px, transparent 96px); }
+.shell { display: grid; grid-template-columns: 76px 1fr; min-height: 100vh; background: linear-gradient(to right, var(--sidebar) 76px, transparent 76px); }
 .sidebar {
   background: var(--sidebar); color: var(--sidebar-text);
   padding: 12px 8px; display: flex; flex-direction: column; align-items: center; gap: 8px;
@@ -84,16 +84,15 @@ h3 { font-size: 1rem; margin: 0 0 .4rem; }
 nav.rail { flex: 1; }
 .rail-me { padding-top: 10px; border-top: 1px solid var(--rail-border); }
 .rail-me form { margin: 0; }
-.rail-sep { width: 48px; height: 2px; border-radius: 2px; background: var(--rail-border); margin: 4px 0; }
-/* Each menu button is its own clearly outlined tile with an icon and a short name. */
+.rail-sep { width: 40px; height: 2px; border-radius: 2px; background: var(--rail-border); margin: 4px 0; }
+/* Each menu button is its own clearly outlined box; the name shows on hover. */
 .rail-btn {
-  width: 78px; min-height: 54px; flex: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+  width: 50px; height: 50px; flex: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
   border-radius: 10px; border: 1px solid var(--rail-border); background: var(--rail-btn); color: var(--sidebar-text);
-  cursor: pointer; font: inherit; padding: 6px 2px; text-decoration: none;
+  cursor: pointer; font: inherit; padding: 0; text-decoration: none;
   transition: background-color .12s, color .12s, border-color .12s;
 }
 .rail-btn .icon { width: 24px; height: 24px; stroke-width: 2; }
-.rail-label { font-size: .68rem; font-weight: 700; line-height: 1.1; letter-spacing: 0; text-align: center; max-width: 76px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rail-btn:hover, .rail-btn:focus-visible { background: var(--sidebar-active); border-color: #6b7a96; color: #fff; text-decoration: none; }
 .rail-btn:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .rail-btn.active { background: var(--brand-rail); border-color: #fff; color: #fff; box-shadow: 0 0 0 1px #fff; }
@@ -273,8 +272,7 @@ img.thumb { width: 36px; height: 36px; border-radius: 6px; object-fit: contain; 
   .rail { flex-direction: row; }
   nav.rail { flex: none; }
   .rail-sep { width: 2px; height: 32px; margin: 0 4px; }
-  .rail-btn { width: 48px; min-height: 48px; }
-  .rail-label { display: none; }
+  .rail-btn { width: 46px; height: 46px; }
   .rail-me { border-top: 0; padding-top: 0; padding-left: 10px; border-left: 1px solid rgba(255,255,255,.08); margin-left: auto; }
   .brand-btn { margin: 0 4px 0 0; }
   .content { padding: 20px 16px 48px; }
@@ -394,6 +392,7 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fo
 .person-menu[open] .person-actions { display: flex; }
 .person-actions { display: none; flex-direction: column; gap: 8px; padding: 10px 0 0; }
 .person-actions input { width: 150px; }
+.person-actions .tab-grid input { width: auto; }
 
 /* ---------- security page ---------- */
 .qr { margin: 10px 0; }
@@ -429,3 +428,7 @@ section[id] { scroll-margin-top: 16px; }
 .warn-text { color: var(--warn); }
 .btn.disabled, .btn:disabled { opacity: .5; pointer-events: none; cursor: not-allowed; }
 tr.subtotal td { font-weight: 600; background: var(--surface-2); }
+
+.tab-picker { display: flex; flex-direction: column; gap: 8px; margin: 0 0 10px; text-align: left; }
+.tab-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 4px 12px; }
+.tab-grid label.check { font-weight: 500; }

@@ -60,6 +60,7 @@ function describe(db, req) {
     if (parts[1] === 'users' && parts[3] === 'people') return { action: 'created', text: `Added ${String(req.body.name || 'a person').trim()} to ${who}` };
     if (parts[1] === 'users' && parts.length === 2) return { action: 'created', text: `Created account @${String(req.body.username || '').trim()}` };
     if (parts[1] === 'backups') return { action: 'created', text: 'Made a backup' };
+    if (parts[3] === 'tabs') return { action: 'updated', text: `Changed which tabs a person sees at ${who}` };
     const verb = { details: 'Saved details for', password: 'Reset password for', suspend: 'Suspended', activate: 'Reactivated', logout: 'Signed out everywhere', delete: 'Deleted account' }[parts[3]];
     if (verb) return { action: parts[3] === 'delete' ? 'deleted' : 'updated', text: `${verb} ${who}` };
     return { action: 'updated', text: `Admin change (${path})` };
