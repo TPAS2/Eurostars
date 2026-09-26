@@ -3,7 +3,7 @@
 <table>
   <thead><tr>
   <% def.columns.filter(c => c !== hideField).forEach(c => { const f = def.fieldMap[c]; %>
-    <th class="<%= ['money','number','integer'].includes(f.type) ? 'num' : '' %>"><%= f.label.replace(' (£)', '') %></th>
+    <th class="<%= ['money','number','integer'].includes(f.type) || f.num ? 'num' : '' %>"><%= f.label.replace(' (£)', '') %></th>
   <% }) %>
   </tr></thead>
   <tbody>
