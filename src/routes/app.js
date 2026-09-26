@@ -211,7 +211,7 @@ module.exports = function appRoutes(db) {
         `SELECT DISTINCT c.id, c.name, c.council_tax_phone, p.id AS property_id, p.address_line1, p.council_tax_account
            FROM tenancies ty JOIN properties p ON p.id = ty.property_id JOIN councils c ON c.id = p.council_id
           WHERE ty.account_id = ? AND ty.tenant_id = ? ORDER BY c.name COLLATE NOCASE`, a, row.id);
-      return [{ title: 'Councils', empty: 'None of this tenant\'s properties has a council set yet.', headers: ['Council', 'Council tax phone', 'Property', 'Account no.'],
+      return [{ title: 'Councils', empty: 'None of this tenant\'s properties has a council set yet.', headers: ['Council', 'Phone number', 'Property', 'Council tax account no.'],
         rows: rows.map((c) => [link('councils', c.id, c.name), { text: c.council_tax_phone || '' }, link('properties', c.property_id, c.address_line1),
           { text: c.council_tax_account || '' }]) }];
     }

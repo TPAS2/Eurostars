@@ -75,8 +75,8 @@
           <dl class="mini">
             <% if (t.council_tax_account) { %><dt>Council tax account</dt><dd><%= t.council_tax_account %></dd><% } %>
             <% if (t.council_tax_payer) { %><dt>Council tax paid by</dt><dd><%= t.council_tax_payer %></dd><% } %>
-            <% if (t.council_tax_phone) { %><dt>Council tax phone</dt><dd><%= t.council_tax_phone %></dd><% } %>
-            <% if (t.council_tax_email) { %><dt>Council tax email</dt><dd><%= t.council_tax_email %></dd><% } %>
+            <% if (t.council_tax_phone) { %><dt>Phone number</dt><dd><%= t.council_tax_phone %></dd><% } %>
+            <% if (t.council_tax_email) { %><dt>Email</dt><dd><%= t.council_tax_email %></dd><% } %>
           </dl>
         <% } else { %><p class="muted">No council set for this property. <a href="/app/properties/<%= t.property_id %>/edit">Set council</a></p><% } %>
       </div>
