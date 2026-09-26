@@ -1,0 +1,100 @@
+<%- include('partials/header') %>
+<% const t = rec.totals; %>
+<header class="page-head">
+  <div>
+    <h1>Council reconciliation</h1>
+    <p class="muted">Every council: the rent it owes for its tenants this month, the money that came in, and what's still owed.</p>
+  </div>
+</header>
+
+<nav class="month-nav" aria-label="Choose month">
+  <a class="btn" href="/app/council-reconciliation?month=<%= prev %>">‹ Previous month</a>
+  <form method="get" class="month-pick">
+    <label for="rec-month" class="month-label"><%= monthLabel %></label>
+    <input id="rec-month" type="month" name="month" value="<%= month %>" aria-label="Month">
+    <button class="btn" type="submit">Go</button>
+  </form>
+  <a class="btn" href="/app/council-reconciliation?month=<%= next %>">Next month ›</a>
+  <% if (month !== thisMonth) { %><a class="btn" href="/app/council-reconciliation?month=<%= thisMonth %>">This month</a><% } %>
+</nav>
+
+<section class="card">
+  <% if (!rec.rows.length) { %>
+    <p class="muted">No councils yet. Add them on the <a href="/app/councils">Councils</a> tab.</p>
+  <% } else { %>
+  <div class="table-wrap"><table class="rec-table">
+    <thead><tr>
+      <th>Council</th><th class="num">Properties</th><th class="num">Money owed</th><th class="num">Money in</th><th class="num">Still owed</th><th>Status</th><th class="notes-col">Notes</th>
+    </tr></thead>
+    <tbody>
+    <% rec.rows.forEach(c => { %>
+      <tr class="<%= open && open.id === c.id ? 'open' : '' %>">
+        <td><a href="/app/council-reconciliation?month=<%= month %>&council_id=<%= c.id %>#detail"><strong><%= c.name %></strong></a></td>
+        <td class="num"><%= c.properties %></td>
+        <td class="num"><%= c.owed ? fmt.money(c.owed) : '—' %></td>
+        <td class="num"><%= c.received ? fmt.money(c.received) : '—' %></td>
+        <td class="num"><% if (c.balance > 0) { %><strong class="bad-text"><%= fmt.money(c.balance) %></strong><% } else if (c.balance < 0) { %><span class="ok-text"><%= fmt.money(-c.balance) %> over</span><% } else { %>—<% } %></td>
+        <td>
+          <% if (!c.owed && !c.received) { %><span class="muted small">Nothing due</span>
+          <% } else if (c.balance <= 0) { %><span class="badge s-active plain">Paid in full</span>
+          <% } else if (c.received) { %><span class="badge warn plain">Part paid</span>
+          <% } else { %><span class="badge bad plain">Not paid</span><% } %>
+        </td>
+        <td class="notes-col">
+          <form method="post" action="/app/council-reconciliation/notes" data-autosave data-autosave-key="rec-notes-<%= c.id %>-<%= month %>" class="rec-notes">
+            <%- include('partials/csrf') %>
+            <input type="hidden" name="council_id" value="<%= c.id %>">
+            <input type="hidden" name="month" value="<%= month %>">
+            <div class="field"><textarea name="notes" rows="2" maxlength="5000" aria-label="Notes for <%= c.name %>, <%= monthLabel %>" placeholder="Add a note…"><%= c.notes %></textarea></div>
+            <span class="save-status small" aria-live="polite"></span>
+          </form>
+        </td>
+      </tr>
+    <% }) %>
+      <tr class="total">
+        <td>Total</td>
+        <td class="num"><%= t.properties %></td>
+        <td class="num"><%= fmt.money(t.owed) %></td>
+        <td class="num"><%= fmt.money(t.received) %></td>
+        <td class="num"><%= t.balance > 0 ? fmt.money(t.balance) : t.balance < 0 ? fmt.money(-t.balance) + ' over' : '—' %></td>
+        <td colspan="2"></td>
+      </tr>
+    </tbody>
+  </table></div>
+  <p class="muted small">Money owed is the rent charged for <%= monthLabel %> for each council's tenancies (or the tenancy's monthly rent if this month hasn't been charged yet). Money in is rent recorded as received. Notes save automatically. Click a council to see each tenant.</p>
+  <% } %>
+</section>
+
+<% if (open && detail) { %>
+<section class="card" id="detail">
+  <div class="card-head">
+    <h2><%= open.name %> · <%= monthLabel %></h2>
+    <a class="btn small" href="/app/council-reconciliation?month=<%= month %>">Close</a>
+  </div>
+  <% if (!detail.length) { %><p class="muted">No tenancies in this council's properties for <%= monthLabel %>.</p><% } else { %>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Property</th><th>Tenant</th><th class="num">Money owed</th><th class="num">Money in</th><th class="num">Still owed</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+    <% detail.forEach(d => { %>
+      <tr>
+        <td><a href="/app/properties/<%= d.property_id %>"><%= d.address_line1 %></a></td>
+        <td><a href="/app/tenancies/<%= d.tenancy_id %>"><%= d.tenant %></a></td>
+        <td class="num"><%= fmt.money(d.owed) %><% if (!d.charged && d.owed) { %><div class="muted small">not charged yet</div><% } %></td>
+        <td class="num"><%= d.received ? fmt.money(d.received) : '—' %></td>
+        <td class="num"><%= d.diff < 0 ? fmt.money(-d.diff) : d.diff > 0 ? fmt.money(d.diff) + ' over' : '—' %></td>
+        <td>
+          <% if (d.status === 'paid') { %><span class="badge s-active plain">Paid</span>
+          <% } else if (d.status === 'part-paid') { %><span class="badge warn plain">Part paid</span>
+          <% } else if (d.status === 'overpaid') { %><span class="badge s-admin plain">Overpaid</span>
+          <% } else if (d.status === 'not-paid') { %><span class="badge bad plain">Not paid</span>
+          <% } else { %><span class="muted small">Nothing due</span><% } %>
+        </td>
+        <td class="num"><% if (d.diff < 0) { %><a class="btn small" href="/app/transactions/new?txn_type=rent_received&tenancy_id=<%= d.tenancy_id %>&amount_pence=<%= fmt.penceToInput(-d.diff) %>&description=<%= encodeURIComponent(open.name + ' payment ' + monthLabel) %>">Record payment</a><% } %></td>
+      </tr>
+    <% }) %>
+    </tbody>
+  </table></div>
+  <% } %>
+</section>
+<% } %>
+<%- include('partials/footer') %>

@@ -96,6 +96,10 @@ nav.rail { flex: 1; }
 .rail-btn:hover, .rail-btn:focus-visible { background: var(--sidebar-active); border-color: #6b7a96; color: #fff; text-decoration: none; }
 .rail-btn:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .rail-btn.active { background: var(--brand-rail); border-color: #fff; color: #fff; box-shadow: 0 0 0 1px #fff; }
+/* Council reconciliation stands out in red. */
+.rail-btn.rail-red { color: #ff6b6b; border-color: #c43b3b; background: #3a1418; }
+.rail-btn.rail-red:hover, .rail-btn.rail-red:focus-visible { color: #fff; border-color: #ff6b6b; background: #5a1c22; }
+.rail-btn.rail-red.active { background: #d92d2d; border-color: #fff; color: #fff; }
 .brand-btn { margin-bottom: 4px; }
 .brand-btn .logo { width: 30px; height: 30px; }
 .brand-btn.active .logo { box-shadow: none; }
@@ -432,3 +436,18 @@ tr.subtotal td { font-weight: 600; background: var(--surface-2); }
 .tab-picker { display: flex; flex-direction: column; gap: 8px; margin: 0 0 10px; text-align: left; }
 .tab-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 4px 12px; }
 .tab-grid label.check { font-weight: 500; }
+
+/* Council reconciliation */
+.month-nav { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0 0 18px; }
+.month-pick { display: flex; align-items: center; gap: 8px; margin: 0; }
+.month-label { font-size: 1.25rem; font-weight: 800; min-width: 170px; text-align: center; }
+.month-pick input[type=month] { width: auto; }
+.rec-table td { vertical-align: middle; }
+.rec-table tr.open td { background: var(--brand-soft); }
+.notes-col { min-width: 240px; width: 30%; }
+.rec-notes { margin: 0; }
+.rec-notes .field { margin: 0; }
+.rec-notes textarea { width: 100%; min-height: 40px; resize: vertical; font: inherit; }
+.rec-notes .save-status { display: block; min-height: 1em; }
+.bad-text { color: var(--bad); }
+.ok-text { color: var(--ok); }

@@ -5,6 +5,7 @@ const { ENTITIES, REF_LABELS } = require('../entities');
 const { transaction } = require('../db');
 const ledger = require('../ledger');
 const { rentRoll } = require('../rentroll');
+const reconcile = require('../reconcile');
 const statements = require('../statements');
 const fmt = require('../format');
 
@@ -291,6 +292,49 @@ module.exports = function appRoutes(db) {
     const msg = encodeURIComponent(`Raised ${n} rent charge${n === 1 ? '' : 's'} for ${month}.`);
     if (req.body.back === 'rent-roll') return res.redirect(`/app/rent-roll?month=${month}&flash=${msg}`);
     res.redirect('/app?flash=' + msg);
+  });
+
+  // ---------- council reconciliation: what each council owes for the month and what came in ----------
+
+  const shiftMonth = (month, by) => {
+    const [y, m] = month.split('-').map(Number);
+    return new Date(Date.UTC(y, m - 1 + by, 1)).toISOString().slice(0, 7);
+  };
+
+  router.get('/council-reconciliation', (req, res) => {
+    const a = req.user.id;
+    const month = statements.isMonth(req.query.month) ? String(req.query.month) : fmt.today().slice(0, 7);
+    const rec = reconcile.reconciliation(db, a, month);
+    const councilId = Number(req.query.council_id);
+    const open = Number.isInteger(councilId) ? rec.rows.find((c) => c.id === councilId) : null;
+    res.render('councilrec', {
+      title: 'Council reconciliation', section: 'councilrec', month, monthLabel: statements.monthLabel(month),
+      prev: shiftMonth(month, -1), next: shiftMonth(month, 1), thisMonth: fmt.today().slice(0, 7), rec, open,
+      detail: open ? reconcile.councilTenancies(db, a, month, open.id) : null, fmt,
+    });
+  });
+
+  // Notes for one council's month (saved automatically as they're typed).
+  router.post('/council-reconciliation/notes', (req, res) => {
+    const a = req.user.id;
+    const month = String(req.body.month || '');
+    const council = db.prepare('SELECT id FROM councils WHERE id = ? AND account_id = ?').get(Number(req.body.council_id), a);
+    const autosave = req.get('X-Autosave') === '1';
+    if (!council || !statements.isMonth(month)) {
+      return autosave ? res.status(422).json({ ok: false, errors: { notes: 'Could not save these notes.' } })
+        : res.status(404).render('error', { title: 'Not found', message: 'That council was not found.' });
+    }
+    const notes = String(req.body.notes || '').trim().slice(0, 5000);
+    if (notes) {
+      db.prepare(
+        `INSERT INTO council_rec_notes (account_id, council_id, month, notes) VALUES (?, ?, ?, ?)
+         ON CONFLICT (account_id, council_id, month) DO UPDATE SET notes = excluded.notes, updated_at = datetime('now')`
+      ).run(a, council.id, month, notes);
+    } else {
+      db.prepare('DELETE FROM council_rec_notes WHERE account_id = ? AND council_id = ? AND month = ?').run(a, council.id, month);
+    }
+    if (autosave) return res.json({ ok: true });
+    res.redirect(`/app/council-reconciliation?month=${month}`);
   });
 
   // ---------- rent roll: every property's rent and deductions for a month ----------

@@ -1451,8 +1451,8 @@ test('the admin chooses which tabs each person sees; hidden tabs are blocked', a
   assert.match(r.text, new RegExp(`action="/admin/users/${companyId}/tabs/${ada}"`));
   // Ada only gets Properties, Tenants and Repairs.
   r = await admin.post(`/admin/users/${companyId}/tabs/${ada}`, { tabs: ['properties', 'tenants', 'maintenance'] });
-  assert.match(decodeURIComponent(r.location), /Ada Assistant now sees 3 of 13 tabs/);
-  assert.match((await admin.get(`/admin/users/${companyId}`)).text, /3 of 13 tabs/);
+  assert.match(decodeURIComponent(r.location), /Ada Assistant now sees 3 of 14 tabs/);
+  assert.match((await admin.get(`/admin/users/${companyId}`)).text, /3 of 14 tabs/);
 
   const c = new Client();
   await c.login('tabs-co', 'adas-pass-123', 'ada');
@@ -1472,7 +1472,7 @@ test('the admin chooses which tabs each person sees; hidden tabs are blocked', a
   // The main login still sees everything; ticking all tabs gives Ada everything back.
   assert.equal((await boss.get('/app/landlords')).status, 200);
   await admin.get(`/admin/users/${companyId}`);
-  await admin.post(`/admin/users/${companyId}/tabs/${ada}`, { tabs: ['councils', 'properties', 'landlords', 'tenants', 'tenancies', 'maintenance', 'invoices', 'compliance', 'rentrun', 'rentroll', 'transactions', 'monthly', 'statements'] });
+  await admin.post(`/admin/users/${companyId}/tabs/${ada}`, { tabs: ['councils', 'councilrec', 'properties', 'landlords', 'tenants', 'tenancies', 'maintenance', 'invoices', 'compliance', 'rentrun', 'rentroll', 'transactions', 'monthly', 'statements'] });
   assert.equal(db.prepare('SELECT hidden_tabs FROM users WHERE id = ?').get(ada).hidden_tabs, null);
   assert.equal((await c.get('/app/landlords')).status, 200);
 
@@ -1483,4 +1483,50 @@ test('the admin chooses which tabs each person sees; hidden tabs are blocked', a
   await admin.get(`/admin/users/${otherId}`);
   assert.equal((await admin.post(`/admin/users/${otherId}/tabs/${ada}`, { tabs: 'properties' })).status, 404);
   assert.ok(other);
+});
+
+test('council reconciliation: every council, money owed and in, notes, totals, month buttons', async () => {
+  const c = await registerAndLogin('council-rec@example.com', 'Rec Lets');
+  let r = await c.post('/app/councils', { name: 'Bristol City Council' });
+  const bristol = idFrom(r.location);
+  r = await c.post('/app/councils', { name: 'Quiet Council' });
+  const quiet = idFrom(r.location);
+  const addLet = async (addr, rent) => {
+    const p = idFrom((await c.post('/app/properties', { address_line1: addr, council_id: String(bristol), status: 'vacant' })).location);
+    return idFrom((await c.post(`/app/properties/${p}/add-tenant`, { tenant_mode: 'new', name: `T ${addr}`, booking_date: '2026-07-01', start_date: '2026-08-01', rent_pence: rent, rent_frequency: 'monthly', status: 'active' })).location);
+  };
+  const t1 = await addLet('1 Park Row', '500');
+  await addLet('2 Park Row', '400');
+  await c.get('/app');
+  await c.post('/app/rent/raise', { month: '2026-08' });
+  await c.post('/app/transactions', { txn_date: '2026-08-06', txn_type: 'rent_received', tenancy_id: t1, amount_pence: '500' });
+
+  assert.match((await c.get('/app')).text, /class="rail-btn  rail-red" href="\/app\/council-reconciliation"/, 'red button in the menu');
+  r = await c.get('/app/council-reconciliation?month=2026-08');
+  assert.match(r.text, /‹ Previous month<\/a>/);
+  assert.match(r.text, /href="\/app\/council-reconciliation\?month=2026-07">‹ Previous month/);
+  assert.match(r.text, /href="\/app\/council-reconciliation\?month=2026-09">Next month ›/);
+  assert.match(r.text, /August 2026/);
+  assert.match(r.text, /<th[^>]*>Money owed<\/th><th[^>]*>Money in<\/th>/);
+  assert.match(r.text, /Bristol City Council[\s\S]*?£900\.00[\s\S]*?£500\.00[\s\S]*?£400\.00[\s\S]*?Part paid/);
+  assert.match(r.text, /Quiet Council[\s\S]*?Nothing due/, 'every council is listed, even with nothing due');
+  assert.match(r.text, /class="total"[\s\S]*?£900\.00[\s\S]*?£500\.00[\s\S]*?£400\.00/);
+
+  // Notes save (as the page's autosave does) and belong to that council and month.
+  const res = await fetch(`${base}/app/council-reconciliation/notes`, {
+    method: 'POST', headers: { cookie: c.cookie, 'content-type': 'application/x-www-form-urlencoded', 'X-Autosave': '1' },
+    body: new URLSearchParams({ _csrf: c.csrf, council_id: String(bristol), month: '2026-08', notes: 'Chased 2 Park Row payment' }).toString(),
+  });
+  assert.equal(res.status, 200);
+  assert.match((await c.get('/app/council-reconciliation?month=2026-08')).text, />Chased 2 Park Row payment<\/textarea>/);
+  assert.doesNotMatch((await c.get('/app/council-reconciliation?month=2026-09')).text, /Chased 2 Park Row/);
+
+  // Detail for one council.
+  r = await c.get(`/app/council-reconciliation?month=2026-08&council_id=${bristol}`);
+  assert.match(r.text, /id="detail"[\s\S]*?1 Park Row[\s\S]*?Paid[\s\S]*?2 Park Row[\s\S]*?Not paid[\s\S]*?Record payment/);
+
+  // Other companies can't write notes on these councils.
+  const other = await registerAndLogin('council-rec-2@example.com', 'Other Rec');
+  r = await other.post('/app/council-reconciliation/notes', { council_id: String(quiet), month: '2026-08', notes: 'x' });
+  assert.equal(r.status, 404);
 });

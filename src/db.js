@@ -101,6 +101,16 @@ CREATE TABLE IF NOT EXISTS councils (
   created_at           TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Notes on each council's reconciliation, one per council per month.
+CREATE TABLE IF NOT EXISTS council_rec_notes (
+  account_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  council_id  INTEGER NOT NULL REFERENCES councils(id) ON DELETE CASCADE,
+  month       TEXT NOT NULL,
+  notes       TEXT NOT NULL,
+  updated_at  TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (account_id, council_id, month)
+);
+
 -- One picture per council (e.g. its logo), kept in the database so backups include it.
 CREATE TABLE IF NOT EXISTS council_photos (
   council_id  INTEGER PRIMARY KEY REFERENCES councils(id) ON DELETE CASCADE,

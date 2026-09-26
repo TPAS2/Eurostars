@@ -6,6 +6,7 @@
 
 const TABS = [
   { key: 'councils', label: 'Councils', paths: ['/app/councils'] },
+  { key: 'councilrec', label: 'Council reconciliation', paths: ['/app/council-reconciliation'] },
   { key: 'properties', label: 'Properties', paths: ['/app/properties'] },
   { key: 'landlords', label: 'Landlords', paths: ['/app/landlords'] },
   { key: 'tenants', label: 'Tenants', paths: ['/app/tenants'] },

@@ -75,6 +75,7 @@ function describe(db, req) {
   // Sections with their own routes.
   if (section === 'account') return { action: 'viewed', text: 'Viewed my account' };
   if (section === 'statements') return { action: 'viewed', text: 'Viewed landlord statements' };
+  if (section === 'council-reconciliation') return post ? { action: 'updated', text: `Updated council reconciliation notes for ${req.body.month || ''}`.trim(), autosave: req.get('X-Autosave') === '1' } : { action: 'viewed', text: 'Viewed council reconciliation' };
   if (section === 'rent-run') return { action: 'viewed', text: 'Viewed the rent run' };
   if (section === 'rent-roll') return { action: 'viewed', text: `Viewed the rent roll for ${/^\d{4}-\d{2}$/.test(String(req.query.month || '')) ? req.query.month : 'this month'}` };
   if (section === 'rent' && post) return { action: 'created', text: `Raised rent for ${req.body.month || 'a month'}` };

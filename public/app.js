@@ -143,7 +143,8 @@ const DRAFT_DAYS = 7;
     let dirty = false;
     // A copy of unsaved changes on this device, cleared once the server has them.
     const store = storage();
-    const backupKey = `unsaved:${new URL(form.action, location.href).pathname}`;
+    // Forms sharing one address (e.g. a notes box per row) each give their own key.
+    const backupKey = `unsaved:${form.dataset.autosaveKey || new URL(form.action, location.href).pathname}`;
     const keepBackup = () => { if (store) try { store.setItem(backupKey, JSON.stringify({ at: Date.now(), values: formValues(form) })); } catch { /* full or blocked */ } };
     const dropBackup = () => { if (store) try { store.removeItem(backupKey); } catch { /* ignore */ } };
 

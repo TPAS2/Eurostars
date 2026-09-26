@@ -20,7 +20,7 @@
   const groups = user.is_admin ? [
     [['accounts', '/admin/accounts', 'Account details'], ['backups', '/admin/backups', 'Backups'], ['security', '/admin/security', 'Security']],
   ] : [
-    [['councils', '/app/councils', 'Councils']],
+    [['councils', '/app/councils', 'Councils'], ['councilrec', '/app/council-reconciliation', 'Council reconciliation']],
     [['properties', '/app/properties', 'Properties'], ['landlords', '/app/landlords', 'Landlords'], ['tenants', '/app/tenants', 'Tenants'], ['tenancies', '/app/tenancies', 'Tenancies']],
     [['maintenance', '/app/maintenance', 'Maintenance'], ['invoices', '/app/invoices', 'Invoices'], ['compliance', '/app/compliance', 'Compliance']],
     [['rentrun', '/app/rent-run', 'Rent run'], ['rentroll', '/app/rent-roll', 'Rent roll'], ['transactions', '/app/transactions', 'Transactions'], ['monthly', '/app/monthly', 'Monthly statements'], ['statements', '/app/statements', 'Statement by date range']],
@@ -34,7 +34,7 @@
       <% groups.filter(g => g.some(([key]) => !(user.hidden_tabs || []).includes(key))).forEach((g, gi) => { %>
         <% if (gi) { %><span class="rail-sep" aria-hidden="true"></span><% } %>
         <% g.filter(([key]) => !(user.hidden_tabs || []).includes(key)).forEach(([key, href, label]) => { %>
-          <a class="rail-btn <%= s === key ? 'active' : '' %>" href="<%= href %>" data-tip="<%= label %>" aria-label="<%= label %>" <%- s === key ? 'aria-current="page"' : '' %>><%- include('icon', { name: key }) %></a>
+          <a class="rail-btn <%= s === key ? 'active' : '' %> <%= key === 'councilrec' ? 'rail-red' : '' %>" href="<%= href %>" data-tip="<%= label %>" aria-label="<%= label %>" <%- s === key ? 'aria-current="page"' : '' %>><%- include('icon', { name: key }) %></a>
         <% }) %>
       <% }) %>
     </nav>
