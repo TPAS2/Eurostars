@@ -308,7 +308,7 @@ module.exports = function appRoutes(db) {
     res.render('councilrec', {
       title: 'Council reconciliation', section: 'councilrec', month, monthLabel: statements.monthLabel(month),
       prev: shiftMonth(month, -1), next: shiftMonth(month, 1), thisMonth: fmt.today().slice(0, 7), rec, open,
-      detail: open ? reconcile.councilTenancies(db, a, month, open.id) : null, fmt,
+      detail: open ? reconcile.councilTenancies(db, a, month, open.id) : null, rowStatus: reconcile.rowStatus, fmt,
     });
   });
 
@@ -323,15 +323,47 @@ module.exports = function appRoutes(db) {
         : res.status(404).render('error', { title: 'Not found', message: 'That council was not found.' });
     }
     const notes = String(req.body.notes || '').trim().slice(0, 5000);
-    if (notes) {
+    // Money owed / money in typed on the page: blank means "use the calculated figure".
+    const errors = {};
+    const amount = (field, label) => {
+      const raw = String(req.body[field] ?? '').trim();
+      if (!raw) return null;
+      const p = fmt.parseMoney(raw);
+      if (Number.isNaN(p)) { errors[field] = `Enter ${label} like 950 or 950.00, or leave it blank.`; return null; }
+      return p;
+    };
+    const owed = amount('owed', 'money owed');
+    const received = amount('received', 'money in');
+    if (Object.keys(errors).length) {
+      return autosave ? res.status(422).json({ ok: false, errors }) : res.redirect(`/app/council-reconciliation?month=${month}`);
+    }
+    if (notes || owed !== null || received !== null) {
       db.prepare(
-        `INSERT INTO council_rec_notes (account_id, council_id, month, notes) VALUES (?, ?, ?, ?)
-         ON CONFLICT (account_id, council_id, month) DO UPDATE SET notes = excluded.notes, updated_at = datetime('now')`
-      ).run(a, council.id, month, notes);
+        `INSERT INTO council_rec_notes (account_id, council_id, month, notes, owed_pence, received_pence) VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT (account_id, council_id, month) DO UPDATE SET notes = excluded.notes, owed_pence = excluded.owed_pence,
+           received_pence = excluded.received_pence, updated_at = datetime('now')`
+      ).run(a, council.id, month, notes, owed, received);
     } else {
       db.prepare('DELETE FROM council_rec_notes WHERE account_id = ? AND council_id = ? AND month = ?').run(a, council.id, month);
     }
-    if (autosave) return res.json({ ok: true });
+    if (autosave) {
+      // Send back the row's new figures and the totals so the page updates without reloading.
+      const rec = reconcile.reconciliation(db, a, month);
+      const c = rec.rows.find((r) => r.id === council.id);
+      const st = reconcile.rowStatus(c);
+      const bal = (b) => (b > 0 ? fmt.money(b) : b < 0 ? `${fmt.money(-b)} over` : '—');
+      const t = rec.totals;
+      return res.json({
+        ok: true,
+        updates: [
+          { id: `rec-balance-${c.id}`, text: bal(c.balance), className: c.balance > 0 ? 'bad-text strong' : c.balance < 0 ? 'ok-text' : '' },
+          { id: `rec-status-${c.id}`, text: st.text, className: st.cls },
+          { id: 'rec-total-owed', text: fmt.money(t.owed) },
+          { id: 'rec-total-received', text: fmt.money(t.received) },
+          { id: 'rec-total-balance', text: bal(t.balance) },
+        ],
+      });
+    }
     res.redirect(`/app/council-reconciliation?month=${month}`);
   });
 

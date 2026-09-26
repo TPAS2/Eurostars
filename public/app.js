@@ -81,7 +81,7 @@ const DRAFT_DAYS = 7;
   function showFieldErrors(form, errors) {
     clearFieldErrors(form);
     for (const [name, msg] of Object.entries(errors)) {
-      const input = form.querySelector(`[name="${CSS.escape(name)}"]`);
+      const input = [...form.elements].find((el) => el.name === name);
       const field = input && input.closest('.field');
       if (!field) continue;
       const div = document.createElement('div');
@@ -94,7 +94,7 @@ const DRAFT_DAYS = 7;
   function formValues(form) {
     const values = {};
     for (const [k, v] of new FormData(form)) {
-      const el = form.querySelector(`[name="${CSS.escape(k)}"]`);
+      const el = [...form.elements].find((x) => x.name === k);
       // Never kept: passwords, one-time codes, and confirmations like "type the username to delete".
       if (el && (el.type === 'password' || el.autocomplete === 'one-time-code' || el.hasAttribute('data-no-keep'))) continue;
       if (typeof v === 'string' && k !== '_csrf') values[k] = v;
@@ -104,7 +104,7 @@ const DRAFT_DAYS = 7;
 
   function applyValues(form, values) {
     for (const [name, value] of Object.entries(values)) {
-      form.querySelectorAll(`[name="${CSS.escape(name)}"]`).forEach((el) => {
+      [...form.elements].filter((el) => el.name === name).forEach((el) => {
         if (el.type === 'radio' || el.type === 'checkbox') el.checked = el.value === value;
         else if (!['file', 'hidden', 'password'].includes(el.type)) el.value = value;
       });
@@ -162,6 +162,14 @@ const DRAFT_DAYS = 7;
         if (res.ok) {
           if (!dirty) dropBackup();
           clearFieldErrors(form);
+          // The server can send back figures elsewhere on the page that changed (e.g. totals).
+          const data = await res.json().catch(() => null);
+          for (const u of (data && data.updates) || []) {
+            const el = document.getElementById(u.id);
+            if (!el) continue;
+            el.textContent = u.text;
+            if (u.className !== undefined) el.className = u.className;
+          }
           setStatus(form, `All changes saved · ${new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`, 'ok');
         } else if (res.status === 422) {
           const data = await res.json().catch(() => ({ errors: {} }));
@@ -205,6 +213,12 @@ const DRAFT_DAYS = 7;
     } else if (pending) dropBackup();
     form.addEventListener('input', schedule);
     form.addEventListener('change', schedule);
+    // Fields placed elsewhere on the page but belonging to this form (form="…") save with it too.
+    for (const el of form.elements) {
+      if (form.contains(el)) continue;
+      el.addEventListener('input', schedule);
+      el.addEventListener('change', schedule);
+    }
     form.addEventListener('submit', (e) => { e.preventDefault(); clearTimeout(timer); dirty = true; save(); });
 
     // Flush on leaving the page; warn if a save is still pending.

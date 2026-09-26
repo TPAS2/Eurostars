@@ -31,17 +31,19 @@
       <tr class="<%= open && open.id === c.id ? 'open' : '' %>">
         <td><a href="/app/council-reconciliation?month=<%= month %>&council_id=<%= c.id %>#detail"><strong><%= c.name %></strong></a></td>
         <td class="num"><%= c.properties %></td>
-        <td class="num"><%= c.owed ? fmt.money(c.owed) : '—' %></td>
-        <td class="num"><%= c.received ? fmt.money(c.received) : '—' %></td>
-        <td class="num"><% if (c.balance > 0) { %><strong class="bad-text"><%= fmt.money(c.balance) %></strong><% } else if (c.balance < 0) { %><span class="ok-text"><%= fmt.money(-c.balance) %> over</span><% } else { %>—<% } %></td>
-        <td>
-          <% if (!c.owed && !c.received) { %><span class="muted small">Nothing due</span>
-          <% } else if (c.balance <= 0) { %><span class="badge s-active plain">Paid in full</span>
-          <% } else if (c.received) { %><span class="badge warn plain">Part paid</span>
-          <% } else { %><span class="badge bad plain">Not paid</span><% } %>
+        <% const st = rowStatus(c); %>
+        <td class="num money-cell">
+          <div class="field"><input form="rec-form-<%= c.id %>" name="owed" inputmode="decimal" autocomplete="off" value="<%= c.owedEntered !== null ? fmt.penceToInput(c.owedEntered) : '' %>" placeholder="<%= fmt.penceToInput(c.owedCalculated) %>" aria-label="Money owed by <%= c.name %>"></div>
+          <% if (c.owedEntered !== null) { %><div class="muted small">calculated <%= fmt.money(c.owedCalculated) %></div><% } %>
         </td>
+        <td class="num money-cell">
+          <div class="field"><input form="rec-form-<%= c.id %>" name="received" inputmode="decimal" autocomplete="off" value="<%= c.receivedEntered !== null ? fmt.penceToInput(c.receivedEntered) : '' %>" placeholder="<%= fmt.penceToInput(c.receivedCalculated) %>" aria-label="Money in from <%= c.name %>"></div>
+          <% if (c.receivedEntered !== null) { %><div class="muted small">recorded <%= fmt.money(c.receivedCalculated) %></div><% } %>
+        </td>
+        <td class="num"><span id="rec-balance-<%= c.id %>" class="<%= c.balance > 0 ? 'bad-text strong' : c.balance < 0 ? 'ok-text' : '' %>"><%= c.balance > 0 ? fmt.money(c.balance) : c.balance < 0 ? fmt.money(-c.balance) + ' over' : '—' %></span></td>
+        <td><span id="rec-status-<%= c.id %>" class="<%= st.cls %>"><%= st.text %></span></td>
         <td class="notes-col">
-          <form method="post" action="/app/council-reconciliation/notes" data-autosave data-autosave-key="rec-notes-<%= c.id %>-<%= month %>" class="rec-notes">
+          <form id="rec-form-<%= c.id %>" method="post" action="/app/council-reconciliation/notes" data-autosave data-autosave-key="rec-notes-<%= c.id %>-<%= month %>" class="rec-notes">
             <%- include('partials/csrf') %>
             <input type="hidden" name="council_id" value="<%= c.id %>">
             <input type="hidden" name="month" value="<%= month %>">
@@ -54,9 +56,9 @@
       <tr class="total">
         <td>Total</td>
         <td class="num"><%= t.properties %></td>
-        <td class="num"><%= fmt.money(t.owed) %></td>
-        <td class="num"><%= fmt.money(t.received) %></td>
-        <td class="num"><%= t.balance > 0 ? fmt.money(t.balance) : t.balance < 0 ? fmt.money(-t.balance) + ' over' : '—' %></td>
+        <td class="num" id="rec-total-owed"><%= fmt.money(t.owed) %></td>
+        <td class="num" id="rec-total-received"><%= fmt.money(t.received) %></td>
+        <td class="num" id="rec-total-balance"><%= t.balance > 0 ? fmt.money(t.balance) : t.balance < 0 ? fmt.money(-t.balance) + ' over' : '—' %></td>
         <td colspan="2"></td>
       </tr>
     </tbody>

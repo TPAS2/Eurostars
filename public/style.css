@@ -474,3 +474,10 @@ dl.mini dd { margin: 0; overflow-wrap: anywhere; }
 .agreement-actions form { margin: 0; }
 .agreement-actions label.btn { cursor: pointer; }
 @media (max-width: 900px) { .tenant-box-grid { grid-template-columns: 1fr; } }
+
+.money-cell { min-width: 130px; }
+.money-cell .field { margin: 0; }
+.money-cell input { width: 120px; text-align: right; font-variant-numeric: tabular-nums; }
+.money-cell input::placeholder { color: var(--text); opacity: .55; }
+.money-cell .field-err { text-align: left; font-size: .75rem; }
+.strong { font-weight: 700; }

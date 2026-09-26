@@ -112,7 +112,8 @@ CREATE TABLE IF NOT EXISTS tenancy_agreements (
   uploaded_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
--- Notes on each council's reconciliation, one per council per month.
+-- Notes on each council's reconciliation, one per council per month, plus any amounts typed in
+-- on the page (which replace the calculated money owed / money in when set).
 CREATE TABLE IF NOT EXISTS council_rec_notes (
   account_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   council_id  INTEGER NOT NULL REFERENCES councils(id) ON DELETE CASCADE,
@@ -294,6 +295,8 @@ function openDatabase(file) {
   addColumnIfMissing(db, 'landlords', 'statement_type', "TEXT NOT NULL DEFAULT 'Email'");
   addColumnIfMissing(db, 'sessions', 'last_seen_at', 'TEXT');
   addColumnIfMissing(db, 'users', 'hidden_tabs', 'TEXT');
+  addColumnIfMissing(db, 'council_rec_notes', 'owed_pence', 'INTEGER');
+  addColumnIfMissing(db, 'council_rec_notes', 'received_pence', 'INTEGER');
   addColumnIfMissing(db, 'monthly_statements', 'emailed_at', 'TEXT');
   addColumnIfMissing(db, 'monthly_statements', 'emailed_to', 'TEXT');
   addColumnIfMissing(db, 'login_challenges', 'next_url', 'TEXT');

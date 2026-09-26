@@ -39,12 +39,15 @@ function councilTenancies(db, accountId, month, councilId = null) {
 // One row per council on the Councils tab (all of them), with totals.
 function reconciliation(db, accountId, month) {
   const councils = db.prepare('SELECT id, name FROM councils WHERE account_id = ? ORDER BY name COLLATE NOCASE').all(accountId);
-  const notes = new Map(db.prepare('SELECT council_id, notes FROM council_rec_notes WHERE account_id = ? AND month = ?').all(accountId, month)
-    .map((n) => [n.council_id, n.notes]));
+  const saved = new Map(db.prepare('SELECT council_id, notes, owed_pence, received_pence FROM council_rec_notes WHERE account_id = ? AND month = ?')
+    .all(accountId, month).map((n) => [n.council_id, n]));
   const props = new Map(db.prepare('SELECT council_id, COUNT(*) AS n FROM properties WHERE account_id = ? AND council_id IS NOT NULL GROUP BY council_id').all(accountId)
     .map((p) => [p.council_id, p.n]));
   const byCouncil = new Map(councils.map((c) => [c.id, {
-    ...c, properties: props.get(c.id) || 0, tenancies: 0, owed: 0, received: 0, notes: notes.get(c.id) || '', unpaid: 0,
+    ...c, properties: props.get(c.id) || 0, tenancies: 0, owed: 0, received: 0, unpaid: 0,
+    notes: (saved.get(c.id) || {}).notes || '',
+    owedEntered: (saved.get(c.id) || {}).owed_pence ?? null,
+    receivedEntered: (saved.get(c.id) || {}).received_pence ?? null,
   }]));
   for (const t of councilTenancies(db, accountId, month)) {
     const c = byCouncil.get(t.council_id);
@@ -54,7 +57,12 @@ function reconciliation(db, accountId, month) {
     c.received += t.received;
     if (t.status === 'not-paid' || t.status === 'part-paid') c.unpaid += 1;
   }
-  const rows = [...byCouncil.values()].map((c) => ({ ...c, balance: c.owed - c.received }));
+  // Amounts typed in on the page replace the calculated ones.
+  const rows = [...byCouncil.values()].map((c) => {
+    const owed = c.owedEntered ?? c.owed;
+    const received = c.receivedEntered ?? c.received;
+    return { ...c, owedCalculated: c.owed, receivedCalculated: c.received, owed, received, balance: owed - received };
+  });
   const totals = rows.reduce((t, c) => ({
     properties: t.properties + c.properties, tenancies: t.tenancies + c.tenancies, owed: t.owed + c.owed,
     received: t.received + c.received, balance: t.balance + c.balance,
@@ -62,4 +70,12 @@ function reconciliation(db, accountId, month) {
   return { rows, totals };
 }
 
-module.exports = { reconciliation, councilTenancies };
+// How a council's row reads: the "still owed" text and status badge.
+function rowStatus(c) {
+  if (!c.owed && !c.received) return { text: 'Nothing due', cls: 'muted small' };
+  if (c.balance <= 0) return { text: 'Paid in full', cls: 'badge s-active plain' };
+  if (c.received) return { text: 'Part paid', cls: 'badge warn plain' };
+  return { text: 'Not paid', cls: 'badge bad plain' };
+}
+
+module.exports = { reconciliation, councilTenancies, rowStatus };

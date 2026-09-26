@@ -1422,7 +1422,7 @@ test('council reconciliation: every council, money owed and in, notes, totals, m
   assert.match(r.text, /href="\/app\/council-reconciliation\?month=2026-09">Next month ›/);
   assert.match(r.text, /August 2026/);
   assert.match(r.text, /<th[^>]*>Money owed<\/th><th[^>]*>Money in<\/th>/);
-  assert.match(r.text, /Bristol City Council[\s\S]*?£900\.00[\s\S]*?£500\.00[\s\S]*?£400\.00[\s\S]*?Part paid/);
+  assert.match(r.text, /Bristol City Council[\s\S]*?name="owed"[^>]*placeholder="900\.00"[\s\S]*?name="received"[^>]*placeholder="500\.00"[\s\S]*?£400\.00[\s\S]*?Part paid/);
   assert.match(r.text, /Quiet Council[\s\S]*?Nothing due/, 'every council is listed, even with nothing due');
   assert.match(r.text, /class="total"[\s\S]*?£900\.00[\s\S]*?£500\.00[\s\S]*?£400\.00/);
 
@@ -1434,6 +1434,30 @@ test('council reconciliation: every council, money owed and in, notes, totals, m
   assert.equal(res.status, 200);
   assert.match((await c.get('/app/council-reconciliation?month=2026-08')).text, />Chased 2 Park Row payment<\/textarea>/);
   assert.doesNotMatch((await c.get('/app/council-reconciliation?month=2026-09')).text, /Chased 2 Park Row/);
+
+  // Money owed and money in can be typed straight into the table; they replace the calculated
+  // figures for that council and month, and the reply carries the new still-owed, status and totals.
+  const save = async (fields) => fetch(`${base}/app/council-reconciliation/notes`, {
+    method: 'POST', headers: { cookie: c.cookie, 'content-type': 'application/x-www-form-urlencoded', 'X-Autosave': '1' },
+    body: new URLSearchParams({ _csrf: c.csrf, council_id: String(bristol), month: '2026-08', notes: 'Chased 2 Park Row payment', ...fields }).toString(),
+  });
+  let saved = await save({ owed: '950', received: '£950.00' });
+  assert.equal(saved.status, 200);
+  const body = await saved.json();
+  assert.deepEqual(body.updates.find((u) => u.id === `rec-status-${bristol}`), { id: `rec-status-${bristol}`, text: 'Paid in full', className: 'badge s-active plain' });
+  assert.equal(body.updates.find((u) => u.id === 'rec-total-owed').text, '£950.00');
+  r = await c.get('/app/council-reconciliation?month=2026-08');
+  assert.match(r.text, /name="owed"[^>]*value="950\.00"[^>]*placeholder="900\.00"/);
+  assert.match(r.text, /calculated £900\.00/);
+  assert.match(r.text, /recorded £500\.00/);
+  assert.match(r.text, /id="rec-total-received">£950\.00/);
+  saved = await save({ owed: 'lots', received: '' });
+  assert.equal(saved.status, 422);
+  assert.match((await saved.json()).errors.owed, /like 950/);
+  // Clearing the boxes goes back to the calculated figures.
+  saved = await save({ owed: '', received: '' });
+  assert.equal(saved.status, 200);
+  assert.match((await c.get('/app/council-reconciliation?month=2026-08')).text, /id="rec-total-owed">£900\.00/);
 
   // Detail for one council.
   r = await c.get(`/app/council-reconciliation?month=2026-08&council_id=${bristol}`);
