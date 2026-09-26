@@ -15,7 +15,8 @@ const TABS = [
   { key: 'invoices', label: 'Invoices', paths: ['/app/invoices'] },
   { key: 'compliance', label: 'Compliance', paths: ['/app/compliance'] },
   { key: 'rentrun', label: 'Rent run', paths: ['/app/rent-run', '/app/monthly/calculate', '/app/monthly/email', '/app/monthly/report'] },
-  { key: 'transactions', label: 'Payments (transactions)', paths: ['/app/transactions'] },
+  // Not in the menu, but the pages behind Record rent received / Record payment / Pay landlord.
+  { key: 'transactions', label: 'Recording payments', paths: ['/app/transactions'] },
   { key: 'monthly', label: 'Monthly statements', paths: ['/app/monthly'] },
   { key: 'statements', label: 'Statement by date range', paths: ['/app/statements'] },
 ];

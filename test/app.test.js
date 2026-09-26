@@ -1677,3 +1677,10 @@ test('invoices link to their property and show whether they were deducted, with 
   assert.match((await c.get(`/app/invoices/${charged}`)).text, /Deducted from landlord[\s\S]*?yes-no yes">Yes<\/span> Dora Deduct/);
   assert.match((await c.get(`/app/invoices/${notCharged}`)).text, /Deducted from landlord[\s\S]*?yes-no no">No/);
 });
+
+test('Transactions is not in the menu, but recording payments still works', async () => {
+  const c = await registerAndLogin('no-txn-tab@example.com', 'No Txn Lets');
+  const rail = (await c.get('/app')).text.match(/<nav class="rail"[\s\S]*?<\/nav>/)[0];
+  assert.doesNotMatch(rail, /aria-label="Transactions"/);
+  assert.equal((await c.get('/app/transactions/new?txn_type=rent_received')).status, 200);
+});
