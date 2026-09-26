@@ -301,10 +301,13 @@ module.exports = function appRoutes(db) {
     const landlordId = Number(req.query.landlord_id);
     const landlord = Number.isInteger(landlordId) && landlordId > 0
       ? db.prepare('SELECT id, name FROM landlords WHERE id = ? AND account_id = ?').get(landlordId, a) : null;
-    const roll = rentRoll(db, a, month, landlord ? landlord.id : null);
+    const councilId = Number(req.query.council_id);
+    const council = Number.isInteger(councilId) && councilId > 0
+      ? db.prepare('SELECT id, name FROM councils WHERE id = ? AND account_id = ?').get(councilId, a) : null;
+    const roll = rentRoll(db, a, month, landlord ? landlord.id : null, council ? council.id : null);
     res.render('rentroll', {
-      title: 'Rent roll', section: 'rentroll', month, monthLabel: statements.monthLabel(month), landlord,
-      landlords: refOptions('landlords', a), roll, fmt, flash: String(req.query.flash || '').slice(0, 200),
+      title: 'Rent roll', section: 'rentroll', month, monthLabel: statements.monthLabel(month), landlord, council,
+      landlords: refOptions('landlords', a), councils: refOptions('councils', a), roll, fmt, flash: String(req.query.flash || '').slice(0, 200),
     });
   });
 

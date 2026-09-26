@@ -1401,3 +1401,35 @@ test('landlords have a statement type (Email or Cheque); cheque landlords are le
   assert.match(r.text, /Chad Cheque[\s\S]*?badge warn">Cheque[\s\S]*?Print statement/);
   assert.match(r.text, /1 paid by cheque is left out/);
 });
+
+test('rent roll shows which council pays each property and what each council still owes', async () => {
+  const c = await registerAndLogin('council-rent@example.com', 'Council Rent Lets');
+  let r = await c.post('/app/councils', { name: 'Leeds City Council' });
+  const leeds = idFrom(r.location);
+  r = await c.post('/app/councils', { name: 'York Council' });
+  const york = idFrom(r.location);
+  const addLet = async (addr, council, rent) => {
+    const p = idFrom((await c.post('/app/properties', { address_line1: addr, council_id: String(council), status: 'vacant' })).location);
+    const t = idFrom((await c.post(`/app/properties/${p}/add-tenant`, { tenant_mode: 'new', name: `T ${addr}`, booking_date: '2026-07-01', start_date: '2026-08-01', rent_pence: rent, rent_frequency: 'monthly', status: 'active' })).location);
+    return t;
+  };
+  const t1 = await addLet('1 Leeds Road', leeds, '500');
+  const t2 = await addLet('2 Leeds Road', leeds, '600');
+  const t3 = await addLet('3 York Way', york, '700');
+  await c.get('/app/rent-roll?month=2026-08');
+  await c.post('/app/rent/raise', { month: '2026-08', back: 'rent-roll' });
+  await c.post('/app/transactions', { txn_date: '2026-08-05', txn_type: 'rent_received', tenancy_id: t1, amount_pence: '500' });
+  await c.post('/app/transactions', { txn_date: '2026-08-05', txn_type: 'rent_received', tenancy_id: t2, amount_pence: '200' });
+  await c.post('/app/transactions', { txn_date: '2026-08-05', txn_type: 'rent_received', tenancy_id: t3, amount_pence: '700' });
+
+  r = await c.get('/app/rent-roll?month=2026-08');
+  assert.match(r.text, /Still owed by councils[\s\S]*?£400\.00/);
+  assert.match(r.text, /By council[\s\S]*?Leeds City Council[\s\S]*?£1,100\.00[\s\S]*?£700\.00[\s\S]*?£400\.00[\s\S]*?Not paid for 1 property/);
+  assert.match(r.text, /York Council[\s\S]*?Paid in full/);
+  assert.match(r.text, /1 Leeds Road[\s\S]*?Leeds City Council[\s\S]*?badge s-active">Paid/);
+  assert.match(r.text, /2 Leeds Road[\s\S]*?Part paid · £400\.00 owed/);
+  // Filter to one council.
+  r = await c.get(`/app/rent-roll?month=2026-08&council_id=${york}`);
+  assert.match(r.text, /3 York Way/);
+  assert.doesNotMatch(r.text, /1 Leeds Road/);
+});

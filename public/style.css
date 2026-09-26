@@ -11,6 +11,9 @@
   --sidebar: #0b111d;
   --sidebar-text: #eef1f5;
   --sidebar-active: #243149;
+  --rail-btn: #1a2436;
+  --rail-border: #3a4862;
+  --brand-rail: #1f5eff;
   --ok: #075a31;
   --ok-soft: #d6f0e0;
   --warn: #6e3f00;
@@ -36,6 +39,9 @@
     --sidebar: #05070a;
     --sidebar-text: #e3e8ef;
     --sidebar-active: #1a2233;
+    --rail-btn: #121a28;
+    --rail-border: #33415a;
+    --brand-rail: #1f5eff;
     --ok: #6ee7a0;
     --ok-soft: #12301f;
     --warn: #fcd34d;
@@ -65,31 +71,36 @@ h3 { font-size: 1rem; margin: 0 0 .4rem; }
 .pre { white-space: pre-wrap; }
 
 /* ---------- layout ---------- */
-.shell { display: grid; grid-template-columns: 64px 1fr; min-height: 100vh; background: linear-gradient(to right, var(--sidebar) 64px, transparent 64px); }
+.shell { display: grid; grid-template-columns: 96px 1fr; min-height: 100vh; background: linear-gradient(to right, var(--sidebar) 96px, transparent 96px); }
 .sidebar {
   background: var(--sidebar); color: var(--sidebar-text);
-  padding: 12px 10px; display: flex; flex-direction: column; align-items: center; gap: 10px;
-  position: sticky; top: 0; height: 100vh; overflow-y: auto; scrollbar-width: none;
+  padding: 12px 8px; display: flex; flex-direction: column; align-items: center; gap: 8px;
+  position: sticky; top: 0; height: 100vh; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--rail-border) transparent;
+  border-right: 1px solid var(--rail-border);
 }
-.sidebar::-webkit-scrollbar { display: none; }
+.sidebar::-webkit-scrollbar { width: 6px; }
+.sidebar::-webkit-scrollbar-thumb { background: var(--rail-border); border-radius: 3px; }
 .rail { display: flex; flex-direction: column; align-items: center; gap: 6px; }
 nav.rail { flex: 1; }
-.rail-me { padding-top: 10px; border-top: 1px solid rgba(255,255,255,.08); }
+.rail-me { padding-top: 10px; border-top: 1px solid var(--rail-border); }
 .rail-me form { margin: 0; }
-.rail-sep { width: 24px; height: 1px; background: rgba(255,255,255,.1); margin: 4px 0; }
+.rail-sep { width: 48px; height: 2px; border-radius: 2px; background: var(--rail-border); margin: 4px 0; }
+/* Each menu button is its own clearly outlined tile with an icon and a short name. */
 .rail-btn {
-  width: 40px; height: 40px; flex: none; display: grid; place-items: center;
-  border-radius: 9px; border: 0; background: transparent; color: var(--sidebar-text);
-  cursor: pointer; font: inherit; padding: 0; text-decoration: none;
-  transition: background-color .12s, color .12s;
+  width: 78px; min-height: 54px; flex: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+  border-radius: 10px; border: 1px solid var(--rail-border); background: var(--rail-btn); color: var(--sidebar-text);
+  cursor: pointer; font: inherit; padding: 6px 2px; text-decoration: none;
+  transition: background-color .12s, color .12s, border-color .12s;
 }
-.rail-btn:hover, .rail-btn:focus-visible { background: var(--sidebar-active); color: #fff; text-decoration: none; }
-.rail-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
-.rail-btn.active { background: var(--brand); color: var(--brand-ink); }
+.rail-btn .icon { width: 24px; height: 24px; stroke-width: 2; }
+.rail-label { font-size: .68rem; font-weight: 700; line-height: 1.1; letter-spacing: 0; text-align: center; max-width: 76px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rail-btn:hover, .rail-btn:focus-visible { background: var(--sidebar-active); border-color: #6b7a96; color: #fff; text-decoration: none; }
+.rail-btn:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.rail-btn.active { background: var(--brand-rail); border-color: #fff; color: #fff; box-shadow: 0 0 0 1px #fff; }
 .brand-btn { margin-bottom: 4px; }
-.brand-btn:hover, .brand-btn.active { background: transparent; }
-.brand-btn.active .logo { box-shadow: 0 0 0 2px var(--sidebar), 0 0 0 4px #fff; }
-.avatar { background: var(--sidebar-active); color: #fff; font-size: .8rem; font-weight: 700; letter-spacing: .02em; }
+.brand-btn .logo { width: 30px; height: 30px; }
+.brand-btn.active .logo { box-shadow: none; }
+.avatar-initials { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: #fff; color: var(--sidebar); font-size: .78rem; font-weight: 800; }
 
 /* Hover / focus label for the icon rail (positioned by app.js so it isn't clipped). */
 .rail-tip {
@@ -150,6 +161,7 @@ tr.total td { font-weight: 700; border-top: 2px solid var(--text); }
 .badge.s-active, .badge.s-let, .badge.s-completed { background: var(--ok-soft); color: var(--ok); }
 .badge.s-vacant, .badge.s-open, .badge.s-pending, .badge.warn, .badge.p-high, .badge.s-high { background: var(--warn-soft); color: var(--warn); }
 .badge.s-suspended, .badge.bad, .badge.p-emergency, .badge.s-emergency, .badge.s-ended { background: var(--bad-soft); color: var(--bad); }
+.badge.plain { text-transform: none; }
 .badge.s-admin, .badge.s-in-progress { background: var(--brand-soft); color: var(--brand); }
 .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--ok); margin-left: 4px; }
 
@@ -260,7 +272,9 @@ img.thumb { width: 36px; height: 36px; border-radius: 6px; object-fit: contain; 
   .sidebar { position: sticky; top: 0; z-index: 20; height: auto; flex-direction: row; padding: 8px 12px; overflow-x: auto; overflow-y: hidden; }
   .rail { flex-direction: row; }
   nav.rail { flex: none; }
-  .rail-sep { width: 1px; height: 24px; margin: 0 4px; }
+  .rail-sep { width: 2px; height: 32px; margin: 0 4px; }
+  .rail-btn { width: 48px; min-height: 48px; }
+  .rail-label { display: none; }
   .rail-me { border-top: 0; padding-top: 0; padding-left: 10px; border-left: 1px solid rgba(255,255,255,.08); margin-left: auto; }
   .brand-btn { margin: 0 4px 0 0; }
   .content { padding: 20px 16px 48px; }
