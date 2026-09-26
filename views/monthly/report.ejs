@@ -7,9 +7,9 @@
     <p class="muted"><%= report.monthLabel %> · preview of the CSV spreadsheet, one line per property</p>
   </div>
   <div class="actions">
-    <form method="get" class="inline-form">
+    <form method="get" data-autogo class="inline-form">
       <input type="month" name="month" value="<%= report.month %>" aria-label="Month">
-      <button class="btn" type="submit">Show</button>
+      <noscript><button class="btn" type="submit">Show</button></noscript>
     </form>
     <a class="btn primary <%= report.landlords.length ? '' : 'disabled' %>" href="/app/monthly/report.csv?month=<%= report.month %>" <%- report.landlords.length ? '' : 'aria-disabled="true" tabindex="-1"' %>>Download CSV</a>
   </div>

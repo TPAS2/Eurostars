@@ -4,9 +4,9 @@
     <h1>Rent run</h1>
     <p class="muted">Month end in four steps: calculate the rents, email every landlord their statement, check the report, and email it.</p>
   </div>
-  <form method="get" class="inline-form">
+  <form method="get" data-autogo class="inline-form">
     <input type="month" name="month" value="<%= month %>" aria-label="Month">
-    <button class="btn" type="submit">Show</button>
+    <noscript><button class="btn" type="submit">Show</button></noscript>
   </form>
 </header>
 <% if (flash) { %><div class="notice ok"><%= flash %></div><% } %>

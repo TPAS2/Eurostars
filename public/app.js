@@ -291,6 +291,14 @@ const DRAFT_DAYS = 7;
   }
 
   document.addEventListener('DOMContentLoaded', () => {
+    // Month pickers (and their filters) go straight to the chosen month; no button needed.
+    document.querySelectorAll('form[data-autogo]').forEach((form) => {
+      form.addEventListener('change', (e) => {
+        const el = e.target;
+        if (el.type === 'month' && !/^\d{4}-\d{2}$/.test(el.value)) return;
+        form.submit();
+      });
+    });
     // A picture is uploaded as soon as one is chosen.
     document.querySelectorAll('input[type=file][data-autosubmit]').forEach((input) => {
       input.addEventListener('change', () => { if (input.files.length) input.form.submit(); });

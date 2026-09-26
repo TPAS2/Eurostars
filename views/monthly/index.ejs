@@ -5,9 +5,9 @@
     <p class="muted">To calculate rents, email landlords and get the CSV report, use <a href="/app/rent-run?month=<%= month %>">Rent run</a>.</p>
     <p class="muted">A statement for each landlord every month: rent received, fees and costs deducted, and what's held for them. <%= aiEnabled ? 'Summaries are written by AI from the figures.' : 'Set ANTHROPIC_API_KEY to have AI write the summaries.' %></p>
   </div>
-  <form method="get" class="inline-form">
+  <form method="get" data-autogo class="inline-form">
     <input type="month" name="month" value="<%= month %>">
-    <button class="btn" type="submit">Show</button>
+    <noscript><button class="btn" type="submit">Show</button></noscript>
   </form>
 </header>
 <% if (flash) { %><div class="notice ok"><%= flash %></div><% } %>

@@ -5,7 +5,7 @@
     <h1>Rent roll</h1>
     <p class="muted">Every property for <%= monthLabel %>: the rent due, what the council has paid, fees and costs deducted, and what's left for the landlord.</p>
   </div>
-  <form method="get" class="inline-form">
+  <form method="get" data-autogo class="inline-form">
     <input type="month" name="month" value="<%= month %>" aria-label="Month">
     <select name="council_id" aria-label="Council">
       <option value="">All councils</option>
@@ -15,7 +15,7 @@
       <option value="">All landlords</option>
       <% landlords.forEach(l => { %><option value="<%= l.id %>" <%= landlord && landlord.id === l.id ? 'selected' : '' %>><%= l.label %></option><% }) %>
     </select>
-    <button class="btn" type="submit">Show</button>
+    <noscript><button class="btn" type="submit">Show</button></noscript>
   </form>
 </header>
 <% if (flash) { %><div class="notice ok"><%= flash %></div><% } %>
