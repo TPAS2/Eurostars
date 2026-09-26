@@ -57,6 +57,73 @@
   <% if (photo) { %></div><% } %>
 </section>
 
+<% if (tenantBoxes) { %>
+  <% if (!tenantBoxes.length && def.key === 'tenants') { %>
+  <section class="card"><p class="muted">No tenancy yet. Add one from a property with <strong>+ Add tenant</strong>.</p></section>
+  <% } %>
+  <% tenantBoxes.forEach(t => { const back = `/app/${def.key}/${row.id}`; %>
+  <section class="card tenant-box" id="tenancy-<%= t.id %>">
+    <div class="card-head">
+      <h2><%= def.key === 'tenants' ? (t.status === 'active' ? 'Current tenancy' : 'Latest tenancy') : 'Council, property & agreement' %></h2>
+      <% if (def.key === 'tenants') { %><a class="btn small" href="/app/tenancies/<%= t.id %>">Open tenancy</a><% } %>
+    </div>
+    <div class="tenant-box-grid">
+      <div>
+        <h3>Council</h3>
+        <% if (t.council_id) { %>
+          <p class="with-thumb-line"><% if (t.council_photo_v) { %><img class="thumb" src="/app/councils/<%= t.council_id %>/photo?v=<%= t.council_photo_v %>" alt=""><% } %><a href="/app/councils/<%= t.council_id %>"><strong><%= t.council_name %></strong></a></p>
+          <dl class="mini">
+            <% if (t.council_tax_account) { %><dt>Council tax account</dt><dd><%= t.council_tax_account %></dd><% } %>
+            <% if (t.council_tax_payer) { %><dt>Council tax paid by</dt><dd><%= t.council_tax_payer %></dd><% } %>
+            <% if (t.council_tax_phone) { %><dt>Council tax phone</dt><dd><%= t.council_tax_phone %></dd><% } %>
+            <% if (t.council_tax_email) { %><dt>Council tax email</dt><dd><%= t.council_tax_email %></dd><% } %>
+          </dl>
+        <% } else { %><p class="muted">No council set for this property. <a href="/app/properties/<%= t.property_id %>/edit">Set council</a></p><% } %>
+      </div>
+      <div>
+        <h3>Property</h3>
+        <p><a href="/app/properties/<%= t.property_id %>"><strong><%= t.address_line1 %></strong></a></p>
+        <dl class="mini">
+          <% if (t.town || t.postcode) { %><dt>Address</dt><dd><%= [t.town, t.postcode].filter(Boolean).join(', ') %></dd><% } %>
+          <% if (t.property_type) { %><dt>Type</dt><dd><%= t.property_type %><%= t.bedrooms ? ` · ${t.bedrooms} bed` : '' %></dd><% } %>
+          <dt>Landlord</dt><dd><% if (t.landlord_id) { %><a href="/app/landlords/<%= t.landlord_id %>"><%= t.landlord_name %></a><% } else { %><span class="muted">—</span><% } %></dd>
+        </dl>
+      </div>
+      <div>
+        <h3>Tenancy agreement</h3>
+        <dl class="mini">
+          <dt>Status</dt><dd><span class="badge s-<%= t.status %>"><%= t.status %></span></dd>
+          <dt>Booked</dt><dd><%= fmt.ukDate(t.booking_date) %></dd>
+          <dt>Term</dt><dd><%= fmt.ukDate(t.start_date) %> – <%= t.end_date ? fmt.ukDate(t.end_date) : 'ongoing' %></dd>
+          <dt>Rent</dt><dd><%= fmt.money(t.rent_pence) %> <%= t.rent_frequency === 'weekly' ? 'a week' : 'a month' %></dd>
+          <% if (t.deposit_pence) { %><dt>Deposit</dt><dd><%= fmt.money(t.deposit_pence) %><%= t.deposit_scheme ? ` · ${t.deposit_scheme}` : '' %></dd><% } %>
+        </dl>
+        <div class="agreement">
+          <% if (t.agreement_name) { %>
+            <p class="small"><a href="/app/tenancies/<%= t.id %>/agreement" target="_blank" rel="noopener"><strong>📄 <%= t.agreement_name %></strong></a><br><span class="muted">Uploaded <%= fmt.ukDateTime(t.agreement_uploaded) %> · <%= Math.max(1, Math.round(t.agreement_size / 1024)) %> KB</span></p>
+          <% } else { %><p class="muted small">No signed agreement uploaded yet.</p><% } %>
+          <div class="agreement-actions">
+            <form method="post" action="/app/tenancies/<%= t.id %>/agreement" enctype="multipart/form-data">
+              <%- include('partials/csrf') %>
+              <input type="hidden" name="back" value="<%= back %>">
+              <label class="btn small"><%= t.agreement_name ? 'Replace agreement' : 'Upload agreement' %><input type="file" name="agreement" accept="application/pdf,image/png,image/jpeg" data-autosubmit hidden></label>
+              <noscript><button class="btn small" type="submit">Upload</button></noscript>
+            </form>
+            <% if (t.agreement_name) { %>
+            <a class="btn small" href="/app/tenancies/<%= t.id %>/agreement?download=1">Download</a>
+            <form method="post" action="/app/tenancies/<%= t.id %>/agreement/delete" data-confirm="Remove the uploaded tenancy agreement?">
+              <%- include('partials/csrf') %><input type="hidden" name="back" value="<%= back %>">
+              <button class="btn small link" type="submit">Remove</button>
+            </form>
+            <% } %>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+  <% }) %>
+<% } %>
+
 <% if (certs) { %>
 <section class="card" id="certificates">
   <div class="card-head"><h2>Certificates &amp; insurance</h2></div>

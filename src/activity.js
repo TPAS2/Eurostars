@@ -104,6 +104,11 @@ function describe(db, req) {
     if (sub === 'delete') return { action: 'deleted', text: withTitle('Deleted invoice', name) };
     return { action: 'updated', text: withTitle('Edited invoice', name) };
   }
+  if (section === 'tenancies' && sub === 'agreement') {
+    const title = recordTitle(db, ENTITIES.tenancies, id, a);
+    if (!post) return { action: 'viewed', text: withTitle('Opened the tenancy agreement for', title) };
+    return { action: parts[4] === 'delete' ? 'deleted' : 'updated', text: withTitle(parts[4] === 'delete' ? 'Removed the tenancy agreement for' : 'Uploaded the tenancy agreement for', title) };
+  }
   if (section === 'councils' && sub === 'photo') {
     if (!post) return null;
     const title = recordTitle(db, ENTITIES.councils, id, a);

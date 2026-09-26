@@ -101,6 +101,17 @@ CREATE TABLE IF NOT EXISTS councils (
   created_at           TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- The signed tenancy agreement for a tenancy (PDF or image), kept in the database so backups include it.
+CREATE TABLE IF NOT EXISTS tenancy_agreements (
+  tenancy_id   INTEGER PRIMARY KEY REFERENCES tenancies(id) ON DELETE CASCADE,
+  account_id   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  filename     TEXT NOT NULL,
+  mime         TEXT NOT NULL,
+  size         INTEGER NOT NULL,
+  data         BLOB NOT NULL,
+  uploaded_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 -- Notes on each council's reconciliation, one per council per month.
 CREATE TABLE IF NOT EXISTS council_rec_notes (
   account_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,

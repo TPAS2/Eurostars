@@ -459,3 +459,18 @@ tr.subtotal td { font-weight: 600; background: var(--surface-2); }
 .access-grid td.tab-col input { width: 18px; height: 18px; margin: 0; cursor: pointer; }
 .access-grid tr.company-row td { background: var(--surface-2); padding-top: 12px; }
 .access-grid tbody tr[data-access-row]:hover td { background: var(--brand-soft); }
+
+/* Tenant page: council, property and tenancy agreement */
+.tenant-box-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; }
+.tenant-box-grid > div { border-left: 3px solid var(--border); padding-left: 16px; }
+.tenant-box-grid h3 { margin: 0 0 8px; font-size: .8rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.tenant-box-grid p { margin: 0 0 8px; }
+dl.mini { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 0; font-size: .9rem; }
+dl.mini dt { color: var(--muted); font-weight: 600; }
+dl.mini dd { margin: 0; overflow-wrap: anywhere; }
+.with-thumb-line { display: flex; align-items: center; gap: 8px; }
+.agreement { margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--border); }
+.agreement-actions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.agreement-actions form { margin: 0; }
+.agreement-actions label.btn { cursor: pointer; }
+@media (max-width: 900px) { .tenant-box-grid { grid-template-columns: 1fr; } }

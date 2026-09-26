@@ -1478,3 +1478,49 @@ test('admin Tab access page: every person against every tab, saved in one go', a
   await admin.post('/admin/access', { people: [String(adminId)], [`t_${adminId}`]: [] });
   assert.equal(db.prepare('SELECT hidden_tabs FROM users WHERE id = ?').get(adminId).hidden_tabs, null);
 });
+
+test('tenant page: a second box with the council, property and tenancy agreement', async () => {
+  const c = await registerAndLogin('tenant-box@example.com', 'Box Lets');
+  let r = await c.post('/app/councils', { name: 'Leeds City Council', council_tax_phone: '0113 222 4404' });
+  const leeds = idFrom(r.location);
+  r = await c.post('/app/landlords', { name: 'Lou Landlord' });
+  const lou = idFrom(r.location);
+  r = await c.post('/app/properties', { address_line1: '7 Canal Street', town: 'Leeds', postcode: 'LS1 4AB', landlord_id: String(lou), council_id: String(leeds), council_tax_account: 'CT-777', council_tax_payer: 'Tenant', status: 'vacant' });
+  const prop = idFrom(r.location);
+  r = await c.post(`/app/properties/${prop}/add-tenant`, { tenant_mode: 'new', name: 'Nina Tenant', booking_date: '2026-07-10', start_date: '2026-08-01', rent_pence: '850', rent_frequency: 'monthly', deposit_pence: '980', deposit_scheme: 'DPS', status: 'active' });
+  const tenancy = idFrom(r.location);
+  const tenant = db.prepare('SELECT tenant_id FROM tenancies WHERE id = ?').get(tenancy).tenant_id;
+
+  r = await c.get(`/app/tenants/${tenant}`);
+  assert.match(r.text, /<dl class="details">[\s\S]*?<\/dl>[\s\S]*?class="card tenant-box"/, 'second box after the tenant details');
+  assert.match(r.text, /Current tenancy/);
+  assert.match(r.text, /<h3>Council<\/h3>[\s\S]*?Leeds City Council[\s\S]*?CT-777[\s\S]*?Tenant[\s\S]*?0113 222 4404/);
+  assert.match(r.text, /<h3>Property<\/h3>[\s\S]*?7 Canal Street[\s\S]*?Leeds, LS1 4AB[\s\S]*?Lou Landlord/);
+  assert.match(r.text, /<h3>Tenancy agreement<\/h3>[\s\S]*?10\/07\/2026[\s\S]*?01\/08\/2026 – ongoing[\s\S]*?£850\.00 a month[\s\S]*?£980\.00 · DPS[\s\S]*?No signed agreement uploaded yet/);
+
+  // Upload the signed agreement from the tenant page; it's shown and can be opened.
+  const pdf = new File([Buffer.from('%PDF-1.4\n%signed\n')], 'Nina agreement.pdf');
+  r = await c.post(`/app/tenancies/${tenancy}/agreement`, { agreement: pdf, back: `/app/tenants/${tenant}` }, { multipart: true });
+  assert.equal(r.location, `/app/tenants/${tenant}#tenancy-${tenancy}`);
+  r = await c.get(`/app/tenants/${tenant}`);
+  assert.match(r.text, /Nina agreement\.pdf/);
+  assert.match(r.text, /Replace agreement/);
+  r = await c.get(`/app/tenancies/${tenancy}/agreement`);
+  assert.equal(r.status, 200);
+  assert.equal(r.headers.get('content-type'), 'application/pdf');
+  assert.match(r.headers.get('content-security-policy'), /sandbox/);
+  assert.match((await c.get(`/app/tenancies/${tenancy}`)).text, /Nina agreement\.pdf/, 'also on the tenancy page');
+
+  // Wrong file types are refused; other companies can't see or change it.
+  r = await c.post(`/app/tenancies/${tenancy}/agreement`, { agreement: new File(['<html>'], 'x.pdf'), back: `/app/tenants/${tenant}` }, { multipart: true });
+  assert.match(decodeURIComponent(r.location), /PDF, JPG or PNG/);
+  const other = await registerAndLogin('tenant-box-2@example.com', 'Other Box');
+  assert.equal((await other.get(`/app/tenancies/${tenancy}/agreement`)).status, 404);
+  assert.equal((await other.post(`/app/tenancies/${tenancy}/agreement/delete`, {})).status, 404);
+
+  r = await c.post(`/app/tenancies/${tenancy}/agreement/delete`, { back: `/app/tenants/${tenant}` });
+  assert.match((await c.get(`/app/tenants/${tenant}`)).text, /No signed agreement uploaded yet/);
+  // "back" can only return to a tenant or tenancy page.
+  r = await c.post(`/app/tenancies/${tenancy}/agreement/delete`, { back: 'https://evil.example/' });
+  assert.equal(r.location, `/app/tenancies/${tenancy}#tenancy-${tenancy}`);
+});

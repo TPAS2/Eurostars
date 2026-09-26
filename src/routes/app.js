@@ -526,10 +526,28 @@ module.exports = function appRoutes(db) {
       const fk = def.key === 'maintenance' ? 'maintenance_job_id' : 'property_id';
       invoices = db.prepare(`SELECT * FROM invoices WHERE account_id = ? AND ${fk} = ? ORDER BY status = 'paid', due_date`).all(a, row.id);
     }
+    // On a tenant's page: their current tenancy (or tenancies), with its council, property and agreement.
+    let tenantBoxes = null;
+    if (def.key === 'tenants' || def.key === 'tenancies') {
+      const all = db.prepare(
+        `SELECT ty.*, p.address_line1, p.town, p.postcode, p.property_type, p.bedrooms, p.council_tax_account, p.council_tax_payer,
+                l.id AS landlord_id, l.name AS landlord_name, c.id AS council_id, c.name AS council_name, c.council_tax_phone, c.council_tax_email,
+                (SELECT strftime('%s', updated_at) FROM council_photos cp WHERE cp.council_id = c.id) AS council_photo_v,
+                ag.filename AS agreement_name, ag.size AS agreement_size, ag.uploaded_at AS agreement_uploaded
+           FROM tenancies ty JOIN properties p ON p.id = ty.property_id
+           LEFT JOIN landlords l ON l.id = p.landlord_id
+           LEFT JOIN councils c ON c.id = p.council_id
+           LEFT JOIN tenancy_agreements ag ON ag.tenancy_id = ty.id
+          WHERE ty.account_id = ? AND ${def.key === 'tenants' ? 'ty.tenant_id' : 'ty.id'} = ?
+          ORDER BY ty.status = 'active' DESC, ty.start_date DESC`
+      ).all(a, row.id);
+      const active = all.filter((t) => t.status === 'active');
+      tenantBoxes = active.length ? active : all.slice(0, 1);
+    }
     const photo = def.key === 'councils'
       ? db.prepare("SELECT strftime('%s', updated_at) AS v FROM council_photos WHERE council_id = ? AND account_id = ?").get(row.id, a) || { v: null }
       : null;
-    res.render('show', { title: rowTitle(def, row, maps), section: def.key, def, row, maps, display, rowTitle, children, extra, invoices, related: relatedLists(def, row, a), certs, photo, error: req.query.error ? String(req.query.error).slice(0, 200) : null, flash: req.query.flash ? String(req.query.flash).slice(0, 200) : null, fmt, today: fmt.today() });
+    res.render('show', { title: rowTitle(def, row, maps), section: def.key, def, row, maps, display, rowTitle, children, extra, invoices, related: relatedLists(def, row, a), certs, photo, tenantBoxes, error: req.query.error ? String(req.query.error).slice(0, 200) : null, flash: req.query.flash ? String(req.query.flash).slice(0, 200) : null, fmt, today: fmt.today() });
   });
 
   router.get('/:entity/:id/edit', (req, res) => {
