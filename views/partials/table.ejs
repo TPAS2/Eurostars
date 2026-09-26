@@ -19,6 +19,11 @@
     <% }) %>
     </tr>
   <% }) %>
+  <% if (typeof totalsRow !== 'undefined' && totalsRow) { %>
+    <tr class="total">
+    <% def.columns.filter(c => c !== hideField).forEach((c, i) => { %><td><%= i === 0 ? totalsRow.label : (totalsRow.cells[c] || '') %></td><% }) %>
+    </tr>
+  <% } %>
   </tbody>
 </table>
 </div>

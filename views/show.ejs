@@ -166,14 +166,14 @@
 </section>
 <% } %>
 
-<% if (invoices) { const q = def.key === 'maintenance' ? 'maintenance_job_id' : 'property_id'; %>
+<% if (invoices) { const q = { maintenance: 'maintenance_job_id', contractors: 'contractor_id' }[def.key] || 'property_id'; %>
 <section class="card">
   <div class="card-head">
-    <h2>Invoices <span class="count"><%= invoices.length %></span></h2>
+    <h2>Invoices <span class="count"><%= invoices.length %></span><% if (def.key === 'contractors') { const paid = invoices.filter(i => i.status === 'paid').reduce((t, i) => t + i.amount_pence, 0); %> <span class="muted small">· <%= fmt.money(paid) %> paid in total</span><% } %></h2>
     <a class="btn small" href="/app/invoices/new?<%= q %>=<%= row.id %>">+ Upload invoice</a>
   </div>
   <% if (!invoices.length) { %><p class="muted">No invoices yet.</p><% } else { %>
-    <%- include('invoices/table', { invoices, showProperty: false, backTo: `/app/${def.key}/${row.id}` }) %>
+    <%- include('invoices/table', { invoices, showProperty: def.key === 'contractors', backTo: `/app/${def.key}/${row.id}` }) %>
   <% } %>
 </section>
 <% } %>

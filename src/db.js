@@ -223,6 +223,19 @@ CREATE TABLE IF NOT EXISTS transactions (
   created_at   TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Contractors and suppliers. Invoices link to one, so the total paid to each is known.
+CREATE TABLE IF NOT EXISTS contractors (
+  id          INTEGER PRIMARY KEY,
+  account_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name        TEXT NOT NULL,
+  trade       TEXT,
+  phone       TEXT,
+  email       TEXT,
+  notes       TEXT,
+  created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_contractors_account ON contractors(account_id, name);
+
 -- Supplier/contractor invoices, usually for a maintenance job, with the uploaded document.
 CREATE TABLE IF NOT EXISTS invoices (
   id                  INTEGER PRIMARY KEY,
@@ -322,7 +335,21 @@ function openDatabase(file) {
   addColumnIfMissing(db, 'monthly_statements', 'emailed_at', 'TEXT');
   addColumnIfMissing(db, 'monthly_statements', 'emailed_to', 'TEXT');
   addColumnIfMissing(db, 'login_challenges', 'next_url', 'TEXT');
+  addColumnIfMissing(db, 'invoices', 'contractor_id', 'INTEGER REFERENCES contractors(id) ON DELETE SET NULL');
+  // Every invoice supplier becomes a contractor (once), so the Contractors tab starts complete.
+  for (const inv of db.prepare('SELECT id, account_id, supplier FROM invoices WHERE contractor_id IS NULL AND trim(supplier) != \'\'').all()) {
+    db.prepare('UPDATE invoices SET contractor_id = ? WHERE id = ?').run(contractorFor(db, inv.account_id, inv.supplier), inv.id);
+  }
   return db;
+}
+
+// The contractor with this name (ignoring capitals and spaces at the ends), added if new.
+function contractorFor(db, accountId, name) {
+  const clean = String(name || '').trim().replace(/\s+/g, ' ');
+  if (!clean) return null;
+  const found = db.prepare('SELECT id FROM contractors WHERE account_id = ? AND lower(name) = lower(?)').get(accountId, clean);
+  if (found) return found.id;
+  return Number(db.prepare('INSERT INTO contractors (account_id, name) VALUES (?, ?)').run(accountId, clean).lastInsertRowid);
 }
 
 function addColumnIfMissing(db, table, column, type) {
@@ -394,4 +421,4 @@ function transaction(db, fn) {
   }
 }
 
-module.exports = { openDatabase, transaction, uniqueUsername, signInNameFrom, USERNAME_RE, LOGIN_NAME_RE };
+module.exports = { contractorFor, openDatabase, transaction, uniqueUsername, signInNameFrom, USERNAME_RE, LOGIN_NAME_RE };

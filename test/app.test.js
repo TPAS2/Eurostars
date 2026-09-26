@@ -1391,7 +1391,7 @@ test('the admin chooses which tabs each person sees; hidden tabs are blocked', a
   // The main login still sees everything; ticking all tabs gives Ada everything back.
   assert.equal((await boss.get('/app/landlords')).status, 200);
   await admin.get(`/admin/users/${companyId}`);
-  await admin.post(`/admin/users/${companyId}/tabs/${ada}`, { tabs: ['councils', 'councilrec', 'properties', 'landlords', 'tenants', 'tenancies', 'maintenance', 'invoices', 'compliance', 'rentrun', 'monthly'] });
+  await admin.post(`/admin/users/${companyId}/tabs/${ada}`, { tabs: ['councils', 'councilrec', 'properties', 'landlords', 'tenants', 'tenancies', 'maintenance', 'contractors', 'invoices', 'rentrun', 'monthly'] });
   assert.equal(db.prepare('SELECT hidden_tabs FROM users WHERE id = ?').get(ada).hidden_tabs, null);
   assert.equal((await c.get('/app/landlords')).status, 200);
 
@@ -1489,7 +1489,7 @@ test('admin Tab access page: every person against every tab, saved in one go', a
   assert.match(r.text, /Grid Lets[\s\S]*?Test User[\s\S]*?main login[\s\S]*?Bea Clerk/);
   assert.match(r.text, new RegExp(`name="t_${bea}" value="councilrec" checked`));
   // Bea: only Rent run and Monthly statements. The main login (companyId) keeps everything.
-  const all = ['councils', 'councilrec', 'properties', 'landlords', 'tenants', 'tenancies', 'maintenance', 'invoices', 'compliance', 'rentrun', 'monthly'];
+  const all = ['councils', 'councilrec', 'properties', 'landlords', 'tenants', 'tenancies', 'maintenance', 'contractors', 'invoices', 'rentrun', 'monthly'];
   r = await admin.post('/admin/access', { company: String(companyId), people: [String(companyId), String(bea)], [`t_${companyId}`]: all, [`t_${bea}`]: ['rentrun', 'monthly'] });
   assert.match(decodeURIComponent(r.location), /Saved tab access for 2 people/);
   assert.equal(db.prepare('SELECT hidden_tabs FROM users WHERE id = ?').get(companyId).hidden_tabs, null);
@@ -1693,4 +1693,48 @@ test('Tab access uses the same names as the menu', async () => {
   const rail = (await c.get('/app')).text.match(/<nav class="rail"[\s\S]*?<\/nav>/)[0];
   const menu = [...rail.matchAll(/aria-label="([^"]+)"/g)].map((m) => m[1]).slice(1);
   assert.deepEqual(TABS.map((t) => t.label), menu);
+});
+
+test('contractors: every supplier listed with how much has been paid to them in total', async () => {
+  const c = await registerAndLogin('contractors@example.com', 'Contractor Lets');
+  const accountId = db.prepare("SELECT id FROM users WHERE username = 'contractors'").get().id;
+  const pdf = () => new File([Buffer.from('%PDF-1.4\n%x\n')], 'i.pdf');
+  await c.get('/app/invoices/new');
+  const upload = async (supplier, amount, date) => idFrom((await c.post('/app/invoices', { supplier, amount, invoice_date: date, file: pdf() }, { multipart: true })).location);
+  const a1 = await upload('Heat Ltd', '100', '2026-06-01');
+  const a2 = await upload('heat ltd ', '50', '2026-08-01'); // same contractor despite capitals/spaces
+  await upload('Heat Ltd', '30', '2026-08-15'); // left unpaid
+  const b1 = await upload('Sparks Electrical', '200', '2026-07-01');
+  for (const id of [a1, a2, b1]) await c.post(`/app/invoices/${id}/pay`, { paid_date: '2026-08-20', payment_method: 'Bank transfer' });
+
+  const contractors = db.prepare('SELECT * FROM contractors WHERE account_id = ? ORDER BY name').all(accountId);
+  assert.deepEqual(contractors.map((x) => x.name), ['Heat Ltd', 'Sparks Electrical'], 'added automatically from invoices, once each');
+  const heat = contractors[0].id;
+
+  // Menu: Contractors sits above Invoices; Compliance is gone.
+  const rail = (await c.get('/app')).text.match(/<nav class="rail"[\s\S]*?<\/nav>/)[0];
+  const labels = [...rail.matchAll(/aria-label="([^"]+)"/g)].map((m) => m[1]);
+  assert.equal(labels.indexOf('Contractors') + 1, labels.indexOf('Invoices'));
+  assert.ok(!labels.includes('Compliance'));
+
+  let r = await c.get('/app/contractors');
+  assert.match(r.text, /<th[^>]*>Total paid<\/th>/);
+  assert.match(r.text, /Heat Ltd[\s\S]*?<td[^>]*>\s*3\s*<\/td>[\s\S]*?£150\.00[\s\S]*?£30\.00/);
+  assert.match(r.text, /Sparks Electrical[\s\S]*?£200\.00/);
+  assert.match(r.text, /class="total"[\s\S]*?4[\s\S]*?£350\.00[\s\S]*?£30\.00/);
+
+  // A contractor's page lists their invoices and total paid, with an upload link that fills them in.
+  r = await c.get(`/app/contractors/${heat}`);
+  assert.match(r.text, /Invoices <span class="count">3<\/span> <span class="muted small">· £150\.00 paid in total/);
+  assert.match(r.text, new RegExp(`/app/invoices/new\\?contractor_id=${heat}`));
+  assert.match((await c.get(`/app/invoices/new?contractor_id=${heat}`)).text, /name="supplier"[^>]*value="Heat Ltd"/);
+
+  // Renaming keeps their history and updates the invoices.
+  await c.get(`/app/contractors/${heat}/edit`);
+  await c.post(`/app/contractors/${heat}`, { name: 'Heat & Gas Ltd', trade: 'Heating engineer' });
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM invoices WHERE contractor_id = ? AND supplier = ?').get(heat, 'Heat & Gas Ltd').n, 3);
+  assert.match((await c.get('/app/contractors')).text, /Heat &amp; Gas Ltd[\s\S]*?Heating engineer[\s\S]*?£150\.00/);
+
+  // Compliance pages still work from a property (certificates), just not in the menu.
+  assert.equal((await c.get('/app/compliance/new')).status, 200);
 });

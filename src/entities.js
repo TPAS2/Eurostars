@@ -120,6 +120,24 @@ const ENTITIES = {
     children: [{ entity: 'transactions', fk: 'tenancy_id' }],
   },
 
+  contractors: {
+    table: 'contractors',
+    singular: 'Contractor',
+    plural: 'Contractors',
+    titleField: 'name',
+    order: 'name COLLATE NOCASE',
+    searchBar: true,
+    fields: [
+      { name: 'name', label: 'Name', type: 'text', required: true, help: 'Invoices from this supplier are matched by name.' },
+      { name: 'trade', label: 'Trade', type: 'text', help: 'e.g. Plumber, Electrician, Roofer.' },
+      { name: 'phone', label: 'Phone', type: 'tel' },
+      { name: 'email', label: 'Email', type: 'email' },
+      { name: 'notes', label: 'Notes', type: 'textarea' },
+    ],
+    columns: ['name', 'trade', 'phone', 'invoice_count', 'total_paid', 'unpaid'],
+    computed: { invoice_count: { label: 'Invoices' }, total_paid: { label: 'Total paid' }, unpaid: { label: 'Unpaid' } },
+  },
+
   maintenance: {
     table: 'maintenance_jobs',
     singular: 'Maintenance job',

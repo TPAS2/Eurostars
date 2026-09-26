@@ -12,8 +12,8 @@ const TABS = [
   { key: 'tenants', label: 'Tenants', paths: ['/app/tenants'] },
   { key: 'tenancies', label: 'Tenancies', paths: ['/app/tenancies'] },
   { key: 'maintenance', label: 'Maintenance', paths: ['/app/maintenance'] },
+  { key: 'contractors', label: 'Contractors', paths: ['/app/contractors'] },
   { key: 'invoices', label: 'Invoices', paths: ['/app/invoices'] },
-  { key: 'compliance', label: 'Compliance', paths: ['/app/compliance'] },
   { key: 'rentrun', label: 'Rent run', paths: ['/app/rent-run', '/app/monthly/calculate', '/app/monthly/email', '/app/monthly/report'] },
   { key: 'monthly', label: 'Monthly statements', paths: ['/app/monthly'] },
 ];

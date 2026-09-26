@@ -158,6 +158,10 @@ module.exports = function appRoutes(db) {
     if (def.key === 'tenancies' && values.status === 'active') {
       db.prepare("UPDATE properties SET status = 'let' WHERE id = ? AND account_id = ?").run(values.property_id, accountId);
     }
+    // A renamed contractor keeps their invoices, which show the new name.
+    if (def.key === 'contractors' && values.name) {
+      db.prepare('UPDATE invoices SET supplier = ? WHERE contractor_id = ? AND account_id = ?').run(values.name, id, accountId);
+    }
   }
 
   function prepareValues(def, accountId, values) {
@@ -473,7 +477,28 @@ module.exports = function appRoutes(db) {
     const rows = db.prepare(`SELECT * FROM ${def.table} WHERE ${where} ORDER BY ${def.order} LIMIT ${LIST_LIMIT + 1}`).all(...params);
     const truncated = rows.length > LIST_LIMIT;
     if (truncated) rows.pop();
+    let totalsRow = null;
     const maps = refLabelMaps(def, a);
+    if (def.key === 'contractors') {
+      // Invoices and money paid to each contractor, all time.
+      const stats = new Map(db.prepare(
+        `SELECT contractor_id, COUNT(*) AS n,
+                COALESCE(SUM(CASE WHEN status = 'paid' THEN amount_pence END), 0) AS paid,
+                COALESCE(SUM(CASE WHEN status = 'unpaid' THEN amount_pence END), 0) AS unpaid
+           FROM invoices WHERE account_id = ? AND contractor_id IS NOT NULL GROUP BY contractor_id`
+      ).all(a).map((s) => [s.contractor_id, s]));
+      for (const row of rows) {
+        const s = stats.get(row.id) || { n: 0, paid: 0, unpaid: 0 };
+        row.invoice_count = { text: String(s.n) };
+        row.total_paid = { text: fmt.money(s.paid) };
+        row.unpaid = { text: s.unpaid ? fmt.money(s.unpaid) : '—' };
+      }
+      totalsRow = { label: 'Total', cells: {
+        invoice_count: String([...stats.values()].reduce((t, s) => t + s.n, 0)),
+        total_paid: fmt.money([...stats.values()].reduce((t, s) => t + s.paid, 0)),
+        unpaid: fmt.money([...stats.values()].reduce((t, s) => t + s.unpaid, 0)),
+      } };
+    }
     if (def.key === 'councils') {
       // How many properties are in each council, and which ones.
       const byCouncil = new Map();
@@ -488,7 +513,7 @@ module.exports = function appRoutes(db) {
         row.properties = { text: String(list.length), count: list.length };
       }
     }
-    res.render('list', { title: def.plural, section: def.key, def, rows, maps, display, rowTitle, q, searchable: textFields.length > 0, truncated });
+    res.render('list', { title: def.plural, section: def.key, def, rows, maps, display, rowTitle, q, searchable: textFields.length > 0, truncated, totalsRow });
   });
 
   router.get('/:entity/new', (req, res) => {
@@ -545,8 +570,8 @@ module.exports = function appRoutes(db) {
       extra = { label: 'Held for landlord', value: fmt.money(r.bal), alert: r.bal < 0 };
     }
     let invoices = null;
-    if (def.key === 'maintenance' || def.key === 'properties') {
-      const fk = def.key === 'maintenance' ? 'maintenance_job_id' : 'property_id';
+    if (def.key === 'maintenance' || def.key === 'properties' || def.key === 'contractors') {
+      const fk = { maintenance: 'maintenance_job_id', properties: 'property_id', contractors: 'contractor_id' }[def.key];
       invoices = db.prepare(`${INVOICE_LIST_SQL} WHERE i.account_id = ? AND i.${fk} = ? ORDER BY i.status = 'paid', i.due_date`).all(a, row.id);
     }
     // On a tenant's page: their current tenancy (or tenancies), with its council, property and agreement.

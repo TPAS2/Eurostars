@@ -6,7 +6,7 @@ const crypto = require('node:crypto');
 const express = require('express');
 const multer = require('multer');
 const auth = require('../auth');
-const { transaction } = require('../db');
+const { transaction, contractorFor } = require('../db');
 const ledger = require('../ledger');
 const fmt = require('../format');
 const { INVOICE_LIST_SQL, statementLink } = require('../invoiceSql');
@@ -154,6 +154,8 @@ module.exports = function invoiceRoutes(db, config) {
     if (job) { values.maintenance_job_id = job.id; values.property_id = job.property_id; values.supplier = job.contractor || ''; }
     const prop = !job && req.query.property_id && owned('properties', req.query.property_id, req.user.id);
     if (prop) values.property_id = prop.id;
+    const contractor = req.query.contractor_id && owned('contractors', req.query.contractor_id, req.user.id);
+    if (contractor) values.supplier = contractor.name;
     renderForm(req, res, { invoice: null, values, errors: {} });
   });
 
@@ -168,7 +170,7 @@ module.exports = function invoiceRoutes(db, config) {
       if (stored.error) { errors.file = stored.error; stored = null; }
     }
     if (Object.keys(errors).length) return renderForm(req, res, { invoice: null, values: req.body, errors, status: 422 });
-    const row = { ...v, ...stored };
+    const row = { ...v, ...stored, contractor_id: contractorFor(db, a, v.supplier) };
     const cols = Object.keys(row);
     const info = db.prepare(`INSERT INTO invoices (account_id, ${cols.join(', ')}) VALUES (?, ${cols.map(() => '?').join(', ')})`)
       .run(a, ...cols.map((c) => row[c]));
@@ -208,7 +210,7 @@ module.exports = function invoiceRoutes(db, config) {
       if (stored.error) { errors.file = stored.error; stored = null; }
     }
     if (Object.keys(errors).length) return renderForm(req, res, { invoice: inv, values: req.body, errors, status: 422 });
-    const row = { ...v, ...(stored || {}) };
+    const row = { ...v, ...(stored || {}), contractor_id: contractorFor(db, a, v.supplier) };
     const cols = Object.keys(row);
     db.prepare(`UPDATE invoices SET ${cols.map((c) => `${c} = ?`).join(', ')} WHERE id = ? AND account_id = ?`)
       .run(...cols.map((c) => row[c]), inv.id, a);
