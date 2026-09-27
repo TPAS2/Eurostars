@@ -654,7 +654,7 @@ test('councils link to properties, and through them to landlords and tenants', a
   const details = (await c.get(`/app/properties/${propertyId}`)).text.match(/<dl class="details">[\s\S]*?<\/dt>/)[0];
   assert.match(details, /<dt>Council<\/dt>$/, 'Council is the first detail on the property page');
   const list = (await c.get('/app/properties')).text;
-  assert.match(list, /<th[^>]*>Council<\/th>\s*<th[^>]*>Town \/ city<\/th>/, 'Council sits left of Town / city');
+  assert.match(list, /<th[^>]*>Council<\/th>\s*<th[^>]*>Landlord<\/th>/, 'Council sits left of Landlord');
   assert.doesNotMatch(list, /<th[^>]*>Postcode<\/th>/, 'Council replaces Postcode in the list');
   assert.match(list, /<th[^>]*>Property name<\/th>/);
   assert.doesNotMatch(list, /<th[^>]*>Address<\/th>/, 'Property name replaces Address');
@@ -2276,4 +2276,19 @@ test('maintenance is shown one month at a time, like the invoice tabs', async ()
   assert.match(r.text, /Boiler August[\s\S]*|Tap September/);
   assert.ok(r.text.includes('Boiler August') && r.text.includes('Tap September'));
   assert.match((await c.get('/app')).text, /href="\/app\/maintenance\?month=all"/);
+});
+
+test('properties list columns: Property name, Council, Landlord, Tenant, Status', async () => {
+  const c = await registerAndLogin('prop-cols@example.com', 'Prop Cols Lets');
+  let r = await c.post('/app/councils', { name: 'Col Council' });
+  const council = idFrom(r.location);
+  r = await c.post('/app/landlords', { name: 'Col Landlord' });
+  const landlord = idFrom(r.location);
+  r = await c.post('/app/properties', { address_line1: '3 Column Close', council_id: String(council), landlord_id: String(landlord), status: 'vacant' });
+  const prop = idFrom(r.location);
+  await c.post(`/app/properties/${prop}/add-tenant`, { tenant_mode: 'new', name: 'Cora Tenant', booking_date: '2026-07-10', start_date: '2026-08-01', rent_pence: '850', rent_frequency: 'monthly', status: 'active' });
+  r = await c.get('/app/properties');
+  const heads = [...r.text.slice(r.text.indexOf('<thead'), r.text.indexOf('</thead>')).matchAll(/<th[^>]*>([^<]+)</g)].map((m) => m[1].trim()).filter(Boolean);
+  assert.deepEqual(heads.slice(0, 5), ['Property name', 'Council', 'Landlord', 'Tenant', 'Status']);
+  assert.match(r.text, /3 Column Close[\s\S]*Col Council[\s\S]*Col Landlord[\s\S]*Cora Tenant/);
 });

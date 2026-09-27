@@ -522,6 +522,23 @@ module.exports = function appRoutes(db) {
       }
       for (const row of rows) row.councils = { text: (byLandlord.get(row.id) || []).join('\n') };
     }
+    if (def.key === 'properties') {
+      // Who lives there now: tenants on an active (or upcoming) tenancy, one per line.
+      const byProperty = new Map();
+      for (const t of db.prepare(
+        `SELECT ty.property_id, t.id, t.name FROM tenancies ty JOIN tenants t ON t.id = ty.tenant_id
+          WHERE ty.account_id = ? AND ty.status IN ('active', 'pending')
+          ORDER BY ty.status = 'active' DESC, t.name COLLATE NOCASE`
+      ).all(a)) {
+        if (!byProperty.has(t.property_id)) byProperty.set(t.property_id, []);
+        byProperty.get(t.property_id).push(t);
+      }
+      for (const row of rows) {
+        const list = byProperty.get(row.id) || [];
+        row.cur_tenant = list.length === 1 ? { text: list[0].name, href: `/app/tenants/${list[0].id}` }
+          : { text: list.length ? list.map((t) => t.name).join('\n') : '—' };
+      }
+    }
     if (def.key === 'tenants') {
       // Each tenant with their current tenancy (or their latest one if none is current).
       const latest = new Map();
