@@ -16,6 +16,7 @@ function loadConfig(env = process.env) {
   const production = env.NODE_ENV === 'production';
   return {
     port: Number(env.PORT) || 3000,
+    // The file keeps its original name (from before the rename to Rift) so existing data carries on.
     dbFile: env.DATABASE_FILE || path.join(__dirname, '..', 'data', 'nexus.db'),
     uploadDir: env.UPLOAD_DIR || path.join(__dirname, '..', 'data', 'uploads'),
     backupDir: env.BACKUP_DIR || path.join(__dirname, '..', 'data', 'backups'),
@@ -25,7 +26,7 @@ function loadConfig(env = process.env) {
     backupKeep: Math.max(1, Number(env.BACKUP_KEEP) || 14),
     backupIntervalHours: Math.max(1, Number(env.BACKUP_INTERVAL_HOURS) || 24),
     autoBackups: env.AUTO_BACKUPS !== 'false',
-    appName: env.APP_NAME || 'Nexus',
+    appName: env.APP_NAME || 'Rift',
     adminEmail: (env.ADMIN_EMAIL || '').trim().toLowerCase(),
     adminPassword: env.ADMIN_PASSWORD || '',
     adminPasswordReset: env.ADMIN_PASSWORD_RESET === 'true',

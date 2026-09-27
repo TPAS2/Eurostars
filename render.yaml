@@ -2,6 +2,8 @@
 # The disk keeps the database, uploaded invoices and backups across restarts and deploys.
 services:
   - type: web
+    # The service, disk and database file keep their original 'nexus' names so the live site and
+    # its data carry on unchanged; the app itself is called Rift (APP_NAME).
     name: nexus
     runtime: node
     plan: starter

@@ -53,9 +53,9 @@ document.addEventListener('submit', (e) => {
 // Create forms ([data-draft]) keep a draft in this browser until they're submitted.
 // Everything typed is kept: edit forms save to the server, and every form also keeps a copy
 // in this browser until it's saved, so nothing is lost if the session ends or the page closes.
-// window.nexusFlush() saves everything right now (used before signing out for inactivity).
+// window.riftFlush() saves everything right now (used before signing out for inactivity).
 const flushers = [];
-window.nexusFlush = () => Promise.all(flushers.map((f) => Promise.resolve().then(f).catch(() => {})));
+window.riftFlush = () => Promise.all(flushers.map((f) => Promise.resolve().then(f).catch(() => {})));
 const DRAFT_DAYS = 7;
 
 (() => {
@@ -180,7 +180,7 @@ const DRAFT_DAYS = 7;
           dirty = true;
           keepBackup();
           setStatus(form, 'Signed out: your changes are kept and will save after you sign in again.', 'err');
-          if (res.status === 401 && window.nexusSignedOut) window.nexusSignedOut();
+          if (res.status === 401 && window.riftSignedOut) window.riftSignedOut();
         } else {
           dirty = true;
           setStatus(form, 'Not saved: will retry…', 'err');
@@ -402,7 +402,7 @@ document.addEventListener('click', (e) => {
   const LIMIT = minutes * 60000;
   const WARN = Math.min(5 * 60000, LIMIT / 2);
   const PING_EVERY = 60000;
-  const KEY = 'nexus:last-active';
+  const KEY = 'rift:last-active';
   let store = null;
   try { store = window.localStorage; } catch { store = null; }
 
@@ -422,7 +422,7 @@ document.addEventListener('click', (e) => {
     if (signingOut) return;
     signingOut = true;
     showWarning('Signing you out… saving your work first.', false);
-    await Promise.race([window.nexusFlush(), new Promise((r) => setTimeout(r, 8000))]);
+    await Promise.race([window.riftFlush(), new Promise((r) => setTimeout(r, 8000))]);
     const csrf = document.querySelector('input[name="_csrf"]');
     const body = new URLSearchParams({ _csrf: csrf ? csrf.value : '', reason: 'idle', next: location.pathname + location.search });
     try { await fetch('/logout', { method: 'POST', body, credentials: 'same-origin', redirect: 'manual' }); } catch { /* signed out on the server anyway */ }
@@ -430,10 +430,10 @@ document.addEventListener('click', (e) => {
   }
 
   // The server ended the session already (e.g. the computer was asleep): keep the work, go to sign in.
-  window.nexusSignedOut = async () => {
+  window.riftSignedOut = async () => {
     if (signingOut) return;
     signingOut = true;
-    await Promise.race([window.nexusFlush(), new Promise((r) => setTimeout(r, 3000))]);
+    await Promise.race([window.riftFlush(), new Promise((r) => setTimeout(r, 3000))]);
     goToSignIn(true);
   };
 
@@ -457,7 +457,7 @@ document.addEventListener('click', (e) => {
     lastPing = Date.now();
     try {
       const res = await fetch('/session/ping', { credentials: 'same-origin', headers: { Accept: 'application/json' }, cache: 'no-store' });
-      if (res.status === 401) window.nexusSignedOut();
+      if (res.status === 401) window.riftSignedOut();
     } catch { /* offline: try again later */ }
   }
 

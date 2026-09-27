@@ -10,10 +10,12 @@ const { once } = require('node:events');
 const crypto = require('node:crypto');
 const { pipeline } = require('node:stream/promises');
 
-const NAME_RE = /^(?:nexus|letwise)-backup-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}Z(-\d+)?\.tar\.gz(\.enc)?$/;
+// Older backups were called nexus-… (and before that letwise-…); they still list and restore.
+const NAME_RE = /^(?:rift|nexus|letwise)-backup-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}Z(-\d+)?\.tar\.gz(\.enc)?$/;
 
 // ---- encryption: AES-256-GCM with a key made from BACKUP_PASSWORD (scrypt) ----
 // File layout: "NEXUSENC1" | salt (16) | iv (12) | encrypted .tar.gz | auth tag (16)
+// (The marker keeps its original name so backups made before the rename to Rift still open.)
 const MAGIC = Buffer.from('NEXUSENC1');
 const SCRYPT = { N: 2 ** 15, r: 8, p: 1, maxmem: 64 * 1024 * 1024 };
 
@@ -51,7 +53,7 @@ async function decryptFile(src, dest, password) {
     fs.readSync(fd, header, 0, headerLen, 0);
     fs.readSync(fd, tag, 0, 16, size - 16);
   } finally { fs.closeSync(fd); }
-  if (!header.subarray(0, MAGIC.length).equals(MAGIC)) throw new Error('This is not an encrypted Nexus backup.');
+  if (!header.subarray(0, MAGIC.length).equals(MAGIC)) throw new Error('This is not an encrypted Rift backup.');
   const salt = header.subarray(MAGIC.length, MAGIC.length + 16);
   const iv = header.subarray(MAGIC.length + 16, headerLen);
   const decipher = crypto.createDecipheriv('aes-256-gcm', backupKey(password, salt), iv);
@@ -133,8 +135,8 @@ async function createBackup(db, config, { reason = 'manual' } = {}) {
   fs.mkdirSync(config.backupDir, { recursive: true, mode: 0o700 });
   // With BACKUP_PASSWORD set, backups are encrypted and end in .tar.gz.enc.
   const ext = config.backupPassword ? '.tar.gz.enc' : '.tar.gz';
-  let name = `nexus-backup-${stamp()}${ext}`;
-  for (let i = 1; fs.existsSync(path.join(config.backupDir, name)); i++) name = `nexus-backup-${stamp()}-${i}${ext}`;
+  let name = `rift-backup-${stamp()}${ext}`;
+  for (let i = 1; fs.existsSync(path.join(config.backupDir, name)); i++) name = `rift-backup-${stamp()}-${i}${ext}`;
   const file = path.join(config.backupDir, name);
   const plainFile = config.backupPassword ? path.join(config.backupDir, `.plain-${process.pid}-${Date.now()}.tar.gz`) : file;
 
@@ -163,7 +165,7 @@ async function createBackup(db, config, { reason = 'manual' } = {}) {
     manifest.encrypted = !!config.backupPassword;
     await writeTarGz(plainFile, [
       { name: 'manifest.json', data: Buffer.from(JSON.stringify(manifest, null, 2)) },
-      { name: 'nexus.db', file: tmpDb },
+      { name: 'rift.db', file: tmpDb },
       ...uploads.map((u) => ({ name: `uploads/${u.rel}`, file: u.full, mtime: fs.statSync(u.full).mtimeMs })),
     ]);
     if (config.backupPassword) await encryptFile(plainFile, file, config.backupPassword);

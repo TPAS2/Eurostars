@@ -12,7 +12,7 @@ const tabs = require('../tabs');
 const { USERNAME_RE, LOGIN_NAME_RE, signInNameFrom } = require('../db');
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const RESERVED_USERNAMES = new Set(['admin', 'administrator', 'root', 'support', 'letwise', 'nexus', 'system']);
+const RESERVED_USERNAMES = new Set(['admin', 'administrator', 'root', 'support', 'letwise', 'nexus', 'rift', 'system']);
 const MIN_PASSWORD = 8;
 
 // Owner-only area: every user of the software, their usage and login history.
@@ -277,7 +277,7 @@ module.exports = function adminRoutes(db, config) {
     for (const t of tables) data[t] = db.prepare(`SELECT * FROM ${t} WHERE account_id = ? ORDER BY id`).all(u.id);
     const safeName = String(u.username).replace(/[^A-Za-z0-9._-]/g, '_');
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="nexus-${safeName}-${fmt.today()}.json"`);
+    res.setHeader('Content-Disposition', `attachment; filename="rift-${safeName}-${fmt.today()}.json"`);
     res.send(JSON.stringify(data, null, 2));
   });
 
@@ -390,7 +390,7 @@ module.exports = function adminRoutes(db, config) {
     const u = me(req);
     if (u.totp_enabled || !u.totp_secret) return res.redirect('/admin/security');
     const step = totp.verify(u.totp_secret, req.body.code, -1);
-    if (step === null) return res.redirect('/admin/security?error=' + encodeURIComponent("That code didn't match. Check the app shows Nexus and try the newest code.") + '#setup');
+    if (step === null) return res.redirect('/admin/security?error=' + encodeURIComponent(`That code didn't match. Check the app shows ${config.appName} and try the newest code.`) + '#setup');
     const { codes, hashes } = totp.makeRecoveryCodes();
     db.prepare('UPDATE users SET totp_enabled = 1, totp_last_step = ?, totp_recovery = ? WHERE id = ?').run(step, JSON.stringify(hashes), u.id);
     // Sign out any other devices so they have to use the code next time.

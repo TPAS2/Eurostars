@@ -29,7 +29,7 @@
 <div class="shell">
   <aside class="sidebar">
     <% const home = user.is_admin ? { href: '/admin', label: 'Admin panel', tip: 'Admin panel', on: s === 'admin' } : { href: '/app', label: 'Dashboard', tip: `Dashboard · ${user.agency_name}`, on: s === 'dashboard' }; %>
-    <a class="rail-btn brand-btn <%= home.on ? 'active' : '' %>" href="<%= home.href %>" data-tip="<%= home.tip %>" aria-label="<%= home.label %>" <%- home.on ? 'aria-current="page"' : '' %>><span class="logo">N</span></a>
+    <a class="rail-btn brand-btn <%= home.on ? 'active' : '' %>" href="<%= home.href %>" data-tip="<%= home.tip %>" aria-label="<%= home.label %>" <%- home.on ? 'aria-current="page"' : '' %>><span class="logo"><%= appName.charAt(0).toUpperCase() %></span></a>
     <nav class="rail" aria-label="Main">
       <% groups.filter(g => g.some(([key]) => !(user.hidden_tabs || []).includes(key))).forEach((g, gi) => { %>
         <% if (gi) { %><span class="rail-sep" aria-hidden="true"></span><% } %>

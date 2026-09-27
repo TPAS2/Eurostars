@@ -8,7 +8,7 @@ const path = require('node:path');
 const { openDatabase } = require('../src/db');
 const { createApp, loadConfig, ensureAdmin } = require('../src/server');
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-test-'));
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'rift-test-'));
 const config = {
   ...loadConfig({}),
   dbFile: ':memory:',
@@ -477,7 +477,7 @@ test('backups: admin creates, downloads, prunes; archive restores', async () => 
     assert.match(decodeURIComponent(r.location), /Backup created/);
   }
   const page = await admin.get('/admin/backups');
-  const names = [...page.text.matchAll(/<code>(nexus-backup-[^<]+)<\/code>/g)].map((m) => m[1]);
+  const names = [...page.text.matchAll(/<code>(rift-backup-[^<]+)<\/code>/g)].map((m) => m[1]);
   assert.equal(names.length, 3, 'old backups pruned to BACKUP_KEEP');
 
   const dl = await fetch(`${base}/admin/backups/${names[0]}`, { headers: { cookie: admin.cookie } });
@@ -488,7 +488,7 @@ test('backups: admin creates, downloads, prunes; archive restores', async () => 
   const file = path.join(config.backupDir, names[0]);
   const listing = execFileSync('tar', ['-tzf', file]).toString();
   assert.match(listing, /manifest\.json/);
-  assert.match(listing, /nexus\.db/);
+  assert.match(listing, /rift\.db/);
   assert.match(listing, /uploads\/\d+\/[0-9a-f]{32}\.pdf/);
 
   // Restore into a fresh data directory and check the data is there.
@@ -512,7 +512,7 @@ test('create account with a username and password (email optional)', async () =>
   assert.equal(r.status, 302, r.text);
   assert.match(r.location, /^\/app/, 'signed in straight away');
   r = await c.get(r.location);
-  assert.match(r.text, /Welcome to Nexus/);
+  assert.match(r.text, /Welcome to Rift/);
   assert.match((await c.get('/app/account')).text, /<code>harbour\.lets<\/code>/);
   const u = db.prepare("SELECT * FROM users WHERE username = 'harbour.lets'").get();
   assert.equal(u.email, null);
@@ -678,7 +678,7 @@ test('account details: companies can only view them; the admin edits them', asyn
   r = await c.get('/app/account');
   assert.equal(r.status, 200);
   assert.match(r.text, /<code>myaccount<\/code>/);
-  assert.match(r.text, /contact your Nexus administrator/);
+  assert.match(r.text, /contact your Rift administrator/);
   assert.doesNotMatch(r.text, /<form method="post" action="\/app\/account"/);
 
   // The company can't change its own details.
@@ -969,7 +969,7 @@ test('encrypted backups: unreadable without the password, restorable with it', a
   assert.ok(!fs.existsSync(path.join(tmp, 'nope.tar.gz')));
   const plain = path.join(tmp, 'ok.tar.gz');
   await decryptFile(b.file, plain, 'correct horse battery staple');
-  assert.match(execFileSync('tar', ['-tzf', plain]).toString(), /nexus\.db/);
+  assert.match(execFileSync('tar', ['-tzf', plain]).toString(), /rift\.db/);
 
   // The restore script decrypts with BACKUP_PASSWORD.
   const target = path.join(tmp, 'restored-enc');
@@ -1328,7 +1328,7 @@ test('mailer: needs a sender and a provider, and refuses bad addresses', async (
   const { createMailer, isEmail } = require('../src/mailer');
   assert.equal(createMailer({}).enabled, false);
   assert.equal(createMailer({ resendApiKey: 'k' }).enabled, false, 'no EMAIL_FROM');
-  assert.equal(createMailer({ resendApiKey: 'k', emailFrom: 'Nexus <statements@example.com>' }).provider, 'Resend');
+  assert.equal(createMailer({ resendApiKey: 'k', emailFrom: 'Rift <statements@example.com>' }).provider, 'Resend');
   assert.equal(createMailer({ smtpHost: 'smtp.example.com', emailFrom: 'statements@example.com' }).provider, 'SMTP');
   assert.ok(isEmail('a@b.co'));
   for (const bad of ['', 'a@b', 'a b@c.com', 'a@b.com, c@d.com', 'x@y.com\r\nBcc: z@z.com']) assert.ok(!isEmail(bad), bad);
@@ -1972,4 +1972,16 @@ test('contractor invoices: unpaid and paid boxes for the chosen month either sid
   const labels = [...r.text.matchAll(/<span class="label">([^<]+)<\/span><span class="value">([^<]+)</g)].map((m) => `${m[1]}=${m[2]}`);
   assert.deepEqual(labels, ['Unpaid · August 2026=£40.00', 'Unpaid · all months=£47.00', 'Overdue · all months=£0.00', 'Paid · August 2026=£100.00']);
   assert.doesNotMatch((await c.get('/app/invoices?month=all')).text, /Paid · /, 'no month boxes when showing all months');
+});
+
+test('the app is called Rift everywhere people see it', async () => {
+  const login = (await new Client().get('/login')).text;
+  assert.match(login, /<title>Sign in · Rift<\/title>/);
+  assert.match(login, /<span class="logo">R<\/span>Rift/);
+  assert.doesNotMatch(login, /Nexus/);
+  const c = await registerAndLogin('rift-name@example.com', 'Rift Name Lets');
+  const home = (await c.get('/app')).text;
+  assert.match(home, /<span class="logo">R<\/span>/);
+  assert.doesNotMatch(home, /Nexus/);
+  assert.match(fs.readFileSync(path.join(__dirname, '..', 'README.md'), 'utf8'), /^# Rift/);
 });

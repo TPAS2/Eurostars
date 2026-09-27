@@ -41,7 +41,7 @@
     <ol class="steps">
       <li>Install an authenticator app on your phone, e.g. <strong>Google Authenticator</strong>, <strong>Microsoft Authenticator</strong> or <strong>Authy</strong>.</li>
       <li>In the app, add an account and scan this QR code:
-        <div class="qr"><img src="<%= qr %>" alt="QR code to add Nexus to your authenticator app" width="200" height="200"></div>
+        <div class="qr"><img src="<%= qr %>" alt="QR code to add <%= appName %> to your authenticator app" width="200" height="200"></div>
         <span class="muted small">Can't scan it? Type this key instead: <code class="secret"><%= secret.match(/.{1,4}/g).join(' ') %></code></span>
       </li>
       <li>Type the 6-digit code the app shows:

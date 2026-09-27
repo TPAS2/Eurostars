@@ -1,6 +1,6 @@
 'use strict';
 
-// Usage (with the server stopped): npm run restore-backup -- path/to/nexus-backup-....tar.gz[.enc]
+// Usage (with the server stopped): npm run restore-backup -- path/to/rift-backup-....tar.gz[.enc]
 // Encrypted backups (.enc) need the backup password: set BACKUP_PASSWORD, or you'll be asked.
 // The current database and uploads are moved to data/pre-restore-<time>/ first, never deleted.
 
@@ -20,7 +20,7 @@ if (!archive || !fs.existsSync(archive)) {
 }
 
 const config = loadConfig();
-const work = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-restore-'));
+const work = fs.mkdtempSync(path.join(os.tmpdir(), 'rift-restore-'));
 (async () => {
 try {
   let tarFile = path.resolve(archive);
@@ -36,9 +36,9 @@ try {
     tarFile = plain;
   }
   execFileSync('tar', ['-xzf', tarFile, '-C', work], { stdio: 'inherit' });
-  // Backups made before the rename to Nexus call the database letwise.db.
-  const restoredDb = ['nexus.db', 'letwise.db'].map((f) => path.join(work, f)).find((f) => fs.existsSync(f));
-  if (!restoredDb) throw new Error('This file does not look like a Nexus backup (no database inside).');
+  // Older backups call the database nexus.db (before the rename to Rift) or letwise.db.
+  const restoredDb = ['rift.db', 'nexus.db', 'letwise.db'].map((f) => path.join(work, f)).find((f) => fs.existsSync(f));
+  if (!restoredDb) throw new Error('This file does not look like a Rift backup (no database inside).');
 
   const check = new DatabaseSync(restoredDb, { readOnly: true });
   const ok = check.prepare('PRAGMA integrity_check').get();
