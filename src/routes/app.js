@@ -611,6 +611,12 @@ module.exports = function appRoutes(db) {
       const fk = { maintenance: 'maintenance_job_id', properties: 'property_id', contractors: 'contractor_id' }[def.key];
       invoices = db.prepare(`${INVOICE_LIST_SQL} WHERE i.account_id = ? AND i.${fk} = ? ORDER BY COALESCE(i.invoice_date, i.created_at) DESC, i.id DESC`).all(a, row.id);
     }
+    // On a maintenance job: its photos and files (without the file contents).
+    const jobFiles = def.key === 'maintenance'
+      ? db.prepare(`SELECT f.id, f.filename, f.mime, f.size, f.uploaded_at, u.name AS uploaded_by_name
+                      FROM maintenance_files f LEFT JOIN users u ON u.id = f.uploaded_by
+                     WHERE f.account_id = ? AND f.job_id = ? ORDER BY f.id DESC`).all(a, row.id)
+      : null;
     // On a tenant's page: their current tenancy (or tenancies), with its council, property and agreement.
     let tenantBoxes = null;
     if (def.key === 'tenants' || def.key === 'tenancies') {
@@ -632,7 +638,7 @@ module.exports = function appRoutes(db) {
     const photo = def.key === 'councils'
       ? db.prepare("SELECT strftime('%s', updated_at) AS v FROM council_photos WHERE council_id = ? AND account_id = ?").get(row.id, a) || { v: null }
       : null;
-    res.render('show', { title: rowTitle(def, row, maps), section: sectionOf(def), def, row, maps, display, rowTitle, children, extra, invoices, related: relatedLists(def, row, a), certs, photo, tenantBoxes, statementLink, error: req.query.error ? String(req.query.error).slice(0, 200) : null, flash: req.query.flash ? String(req.query.flash).slice(0, 200) : null, fmt, today: fmt.today() });
+    res.render('show', { title: rowTitle(def, row, maps), section: sectionOf(def), def, row, maps, display, rowTitle, children, extra, invoices, related: relatedLists(def, row, a), certs, photo, tenantBoxes, statementLink, jobFiles, error: req.query.error ? String(req.query.error).slice(0, 200) : null, flash: req.query.flash ? String(req.query.flash).slice(0, 200) : null, fmt, today: fmt.today() });
   });
 
   router.get('/:entity/:id/edit', (req, res) => {

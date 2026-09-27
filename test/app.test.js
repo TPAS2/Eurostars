@@ -2016,3 +2016,50 @@ test('Tenants and Tenancies are one tab', async () => {
   assert.match(r.text, new RegExp(`class="crumb" href="/app/tenants/${carol}">← Current Carol`));
   assert.match(r.text, /class="rail-btn active " href="\/app\/tenants"|class="rail-btn active" href="\/app\/tenants"|aria-label="Tenants" aria-current="page"/);
 });
+
+test('maintenance jobs: upload photos and files, view, download, remove', async () => {
+  const c = await registerAndLogin('job-files@example.com', 'Job Files Lets');
+  const prop = idFrom((await c.post('/app/properties', { address_line1: '6 Photo Lane', status: 'let' })).location);
+  const job = idFrom((await c.post('/app/maintenance', { property_id: String(prop), title: 'Leaking tap', priority: 'normal', status: 'open' })).location);
+  let r = await c.get(`/app/maintenance/${job}`);
+  assert.match(r.text, /id="files"[\s\S]*?Photos &amp; files[\s\S]*?name="files" multiple/);
+  assert.match(r.text, /No photos or files yet/);
+
+  const png = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(30)]);
+  const jpg = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(30)]);
+  const heic = Buffer.concat([Buffer.from([0, 0, 0, 24]), Buffer.from('ftypheic'), Buffer.alloc(20)]);
+  const form = new FormData();
+  form.append('_csrf', c.csrf);
+  form.append('files', new File([png], 'before.png'));
+  form.append('files', new File([jpg], 'after.jpg'));
+  form.append('files', new File([heic], 'IMG_0001.HEIC'));
+  form.append('files', new File([Buffer.from('%PDF-1.4\n')], 'quote.pdf'));
+  form.append('files', new File(['<script>'], 'evil.png'));
+  const res = await fetch(`${base}/app/maintenance/${job}/files`, { method: 'POST', headers: { cookie: c.cookie }, body: form, redirect: 'manual' });
+  const loc = decodeURIComponent(res.headers.get('location'));
+  assert.match(loc, /Uploaded 4 files\. Not uploaded .*evil\.png/);
+
+  r = await c.get(`/app/maintenance/${job}`);
+  assert.match(r.text, /Photos &amp; files <span class="count">4<\/span>/);
+  assert.match(r.text, /<img src="\/app\/maintenance\/\d+\/files\/\d+" alt="after\.jpg"/);
+  assert.match(r.text, /file-type">PDF</);
+  assert.match(r.text, /file-type">HEIC</);
+  assert.match(r.text, /Test User/, 'shows who uploaded it');
+  const files = db.prepare('SELECT id, filename FROM maintenance_files WHERE job_id = ? ORDER BY id').all(job);
+  r = await c.get(`/app/maintenance/${job}/files/${files[0].id}`);
+  assert.equal(r.headers.get('content-type'), 'image/png');
+  assert.match(r.headers.get('content-security-policy'), /sandbox/);
+  r = await c.get(`/app/maintenance/${job}/files/${files[2].id}`);
+  assert.match(r.headers.get('content-disposition'), /^attachment/, 'HEIC downloads rather than displays');
+
+  // Private to the company; removing works.
+  const other = await registerAndLogin('job-files-2@example.com', 'Other Files');
+  assert.equal((await other.get(`/app/maintenance/${job}/files/${files[0].id}`)).status, 404);
+  assert.equal((await other.post(`/app/maintenance/${job}/files/${files[0].id}/delete`, {})).status, 404);
+  await c.get(`/app/maintenance/${job}`);
+  await c.post(`/app/maintenance/${job}/files/${files[0].id}/delete`, {});
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM maintenance_files WHERE job_id = ?').get(job).n, 3);
+  // Deleting the job removes its files.
+  await c.post(`/app/maintenance/${job}/delete`, {});
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM maintenance_files WHERE job_id = ?').get(job).n, 0);
+});

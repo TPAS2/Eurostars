@@ -124,6 +124,38 @@
   <% }) %>
 <% } %>
 
+<% if (jobFiles) { %>
+<section class="card" id="files">
+  <div class="card-head">
+    <h2>Photos &amp; files <span class="count"><%= jobFiles.length %></span></h2>
+    <form method="post" action="/app/maintenance/<%= row.id %>/files" enctype="multipart/form-data" class="inline">
+      <%- include('partials/csrf') %>
+      <label class="btn small primary">+ Upload photos or files<input type="file" name="files" multiple accept="image/*,.heic,.heif,application/pdf" data-autosubmit hidden></label>
+      <noscript><button class="btn small" type="submit">Upload</button></noscript>
+    </form>
+  </div>
+  <% if (!jobFiles.length) { %><p class="muted">No photos or files yet. Add before/after photos, quotes or reports. You can pick several at once, up to 15 MB each.</p><% } else { %>
+  <div class="file-grid">
+    <% jobFiles.forEach(f => { const url = `/app/maintenance/${row.id}/files/${f.id}`; const isImg = ['image/jpeg','image/png','image/webp','image/gif'].includes(f.mime); %>
+    <figure class="file-tile">
+      <a href="<%= url %>" target="_blank" rel="noopener" class="file-thumb">
+        <% if (isImg) { %><img src="<%= url %>" alt="<%= f.filename %>" loading="lazy"><% } else { %><span class="file-type"><%= f.mime === 'application/pdf' ? 'PDF' : 'HEIC' %></span><% } %>
+      </a>
+      <figcaption>
+        <span class="file-name" title="<%= f.filename %>"><%= f.filename %></span>
+        <span class="muted small"><%= fmt.ukDate(f.uploaded_at.slice(0, 10)) %><%= f.uploaded_by_name ? ` · ${f.uploaded_by_name}` : '' %></span>
+        <span class="file-actions">
+          <a class="small" href="<%= url %>?download=1">Download</a>
+          <form method="post" action="<%= url %>/delete" data-confirm="Remove <%= f.filename %>?" class="inline"><%- include('partials/csrf') %><button class="btn small link" type="submit">Remove</button></form>
+        </span>
+      </figcaption>
+    </figure>
+    <% }) %>
+  </div>
+  <% } %>
+</section>
+<% } %>
+
 <% if (certs) { %>
 <section class="card" id="certificates">
   <div class="card-head"><h2>Certificates &amp; insurance</h2></div>

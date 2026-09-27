@@ -122,6 +122,11 @@ function describe(db, req) {
     if (sub === 'delete') return { action: 'deleted', text: withTitle('Deleted invoice', name) };
     return { action: 'updated', text: withTitle('Edited invoice', name) };
   }
+  if (section === 'maintenance' && sub === 'files') {
+    const title = recordTitle(db, ENTITIES.maintenance, id, a);
+    if (!post) return null; // opening a photo isn't logged
+    return parts[5] === 'delete' ? { action: 'deleted', text: withTitle('Removed a file from maintenance job', title) } : { action: 'updated', text: withTitle('Uploaded files to maintenance job', title) };
+  }
   if (section === 'tenancies' && sub === 'agreement') {
     const title = recordTitle(db, ENTITIES.tenancies, id, a);
     if (!post) return { action: 'viewed', text: withTitle('Opened the tenancy agreement for', title) };

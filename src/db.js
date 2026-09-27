@@ -258,6 +258,20 @@ CREATE TABLE IF NOT EXISTS landlord_invoices (
 );
 CREATE INDEX IF NOT EXISTS idx_landlord_invoices ON landlord_invoices(account_id, invoice_date);
 
+-- Photos and documents on a maintenance job, kept in the database so backups include them.
+CREATE TABLE IF NOT EXISTS maintenance_files (
+  id           INTEGER PRIMARY KEY,
+  account_id   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  job_id       INTEGER NOT NULL REFERENCES maintenance_jobs(id) ON DELETE CASCADE,
+  filename     TEXT NOT NULL,
+  mime         TEXT NOT NULL,
+  size         INTEGER NOT NULL,
+  data         BLOB NOT NULL,
+  uploaded_by  INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  uploaded_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_maintenance_files ON maintenance_files(account_id, job_id);
+
 -- Supplier/contractor invoices, usually for a maintenance job, with the uploaded document.
 CREATE TABLE IF NOT EXISTS invoices (
   id                  INTEGER PRIMARY KEY,
