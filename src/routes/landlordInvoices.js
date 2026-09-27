@@ -1,0 +1,226 @@
+'use strict';
+
+// Landlord invoices: bills the agency raises to its landlords. Each can be printed or emailed,
+// marked paid by the landlord, or deducted from their rent (a fee on their monthly statement).
+
+const express = require('express');
+const fmt = require('../format');
+const st = require('../statements');
+const { transaction } = require('../db');
+const { isEmail } = require('../mailer');
+
+module.exports = function landlordInvoiceRoutes(db, mailer = { enabled: false }) {
+  const router = express.Router();
+  const clip = (v, n) => String(v ?? '').trim().slice(0, n);
+
+  const LIST_SQL = `
+    SELECT li.*, l.name AS landlord_name, l.code AS landlord_code, l.email AS landlord_email, l.address AS landlord_address,
+           p.address_line1, ms.id AS statement_id, tx.txn_date AS deducted_on
+      FROM landlord_invoices li
+      JOIN landlords l ON l.id = li.landlord_id
+      LEFT JOIN properties p ON p.id = li.property_id
+      LEFT JOIN transactions tx ON tx.id = li.txn_id
+      LEFT JOIN monthly_statements ms ON ms.account_id = li.account_id AND ms.landlord_id = li.landlord_id AND ms.month = substr(tx.txn_date, 1, 7)`;
+
+  const statementLink = (inv) => (!inv.txn_id ? null : inv.statement_id ? `/app/monthly/${inv.statement_id}` : `/app/monthly?month=${inv.deducted_on.slice(0, 7)}`);
+
+  function load(req, res) {
+    const id = Number(req.params.id);
+    const inv = Number.isInteger(id) && db.prepare(`${LIST_SQL} WHERE li.id = ? AND li.account_id = ?`).get(id, req.user.id);
+    if (!inv) res.status(404).render('error', { title: 'Not found', message: 'That landlord invoice was not found.' });
+    return inv || null;
+  }
+
+  function nextNumber(accountId) {
+    const rows = db.prepare('SELECT invoice_number FROM landlord_invoices WHERE account_id = ?').all(accountId);
+    const n = rows.reduce((max, r) => Math.max(max, Number((r.invoice_number.match(/(\d+)\s*$/) || [0, 0])[1])), 0);
+    return `LI-${String(n + 1).padStart(4, '0')}`;
+  }
+
+  const options = (accountId) => ({
+    landlords: db.prepare('SELECT id, name, code FROM landlords WHERE account_id = ? ORDER BY name COLLATE NOCASE').all(accountId),
+    properties: db.prepare('SELECT id, address_line1, landlord_id FROM properties WHERE account_id = ? ORDER BY address_line1 COLLATE NOCASE').all(accountId),
+  });
+
+  function parse(body, accountId) {
+    const v = {
+      landlord_id: Number(body.landlord_id) || null,
+      property_id: Number(body.property_id) || null,
+      invoice_number: clip(body.invoice_number, 30),
+      invoice_date: clip(body.invoice_date, 10),
+      due_date: clip(body.due_date, 10) || null,
+      description: clip(body.description, 500),
+      notes: clip(body.notes, 2000) || null,
+    };
+    const errors = {};
+    if (!v.landlord_id || !db.prepare('SELECT 1 FROM landlords WHERE id = ? AND account_id = ?').get(v.landlord_id, accountId)) errors.landlord_id = 'Choose the landlord to bill.';
+    if (v.property_id && !db.prepare('SELECT 1 FROM properties WHERE id = ? AND account_id = ?').get(v.property_id, accountId)) errors.property_id = 'Choose a valid property.';
+    if (!v.invoice_number) errors.invoice_number = 'Enter an invoice number.';
+    if (!fmt.isIsoDate(v.invoice_date)) errors.invoice_date = 'Enter the invoice date.';
+    if (v.due_date && !fmt.isIsoDate(v.due_date)) errors.due_date = 'Enter a valid due date.';
+    if (!v.description) errors.description = 'Say what the invoice is for.';
+    v.amount_pence = fmt.parseMoney(body.amount);
+    if (Number.isNaN(v.amount_pence) || v.amount_pence <= 0) errors.amount = 'Enter the amount, like 120 or 120.00.';
+    return { v, errors };
+  }
+
+  const renderForm = (req, res, { inv, values, errors, status = 200 }) => res.status(status).render('landlordinvoices/form', {
+    title: inv ? `Edit ${inv.invoice_number}` : 'New landlord invoice', section: 'landlordinvoices', inv, values, errors, ...options(req.user.id), fmt,
+  });
+
+  // ---------- list ----------
+
+  router.get('/', (req, res) => {
+    const a = req.user.id;
+    const today = fmt.today();
+    const thisMonth = today.slice(0, 7);
+    const status = ['unpaid', 'paid'].includes(req.query.status) ? req.query.status : 'all';
+    const month = req.query.month === 'all' ? 'all' : st.isMonth(req.query.month) ? String(req.query.month) : status === 'unpaid' ? 'all' : thisMonth;
+    let where = 'li.account_id = ?';
+    const params = [a];
+    if (month !== 'all') { where += ' AND substr(li.invoice_date, 1, 7) = ?'; params.push(month); }
+    if (status !== 'all') { where += ' AND li.status = ?'; params.push(status); }
+    const invoices = db.prepare(`${LIST_SQL} WHERE ${where} ORDER BY li.invoice_date DESC, li.id DESC LIMIT 500`).all(...params);
+    const totals = db.prepare(
+      `SELECT COALESCE(SUM(CASE WHEN status = 'unpaid' THEN amount_pence END), 0) AS unpaid, COUNT(CASE WHEN status = 'unpaid' THEN 1 END) AS unpaid_n,
+              COALESCE(SUM(CASE WHEN status = 'unpaid' AND due_date < ? THEN amount_pence END), 0) AS overdue
+         FROM landlord_invoices WHERE account_id = ?`
+    ).get(today, a);
+    const shift = (by) => { const [y, m] = (month === 'all' ? thisMonth : month).split('-').map(Number); return new Date(Date.UTC(y, m - 1 + by, 1)).toISOString().slice(0, 7); };
+    res.render('landlordinvoices/list', {
+      title: 'Landlord invoices', section: 'landlordinvoices', invoices, totals, status, month, prev: shift(-1), next: shift(1), thisMonth,
+      monthLabel: month === 'all' ? 'All months' : st.monthLabel(month), statementLink, today, fmt, flash: clip(req.query.flash, 300),
+    });
+  });
+
+  // ---------- create / edit ----------
+
+  router.get('/new', (req, res) => {
+    const values = { invoice_number: nextNumber(req.user.id), invoice_date: fmt.today(), due_date: fmt.addDays(fmt.today(), 14) };
+    const ll = Number(req.query.landlord_id);
+    if (ll) values.landlord_id = ll;
+    const prop = Number(req.query.property_id) && db.prepare('SELECT id, landlord_id FROM properties WHERE id = ? AND account_id = ?').get(Number(req.query.property_id), req.user.id);
+    if (prop) { values.property_id = prop.id; values.landlord_id = values.landlord_id || prop.landlord_id; }
+    renderForm(req, res, { inv: null, values, errors: {} });
+  });
+
+  router.post('/', (req, res) => {
+    const a = req.user.id;
+    const { v, errors } = parse(req.body, a);
+    if (Object.keys(errors).length) return renderForm(req, res, { inv: null, values: req.body, errors, status: 422 });
+    const cols = Object.keys(v);
+    const info = db.prepare(`INSERT INTO landlord_invoices (account_id, ${cols.join(', ')}) VALUES (?, ${cols.map(() => '?').join(', ')})`).run(a, ...cols.map((c) => v[c]));
+    res.redirect(`/app/landlord-invoices/${info.lastInsertRowid}`);
+  });
+
+  router.get('/:id(\\d+)', (req, res) => {
+    const inv = load(req, res);
+    if (!inv) return;
+    const agency = db.prepare('SELECT agency_name, email, phone, address FROM users WHERE id = ?').get(req.user.id);
+    res.render('landlordinvoices/show', {
+      title: `Landlord invoice ${inv.invoice_number}`, section: 'landlordinvoices', inv, agency, statementLink, emailEnabled: mailer.enabled,
+      today: fmt.today(), fmt, flash: clip(req.query.flash, 300), error: clip(req.query.error, 300),
+    });
+  });
+
+  router.get('/:id(\\d+)/edit', (req, res) => {
+    const inv = load(req, res);
+    if (!inv) return;
+    renderForm(req, res, { inv, values: { ...inv, amount: fmt.penceToInput(inv.amount_pence) }, errors: {} });
+  });
+
+  router.post('/:id(\\d+)', (req, res) => {
+    const inv = load(req, res);
+    if (!inv) return;
+    const a = req.user.id;
+    const { v, errors } = parse(req.body, a);
+    if (Object.keys(errors).length) return renderForm(req, res, { inv, values: req.body, errors, status: 422 });
+    const cols = Object.keys(v);
+    transaction(db, () => {
+      db.prepare(`UPDATE landlord_invoices SET ${cols.map((c) => `${c} = ?`).join(', ')} WHERE id = ? AND account_id = ?`).run(...cols.map((c) => v[c]), inv.id, a);
+      // Already deducted: keep the deduction matching the invoice.
+      if (inv.txn_id) {
+        db.prepare('UPDATE transactions SET landlord_id = ?, property_id = ?, amount_pence = ?, description = ? WHERE id = ? AND account_id = ?')
+          .run(v.landlord_id, v.property_id, v.amount_pence, `Invoice ${v.invoice_number} — ${v.description}`.slice(0, 200), inv.txn_id, a);
+      }
+    });
+    res.redirect(`/app/landlord-invoices/${inv.id}`);
+  });
+
+  router.post('/:id(\\d+)/delete', (req, res) => {
+    const inv = load(req, res);
+    if (!inv) return;
+    transaction(db, () => {
+      if (inv.txn_id) db.prepare('DELETE FROM transactions WHERE id = ? AND account_id = ?').run(inv.txn_id, req.user.id);
+      db.prepare('DELETE FROM landlord_invoices WHERE id = ? AND account_id = ?').run(inv.id, req.user.id);
+    });
+    res.redirect(`/app/landlord-invoices?flash=${encodeURIComponent(`Deleted invoice ${inv.invoice_number}.`)}`);
+  });
+
+  // ---------- settling ----------
+
+  router.post('/:id(\\d+)/settle', (req, res) => {
+    const inv = load(req, res);
+    if (!inv) return;
+    const a = req.user.id;
+    const back = (msg, ok) => res.redirect(`/app/landlord-invoices/${inv.id}?${ok ? 'flash' : 'error'}=${encodeURIComponent(msg)}`);
+    if (inv.status === 'paid') return back('This invoice is already settled.');
+    const date = String(req.body.date || '');
+    if (!fmt.isIsoDate(date)) return back('Enter the date.');
+    if (req.body.how === 'deduct') {
+      // Taken off their rent: a fee on their statement for that month.
+      transaction(db, () => {
+        const txn = db.prepare(
+          `INSERT INTO transactions (account_id, txn_date, txn_type, landlord_id, property_id, description, amount_pence)
+           VALUES (?, ?, 'fee', ?, ?, ?, ?)`
+        ).run(a, date, inv.landlord_id, inv.property_id, `Invoice ${inv.invoice_number} — ${inv.description}`.slice(0, 200), inv.amount_pence);
+        db.prepare("UPDATE landlord_invoices SET status = 'paid', paid_date = ?, paid_how = 'Deducted from rent', txn_id = ? WHERE id = ? AND account_id = ?")
+          .run(date, Number(txn.lastInsertRowid), inv.id, a);
+      });
+      return back(`Deducted ${fmt.money(inv.amount_pence)} from ${inv.landlord_name}'s rent for ${st.monthLabel(date.slice(0, 7))}.`, true);
+    }
+    db.prepare("UPDATE landlord_invoices SET status = 'paid', paid_date = ?, paid_how = 'Paid by landlord' WHERE id = ? AND account_id = ?").run(date, inv.id, a);
+    back(`Marked ${inv.invoice_number} as paid by ${inv.landlord_name}.`, true);
+  });
+
+  router.post('/:id(\\d+)/unsettle', (req, res) => {
+    const inv = load(req, res);
+    if (!inv) return;
+    transaction(db, () => {
+      if (inv.txn_id) db.prepare('DELETE FROM transactions WHERE id = ? AND account_id = ?').run(inv.txn_id, req.user.id);
+      db.prepare("UPDATE landlord_invoices SET status = 'unpaid', paid_date = NULL, paid_how = NULL, txn_id = NULL WHERE id = ? AND account_id = ?").run(inv.id, req.user.id);
+    });
+    res.redirect(`/app/landlord-invoices/${inv.id}?flash=${encodeURIComponent('Undone. The invoice is unpaid again.')}`);
+  });
+
+  // ---------- email ----------
+
+  router.post('/:id(\\d+)/email', async (req, res, next) => {
+    try {
+      const inv = load(req, res);
+      if (!inv) return;
+      const back = (msg, ok) => res.redirect(`/app/landlord-invoices/${inv.id}?${ok ? 'flash' : 'error'}=${encodeURIComponent(msg)}`);
+      if (!mailer.enabled) return back('Email isn’t set up yet. Print the invoice instead.');
+      if (!isEmail(inv.landlord_email)) return back(`${inv.landlord_name} has no email address. Add one on their landlord page.`);
+      const agency = db.prepare('SELECT agency_name, email FROM users WHERE id = ?').get(req.user.id);
+      const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+      const lines = [
+        `Dear ${inv.landlord_name},`, '',
+        `Please find our invoice ${inv.invoice_number} below.`, '',
+        `Date: ${fmt.ukDate(inv.invoice_date)}`, inv.due_date ? `Due: ${fmt.ukDate(inv.due_date)}` : null,
+        inv.address_line1 ? `Property: ${inv.address_line1}` : null,
+        `For: ${inv.description}`, `Amount: ${fmt.money(inv.amount_pence)}`, '',
+        inv.status === 'paid' ? `Status: settled (${inv.paid_how.toLowerCase()} on ${fmt.ukDate(inv.paid_date)}).` : 'Unless you tell us otherwise, we will deduct this from your rent.', '',
+        agency.agency_name,
+      ].filter((l) => l !== null);
+      await mailer.send({
+        to: inv.landlord_email, subject: `Invoice ${inv.invoice_number} from ${agency.agency_name}`, fromName: agency.agency_name, replyTo: agency.email,
+        text: lines.join('\n'), html: `<!doctype html><html><body style="font-family:Arial,sans-serif;color:#111">${lines.map((l) => (l ? `<p style="margin:0 0 6px">${esc(l)}</p>` : '<br>')).join('')}</body></html>`,
+      });
+      db.prepare("UPDATE landlord_invoices SET emailed_at = datetime('now') WHERE id = ?").run(inv.id);
+      back(`Emailed ${inv.invoice_number} to ${inv.landlord_email}.`, true);
+    } catch (err) { next(err); }
+  });
+
+  return router;
+};

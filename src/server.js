@@ -140,6 +140,7 @@ function createApp(config, db, { writer = null, mailer = null } = {}) {
   app.use('/app/councils', auth.requireLogin, require('./routes/councilPhotos')(db));
   app.use('/app/tenancies', auth.requireLogin, require('./routes/agreements')(db));
   app.use('/app/rent-run', auth.requireLogin, require('./routes/payments')(db));
+  app.use('/app/landlord-invoices', auth.requireLogin, require('./routes/landlordInvoices')(db, mailer));
   app.use(auth.rejectUncheckedMultipart);
   const monthly = require('./routes/monthly')(db, writer, mailer);
   app.use('/app/monthly', auth.requireLogin, monthly);

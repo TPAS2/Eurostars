@@ -1,0 +1,80 @@
+<%- include('../partials/header') %>
+<% const overdue = inv.status === 'unpaid' && inv.due_date && inv.due_date < today; const link = statementLink(inv); %>
+<header class="page-head no-print">
+  <div>
+    <a class="crumb" href="/app/landlord-invoices">← Landlord invoices</a>
+    <h1><%= inv.invoice_number %> · <%= fmt.money(inv.amount_pence) %></h1>
+    <p class="muted"><%= inv.landlord_name %> ·
+      <% if (inv.status === 'paid') { %><span class="badge s-active plain"><%= inv.paid_how %> <%= fmt.ukDate(inv.paid_date) %></span><% } else if (overdue) { %><span class="badge bad plain">Overdue</span><% } else { %><span class="badge warn plain">Unpaid</span><% } %>
+      <% if (inv.emailed_at) { %><span class="muted small">· emailed <%= fmt.ukDateTime(inv.emailed_at) %></span><% } %>
+    </p>
+  </div>
+  <div class="actions">
+    <button class="btn" type="button" data-print>Print</button>
+    <% if (emailEnabled && inv.landlord_email) { %>
+    <form method="post" action="/app/landlord-invoices/<%= inv.id %>/email" data-busy="Sending…" data-confirm="Email <%= inv.invoice_number %> to <%= inv.landlord_email %>?">
+      <%- include('../partials/csrf') %><button class="btn" type="submit">Email to landlord</button>
+    </form>
+    <% } %>
+    <a class="btn" href="/app/landlord-invoices/<%= inv.id %>/edit">Edit</a>
+    <form method="post" action="/app/landlord-invoices/<%= inv.id %>/delete" data-confirm="Delete <%= inv.invoice_number %>?<%= inv.txn_id ? ' The deduction from the landlord\'s rent will be removed too.' : '' %>">
+      <%- include('../partials/csrf') %><button class="btn danger" type="submit">Delete</button>
+    </form>
+  </div>
+</header>
+<% if (flash) { %><div class="notice ok no-print"><%= flash %></div><% } %>
+<% if (error) { %><div class="notice err no-print"><%= error %></div><% } %>
+
+<% if (inv.status === 'unpaid') { %>
+<section class="card no-print">
+  <h2>Settle this invoice</h2>
+  <form method="post" action="/app/landlord-invoices/<%= inv.id %>/settle" class="settle-form">
+    <%- include('../partials/csrf') %>
+    <label class="check"><input type="radio" name="how" value="deduct" checked> <span><strong>Deduct from <%= inv.landlord_name %>'s rent</strong><br><span class="muted small">Shows as a deduction on their statement for the month of this date.</span></span></label>
+    <label class="check"><input type="radio" name="how" value="paid"> <span><strong>Paid by the landlord</strong><br><span class="muted small">They paid you directly; nothing is taken from their rent.</span></span></label>
+    <label>Date <input type="date" name="date" value="<%= today %>" required></label>
+    <button class="btn primary" type="submit">Settle <%= fmt.money(inv.amount_pence) %></button>
+  </form>
+</section>
+<% } else { %>
+<section class="card no-print">
+  <div class="settled">
+    <div><strong><%= inv.paid_how %></strong> on <%= fmt.ukDate(inv.paid_date) %>.
+      <% if (inv.txn_id) { %>Deducted: <span class="yes-no yes">Yes</span><% if (link) { %> · <a href="<%= link %>">View statement</a><% } %><% } else { %>Deducted: <span class="yes-no no">No</span><% } %>
+    </div>
+    <form method="post" action="/app/landlord-invoices/<%= inv.id %>/unsettle" data-confirm="Undo? <%= inv.txn_id ? 'The deduction from their rent will be removed.' : '' %>">
+      <%- include('../partials/csrf') %><button class="btn small" type="submit">Undo</button>
+    </form>
+  </div>
+</section>
+<% } %>
+
+<section class="card invoice-doc">
+  <div class="doc-head">
+    <div>
+      <div class="doc-agency"><%= agency.agency_name %></div>
+      <% if (agency.address) { %><div class="pre small"><%= agency.address %></div><% } %>
+      <div class="small"><%= [agency.phone, agency.email].filter(Boolean).join(' · ') %></div>
+    </div>
+    <div class="doc-to">
+      <h2>INVOICE</h2>
+      <div><strong><%= inv.invoice_number %></strong></div>
+      <div class="small">Date <%= fmt.ukDate(inv.invoice_date) %><% if (inv.due_date) { %> · Due <%= fmt.ukDate(inv.due_date) %><% } %></div>
+    </div>
+  </div>
+  <div class="bill-to">
+    <div class="muted small">Bill to</div>
+    <strong><%= inv.landlord_name %></strong><% if (inv.landlord_code) { %> <span class="muted">(<%= inv.landlord_code %>)</span><% } %>
+    <% if (inv.landlord_address) { %><div class="pre small"><%= inv.landlord_address %></div><% } %>
+  </div>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Description</th><th>Property</th><th class="num">Amount</th></tr></thead>
+    <tbody>
+      <tr><td><%= inv.description %></td><td><%= inv.address_line1 || '' %></td><td class="num"><%= fmt.money(inv.amount_pence) %></td></tr>
+      <tr class="total"><td colspan="2">Total</td><td class="num"><%= fmt.money(inv.amount_pence) %></td></tr>
+    </tbody>
+  </table></div>
+  <% if (inv.notes) { %><p class="pre small"><%= inv.notes %></p><% } %>
+  <p class="small"><% if (inv.status === 'paid') { %>Settled: <%= inv.paid_how.toLowerCase() %> on <%= fmt.ukDate(inv.paid_date) %>.<% } else { %>Unless agreed otherwise, this will be deducted from your rent.<% } %></p>
+</section>
+<%- include('../partials/footer') %>

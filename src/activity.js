@@ -76,6 +76,14 @@ function describe(db, req) {
 
   // Sections with their own routes.
   if (section === 'account') return { action: 'viewed', text: 'Viewed my account' };
+  if (section === 'landlord-invoices') {
+    const li = id ? db.prepare('SELECT invoice_number FROM landlord_invoices WHERE id = ? AND account_id = ?').get(id, a) : null;
+    const name = li ? li.invoice_number : '';
+    if (!post) return { action: 'viewed', text: id ? withTitle('Viewed landlord invoice', name) : idPart === 'new' ? 'Opened New landlord invoice' : 'Viewed landlord invoices' };
+    if (!id) return { action: 'created', text: withTitle('Created landlord invoice', String(req.body.invoice_number || '').trim()) };
+    const verb = { settle: req.body.how === 'deduct' ? 'Deducted from rent: landlord invoice' : 'Marked paid: landlord invoice', unsettle: 'Undid settling landlord invoice', delete: 'Deleted landlord invoice', email: 'Emailed landlord invoice' }[sub] || 'Edited landlord invoice';
+    return { action: sub === 'delete' ? 'deleted' : 'updated', text: withTitle(verb, name) };
+  }
   if (section === 'council-reconciliation') return post ? { action: 'updated', text: `Updated council reconciliation notes for ${req.body.month || ''}`.trim(), autosave: req.get('X-Autosave') === '1' } : { action: 'viewed', text: 'Viewed council reconciliation' };
   if (section === 'rent-run') {
     const m = /^\d{4}-\d{2}$/.test(String(req.body.month || req.query.month || '')) ? ` for ${req.body.month || req.query.month}` : '';

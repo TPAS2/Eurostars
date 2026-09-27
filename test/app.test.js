@@ -1370,8 +1370,8 @@ test('the admin chooses which tabs each person sees; hidden tabs are blocked', a
   assert.match(r.text, new RegExp(`action="/admin/users/${companyId}/tabs/${ada}"`));
   // Ada only gets Properties, Tenants and Repairs.
   r = await admin.post(`/admin/users/${companyId}/tabs/${ada}`, { tabs: ['properties', 'tenants', 'maintenance'] });
-  assert.match(decodeURIComponent(r.location), /Ada Assistant now sees 3 of 11 tabs/);
-  assert.match((await admin.get(`/admin/users/${companyId}`)).text, /3 of 11 tabs/);
+  assert.match(decodeURIComponent(r.location), /Ada Assistant now sees 3 of 12 tabs/);
+  assert.match((await admin.get(`/admin/users/${companyId}`)).text, /3 of 12 tabs/);
 
   const c = new Client();
   await c.login('tabs-co', 'adas-pass-123', 'ada');
@@ -1391,7 +1391,7 @@ test('the admin chooses which tabs each person sees; hidden tabs are blocked', a
   // The main login still sees everything; ticking all tabs gives Ada everything back.
   assert.equal((await boss.get('/app/landlords')).status, 200);
   await admin.get(`/admin/users/${companyId}`);
-  await admin.post(`/admin/users/${companyId}/tabs/${ada}`, { tabs: ['councils', 'councilrec', 'properties', 'landlords', 'tenants', 'tenancies', 'maintenance', 'contractors', 'invoices', 'rentrun', 'monthly'] });
+  await admin.post(`/admin/users/${companyId}/tabs/${ada}`, { tabs: ['councils', 'councilrec', 'properties', 'landlords', 'tenants', 'tenancies', 'maintenance', 'contractors', 'invoices', 'landlordinvoices', 'rentrun', 'monthly'] });
   assert.equal(db.prepare('SELECT hidden_tabs FROM users WHERE id = ?').get(ada).hidden_tabs, null);
   assert.equal((await c.get('/app/landlords')).status, 200);
 
@@ -1489,11 +1489,11 @@ test('admin Tab access page: every person against every tab, saved in one go', a
   assert.match(r.text, /Grid Lets[\s\S]*?Test User[\s\S]*?main login[\s\S]*?Bea Clerk/);
   assert.match(r.text, new RegExp(`name="t_${bea}" value="councilrec" checked`));
   // Bea: only Rent run and Monthly statements. The main login (companyId) keeps everything.
-  const all = ['councils', 'councilrec', 'properties', 'landlords', 'tenants', 'tenancies', 'maintenance', 'contractors', 'invoices', 'rentrun', 'monthly'];
+  const all = ['councils', 'councilrec', 'properties', 'landlords', 'tenants', 'tenancies', 'maintenance', 'contractors', 'invoices', 'landlordinvoices', 'rentrun', 'monthly'];
   r = await admin.post('/admin/access', { company: String(companyId), people: [String(companyId), String(bea)], [`t_${companyId}`]: all, [`t_${bea}`]: ['rentrun', 'monthly'] });
   assert.match(decodeURIComponent(r.location), /Saved tab access for 2 people/);
   assert.equal(db.prepare('SELECT hidden_tabs FROM users WHERE id = ?').get(companyId).hidden_tabs, null);
-  assert.deepEqual(JSON.parse(db.prepare('SELECT hidden_tabs FROM users WHERE id = ?').get(bea).hidden_tabs).length, 9);
+  assert.deepEqual(JSON.parse(db.prepare('SELECT hidden_tabs FROM users WHERE id = ?').get(bea).hidden_tabs).length, 10);
 
   const c = new Client();
   await c.login('grid-co', 'beas-pass-123', 'bea');
@@ -1714,7 +1714,7 @@ test('contractors: every supplier listed with how much has been paid to them in 
   // Menu: Contractors sits above Invoices; Compliance is gone.
   const rail = (await c.get('/app')).text.match(/<nav class="rail"[\s\S]*?<\/nav>/)[0];
   const labels = [...rail.matchAll(/aria-label="([^"]+)"/g)].map((m) => m[1]);
-  assert.equal(labels.indexOf('Contractors') + 1, labels.indexOf('Invoices'));
+  assert.equal(labels.indexOf('Contractors') + 1, labels.indexOf('Contractors Invoices'));
   assert.ok(!labels.includes('Compliance'));
 
   let r = await c.get('/app/contractors');
@@ -1737,4 +1737,71 @@ test('contractors: every supplier listed with how much has been paid to them in 
 
   // Compliance pages still work from a property (certificates), just not in the menu.
   assert.equal((await c.get('/app/compliance/new')).status, 200);
+});
+
+test('landlord invoices: bill a landlord, deduct from rent or mark paid, print and email', async () => {
+  const c = await registerAndLogin('ll-invoices@example.com', 'Bill Lets');
+  let r = await c.post('/app/landlords', { name: 'Larry Landlord', code: 'LL9', email: 'larry@example.com', address: '1 Home Road' });
+  const larry = idFrom(r.location);
+  r = await c.post('/app/properties', { address_line1: '8 Bill Street', landlord_id: String(larry), status: 'let' });
+  const prop = idFrom(r.location);
+
+  const rail = (await c.get('/app')).text.match(/<nav class="rail"[\s\S]*?<\/nav>/)[0];
+  const labels = [...rail.matchAll(/aria-label="([^"]+)"/g)].map((m) => m[1]);
+  assert.equal(labels.indexOf('Contractors Invoices') + 1, labels.indexOf('Landlord Invoices'));
+  assert.match((await c.get('/app/invoices')).text, /<h1>Contractors invoices<\/h1>/);
+
+  r = await c.get(`/app/landlord-invoices/new?property_id=${prop}`);
+  assert.match(r.text, /name="invoice_number" value="LI-0001"/);
+  assert.match(r.text, new RegExp(`<option value="${larry}" selected>Larry Landlord`), 'landlord filled in from the property');
+  r = await c.post('/app/landlord-invoices', { landlord_id: String(larry), property_id: String(prop), invoice_number: 'LI-0001', invoice_date: '2026-08-04', due_date: '2026-08-18', description: 'Tenant find fee', amount: '£300' });
+  const inv1 = idFrom(r.location);
+  r = await c.post('/app/landlord-invoices', { landlord_id: '', invoice_number: '', invoice_date: 'x', description: '', amount: 'lots' });
+  assert.equal(r.status, 422);
+  assert.match((await c.get('/app/landlord-invoices/new')).text, /value="LI-0002"/, 'numbers count up');
+
+  // The invoice page is printable, with who it's billed to.
+  r = await c.get(`/app/landlord-invoices/${inv1}`);
+  assert.match(r.text, /INVOICE[\s\S]*?LI-0001[\s\S]*?Bill to[\s\S]*?Larry Landlord[\s\S]*?1 Home Road[\s\S]*?Tenant find fee[\s\S]*?8 Bill Street[\s\S]*?£300\.00/);
+  assert.match(r.text, /data-print/);
+
+  // Deduct from rent: a fee on the landlord's statement for that month.
+  r = await c.post(`/app/landlord-invoices/${inv1}/settle`, { how: 'deduct', date: '2026-08-20' });
+  assert.match(decodeURIComponent(r.location), /Deducted £300\.00 from Larry Landlord's rent for August 2026/);
+  const li = db.prepare('SELECT * FROM landlord_invoices WHERE id = ?').get(inv1);
+  assert.equal(li.status, 'paid');
+  const fee = db.prepare('SELECT * FROM transactions WHERE id = ?').get(li.txn_id);
+  assert.equal(fee.txn_type, 'fee');
+  assert.equal(fee.amount_pence, 30000);
+  assert.equal(fee.landlord_id, larry);
+  await c.get('/app/monthly?month=2026-08');
+  await c.post('/app/monthly/generate', { month: '2026-08', landlord_id: String(larry) });
+  const statement = db.prepare("SELECT * FROM monthly_statements WHERE landlord_id = ? AND month = '2026-08'").get(larry);
+  assert.equal(statement.fees_pence, 30000, 'on their statement as a deduction');
+  r = await c.get('/app/landlord-invoices?month=2026-08');
+  assert.match(r.text, new RegExp(`LI-0001[\\s\\S]*?Larry Landlord[\\s\\S]*?8 Bill Street[\\s\\S]*?Deducted 20/08/2026[\\s\\S]*?yes-no yes">Yes[\\s\\S]*?href="/app/monthly/${statement.id}"`));
+
+  // Undo removes the deduction.
+  await c.post(`/app/landlord-invoices/${inv1}/unsettle`, {});
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM transactions WHERE id = ?').get(li.txn_id).n, 0);
+  // Paid by the landlord: no deduction.
+  await c.post(`/app/landlord-invoices/${inv1}/settle`, { how: 'paid', date: '2026-08-22' });
+  const paid = db.prepare('SELECT * FROM landlord_invoices WHERE id = ?').get(inv1);
+  assert.equal(paid.paid_how, 'Paid by landlord');
+  assert.equal(paid.txn_id, null);
+  assert.match((await c.get('/app/landlord-invoices?month=2026-08')).text, /yes-no no">No/);
+
+  // Email to the landlord.
+  sentMail.length = 0;
+  r = await c.post(`/app/landlord-invoices/${inv1}/email`, {});
+  assert.equal(sentMail.length, 1);
+  assert.equal(sentMail[0].to, 'larry@example.com');
+  assert.match(sentMail[0].subject, /Invoice LI-0001 from Bill Lets/);
+  assert.match(sentMail[0].text, /Tenant find fee[\s\S]*?£300\.00/);
+
+  // Private to the company; deleting removes it.
+  const other = await registerAndLogin('ll-invoices-2@example.com', 'Other Bill');
+  assert.equal((await other.get(`/app/landlord-invoices/${inv1}`)).status, 404);
+  await c.post(`/app/landlord-invoices/${inv1}/delete`, {});
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM landlord_invoices WHERE id = ?').get(inv1).n, 0);
 });

@@ -513,3 +513,14 @@ form.inline { display: inline-flex; margin: 0; }
 .yes-no { display: inline-block; font-weight: 800; font-size: .8rem; padding: 2px 9px; border-radius: 99px; }
 .yes-no.yes { background: var(--ok-soft); color: var(--ok); }
 .yes-no.no { background: var(--bad-soft); color: var(--bad); }
+
+/* Landlord invoices */
+.settle-form { display: flex; gap: 18px; align-items: flex-end; flex-wrap: wrap; margin: 0; }
+.settle-form label.check { max-width: 320px; }
+.settle-form label.check input { margin-top: 5px; }
+.settled { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.settled form { margin: 0; }
+.invoice-doc .doc-head { display: flex; justify-content: space-between; gap: 20px; margin-bottom: 18px; }
+.invoice-doc .doc-to { text-align: right; }
+.invoice-doc .doc-to h2 { margin: 0 0 4px; letter-spacing: .12em; }
+.bill-to { margin: 0 0 14px; }

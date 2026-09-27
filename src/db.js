@@ -236,6 +236,28 @@ CREATE TABLE IF NOT EXISTS contractors (
 );
 CREATE INDEX IF NOT EXISTS idx_contractors_account ON contractors(account_id, name);
 
+-- Invoices the agency raises to its landlords (fees, inspections, work arranged...). Settled either
+-- by the landlord paying, or by deducting it from their rent (txn_id: the fee on their statement).
+CREATE TABLE IF NOT EXISTS landlord_invoices (
+  id              INTEGER PRIMARY KEY,
+  account_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  landlord_id     INTEGER NOT NULL REFERENCES landlords(id) ON DELETE CASCADE,
+  property_id     INTEGER REFERENCES properties(id) ON DELETE SET NULL,
+  invoice_number  TEXT NOT NULL,
+  invoice_date    TEXT NOT NULL,
+  due_date        TEXT,
+  description     TEXT NOT NULL,
+  amount_pence    INTEGER NOT NULL,
+  notes           TEXT,
+  status          TEXT NOT NULL DEFAULT 'unpaid',   -- unpaid | paid
+  paid_date       TEXT,
+  paid_how        TEXT,                              -- Deducted from rent | Paid by landlord
+  txn_id          INTEGER REFERENCES transactions(id) ON DELETE SET NULL,
+  emailed_at      TEXT,
+  created_at      TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_landlord_invoices ON landlord_invoices(account_id, invoice_date);
+
 -- Supplier/contractor invoices, usually for a maintenance job, with the uploaded document.
 CREATE TABLE IF NOT EXISTS invoices (
   id                  INTEGER PRIMARY KEY,

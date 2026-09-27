@@ -13,7 +13,8 @@ const TABS = [
   { key: 'tenancies', label: 'Tenancies', paths: ['/app/tenancies'] },
   { key: 'maintenance', label: 'Maintenance', paths: ['/app/maintenance'] },
   { key: 'contractors', label: 'Contractors', paths: ['/app/contractors'] },
-  { key: 'invoices', label: 'Invoices', paths: ['/app/invoices'] },
+  { key: 'invoices', label: 'Contractors Invoices', paths: ['/app/invoices'] },
+  { key: 'landlordinvoices', label: 'Landlord Invoices', paths: ['/app/landlord-invoices'] },
   { key: 'rentrun', label: 'Rent run', paths: ['/app/rent-run', '/app/monthly/calculate', '/app/monthly/email', '/app/monthly/report'] },
   { key: 'monthly', label: 'Monthly statements', paths: ['/app/monthly'] },
 ];
