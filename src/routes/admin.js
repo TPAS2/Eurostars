@@ -141,10 +141,14 @@ module.exports = function adminRoutes(db, config) {
       username: text('username', 60) || u.username,
     };
     let error = '';
+    // Keeping your own username (or only changing its capitals) is always fine.
+    const sameName = values.username.toLowerCase() === String(u.username).toLowerCase();
     // The username can be changed too (e.g. to fix its capitals); it stays unique ignoring case.
-    if (!USERNAME_RE.test(values.username)) error = 'The username must be 3–30 letters, numbers, dots, dashes or underscores.';
-    else if (RESERVED_USERNAMES.has(values.username.toLowerCase()) || values.username.toLowerCase() === config.adminUsername.toLowerCase()
-      || db.prepare('SELECT 1 FROM users WHERE username = ? COLLATE NOCASE AND id != ? AND (company_id IS NULL OR company_id != ?)').get(values.username, u.id, u.id)) {
+    if (u.is_admin && values.username !== u.username) error = 'The admin username is set in the server settings (ADMIN_USERNAME), so it can’t be changed here.';
+    else if (u.is_admin && values.login_name !== u.login_name) error = 'The admin sign-in name is set in the server settings (ADMIN_LOGIN_NAME), so it can’t be changed here.';
+    else if (!USERNAME_RE.test(values.username)) error = 'The username must be 3–30 letters, numbers, dots, dashes or underscores.';
+    else if (!sameName && (RESERVED_USERNAMES.has(values.username.toLowerCase()) || values.username.toLowerCase() === config.adminUsername.toLowerCase()
+      || db.prepare('SELECT 1 FROM users WHERE username = ? COLLATE NOCASE AND id != ? AND (company_id IS NULL OR company_id != ?)').get(values.username, u.id, u.id))) {
       error = 'That username is taken.';
     }
     if (error) return res.redirect(`/admin/users/${u.id}?error=${encodeURIComponent(error)}#details`);

@@ -57,7 +57,8 @@
     <% } %>
     <div class="field">
       <label for="d-login_name">Contact's sign-in name <span class="req">*</span></label>
-      <input id="d-login_name" name="login_name" value="<%= u.login_name || '' %>" required maxlength="30" autocomplete="off" autocapitalize="none" spellcheck="false">
+      <input id="d-login_name" name="login_name" value="<%= u.login_name || '' %>" required maxlength="30" autocomplete="off" autocapitalize="none" spellcheck="false"<%= u.is_admin ? ' readonly' : '' %>>
+      <% if (u.is_admin) { %><div class="help">Your admin username and sign-in name come from the server settings (ADMIN_USERNAME, ADMIN_LOGIN_NAME).</div><% } %>
     </div>
     <div class="field">
       <label for="d-name">Contact name <span class="req">*</span></label>

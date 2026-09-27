@@ -2084,3 +2084,41 @@ test('a landlord page has no Transactions list', async () => {
   assert.match(r.text, /Properties owned/);
   assert.doesNotMatch(r.text, /<h2>Transactions/);
 });
+
+test('saving account details keeps your own username (including the admin account)', async () => {
+  const admin = new Client();
+  await admin.login('admin', 'owner-password-123');
+  const me = db.prepare('SELECT * FROM users WHERE is_admin = 1').get();
+  await admin.get(`/admin/users/${me.id}`);
+  let r = await admin.post(`/admin/users/${me.id}/details`, { username: me.username, login_name: me.login_name, name: me.name, agency_name: me.agency_name || 'Owner', email: me.email || '', phone: '0113 000 0000', address: '' });
+  assert.doesNotMatch(decodeURIComponent(r.location), /taken/, 'the admin can save their own details');
+  assert.match(decodeURIComponent(r.location), /Account details saved/);
+  assert.equal(db.prepare('SELECT phone FROM users WHERE id = ?').get(me.id).phone, '0113 000 0000');
+  // The admin's username can't be changed here (it comes from the ADMIN_USERNAME setting).
+  r = await admin.post(`/admin/users/${me.id}/details`, { username: 'SomethingElse', login_name: me.login_name, name: me.name, agency_name: me.agency_name || 'Owner' });
+  assert.match(decodeURIComponent(r.location), /admin username is set in the server settings/);
+  assert.equal(db.prepare('SELECT username FROM users WHERE id = ?').get(me.id).username, me.username);
+
+  // A company saving with its own username (any capitals) is fine too; someone else's is still refused.
+  await registerAndLogin('keep-name@example.com', 'Keep Name Lets');
+  const co = db.prepare("SELECT * FROM users WHERE username = 'keep-name'").get();
+  await admin.get(`/admin/users/${co.id}`);
+  r = await admin.post(`/admin/users/${co.id}/details`, { username: 'keep-name', login_name: co.login_name, name: co.name, agency_name: co.agency_name, email: co.email });
+  assert.match(decodeURIComponent(r.location), /Account details saved/);
+  r = await admin.post(`/admin/users/${co.id}/details`, { username: 'Keep-Name', login_name: co.login_name, name: co.name, agency_name: co.agency_name, email: co.email });
+  assert.match(decodeURIComponent(r.location), /Account details saved/, 'changing only the capitals is allowed');
+  await registerAndLogin('other-name@example.com', 'Other Name Lets');
+  r = await admin.post(`/admin/users/${co.id}/details`, { username: 'other-name', login_name: co.login_name, name: co.name, agency_name: co.agency_name, email: co.email });
+  assert.match(decodeURIComponent(r.location), /That username is taken/);
+});
+
+test('the admin sign-in name is shown read-only and cannot be changed from the form', async () => {
+  const admin = new Client();
+  await admin.login('admin', 'owner-password-123');
+  const me = db.prepare('SELECT * FROM users WHERE is_admin = 1').get();
+  const r0 = await admin.get(`/admin/users/${me.id}`);
+  assert.match(r0.text, /name="login_name"[^>]*readonly/);
+  const r = await admin.post(`/admin/users/${me.id}/details`, { login_name: 'Someone', name: me.name, agency_name: me.agency_name || 'Owner' });
+  assert.match(decodeURIComponent(r.location), /ADMIN_LOGIN_NAME/);
+  assert.equal(db.prepare('SELECT login_name FROM users WHERE id = ?').get(me.id).login_name, me.login_name);
+});
