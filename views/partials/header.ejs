@@ -12,16 +12,11 @@
   <script src="/static/app.js" defer></script>
 </head>
 <body class="<%= typeof bodyClass !== 'undefined' ? bodyClass : '' %>"<% if (user && typeof idleMinutes !== 'undefined' && idleMinutes > 0) { %> data-idle-minutes="<%= idleMinutes %>"<% } %>>
-<% if (user && typeof intro !== 'undefined' && intro) { const first = String(user.name || user.login_name || '').trim().split(/\s+/)[0]; %>
+<% if (user && typeof intro !== 'undefined' && intro) { %>
 <div class="intro" data-intro role="presentation" aria-hidden="true">
   <span class="intro-half intro-l"></span><span class="intro-half intro-r"></span>
   <span class="intro-seam"></span><span class="intro-bloom"></span>
-  <div class="intro-center">
-    <span class="intro-logo"><%= appName.charAt(0).toUpperCase() %></span>
-    <span class="intro-word"><% appName.split('').forEach((ch, i) => { %><span><%= ch %></span><% }) %></span>
-    <span class="intro-hello">Welcome back<%= first ? `, ${first}` : '' %></span>
-    <% if (!user.is_admin && user.agency_name) { %><span class="intro-agency"><%= user.agency_name %></span><% } %>
-  </div>
+  <div class="intro-center"><span class="intro-logo"><%= appName.charAt(0).toUpperCase() %></span></div>
 </div>
 <% } %>
 <% if (user) {

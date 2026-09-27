@@ -2186,10 +2186,10 @@ test('signing in plays the welcome animation once, on the first page', async () 
   const c = new Client();
   let r = await c.get('/login');
   assert.match(r.text, /Welcome back/);
-  assert.match(r.text, /Lettings, <span>sorted/);
   r = await c.post('/login', { login: 'admin', member: 'Theo', password: 'owner-password-123' });
   r = await c.get(r.location);
   assert.match(r.text, /data-intro/);
+  assert.doesNotMatch(r.text.slice(r.text.indexOf('data-intro'), r.text.indexOf('</div>', r.text.indexOf('intro-center'))), /Welcome/);
   r = await c.get('/admin');
   assert.doesNotMatch(r.text, /data-intro/);
 });

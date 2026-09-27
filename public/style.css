@@ -627,15 +627,6 @@ details.fold[open] > summary { margin-bottom: 12px; }
 .intro-bloom { position: absolute; width: 70vmin; height: 70vmin; border-radius: 50%; background: radial-gradient(circle, rgba(47,107,255,.45), rgba(47,107,255,.12) 45%, transparent 70%); opacity: 0; transform: scale(.4); animation: intro-bloom 2.9s ease-out .45s forwards; }
 .intro-center { position: relative; display: flex; flex-direction: column; align-items: center; gap: 14px; color: #fff; text-align: center; animation: intro-fade-out .45s ease-in 2.1s forwards; }
 .intro-logo { width: 76px; height: 76px; border-radius: 20px; font-size: 2.3rem; opacity: 0; transform: scale(.6) rotate(-8deg); animation: intro-pop .7s cubic-bezier(.2,1.4,.3,1) .55s forwards; }
-.intro-word { display: flex; gap: .06em; font-size: clamp(2.4rem, 7vw, 4.2rem); font-weight: 800; letter-spacing: .08em; }
-.intro-word span { opacity: 0; transform: translateY(14px); filter: blur(6px); animation: intro-letter .55s ease-out forwards; }
-.intro-word span:nth-child(1) { animation-delay: .85s; }
-.intro-word span:nth-child(2) { animation-delay: .93s; }
-.intro-word span:nth-child(3) { animation-delay: 1.01s; }
-.intro-word span:nth-child(4) { animation-delay: 1.09s; }
-.intro-word span:nth-child(n+5) { animation-delay: 1.17s; }
-.intro-hello { font-size: 1.1rem; color: #c7d3ea; opacity: 0; animation: intro-up .5s ease-out 1.35s forwards; }
-.intro-agency { font-size: .8rem; letter-spacing: .14em; text-transform: uppercase; color: #5ee1ff; opacity: 0; animation: intro-up .5s ease-out 1.5s forwards; }
 .intro.skip { animation: intro-skip .3s ease forwards; }
 .intro.skip * { animation: none !important; }
 @keyframes intro-seam { 0% { transform: scaleY(0); opacity: 1; } 25% { transform: scaleY(1); } 85% { opacity: 1; } 100% { transform: scaleY(1); opacity: 0; } }
@@ -651,4 +642,19 @@ details.fold[open] > summary { margin-bottom: 12px; }
 @media (prefers-reduced-motion: reduce) {
   .intro { display: none; }
   .rift-glow, .rift-seam, .auth .auth-card { animation: none; }
+}
+
+/* Sign-in card centred on the page, over the full-screen rift. */
+.auth-split { position: relative; display: grid; grid-template-columns: 1fr; place-items: center; background: #060b16; }
+.auth-side { position: absolute; inset: 0; }
+.auth-side-inner { padding: 28px 36px; }
+.auth-pitch { display: none; }
+.rift-glow, .rift-seam { left: 50%; }
+.rift-glow { width: 70%; }
+.rift-grid { mask-image: radial-gradient(ellipse at 50% 50%, #000 10%, transparent 70%); -webkit-mask-image: radial-gradient(ellipse at 50% 50%, #000 10%, transparent 70%); }
+.auth-main { position: relative; z-index: 2; background: transparent; width: 100%; min-height: 100vh; }
+.auth .auth-card { box-shadow: 0 30px 80px -20px rgba(0,0,0,.7), 0 0 0 1px rgba(143,180,255,.15); }
+@media (max-width: 860px) {
+  .auth-side-inner { padding: 18px 20px; }
+  .auth-main { padding-top: 80px; }
 }
