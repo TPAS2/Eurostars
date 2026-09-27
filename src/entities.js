@@ -95,7 +95,11 @@ const ENTITIES = {
       { name: 'phone', label: 'Phone', type: 'tel' },
       { name: 'notes', label: 'Notes', type: 'textarea' },
     ],
-    columns: ['name', 'email', 'phone'],
+    columns: ['name', 'cur_property', 'cur_council', 'cur_rent', 'cur_term', 'cur_status', 'phone'],
+    computed: {
+      cur_property: { label: 'Property' }, cur_council: { label: 'Council' }, cur_rent: { label: 'Rent' },
+      cur_term: { label: 'Tenancy' }, cur_status: { label: 'Status' },
+    },
     children: [{ entity: 'tenancies', fk: 'tenant_id' }],
   },
 

@@ -534,3 +534,5 @@ table.centered td.row-actions { text-align: center; }
 
 .tile.ok { border-color: var(--ok); background: var(--ok-soft); }
 .tile.ok .value { color: var(--ok); }
+
+.page-tabs { margin: 0 0 12px; }

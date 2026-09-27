@@ -38,7 +38,7 @@
 <section class="tiles">
   <a class="tile" href="/app/properties"><span class="label">Properties</span><span class="value"><%= stats.properties %></span><span class="sub"><%= stats.let %> let · <%= stats.vacant %> vacant</span></a>
   <a class="tile" href="/app/landlords"><span class="label">Landlords</span><span class="value"><%= stats.landlords %></span><span class="sub"><%= stats.tenants %> tenants</span></a>
-  <a class="tile" href="/app/tenancies"><span class="label">Active tenancies</span><span class="value"><%= stats.activeTenancies %></span><span class="sub">&nbsp;</span></a>
+  <a class="tile" href="/app/tenants"><span class="label">Active tenancies</span><span class="value"><%= stats.activeTenancies %></span><span class="sub">&nbsp;</span></a>
   <a class="tile" href="/app/transactions"><span class="label">Rent received this month</span><span class="value"><%= fmt.money(stats.rentThisMonth) %></span><span class="sub">Client account <%= fmt.money(stats.clientBalance) %></span></a>
   <div class="tile <%= stats.arrearsTotal > 0 ? 'alert' : '' %>"><span class="label">Arrears</span><span class="value"><%= fmt.money(stats.arrearsTotal) %></span><span class="sub"><%= arrears.length %> tenanc<%= arrears.length === 1 ? 'y' : 'ies' %></span></div>
   <a class="tile <%= stats.openJobs > 0 ? 'warn' : '' %>" href="/app/maintenance"><span class="label">Open maintenance</span><span class="value"><%= stats.openJobs %></span><span class="sub">&nbsp;</span></a>

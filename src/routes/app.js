@@ -154,10 +154,13 @@ module.exports = function appRoutes(db) {
     return values;
   }
 
+  // Tenancies live under the Tenants tab.
+  const sectionOf = (def) => (def.key === 'tenancies' ? 'tenants' : def.key);
+
   function renderForm(res, def, { row, values, errors, accountId, status = 200 }) {
     const options = {};
     for (const f of def.fields) if (f.type === 'ref') options[f.name] = refOptions(f.ref, accountId);
-    res.status(status).render('form', { title: row ? `Edit ${def.singular.toLowerCase()}` : `New ${def.singular.toLowerCase()}`, def, row, values, errors, options, fmt, section: def.key });
+    res.status(status).render('form', { title: row ? `Edit ${def.singular.toLowerCase()}` : `New ${def.singular.toLowerCase()}`, def, row, values, errors, options, fmt, section: sectionOf(def) });
   }
 
   // Keep derived data consistent after a record is saved.
@@ -463,6 +466,8 @@ module.exports = function appRoutes(db) {
   // ---------- generic CRUD ----------
 
   router.get('/:entity', (req, res) => {
+    // Tenants and tenancies are one tab now.
+    if (req.params.entity === 'tenancies') return res.redirect('/app/tenants');
     const def = getEntity(req, res);
     if (!def) return;
     const a = req.user.id;
@@ -482,11 +487,35 @@ module.exports = function appRoutes(db) {
       }
       where += ` AND (${terms.join(' OR ')})`;
     }
-    const rows = db.prepare(`SELECT * FROM ${def.table} WHERE ${where} ORDER BY ${def.order} LIMIT ${LIST_LIMIT + 1}`).all(...params);
+    let rows = db.prepare(`SELECT * FROM ${def.table} WHERE ${where} ORDER BY ${def.order} LIMIT ${LIST_LIMIT + 1}`).all(...params);
     const truncated = rows.length > LIST_LIMIT;
     if (truncated) rows.pop();
     let totalsRow = null;
     const maps = refLabelMaps(def, a);
+    let tenantFilter = null;
+    if (def.key === 'tenants') {
+      // Each tenant with their current tenancy (or their latest one if none is current).
+      const latest = new Map();
+      for (const t of db.prepare(
+        `SELECT ty.id, ty.tenant_id, ty.status, ty.start_date, ty.end_date, ty.rent_pence, ty.rent_frequency,
+                p.id AS property_id, p.address_line1, c.id AS council_id, c.name AS council_name
+           FROM tenancies ty JOIN properties p ON p.id = ty.property_id LEFT JOIN councils c ON c.id = p.council_id
+          WHERE ty.account_id = ?
+          ORDER BY ty.status = 'active' DESC, ty.status = 'pending' DESC, ty.start_date DESC`
+      ).all(a)) if (!latest.has(t.tenant_id)) latest.set(t.tenant_id, t);
+      for (const row of rows) {
+        const t = latest.get(row.id);
+        row.tenancy_status = t ? t.status : null;
+        row.cur_property = t ? { text: t.address_line1, href: `/app/properties/${t.property_id}` } : { text: '' };
+        row.cur_council = t && t.council_id ? { text: t.council_name, href: `/app/councils/${t.council_id}` } : { text: '' };
+        row.cur_rent = t ? { text: `${fmt.money(t.rent_pence)}${t.rent_frequency === 'weekly' ? ' pw' : ' pcm'}` } : { text: '' };
+        row.cur_term = t ? { text: `${fmt.ukDate(t.start_date)} – ${t.end_date ? fmt.ukDate(t.end_date) : 'ongoing'}`, href: `/app/tenancies/${t.id}` } : { text: 'No tenancy yet' };
+        row.cur_status = t ? { text: fmt.humanize(t.status), cls: `badge s-${t.status}` } : { text: '' };
+      }
+      tenantFilter = ['current', 'past', 'all'].includes(req.query.show) ? req.query.show : 'current';
+      if (tenantFilter === 'current') rows = rows.filter((r) => r.tenancy_status !== 'ended');
+      if (tenantFilter === 'past') rows = rows.filter((r) => r.tenancy_status === 'ended');
+    }
     if (def.key === 'contractors') {
       // Invoices and money paid to each contractor, all time.
       const stats = new Map(db.prepare(
@@ -521,7 +550,7 @@ module.exports = function appRoutes(db) {
         row.properties = { text: String(list.length), count: list.length };
       }
     }
-    res.render('list', { title: def.plural, section: def.key, def, rows, maps, display, rowTitle, q, searchable: textFields.length > 0, truncated, totalsRow });
+    res.render('list', { title: def.plural, section: sectionOf(def), def, rows, maps, display, rowTitle, q, searchable: textFields.length > 0, truncated, totalsRow, tenantFilter });
   });
 
   router.get('/:entity/new', (req, res) => {
@@ -603,7 +632,7 @@ module.exports = function appRoutes(db) {
     const photo = def.key === 'councils'
       ? db.prepare("SELECT strftime('%s', updated_at) AS v FROM council_photos WHERE council_id = ? AND account_id = ?").get(row.id, a) || { v: null }
       : null;
-    res.render('show', { title: rowTitle(def, row, maps), section: def.key, def, row, maps, display, rowTitle, children, extra, invoices, related: relatedLists(def, row, a), certs, photo, tenantBoxes, statementLink, error: req.query.error ? String(req.query.error).slice(0, 200) : null, flash: req.query.flash ? String(req.query.flash).slice(0, 200) : null, fmt, today: fmt.today() });
+    res.render('show', { title: rowTitle(def, row, maps), section: sectionOf(def), def, row, maps, display, rowTitle, children, extra, invoices, related: relatedLists(def, row, a), certs, photo, tenantBoxes, statementLink, error: req.query.error ? String(req.query.error).slice(0, 200) : null, flash: req.query.flash ? String(req.query.flash).slice(0, 200) : null, fmt, today: fmt.today() });
   });
 
   router.get('/:entity/:id/edit', (req, res) => {

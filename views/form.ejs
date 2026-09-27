@@ -1,7 +1,7 @@
 <%- include('partials/header') %>
 <header class="page-head">
   <div>
-    <a class="crumb" href="/app/<%= def.key %>">← <%= def.plural %></a>
+    <a class="crumb" href="<%= def.key === 'tenancies' ? (row ? `/app/tenancies/${row.id}` : '/app/tenants') : `/app/${def.key}` %>">← <%= def.key === 'tenancies' ? (row ? 'Tenancy' : 'Tenants') : def.plural %></a>
     <h1><%= title %></h1>
   </div>
 </header>

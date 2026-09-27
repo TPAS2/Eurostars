@@ -13,6 +13,7 @@
       <td class="<%= d.num ? 'num' : '' %>">
         <% if (i === 0) { %><a href="/app/<%= def.key %>/<%= row.id %>"<%= row.photo_v ? ' class=with-thumb' : '' %>><% if (row.photo_v) { %><img class="thumb" src="/app/<%= def.key %>/<%= row.id %>/photo?v=<%= row.photo_v %>" alt=""><% } %><%= d.text || rowTitle(def, row, maps) %></a>
         <% } else if (d.href) { %><a href="<%= d.href %>"><%= d.text %></a>
+        <% } else if (d.cls) { %><span class="<%= d.cls %>"><%= d.text %></span>
         <% } else if (d.badge) { %><span class="badge s-<%= String(row[c]).replace(/\W+/g, '-') %>"><%= d.text %></span>
         <% } else { %><%= d.text %><% } %>
       </td>

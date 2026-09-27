@@ -16,6 +16,11 @@
 </form>
 <% if (q) { %><p class="muted small search-count"><%= rows.length %><%= truncated ? '+' : '' %> result<%= rows.length === 1 ? '' : 's' %> for “<%= q %>”</p><% } %>
 <% } %>
+<% if (typeof tenantFilter !== 'undefined' && tenantFilter) { %>
+<nav class="tabs page-tabs">
+  <% [['current', 'Current'], ['past', 'Past'], ['all', 'All']].forEach(([k, label]) => { %><a href="/app/tenants?show=<%= k %><%= q ? '&q=' + encodeURIComponent(q) : '' %>" class="<%= tenantFilter === k ? 'active' : '' %>"><%= label %></a><% }) %>
+</nav>
+<% } %>
 <section class="card">
   <% if (!rows.length) { %>
     <p class="muted"><%= q ? 'No matches.' : `No ${def.plural.toLowerCase()} yet.` %></p>
