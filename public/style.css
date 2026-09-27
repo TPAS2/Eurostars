@@ -549,3 +549,6 @@ table.centered td.row-actions { text-align: center; }
 .file-tile figcaption { padding: 8px 10px; display: flex; flex-direction: column; gap: 2px; font-size: .85rem; }
 .file-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .file-actions { display: flex; gap: 10px; align-items: center; }
+/* Landlords and tenants lists: every column the same width, so the gaps are equal. */
+table.list-landlords, table.list-tenants { table-layout: fixed; width: 100%; }
+table.list-landlords td, table.list-tenants td { overflow-wrap: anywhere; }
