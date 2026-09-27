@@ -2122,3 +2122,16 @@ test('the admin sign-in name is shown read-only and cannot be changed from the f
   assert.match(decodeURIComponent(r.location), /ADMIN_LOGIN_NAME/);
   assert.equal(db.prepare('SELECT login_name FROM users WHERE id = ?').get(me.id).login_name, me.login_name);
 });
+
+test('the admin account picks up the Rift name instead of the old Nexus one', () => {
+  const dbx = openDatabase(':memory:');
+  const cfg = { ...config, adminUsername: 'TPAS2', adminLoginName: 'Theo', adminPassword: 'owner-password-123', appName: 'Nexus' };
+  ensureAdmin(dbx, cfg, () => {});
+  assert.equal(dbx.prepare('SELECT agency_name FROM users WHERE is_admin = 1').get().agency_name, 'Nexus');
+  ensureAdmin(dbx, { ...cfg, appName: 'Rift' }, () => {});
+  assert.equal(dbx.prepare('SELECT agency_name FROM users WHERE is_admin = 1').get().agency_name, 'Rift');
+  // A name the admin chose themselves is left alone.
+  dbx.prepare("UPDATE users SET agency_name = 'Theo Lettings' WHERE is_admin = 1").run();
+  ensureAdmin(dbx, { ...cfg, appName: 'Rift' }, () => {});
+  assert.equal(dbx.prepare('SELECT agency_name FROM users WHERE is_admin = 1').get().agency_name, 'Theo Lettings');
+});

@@ -77,6 +77,8 @@ function ensureAdmin(db, config, log = console.log) {
     // Keep the stored username (with its capitals) and sign-in name in line with the settings.
     db.prepare("UPDATE users SET username = ?, login_name = ?, name = CASE WHEN name = 'Administrator' THEN ? ELSE name END WHERE id = ?")
       .run(config.adminUsername, config.adminLoginName, config.adminLoginName, admin.id);
+    // The admin account's company name started as the app's name; follow renames (Letwise → Nexus → Rift).
+    db.prepare("UPDATE users SET agency_name = ? WHERE id = ? AND agency_name IN ('Letwise', 'Nexus', 'Rift')").run(config.appName, admin.id);
   }
   if (admin && config.adminPasswordReset && config.adminPassword) {
     db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(auth.hashPassword(config.adminPassword), admin.id);
