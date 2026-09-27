@@ -96,7 +96,6 @@
           <dt>Booked</dt><dd><%= fmt.ukDate(t.booking_date) %></dd>
           <dt>Term</dt><dd><%= fmt.ukDate(t.start_date) %> – <%= t.end_date ? fmt.ukDate(t.end_date) : 'ongoing' %></dd>
           <dt>Rent</dt><dd><%= fmt.money(t.rent_pence) %> <%= t.rent_frequency === 'weekly' ? 'a week' : 'a month' %></dd>
-          <% if (t.deposit_pence) { %><dt>Deposit</dt><dd><%= fmt.money(t.deposit_pence) %><%= t.deposit_scheme ? ` · ${t.deposit_scheme}` : '' %></dd><% } %>
         </dl>
         <div class="agreement">
           <% if (t.agreement_name) { %>

@@ -115,8 +115,6 @@ const ENTITIES = {
       { name: 'end_date', label: 'End date', type: 'date' },
       { name: 'rent_pence', label: 'Rent (£)', type: 'money', required: true },
       { name: 'rent_frequency', label: 'Rent frequency', type: 'select', options: ['monthly', 'weekly'], required: true, default: 'monthly' },
-      { name: 'deposit_pence', label: 'Deposit (£)', type: 'money' },
-      { name: 'deposit_scheme', label: 'Deposit scheme', type: 'select', options: ['DPS', 'TDS', 'mydeposits', 'Held by landlord', 'None'] },
       { name: 'status', label: 'Status', type: 'select', options: ['active', 'pending', 'ended'], required: true, default: 'active' },
     ],
     columns: ['property_id', 'tenant_id', 'booking_date', 'start_date', 'end_date', 'rent_pence', 'status'],

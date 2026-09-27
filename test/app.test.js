@@ -185,7 +185,7 @@ test('full lettings workflow: landlord → property → tenant → rent → fee 
   r = await c.post(`/app/properties/${propertyId}/add-tenant`, {
     tenant_mode: 'new', name: 'Tom Tenant', email: 'tom@example.com', phone: '',
     booking_date: '2026-08-20', start_date: '2026-09-01', end_date: '2027-08-31',
-    rent_pence: '1,000.00', rent_frequency: 'monthly', deposit_pence: '1150', deposit_scheme: 'DPS', status: 'active',
+    rent_pence: '1,000.00', rent_frequency: 'monthly', status: 'active',
   });
   assert.equal(r.status, 302, r.text);
   const tenancyId = idFrom(r.location);
@@ -1539,7 +1539,7 @@ test('tenant page: a second box with the council, property and tenancy agreement
   const lou = idFrom(r.location);
   r = await c.post('/app/properties', { address_line1: '7 Canal Street', town: 'Leeds', postcode: 'LS1 4AB', landlord_id: String(lou), council_id: String(leeds), council_tax_account: 'CT-777', council_tax_payer: 'Tenant', status: 'vacant' });
   const prop = idFrom(r.location);
-  r = await c.post(`/app/properties/${prop}/add-tenant`, { tenant_mode: 'new', name: 'Nina Tenant', booking_date: '2026-07-10', start_date: '2026-08-01', rent_pence: '850', rent_frequency: 'monthly', deposit_pence: '980', deposit_scheme: 'DPS', status: 'active' });
+  r = await c.post(`/app/properties/${prop}/add-tenant`, { tenant_mode: 'new', name: 'Nina Tenant', booking_date: '2026-07-10', start_date: '2026-08-01', rent_pence: '850', rent_frequency: 'monthly', status: 'active' });
   const tenancy = idFrom(r.location);
   const tenant = db.prepare('SELECT tenant_id FROM tenancies WHERE id = ?').get(tenancy).tenant_id;
 
@@ -1548,7 +1548,9 @@ test('tenant page: a second box with the council, property and tenancy agreement
   assert.match(r.text, /Current tenancy/);
   assert.match(r.text, /<h3>Council<\/h3>[\s\S]*?Leeds City Council[\s\S]*?CT-777[\s\S]*?Tenant[\s\S]*?0113 222 4404/);
   assert.match(r.text, /<h3>Property<\/h3>[\s\S]*?7 Canal Street[\s\S]*?Leeds, LS1 4AB[\s\S]*?Lou Landlord/);
-  assert.match(r.text, /<h3>Tenancy agreement<\/h3>[\s\S]*?10\/07\/2026[\s\S]*?01\/08\/2026 – ongoing[\s\S]*?£850\.00 a month[\s\S]*?£980\.00 · DPS[\s\S]*?No signed agreement uploaded yet/);
+  assert.doesNotMatch(r.text, /Deposit/);
+  assert.doesNotMatch((await c.get(`/app/properties/${prop}/add-tenant`)).text, /Deposit/);
+  assert.match(r.text, /<h3>Tenancy agreement<\/h3>[\s\S]*?10\/07\/2026[\s\S]*?01\/08\/2026 – ongoing[\s\S]*?£850\.00 a month[\s\S]*?No signed agreement uploaded yet/);
 
   // Upload the signed agreement from the tenant page; it's shown and can be opened.
   const pdf = new File([Buffer.from('%PDF-1.4\n%signed\n')], 'Nina agreement.pdf');
