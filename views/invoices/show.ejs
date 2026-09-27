@@ -26,9 +26,10 @@
       <div><dt>Supplier</dt><dd><%= inv.supplier %></dd></div>
       <div><dt>Amount</dt><dd><strong><%= fmt.money(inv.amount_pence) %></strong></dd></div>
       <div><dt>Invoice date</dt><dd><%= fmt.ukDate(inv.invoice_date) || '—' %></dd></div>
-      <div><dt>Due date</dt><dd class="<%= overdue ? 'neg' : '' %>"><%= fmt.ukDate(inv.due_date) || '—' %></dd></div>
+      <% if (inv.due_date) { %><div><dt>Due date</dt><dd class="<%= overdue ? 'neg' : '' %>"><%= fmt.ukDate(inv.due_date) %></dd></div><% } %>
       <div><dt>Property</dt><dd><% if (property) { %><a href="/app/properties/<%= property.id %>"><%= property.address_line1 %></a><% } else { %>—<% } %></dd></div>
       <div><dt>Maintenance job</dt><dd><% if (job) { %><a href="/app/maintenance/<%= job.id %>"><%= job.title %></a><% } else { %>—<% } %></dd></div>
+      <div><dt>Added by</dt><dd><%= addedBy ? addedBy.name : '—' %></dd></div>
       <div><dt>Landlord</dt><dd><% if (landlord) { %><a href="/app/landlords/<%= landlord.id %>"><%= landlord.name %></a><% } else { %>—<% } %></dd></div>
       <% if (inv.description) { %><div class="wide"><dt>Notes</dt><dd class="pre"><%= inv.description %></dd></div><% } %>
     </dl>

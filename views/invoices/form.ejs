@@ -1,7 +1,7 @@
 <%- include('../partials/header') %>
 <header class="page-head">
   <div>
-    <a class="crumb" href="<%= invoice ? '/app/invoices/' + invoice.id : '/app/invoices' %>">← <%= invoice ? 'Invoice' : 'Invoices' %></a>
+    <a class="crumb" href="<%= invoice ? '/app/invoices/' + invoice.id : '/app/invoices' %>">← <%= invoice ? 'Invoice' : 'Contractors invoices' %></a>
     <h1><%= title %></h1>
   </div>
 </header>
@@ -17,12 +17,10 @@
     </div>
     <div class="field">
       <label for="f-supplier">Supplier / contractor <span class="req">*</span></label>
-      <input id="f-supplier" name="supplier" value="<%= values.supplier || '' %>" required>
+      <input id="f-supplier" name="supplier" value="<%= values.supplier || '' %>" list="contractor-list" autocomplete="off" placeholder="Start typing to pick a contractor" required>
+      <datalist id="contractor-list"><% contractors.forEach(c => { %><option value="<%= c.name %>"><%= c.trade || '' %></option><% }) %></datalist>
+      <div class="help">Pick from your contractors, or type a new name to add one.</div>
       <% if (errors.supplier) { %><div class="field-err"><%= errors.supplier %></div><% } %>
-    </div>
-    <div class="field">
-      <label for="f-invoice_number">Invoice number</label>
-      <input id="f-invoice_number" name="invoice_number" value="<%= values.invoice_number || '' %>">
     </div>
     <div class="field">
       <label for="f-amount">Amount (£) <span class="req">*</span></label>
@@ -33,11 +31,6 @@
       <label for="f-invoice_date">Invoice date</label>
       <input id="f-invoice_date" type="date" name="invoice_date" value="<%= values.invoice_date || '' %>">
       <% if (errors.invoice_date) { %><div class="field-err"><%= errors.invoice_date %></div><% } %>
-    </div>
-    <div class="field">
-      <label for="f-due_date">Due date</label>
-      <input id="f-due_date" type="date" name="due_date" value="<%= values.due_date || '' %>">
-      <% if (errors.due_date) { %><div class="field-err"><%= errors.due_date %></div><% } %>
     </div>
     <div class="field">
       <label for="f-job">Maintenance job</label>
@@ -55,6 +48,12 @@
         <% properties.forEach(p => { %><option value="<%= p.id %>" <%= Number(values.property_id) === p.id ? 'selected' : '' %>><%= p.label %></option><% }) %>
       </select>
       <% if (errors.property_id) { %><div class="field-err"><%= errors.property_id %></div><% } %>
+    </div>
+    <div class="field">
+      <label for="f-added_by">Added by</label>
+      <select id="f-added_by" name="added_by">
+        <% people.forEach(m => { %><option value="<%= m.id %>" <%= Number(values.added_by) === m.id ? 'selected' : '' %>><%= m.name %></option><% }) %>
+      </select>
     </div>
     <div class="field wide">
       <label for="f-description">Notes</label>

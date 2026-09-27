@@ -1805,3 +1805,45 @@ test('landlord invoices: bill a landlord, deduct from rent or mark paid, print a
   await c.post(`/app/landlord-invoices/${inv1}/delete`, {});
   assert.equal(db.prepare('SELECT COUNT(*) n FROM landlord_invoices WHERE id = ?').get(inv1).n, 0);
 });
+
+test('contractor invoices: no invoice number or due date on the form; "Added by" beside Property', async () => {
+  const c = await registerAndLogin('added-by@example.com', 'Added By Lets');
+  const companyId = db.prepare("SELECT id FROM users WHERE username = 'added-by'").get().id;
+  const admin = new Client();
+  await admin.login('admin', 'owner-password-123');
+  await admin.get(`/admin/users/${companyId}`);
+  await admin.post(`/admin/users/${companyId}/people`, { name: 'Pat Clerk', login_name: 'pat', password: 'pats-pass-123' });
+  const pat = db.prepare("SELECT id FROM users WHERE company_id = ? AND login_name = 'pat'").get(companyId).id;
+
+  let r = await c.get('/app/invoices/new');
+  assert.doesNotMatch(r.text, /name="invoice_number"|name="due_date"/);
+  assert.match(r.text, /<label for="f-property">Property<\/label>[\s\S]*?<\/div>\s*<div class="field">\s*<label for="f-added_by">Added by<\/label>/, 'Added by comes right after Property');
+  assert.match(r.text, new RegExp(`<option value="${companyId}" selected>Test User</option><option value="${pat}" >Pat Clerk</option>`), 'defaults to whoever is signed in');
+
+  const pdf = new File([Buffer.from('%PDF-1.4\n%x\n')], 'i.pdf');
+  r = await c.post('/app/invoices', { supplier: 'Lock Co', amount: '75', invoice_date: '2026-09-01', added_by: String(pat), file: pdf }, { multipart: true });
+  const id = idFrom(r.location);
+  assert.equal(db.prepare('SELECT added_by FROM invoices WHERE id = ?').get(id).added_by, pat);
+  assert.match((await c.get(`/app/invoices/${id}`)).text, /<dt>Added by<\/dt><dd>Pat Clerk<\/dd>/);
+  // Someone from another company can't be picked.
+  const other = await registerAndLogin('added-by-2@example.com', 'Other Added');
+  const otherId = db.prepare("SELECT id FROM users WHERE username = 'added-by-2'").get().id;
+  r = await c.post('/app/invoices', { supplier: 'Lock Co', amount: '5', added_by: String(otherId), file: new File([Buffer.from('%PDF-1.4\n')], 'j.pdf') }, { multipart: true });
+  assert.equal(r.status, 422);
+  assert.ok(other);
+  // Editing keeps an existing invoice number / due date.
+  db.prepare("UPDATE invoices SET invoice_number = 'INV-9', due_date = '2026-09-30' WHERE id = ?").run(id);
+  await c.get(`/app/invoices/${id}/edit`);
+  await c.post(`/app/invoices/${id}`, { supplier: 'Lock Co', amount: '80', invoice_date: '2026-09-01', added_by: String(pat) }, { multipart: true });
+  assert.deepEqual({ ...db.prepare('SELECT invoice_number, due_date, amount_pence FROM invoices WHERE id = ?').get(id) }, { invoice_number: 'INV-9', due_date: '2026-09-30', amount_pence: 8000 });
+});
+
+test('contractor invoice form offers the saved contractors as a type-to-narrow list', async () => {
+  const c = await registerAndLogin('supplier-list@example.com', 'Supplier List Lets');
+  await c.post('/app/contractors', { name: 'Ace Plumbing', trade: 'Plumber' });
+  await c.post('/app/contractors', { name: 'Bright Sparks', trade: 'Electrician' });
+  const r = await c.get('/app/invoices/new');
+  assert.match(r.text, /name="supplier"[^>]*list="contractor-list"/);
+  assert.match(r.text, /<datalist id="contractor-list"><option value="Ace Plumbing">Plumber<\/option><option value="Bright Sparks">Electrician<\/option><\/datalist>/);
+  assert.match(r.text, /<h1>Upload contractor invoice<\/h1>/);
+});

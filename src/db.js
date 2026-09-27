@@ -357,6 +357,7 @@ function openDatabase(file) {
   addColumnIfMissing(db, 'monthly_statements', 'emailed_at', 'TEXT');
   addColumnIfMissing(db, 'monthly_statements', 'emailed_to', 'TEXT');
   addColumnIfMissing(db, 'login_challenges', 'next_url', 'TEXT');
+  addColumnIfMissing(db, 'invoices', 'added_by', 'INTEGER REFERENCES users(id) ON DELETE SET NULL');
   addColumnIfMissing(db, 'invoices', 'contractor_id', 'INTEGER REFERENCES contractors(id) ON DELETE SET NULL');
   // Every invoice supplier becomes a contractor (once), so the Contractors tab starts complete.
   for (const inv of db.prepare('SELECT id, account_id, supplier FROM invoices WHERE contractor_id IS NULL AND trim(supplier) != \'\'').all()) {

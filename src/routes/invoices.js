@@ -73,11 +73,19 @@ module.exports = function invoiceRoutes(db, config) {
     const text = (k, max = 200) => { const s = String(body[k] ?? '').trim(); return s ? s.slice(0, max) : null; };
     v.supplier = text('supplier');
     if (!v.supplier) errors.supplier = 'Enter the supplier or contractor.';
-    v.invoice_number = text('invoice_number', 100);
+    // Invoice number and due date aren't on the form; only change them if they're sent.
+    if (body.invoice_number !== undefined) v.invoice_number = text('invoice_number', 100);
     v.description = text('description', 5000);
     for (const k of ['invoice_date', 'due_date']) {
+      if (k === 'due_date' && body.due_date === undefined) continue;
       v[k] = text(k, 10);
       if (v[k] && !fmt.isIsoDate(v[k])) errors[k] = 'Enter a valid date.';
+    }
+    // Who in the company added it.
+    if (body.added_by !== undefined) {
+      const who = Number(body.added_by);
+      const ok = Number.isInteger(who) && db.prepare('SELECT 1 FROM users WHERE id = ? AND (id = ? OR company_id = ?)').get(who, accountId, accountId);
+      if (!ok) errors.added_by = 'Choose who added it.'; else v.added_by = who;
     }
     v.amount_pence = fmt.parseMoney(String(body.amount || '').trim());
     if (Number.isNaN(v.amount_pence) || v.amount_pence <= 0) errors.amount = 'Enter the invoice total, e.g. 180.00.';
@@ -98,8 +106,11 @@ module.exports = function invoiceRoutes(db, config) {
 
   function renderForm(req, res, { invoice, values, errors, status = 200 }) {
     const a = req.user.id;
+    const people = db.prepare("SELECT id, name FROM users WHERE (id = ? OR company_id = ?) AND status = 'active' ORDER BY company_id IS NOT NULL, name COLLATE NOCASE").all(a, a);
+    if (values.added_by === undefined || values.added_by === null || values.added_by === '') values = { ...values, added_by: req.user.person_id };
     res.status(status).render('invoices/form', {
-      title: invoice ? 'Edit invoice' : 'Upload invoice', section: 'invoices', invoice, values, errors,
+      title: invoice ? 'Edit contractor invoice' : 'Upload contractor invoice', section: 'invoices', invoice, values, errors, people,
+      contractors: db.prepare('SELECT name, trade FROM contractors WHERE account_id = ? ORDER BY name COLLATE NOCASE').all(a),
       jobs: db.prepare(JOB_OPTS).all(a), properties: db.prepare(PROPERTY_OPTS).all(a), fmt,
     });
   }
@@ -187,6 +198,7 @@ module.exports = function invoiceRoutes(db, config) {
     const deduction = db.prepare(`${INVOICE_LIST_SQL} WHERE i.id = ? AND i.account_id = ?`).get(inv.id, a);
     res.render('invoices/show', {
       title: `Invoice ${inv.invoice_number || '#' + inv.id}`, section: 'invoices', inv, property, landlord, job, deduction, statementLink,
+      addedBy: inv.added_by ? db.prepare('SELECT name FROM users WHERE id = ? AND (id = ? OR company_id = ?)').get(inv.added_by, a, a) : null,
       methods: PAYMENT_METHODS, today: fmt.today(), fmt, error: req.query.error || '', flash: req.query.flash || '',
     });
   });
