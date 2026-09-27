@@ -56,10 +56,11 @@
     <div class="field">
       <label for="d-password">Password</label>
       <div class="pw-row">
-        <input id="d-password" name="password" type="text" minlength="<%= minPassword %>" autocomplete="new-password" placeholder="Leave blank to keep the current one">
+        <input id="d-password" name="password" type="text" minlength="<%= minPassword %>" autocomplete="new-password" placeholder="New password">
         <button class="btn" type="button" data-generate="#d-password">Suggest</button>
+        <button class="btn primary" type="submit" formaction="/admin/users/<%= u.id %>/password" formnovalidate>Change password</button>
       </div>
-      <div class="help">Passwords are stored scrambled, so nobody can look one up. Set a new one here<%= isSelf ? '' : ' and tell them what it is; they’ll be signed out' %>. At least <%= minPassword %> characters.</div>
+      <div class="help">Passwords are stored scrambled, so nobody can look one up. Type a new one and click Change password<%= isSelf ? '' : ', then tell them what it is; they’ll be signed out' %>. At least <%= minPassword %> characters.</div>
     </div>
     <div class="field">
       <label for="d-email">Email</label>

@@ -2155,6 +2155,12 @@ test('account details on the admin panel: Agency, Your name, Password, Email, Ph
   const order = ['Agency', 'Your name', 'Password', 'Email', 'Phone'].map((l) => details.indexOf(`>${l}`));
   assert.ok(order.every((i, k) => i > 0 && (k === 0 || i > order[k - 1])), `labels out of order: ${order}`);
   assert.doesNotMatch(r.text, /id="reset-password"/);
+  assert.match(details, new RegExp(`formaction="/admin/users/${co.id}/password"[^>]*>Change password`));
+  let pw = await admin.post(`/admin/users/${co.id}/password`, { password: '' });
+  assert.match(decodeURIComponent(pw.location), /Type a new password first/);
+  pw = await admin.post(`/admin/users/${co.id}/password`, { password: 'changed-by-button-1', name: 'ignored' });
+  assert.match(decodeURIComponent(pw.location), /Password changed/);
+  assert.ok(require('../src/auth').verifyPassword('changed-by-button-1', db.prepare('SELECT password_hash FROM users WHERE id = ?').get(co.id).password_hash));
   const saved = await admin.post(`/admin/users/${co.id}/details`, { login_name: co.login_name, name: 'New Contact', agency_name: co.agency_name, email: co.email });
   assert.match(decodeURIComponent(saved.location), /Account details saved/);
   assert.deepEqual({ ...db.prepare('SELECT username, name FROM users WHERE id = ?').get(co.id) }, { username: 'no-username-box', name: 'New Contact' });

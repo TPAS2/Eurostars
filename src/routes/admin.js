@@ -182,11 +182,11 @@ module.exports = function adminRoutes(db, config) {
     if (!u) return;
     const password = String(req.body.password || '');
     if (password.length < MIN_PASSWORD || password.length > 200) {
-      return res.redirect(`/admin/users/${u.id}?error=` + encodeURIComponent(`The new password must be at least ${MIN_PASSWORD} characters.`));
+      return res.redirect(`/admin/users/${u.id}?error=` + encodeURIComponent(password ? `The new password must be at least ${MIN_PASSWORD} characters.` : 'Type a new password first, or click Suggest.') + '#details');
     }
     db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(auth.hashPassword(password), u.id);
     if (u.id !== req.user.id) db.prepare('DELETE FROM sessions WHERE user_id = ?').run(u.id);
-    res.redirect(`/admin/users/${u.id}?flash=` + encodeURIComponent(`Password changed for @${u.username}.` + (u.id !== req.user.id ? ' They have been signed out and must use the new password.' : '')));
+    res.redirect(`/admin/users/${u.id}?flash=` + encodeURIComponent(`Password changed for @${u.username}.` + (u.id !== req.user.id ? ' They have been signed out and must use the new password.' : '')) + '#details');
   });
 
   // ---------- people inside a company (only the admin adds them) ----------
