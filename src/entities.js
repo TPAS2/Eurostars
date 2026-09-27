@@ -151,12 +151,13 @@ const ENTITIES = {
     fields: [
       { name: 'property_id', label: 'Property', type: 'ref', ref: 'properties', required: true },
       { name: 'title', label: 'Issue', type: 'text', required: true },
-      { name: 'description', label: 'Details', type: 'textarea' },
+      // Details then cost sit beside the issue.
+      { name: 'description', label: 'Details', type: 'textarea', inline: true },
+      { name: 'cost_pence', label: 'Cost (£)', type: 'money' },
       { name: 'contractor', label: 'Contractor', type: 'text' },
       { name: 'priority', label: 'Priority', type: 'select', options: ['low', 'normal', 'high', 'emergency'], required: true, default: 'normal' },
       { name: 'status', label: 'Status', type: 'select', options: ['open', 'in progress', 'completed'], required: true, default: 'open' },
       { name: 'reported_date', label: 'Reported', type: 'date', default: 'today' },
-      { name: 'cost_pence', label: 'Cost (£)', type: 'money' },
     ],
     columns: ['title', 'property_id', 'priority', 'status', 'reported_date', 'cost_pence'],
   },
