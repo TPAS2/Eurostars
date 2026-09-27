@@ -337,7 +337,13 @@ const DRAFT_DAYS = 7;
     });
     // A picture is uploaded as soon as one is chosen.
     document.querySelectorAll('input[type=file][data-autosubmit]').forEach((input) => {
-      input.addEventListener('change', () => { if (input.files.length) input.form.submit(); });
+      input.addEventListener('change', () => {
+        if (!input.files.length) return;
+        // Show that something is happening while large photos upload.
+        const label = input.closest('label');
+        if (label && input.form.dataset.busy) { label.classList.add('busy'); label.firstChild.textContent = `${input.form.dataset.busy} (${input.files.length}) `; }
+        input.form.submit();
+      });
     });
     document.querySelectorAll('form[data-autosave]').forEach(setupAutosave);
     document.querySelectorAll('form[data-draft]').forEach(setupDraft);

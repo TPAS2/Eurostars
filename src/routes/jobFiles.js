@@ -2,12 +2,14 @@
 
 // Photos and files on a maintenance job: upload several at once, view, download, remove.
 
+const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 const express = require('express');
 const multer = require('multer');
 const auth = require('../auth');
 
-const MAX_BYTES = 15 * 1024 * 1024;
+const MAX_BYTES = 25 * 1024 * 1024;
 const MAX_FILES = 20;
 // Identified by content, not by the name or type the browser sent.
 const TYPES = [
@@ -23,7 +25,11 @@ const SHOWABLE = new Set(TYPES.filter((t) => t.image).map((t) => t.mime));
 
 module.exports = function jobFileRoutes(db) {
   const router = express.Router();
-  const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_BYTES, files: MAX_FILES, fields: 5 } }).array('files', MAX_FILES);
+  // Files land in a temporary folder and are saved one at a time, so a batch of large phone
+  // photos never has to sit in memory all at once.
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'rift-job-files-'));
+  const upload = multer({ dest: tmpDir, limits: { fileSize: MAX_BYTES, files: MAX_FILES, fields: 5 } }).array('files', MAX_FILES);
+  const cleanUp = (files) => { for (const f of files || []) fs.rm(f.path, { force: true }, () => {}); };
 
   function ownedJob(req, res) {
     const id = Number(req.params.id);
@@ -35,24 +41,27 @@ module.exports = function jobFileRoutes(db) {
 
   router.post('/:id(\\d+)/files', (req, res, next) => {
     upload(req, res, (err) => {
-      if (err) req.uploadError = err.code === 'LIMIT_FILE_SIZE' ? 'A file is larger than 15 MB.' : err.code === 'LIMIT_FILE_COUNT' ? `Upload up to ${MAX_FILES} files at a time.` : 'The upload failed. Please try again.';
+      if (err) req.uploadError = err.code === 'LIMIT_FILE_SIZE' ? 'A file is larger than 25 MB.' : err.code === 'LIMIT_FILE_COUNT' ? `Upload up to ${MAX_FILES} files at a time.` : 'The upload failed. Please try again.';
       req.body = req.body || {};
       auth.checkCsrfAfterUpload(req, res, next);
     });
   }, (req, res) => {
+    const all = req.files || [];
+    res.on('finish', () => cleanUp(all));
     const job = ownedJob(req, res);
     if (!job) return;
     if (req.uploadError) return back(res, job.id, 'error', req.uploadError);
-    const files = (req.files || []).filter((f) => f.size);
+    const files = all.filter((f) => f.size);
     if (!files.length) return back(res, job.id, 'error', 'Choose one or more photos or files to upload.');
     const insert = db.prepare('INSERT INTO maintenance_files (account_id, job_id, filename, mime, size, data, uploaded_by) VALUES (?, ?, ?, ?, ?, ?, ?)');
     const refused = [];
     let saved = 0;
     for (const f of files) {
-      const type = TYPES.find((t) => t.test(f.buffer));
+      const buffer = fs.readFileSync(f.path);
+      const type = TYPES.find((t) => t.test(buffer));
       const name = path.basename(String(f.originalname || 'file')).replace(/[^\w.\- ()]/g, '_').slice(0, 150) || 'file';
       if (!type) { refused.push(name); continue; }
-      insert.run(req.user.id, job.id, name, type.mime, f.size, f.buffer, req.user.person_id);
+      insert.run(req.user.id, job.id, name, type.mime, f.size, buffer, req.user.person_id);
       saved += 1;
     }
     const msg = `Uploaded ${saved} file${saved === 1 ? '' : 's'}.`;
