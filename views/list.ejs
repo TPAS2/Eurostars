@@ -3,7 +3,7 @@
   <h1><%= def.plural %></h1>
   <div class="actions">
     <% if (searchable && !def.searchBar) { %>
-    <form method="get" class="search"><input type="search" name="q" value="<%= q %>" placeholder="Search <%= def.plural.toLowerCase() %>…"></form>
+    <form method="get" class="search"><% if (typeof monthView !== 'undefined' && monthView) { %><input type="hidden" name="month" value="<%= monthView.month %>"><% } %><input type="search" name="q" value="<%= q %>" placeholder="Search <%= def.plural.toLowerCase() %>…"></form>
     <% } %>
     <a class="btn primary" href="/app/<%= def.key %>/new">+ Add <%= def.singular.toLowerCase() %></a>
   </div>
@@ -21,9 +21,21 @@
   <% [['current', 'Current'], ['past', 'Past'], ['all', 'All']].forEach(([k, label]) => { %><a href="/app/tenants?show=<%= k %><%= q ? '&q=' + encodeURIComponent(q) : '' %>" class="<%= tenantFilter === k ? 'active' : '' %>"><%= label %></a><% }) %>
 </nav>
 <% } %>
+<% if (typeof monthView !== 'undefined' && monthView) { const mv = monthView; %>
+<%- include('partials/month-nav', { base: `/app/${def.key}`, month: mv.month, prev: mv.prev, next: mv.next, thisMonth: mv.thisMonth, keep: q ? { q } : {}, allowAll: true }) %>
+<section class="tiles">
+  <% if (mv.inMonth) { %>
+  <div class="tile"><span class="label">Reported · <%= mv.monthLabel %></span><span class="value"><%= mv.inMonth.n %></span><span class="sub"><%= mv.inMonth.n === 1 ? 'job' : 'jobs' %></span></div>
+  <div class="tile <%= mv.inMonth.open ? 'warn' : '' %>"><span class="label">Still open</span><span class="value"><%= mv.inMonth.open %></span><span class="sub">from <%= mv.monthLabel %></span></div>
+  <div class="tile ok"><span class="label">Completed</span><span class="value"><%= mv.inMonth.done %></span><span class="sub">from <%= mv.monthLabel %></span></div>
+  <div class="tile"><span class="label">Cost · <%= mv.monthLabel %></span><span class="value"><%= fmt.money(mv.inMonth.cost) %></span><span class="sub">&nbsp;</span></div>
+  <a class="tile <%= mv.olderOpen ? 'warn' : '' %>" href="/app/<%= def.key %>?month=all"><span class="label">Open from earlier months</span><span class="value"><%= mv.olderOpen %></span><span class="sub">Show all months</span></a>
+  <% } %>
+</section>
+<% } %>
 <section class="card">
   <% if (!rows.length) { %>
-    <p class="muted"><%= q ? 'No matches.' : `No ${def.plural.toLowerCase()} yet.` %></p>
+    <p class="muted"><%= q ? 'No matches.' : (typeof monthView !== 'undefined' && monthView && monthView.month !== 'all') ? `No maintenance jobs reported in ${monthView.monthLabel}.` : `No ${def.plural.toLowerCase()} yet.` %></p>
   <% } else { %>
     <%- include('partials/table', { rows, hideField: null }) %>
     <% if (truncated) { %><p class="muted small">Showing the first 500. Use search to narrow down.</p><% } %>

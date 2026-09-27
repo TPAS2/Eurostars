@@ -485,6 +485,25 @@ module.exports = function appRoutes(db) {
       }
       where += ` AND (${terms.join(' OR ')})`;
     }
+    // Maintenance is shown one month at a time (by reported date), like the invoice tabs.
+    let monthView = null;
+    if (def.key === 'maintenance') {
+      const thisMonth = fmt.today().slice(0, 7);
+      const month = req.query.month === 'all' ? 'all' : /^\d{4}-(0[1-9]|1[0-2])$/.test(String(req.query.month || '')) ? String(req.query.month) : thisMonth;
+      const jobMonth = "substr(COALESCE(reported_date, created_at), 1, 7)";
+      if (month !== 'all') { where += ` AND ${jobMonth} = ?`; params.push(month); }
+      const shift = (by) => { const [y, m] = (month === 'all' ? thisMonth : month).split('-').map(Number); return new Date(Date.UTC(y, m - 1 + by, 1)).toISOString().slice(0, 7); };
+      const inMonth = month === 'all' ? null : db.prepare(
+        `SELECT COUNT(*) AS n, COALESCE(SUM(status != 'completed'), 0) AS open, COALESCE(SUM(status = 'completed'), 0) AS done,
+                COALESCE(SUM(cost_pence), 0) AS cost
+           FROM maintenance_jobs WHERE account_id = ? AND ${jobMonth} = ?`
+      ).get(a, month);
+      const olderOpen = month === 'all' ? 0 : db.prepare(
+        `SELECT COUNT(*) AS n FROM maintenance_jobs WHERE account_id = ? AND status != 'completed' AND ${jobMonth} < ?`
+      ).get(a, month).n;
+      monthView = { month, thisMonth, prev: shift(-1), next: shift(1), inMonth, olderOpen,
+        monthLabel: month === 'all' ? 'All months' : require('../statements').monthLabel(month) };
+    }
     let rows = db.prepare(`SELECT * FROM ${def.table} WHERE ${where} ORDER BY ${def.order} LIMIT ${LIST_LIMIT + 1}`).all(...params);
     const truncated = rows.length > LIST_LIMIT;
     if (truncated) rows.pop();
@@ -560,7 +579,7 @@ module.exports = function appRoutes(db) {
         row.properties = { text: String(list.length), count: list.length };
       }
     }
-    res.render('list', { title: def.plural, section: sectionOf(def), def, rows, maps, display, rowTitle, q, searchable: textFields.length > 0, truncated, totalsRow, tenantFilter });
+    res.render('list', { title: def.plural, section: sectionOf(def), def, rows, maps, display, rowTitle, q, searchable: textFields.length > 0, truncated, totalsRow, tenantFilter, monthView });
   });
 
   router.get('/:entity/new', (req, res) => {

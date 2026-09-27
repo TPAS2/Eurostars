@@ -2254,3 +2254,24 @@ test('Account details page: People section under All logins adds someone to a ch
   const s = await staff.post('/login', { login: 'people-here', member: 'jo', password: 'long-enough-1' });
   assert.match(s.location, /^\/app/);
 });
+
+test('maintenance is shown one month at a time, like the invoice tabs', async () => {
+  const c = await registerAndLogin('maint-months@example.com', 'Maint Months Lets');
+  let r = await c.post('/app/properties', { address_line1: '9 Month Row', status: 'let' });
+  const pid = idFrom(r.location);
+  await c.post('/app/maintenance', { property_id: String(pid), title: 'Boiler August', priority: 'normal', status: 'open', reported_date: '2026-08-12', cost_pence: '120' });
+  await c.post('/app/maintenance', { property_id: String(pid), title: 'Tap September', priority: 'normal', status: 'completed', reported_date: '2026-09-03', cost_pence: '40' });
+  r = await c.get('/app/maintenance?month=2026-09');
+  assert.match(r.text, /Tap September/);
+  assert.doesNotMatch(r.text, /Boiler August/);
+  assert.match(r.text, /‹ Previous month/);
+  assert.match(r.text, /Open from earlier months<\/span><span class="value">1</);
+  assert.match(r.text, /Cost · September 2026<\/span><span class="value">£40\.00/);
+  r = await c.get('/app/maintenance?month=2026-08');
+  assert.match(r.text, /Boiler August/);
+  assert.doesNotMatch(r.text, /Tap September/);
+  r = await c.get('/app/maintenance?month=all');
+  assert.match(r.text, /Boiler August[\s\S]*|Tap September/);
+  assert.ok(r.text.includes('Boiler August') && r.text.includes('Tap September'));
+  assert.match((await c.get('/app')).text, /href="\/app\/maintenance\?month=all"/);
+});
