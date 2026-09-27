@@ -30,7 +30,6 @@ const ENTITIES = {
     computed: { councils: { label: 'Councils' } },
     children: [
       { entity: 'properties', fk: 'landlord_id' },
-      { entity: 'transactions', fk: 'landlord_id' },
     ],
   },
 

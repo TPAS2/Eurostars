@@ -2076,3 +2076,11 @@ test('landlords list shows their councils to the right of phone', async () => {
   assert.match(r.text, /<th[^>]*>Phone<\/th>\s*<th[^>]*>Councils<\/th>/);
   assert.match(r.text, /07700 900001[\s\S]*?<span class="cell-text">Leeds City Council\nYork Council<\/span>/);
 });
+
+test('a landlord page has no Transactions list', async () => {
+  const c = await registerAndLogin('ll-no-txn@example.com', 'No Txn LL Lets');
+  const ll = idFrom((await c.post('/app/landlords', { name: 'Quiet Landlord' })).location);
+  const r = await c.get(`/app/landlords/${ll}`);
+  assert.match(r.text, /Properties owned/);
+  assert.doesNotMatch(r.text, /<h2>Transactions/);
+});
