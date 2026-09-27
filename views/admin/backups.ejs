@@ -13,10 +13,25 @@
 <% if (error) { %><div class="notice err"><%= error %></div><% } %>
 
 <% if (!config.backupPassword) { %><div class="notice err">Backups are not encrypted. Set <code>BACKUP_PASSWORD</code> in Render to encrypt them. See <a href="/admin/security">Security</a>.</div><% } %>
+<% const everyLabel = (h) => ({ 0: 'Off', 1: 'Every hour', 24: 'Every day', 48: 'Every 2 days', 168: 'Every week' })[h] || `Every ${h} hours`; %>
 <section class="tiles">
-  <div class="tile"><span class="label">Automatic backups</span><span class="value sm"><%= config.autoBackups ? `Every ${config.backupIntervalHours} h` : 'Off' %></span><span class="sub">Keeping the latest <%= config.backupKeep %></span></div>
+  <div class="tile"><span class="label">Automatic backups</span><span class="value sm"><%= config.autoBackups && intervalHours ? everyLabel(intervalHours) : 'Off' %></span><span class="sub">Keeping the latest <%= config.backupKeep %></span></div>
   <div class="tile"><span class="label">Latest backup</span><span class="value sm"><%= backups[0] ? fmt.ukDateTime(backups[0].created.toISOString().replace('T', ' ')) : 'None yet' %></span><span class="sub"><%= backups.length %> stored</span></div>
   <div class="tile <%= config.backupCopyDir ? '' : 'warn' %>"><span class="label">Second copy</span><span class="value sm"><%= config.backupCopyDir ? 'On' : 'Off' %></span><span class="sub"><%= config.backupCopyDir ? 'Copied to BACKUP_COPY_DIR' : 'Set BACKUP_COPY_DIR, or download regularly' %></span></div>
+</section>
+
+<section class="card">
+  <h2>Backup frequency</h2>
+  <% if (!config.autoBackups) { %><div class="notice warn">Automatic backups are switched off on the server (<code>AUTO_BACKUPS=false</code>), so this setting has no effect until that's removed.</div><% } %>
+  <form method="post" action="/admin/backups/frequency" class="inline-form" data-no-keep>
+    <%- include('../partials/csrf') %>
+    <label for="backup-hours">Back up automatically</label>
+    <select id="backup-hours" name="hours">
+      <% intervalChoices.forEach(h => { %><option value="<%= h %>" <%= h === intervalHours ? 'selected' : '' %>><%= everyLabel(h) %></option><% }) %>
+    </select>
+    <button class="btn primary" type="submit">Save frequency</button>
+  </form>
+  <p class="muted small">Takes effect within 15 minutes, no restart needed. The latest <%= config.backupKeep %> backups are kept; older ones are deleted.</p>
 </section>
 
 <section class="card">

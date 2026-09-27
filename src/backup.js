@@ -214,9 +214,23 @@ function backupPath(config, name) {
 }
 
 // Back up on a timer; skips a run if a recent enough backup already exists.
+// How often automatic backups run, in hours (0 = off). The admin sets it on the Backups page;
+// until then BACKUP_INTERVAL_HOURS applies.
+const INTERVAL_CHOICES = [0, 1, 6, 12, 24, 48, 168];
+function intervalHours(db, config) {
+  const row = db.prepare("SELECT value FROM app_settings WHERE key = 'backup_interval_hours'").get();
+  const n = row ? Number(row.value) : NaN;
+  return INTERVAL_CHOICES.includes(n) ? n : config.backupIntervalHours;
+}
+function setIntervalHours(db, hours) {
+  db.prepare("INSERT INTO app_settings (key, value) VALUES ('backup_interval_hours', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").run(String(hours));
+}
+
 function scheduleBackups(db, config, log = console.log) {
-  const everyMs = config.backupIntervalHours * 3600 * 1000;
   const tick = async () => {
+    const hours = intervalHours(db, config);
+    if (!hours) return;
+    const everyMs = hours * 3600 * 1000;
     const latest = listBackups(config)[0];
     if (latest && Date.now() - latest.created.getTime() < everyMs * 0.9) return;
     try {
@@ -227,7 +241,8 @@ function scheduleBackups(db, config, log = console.log) {
     }
   };
   setTimeout(tick, 60 * 1000).unref();
-  setInterval(tick, Math.min(everyMs, 3600 * 1000)).unref();
+  // Checked every 15 minutes, so a new frequency takes effect without a restart.
+  setInterval(tick, 15 * 60 * 1000).unref();
 }
 
-module.exports = { createBackup, listBackups, backupPath, scheduleBackups, writeTarGz, encryptFile, decryptFile, isEncrypted };
+module.exports = { INTERVAL_CHOICES, intervalHours, setIntervalHours, createBackup, listBackups, backupPath, scheduleBackups, writeTarGz, encryptFile, decryptFile, isEncrypted };

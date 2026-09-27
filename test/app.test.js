@@ -688,12 +688,12 @@ test('account details: companies can only view them; the admin edits them', asyn
   assert.equal(u.agency_name, 'Before Lets');
   assert.equal((await c.post(`/admin/users/${u.id}/details`, { name: 'X', agency_name: 'X' })).status, 404);
 
-  // The admin can, but not the username or password.
+  // The admin can, but not the username; a blank password keeps the current one.
   const admin = new Client();
   await admin.login('admin', 'owner-password-123');
   r = await admin.get(`/admin/users/${u.id}`);
   assert.match(r.text, /Account details/);
-  r = await admin.post(`/admin/users/${u.id}/details`, { name: 'Robin Hart', agency_name: 'After Lets', email: 'robin@after.example.com', phone: '0117 000 1111', address: '1 Quay St', password: 'hacked-pass' });
+  r = await admin.post(`/admin/users/${u.id}/details`, { name: 'Robin Hart', agency_name: 'After Lets', email: 'robin@after.example.com', phone: '0117 000 1111', address: '1 Quay St', password: '' });
   assert.match(decodeURIComponent(r.location), /Account details saved/);
   const after = db.prepare('SELECT * FROM users WHERE id = ?').get(u.id);
   assert.equal(after.agency_name, 'After Lets');
@@ -704,6 +704,15 @@ test('account details: companies can only view them; the admin edits them', asyn
 
   r = await admin.post(`/admin/users/${u.id}/details`, { name: '', agency_name: 'After Lets' });
   assert.match(decodeURIComponent(r.location), /Enter the contact name/);
+
+  // The Password box resets it: too short is refused; a good one is saved and signs them out.
+  r = await admin.post(`/admin/users/${u.id}/details`, { name: 'Robin Hart', agency_name: 'After Lets', password: 'short' });
+  assert.match(decodeURIComponent(r.location), /at least 8 characters/);
+  assert.ok(require('../src/auth').verifyPassword('password-1234', db.prepare('SELECT password_hash FROM users WHERE id = ?').get(u.id).password_hash));
+  r = await admin.post(`/admin/users/${u.id}/details`, { name: 'Robin Hart', agency_name: 'After Lets', password: 'brand-new-pass-1' });
+  assert.match(decodeURIComponent(r.location), /password saved/);
+  assert.ok(require('../src/auth').verifyPassword('brand-new-pass-1', db.prepare('SELECT password_hash FROM users WHERE id = ?').get(u.id).password_hash));
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM sessions WHERE user_id = ?').get(u.id).n, 0);
 });
 
 test('property certificates: gas, electrical and insurance with current, previous and status', async () => {
@@ -2136,14 +2145,33 @@ test('the admin account picks up the Rift name instead of the old Nexus one', ()
   assert.equal(dbx.prepare('SELECT agency_name FROM users WHERE is_admin = 1').get().agency_name, 'Theo Lettings');
 });
 
-test('account details on the admin panel have no username box, and saving keeps the username', async () => {
+test('account details on the admin panel: Agency, Your name, Password, Email, Phone; saving without a username keeps it', async () => {
   await registerAndLogin('no-username-box@example.com', 'No Box Lets');
   const co = db.prepare("SELECT * FROM users WHERE username = 'no-username-box'").get();
   const admin = new Client();
   await admin.login('admin', 'owner-password-123');
   const r = await admin.get(`/admin/users/${co.id}`);
-  assert.doesNotMatch(r.text, /name="username"/);
+  const details = r.text.slice(r.text.indexOf('id="details"'), r.text.indexOf('id="people"'));
+  const order = ['Agency', 'Your name', 'Password', 'Email', 'Phone'].map((l) => details.indexOf(`>${l}`));
+  assert.ok(order.every((i, k) => i > 0 && (k === 0 || i > order[k - 1])), `labels out of order: ${order}`);
+  assert.doesNotMatch(r.text, /id="reset-password"/);
   const saved = await admin.post(`/admin/users/${co.id}/details`, { login_name: co.login_name, name: 'New Contact', agency_name: co.agency_name, email: co.email });
   assert.match(decodeURIComponent(saved.location), /Account details saved/);
   assert.deepEqual({ ...db.prepare('SELECT username, name FROM users WHERE id = ?').get(co.id) }, { username: 'no-username-box', name: 'New Contact' });
+});
+
+test('admin can change how often automatic backups run', async () => {
+  const admin = new Client();
+  await admin.login('admin', 'owner-password-123');
+  let r = await admin.get('/admin/backups');
+  assert.match(r.text, /Backup frequency/);
+  r = await admin.post('/admin/backups/frequency', { hours: '6' });
+  assert.match(decodeURIComponent(r.location), /every 6 hours/);
+  assert.equal(require('../src/backup').intervalHours(db, { backupIntervalHours: 24 }), 6);
+  assert.match((await admin.get('/admin/backups')).text, /<option value="6" selected>Every 6 hours/);
+  r = await admin.post('/admin/backups/frequency', { hours: '5' });
+  assert.match(decodeURIComponent(r.location), /Choose a backup frequency/);
+  r = await admin.post('/admin/backups/frequency', { hours: '0' });
+  assert.match(decodeURIComponent(r.location), /Automatic backups are off/);
+  assert.equal(require('../src/backup').intervalHours(db, { backupIntervalHours: 24 }), 0);
 });

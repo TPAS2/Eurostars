@@ -17,6 +17,10 @@ const MIN_PASSWORD = 8;
 
 // Owner-only area: every user of the software, their usage and login history.
 // It deliberately shows usage counts, not the contents of agencies' records.
+function backupEvery(hours) {
+  return { 1: 'every hour', 24: 'every day', 48: 'every 2 days', 168: 'every week' }[hours] || `every ${hours} hours`;
+}
+
 module.exports = function adminRoutes(db, config) {
   const router = express.Router();
 
@@ -158,12 +162,19 @@ module.exports = function adminRoutes(db, config) {
     else if (!values.agency_name) error = 'Enter the company name.';
     else if (values.email && !EMAIL_RE.test(values.email)) error = 'Enter a valid email address, or leave it blank.';
     else if (values.email && db.prepare('SELECT 1 FROM users WHERE email = ? AND id != ?').get(values.email, u.id)) error = 'Another account already uses this email.';
+    // A new password, if one was typed (blank keeps the current one).
+    const password = String(req.body.password || '');
+    if (!error && password && (password.length < MIN_PASSWORD || password.length > 200)) error = `The new password must be at least ${MIN_PASSWORD} characters.`;
     if (error) return res.redirect(`/admin/users/${u.id}?error=${encodeURIComponent(error)}#details`);
     db.prepare('UPDATE users SET name = ?, agency_name = ?, email = ?, phone = ?, address = ?, login_name = ?, username = ? WHERE id = ?')
       .run(values.name, values.agency_name, values.email || null, values.phone || null, values.address || null, values.login_name, values.username, u.id);
+    if (password) {
+      db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(auth.hashPassword(password), u.id);
+      if (u.id !== req.user.id) db.prepare('DELETE FROM sessions WHERE user_id = ?').run(u.id);
+    }
     // People inside the company carry the company username in their own record.
     db.prepare("UPDATE users SET username = ? || '.' || login_name WHERE company_id = ?").run(values.username, u.id);
-    res.redirect(`/admin/users/${u.id}?flash=${encodeURIComponent('Account details saved.')}#details`);
+    res.redirect(`/admin/users/${u.id}?flash=${encodeURIComponent(password ? `Account details and password saved.${u.id !== req.user.id ? ' They have been signed out and must use the new password.' : ''}` : 'Account details saved.')}#details`);
   });
 
   router.post('/users/:id/password', (req, res) => {
@@ -433,6 +444,7 @@ module.exports = function adminRoutes(db, config) {
   router.get('/backups', (req, res) => {
     res.render('admin/backups', {
       title: 'Backups', section: 'backups', backups: backup.listBackups(config), config, fmt,
+      intervalHours: backup.intervalHours(db, config), intervalChoices: backup.INTERVAL_CHOICES,
       flash: req.query.flash || '', error: req.query.error || '',
     });
   });
@@ -442,6 +454,13 @@ module.exports = function adminRoutes(db, config) {
       .then((b) => res.redirect('/admin/backups?flash=' + encodeURIComponent(`Backup created: ${b.name}`)))
       .catch((err) => { console.error(err); res.redirect('/admin/backups?error=' + encodeURIComponent('Backup failed: ' + err.message)); })
       .catch(next);
+  });
+
+  router.post('/backups/frequency', (req, res) => {
+    const hours = Number(req.body.hours);
+    if (!backup.INTERVAL_CHOICES.includes(hours)) return res.redirect('/admin/backups?error=' + encodeURIComponent('Choose a backup frequency from the list.'));
+    backup.setIntervalHours(db, hours);
+    res.redirect('/admin/backups?flash=' + encodeURIComponent(hours ? `Automatic backups will now run ${backupEvery(hours)}.` : 'Automatic backups are off. Use "Back up now" to make one.'));
   });
 
   router.get('/backups/:name', (req, res) => {

@@ -58,8 +58,8 @@
   </div>
 </section>
 
-<section class="card">
-  <h2>Recent activity</h2>
+<details class="card fold">
+  <summary><h2>Recent activity</h2><span class="muted small"><%= recentActivity.length %> item<%= recentActivity.length === 1 ? '' : 's' %></span></summary>
   <p class="muted small">What your users have been doing (your own actions aren't listed here). Click a user for their full history.</p>
   <% if (!recentActivity.length) { %><p class="muted">No activity yet.</p><% } else { %>
   <div class="table-wrap"><table>
@@ -71,10 +71,10 @@
     <% }) %>
     </tbody>
   </table></div><% } %>
-</section>
+</details>
 
-<section class="card">
-  <h2>Recent sign-in activity</h2>
+<details class="card fold">
+  <summary><h2>Recent sign-in activity</h2><span class="muted small"><%= recentLogins.length %> sign-in<%= recentLogins.length === 1 ? '' : 's' %></span></summary>
   <% if (!recentLogins.length) { %><p class="muted">No sign-ins yet.</p><% } else { %>
   <div class="table-wrap"><table>
     <thead><tr><th>When</th><th>Signed in as</th><th>Agency</th><th>Result</th><th>IP</th></tr></thead>
@@ -85,5 +85,5 @@
     <% }) %>
     </tbody>
   </table></div><% } %>
-</section>
+</details>
 <%- include('../partials/footer') %>

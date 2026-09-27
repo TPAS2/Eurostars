@@ -133,6 +133,12 @@ CREATE TABLE IF NOT EXISTS payment_instructions (
 
 -- Notes on each council's reconciliation, one per council per month, plus any amounts typed in
 -- on the page (which replace the calculated money owed / money in when set).
+-- Site-wide settings the admin can change (e.g. how often backups run).
+CREATE TABLE IF NOT EXISTS app_settings (
+  key   TEXT PRIMARY KEY,
+  value TEXT
+);
+
 CREATE TABLE IF NOT EXISTS council_rec_notes (
   account_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   council_id  INTEGER NOT NULL REFERENCES councils(id) ON DELETE CASCADE,

@@ -561,3 +561,14 @@ table.equal td { overflow-wrap: anywhere; }
 /* Every table on every page: headings and the text under them centred. */
 .content table th, .content table td, .content table td.num, .content table th.num { text-align: center; }
 .content table td .field-err { text-align: left; }
+
+.pw-row { display: flex; gap: 8px; }
+.pw-row input { flex: 1; min-width: 0; }
+.form-subhead { margin: 10px 0 0; font-size: .8rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+
+details.fold > summary { display: flex; align-items: center; gap: 12px; cursor: pointer; list-style: none; }
+details.fold > summary::-webkit-details-marker { display: none; }
+details.fold > summary h2 { margin: 0; }
+details.fold > summary::after { content: '▾'; margin-left: auto; font-size: 1.1rem; color: var(--muted); transition: transform .15s; }
+details.fold:not([open]) > summary::after { transform: rotate(-90deg); }
+details.fold[open] > summary { margin-bottom: 12px; }
