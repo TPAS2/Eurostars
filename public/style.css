@@ -529,8 +529,9 @@ form.inline { display: inline-flex; margin: 0; }
 
 /* Several phone numbers / emails on a council: one per line. */
 .cell-text { white-space: pre-line; }
-/* Properties and landlords lists: headings and text centred. */
-table.list-properties th, table.list-properties td, table.list-landlords th, table.list-landlords td { text-align: center; }
+/* Properties, landlords and tenants lists: headings and text centred. */
+table.list-properties th, table.list-properties td, table.list-landlords th, table.list-landlords td,
+table.list-tenants th, table.list-tenants td { text-align: center; }
 
 table.centered td.row-actions { text-align: center; }
 
