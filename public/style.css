@@ -553,3 +553,7 @@ table.centered td.row-actions { text-align: center; }
 table.list-landlords, table.list-tenants, table.list-maintenance, table.list-contractors { table-layout: fixed; width: 100%; }
 table.list-landlords td, table.list-tenants td, table.list-maintenance td, table.list-contractors td { overflow-wrap: anywhere; }
 table.list-maintenance th, table.list-maintenance td, table.list-contractors th, table.list-contractors td { text-align: center; }
+
+/* Tables with every column the same width. */
+table.equal { table-layout: fixed; width: 100%; }
+table.equal td { overflow-wrap: anywhere; }

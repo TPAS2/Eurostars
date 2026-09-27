@@ -23,7 +23,7 @@
     </form>
   </div>
   <% if (!rows.length) { %><p class="muted">Add landlords to start producing statements.</p><% } else { %>
-  <div class="table-wrap"><table>
+  <div class="table-wrap"><table class="equal centered">
     <thead><tr><th>Landlord</th><th class="num">Rent</th><th class="num">Fees</th><th class="num">Costs</th><th class="num">Net</th><th class="num">Held</th><th>Status</th><th>Emailed</th><th></th></tr></thead>
     <tbody>
     <% rows.forEach(r => { %>
