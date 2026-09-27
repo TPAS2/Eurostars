@@ -557,3 +557,7 @@ table.list-maintenance th, table.list-maintenance td, table.list-contractors th,
 /* Tables with every column the same width. */
 table.equal { table-layout: fixed; width: 100%; }
 table.equal td { overflow-wrap: anywhere; }
+
+/* Every table on every page: headings and the text under them centred. */
+.content table th, .content table td, .content table td.num, .content table th.num { text-align: center; }
+.content table td .field-err { text-align: left; }
