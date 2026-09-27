@@ -156,9 +156,15 @@ module.exports = function invoiceRoutes(db, config) {
               COUNT(CASE WHEN status = 'unpaid' AND due_date < ? THEN 1 END) AS overdue_n
          FROM invoices WHERE account_id = ?`
     ).get(today, today, a);
+    // The chosen month's unpaid and paid invoices (by invoice date).
+    const monthTotals = month === 'all' ? null : db.prepare(
+      `SELECT COALESCE(SUM(CASE WHEN status = 'unpaid' THEN amount_pence END), 0) AS unpaid, COUNT(CASE WHEN status = 'unpaid' THEN 1 END) AS unpaid_n,
+              COALESCE(SUM(CASE WHEN status = 'paid' THEN amount_pence END), 0) AS paid, COUNT(CASE WHEN status = 'paid' THEN 1 END) AS paid_n
+         FROM invoices WHERE account_id = ? AND substr(COALESCE(invoice_date, due_date, created_at), 1, 7) = ?`
+    ).get(a, month);
     const shift = (by) => { const [y, m] = (month === 'all' ? thisMonth : month).split('-').map(Number); return new Date(Date.UTC(y, m - 1 + by, 1)).toISOString().slice(0, 7); };
     res.render('invoices/list', {
-      title: 'Invoices', section: 'invoices', invoices, statementLink, totals, status, today, fmt, flash: String(req.query.flash || '').slice(0, 200),
+      title: 'Invoices', section: 'invoices', invoices, statementLink, totals, monthTotals, status, today, fmt, flash: String(req.query.flash || '').slice(0, 200),
       month, prev: shift(-1), next: shift(1), thisMonth, monthLabel: month === 'all' ? 'All months' : require('../statements').monthLabel(month),
     });
   });

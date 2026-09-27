@@ -1958,3 +1958,18 @@ test('contractor invoice job can be None; councils take several phone numbers an
   assert.equal(r.status, 422);
   assert.match(r.text, /Check &#34;not-an-email&#34;: not a valid email address/);
 });
+
+test('contractor invoices: unpaid and paid boxes for the chosen month either side of the all-months boxes', async () => {
+  const c = await registerAndLogin('inv-tiles@example.com', 'Tiles Lets');
+  await c.get('/app/invoices/new');
+  const pdf = () => new File([Buffer.from('%PDF-1.4\n%x\n')], 'i.pdf');
+  const add = async (amount, date) => idFrom((await c.post('/app/invoices', await invoiceBody(c, { supplier: 'Tile Co', amount, invoice_date: date, file: pdf() }), { multipart: true })).location);
+  const paid = await add('100', '2026-08-03');
+  await add('40', '2026-08-09');
+  await add('7', '2026-07-01');
+  await c.post(`/app/invoices/${paid}/pay`, { paid_date: '2026-08-10', payment_method: 'Card' });
+  const r = await c.get('/app/invoices?month=2026-08');
+  const labels = [...r.text.matchAll(/<span class="label">([^<]+)<\/span><span class="value">([^<]+)</g)].map((m) => `${m[1]}=${m[2]}`);
+  assert.deepEqual(labels, ['Unpaid · August 2026=£40.00', 'Unpaid · all months=£47.00', 'Overdue · all months=£0.00', 'Paid · August 2026=£100.00']);
+  assert.doesNotMatch((await c.get('/app/invoices?month=all')).text, /Paid · /, 'no month boxes when showing all months');
+});

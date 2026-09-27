@@ -531,3 +531,6 @@ form.inline { display: inline-flex; margin: 0; }
 table.list-councils td { white-space: pre-line; }
 
 table.centered td.row-actions { text-align: center; }
+
+.tile.ok { border-color: var(--ok); background: var(--ok-soft); }
+.tile.ok .value { color: var(--ok); }
