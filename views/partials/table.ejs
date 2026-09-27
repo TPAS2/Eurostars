@@ -15,6 +15,7 @@
         <% } else if (d.href) { %><a href="<%= d.href %>"><%= d.text %></a>
         <% } else if (d.cls) { %><span class="<%= d.cls %>"><%= d.text %></span>
         <% } else if (d.badge) { %><span class="badge s-<%= String(row[c]).replace(/\W+/g, '-') %>"><%= d.text %></span>
+        <% } else if (String(d.text).includes('\n')) { %><span class="cell-text"><%= d.text %></span>
         <% } else { %><%= d.text %><% } %>
       </td>
     <% }) %>
