@@ -101,6 +101,11 @@ module.exports = function invoiceRoutes(db, config) {
       if (!p) errors.property_id = 'Choose a valid property.';
       else v.property_id = p.id;
     }
+    // Every section of the form must be filled in.
+    if (!v.invoice_date && !errors.invoice_date) errors.invoice_date = 'Enter the invoice date.';
+    if (!v.maintenance_job_id && !errors.maintenance_job_id) errors.maintenance_job_id = 'Choose the maintenance job.';
+    if (!v.property_id && !errors.property_id) errors.property_id = 'Choose the property.';
+    if (!v.description) errors.description = 'Add a note about this invoice.';
     return { v, errors };
   }
 

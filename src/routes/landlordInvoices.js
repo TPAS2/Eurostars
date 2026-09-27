@@ -54,6 +54,10 @@ module.exports = function landlordInvoiceRoutes(db, mailer = { enabled: false })
     };
     const errors = {};
     if (!v.landlord_id || !db.prepare('SELECT 1 FROM landlords WHERE id = ? AND account_id = ?').get(v.landlord_id, accountId)) errors.landlord_id = 'Choose the landlord to bill.';
+    // Every section of the form must be filled in.
+    if (!v.property_id) errors.property_id = 'Choose the property.';
+    if (!v.due_date) errors.due_date = 'Enter the due date.';
+    if (!v.notes) errors.notes = 'Add notes for the invoice.';
     if (v.property_id && !db.prepare('SELECT 1 FROM properties WHERE id = ? AND account_id = ?').get(v.property_id, accountId)) errors.property_id = 'Choose a valid property.';
     if (!v.invoice_number) errors.invoice_number = 'Enter an invoice number.';
     if (!fmt.isIsoDate(v.invoice_date)) errors.invoice_date = 'Enter the invoice date.';

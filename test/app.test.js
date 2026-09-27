@@ -105,6 +105,19 @@ async function registerAndLogin(email, agency) {
 
 const idFrom = (location) => Number(location.split('/').pop());
 
+// Contractor invoices need every field; tests fill in what they don't care about
+// (a note, a date, and a maintenance job on the given property, or on a new one).
+let jobHouse = 0;
+async function invoiceBody(client, fields) {
+  const f = { invoice_date: '2026-08-01', description: 'Test invoice', ...fields };
+  if (!f.maintenance_job_id) {
+    const pid = f.property_id || String(idFrom((await client.post('/app/properties', { address_line1: `Job house ${++jobHouse}`, status: 'vacant' })).location));
+    f.maintenance_job_id = String(idFrom((await client.post('/app/maintenance', { property_id: pid, title: 'Repair', priority: 'normal', status: 'open' })).location));
+    f.property_id = pid;
+  }
+  return f;
+}
+
 test('public pages and protected areas', async () => {
   const c = new Client();
   const home = await c.get('/');
@@ -233,7 +246,7 @@ test('maintenance invoices: upload, list unpaid, pay, undo', async () => {
   assert.match(r.text, /value="Heat Ltd"/);
 
   const pdf = new Blob([Buffer.from('%PDF-1.4\n%fake invoice\n')], { type: 'application/pdf' });
-  r = await c.post('/app/invoices', { supplier: 'Heat Ltd', invoice_number: 'INV-42', amount: '240.00', due_date: '2026-01-01', maintenance_job_id: String(jobId), file: new File([pdf], 'inv-42.pdf') }, { multipart: true });
+  r = await c.post('/app/invoices', await invoiceBody(c, { supplier: 'Heat Ltd', invoice_number: 'INV-42', amount: '240.00', due_date: '2026-01-01', maintenance_job_id: String(jobId), file: new File([pdf], 'inv-42.pdf') }), { multipart: true });
   assert.equal(r.status, 302, r.text);
   const invoiceId = idFrom(r.location);
   const inv = db.prepare('SELECT * FROM invoices WHERE id = ?').get(invoiceId);
@@ -241,7 +254,7 @@ test('maintenance invoices: upload, list unpaid, pay, undo', async () => {
   assert.equal(inv.status, 'unpaid');
 
   // A non-PDF/image file is refused, even with a .pdf name.
-  r = await c.post('/app/invoices', { supplier: 'Evil', amount: '1', file: new File([new Blob(['<script>alert(1)</script>'])], 'x.pdf') }, { multipart: true });
+  r = await c.post('/app/invoices', await invoiceBody(c, { supplier: 'Evil', amount: '1', file: new File([new Blob(['<script>alert(1)</script>'])], 'x.pdf') }), { multipart: true });
   assert.equal(r.status, 422);
   assert.match(r.text, /Upload a PDF/);
 
@@ -288,7 +301,7 @@ test('agencies cannot see or touch each other\'s data', async () => {
   r = await a.post('/app/properties', { address_line1: 'A Street', status: 'vacant' });
   const propertyId = idFrom(r.location);
   const pdf = new File([new Blob([Buffer.from('%PDF-1.4 x')])], 'a.pdf');
-  r = await a.post('/app/invoices', { supplier: 'S', amount: '5', property_id: String(propertyId), file: pdf }, { multipart: true });
+  r = await a.post('/app/invoices', await invoiceBody(a, { supplier: 'S', amount: '5', property_id: String(propertyId), file: pdf }), { multipart: true });
   const invoiceId = idFrom(r.location);
 
   assert.equal((await b.get(`/app/landlords/${landlordId}`)).status, 404);
@@ -1101,7 +1114,7 @@ test('any invoice can be deleted, from its page or from a list', async () => {
   const propertyId = idFrom(r.location);
   const upload = async (supplier) => {
     const pdf = new File([Buffer.from('%PDF-1.4\n%x\n')], 'i.pdf');
-    const res = await c.post('/app/invoices', { supplier, amount: '50.00', property_id: String(propertyId), file: pdf }, { multipart: true });
+    const res = await c.post('/app/invoices', await invoiceBody(c, { supplier, amount: '50.00', property_id: String(propertyId), file: pdf }), { multipart: true });
     return idFrom(res.location);
   };
 
@@ -1126,7 +1139,7 @@ test('any invoice can be deleted, from its page or from a list', async () => {
   const unpaidId = await upload('Roof Repairs');
   r = await c.get(`/app/properties/${propertyId}`);
   assert.match(r.text, new RegExp(`action="/app/invoices/${unpaidId}/delete"[\\s\\S]*?name="back" value="/app/properties/${propertyId}"`));
-  assert.match((await c.get('/app/invoices')).text, new RegExp(`action="/app/invoices/${unpaidId}/delete"`), 'the invoices list has Delete too');
+  assert.match((await c.get('/app/invoices?month=all')).text, new RegExp(`action="/app/invoices/${unpaidId}/delete"`), 'the invoices list has Delete too');
   r = await c.post(`/app/invoices/${unpaidId}/delete`, { back: `/app/properties/${propertyId}` });
   assert.match(r.location, new RegExp(`^/app/properties/${propertyId}\\?flash=`));
   assert.match((await c.get(r.location)).text, /Deleted invoice from Roof Repairs/);
@@ -1628,8 +1641,8 @@ test('invoices have a month switcher', async () => {
   const c = await registerAndLogin('inv-month@example.com', 'Inv Month Lets');
   const pdf = () => new File([Buffer.from('%PDF-1.4\n%x\n')], 'i.pdf');
   await c.get('/app/invoices/new');
-  await c.post('/app/invoices', { supplier: 'July Plumbing', amount: '10', invoice_date: '2026-07-10', due_date: '2026-07-20', file: pdf() }, { multipart: true });
-  await c.post('/app/invoices', { supplier: 'August Roofing', amount: '20', invoice_date: '2026-08-05', due_date: '2026-08-30', file: pdf() }, { multipart: true });
+  await c.post('/app/invoices', await invoiceBody(c, { supplier: 'July Plumbing', amount: '10', invoice_date: '2026-07-10', due_date: '2026-07-20', file: pdf() }), { multipart: true });
+  await c.post('/app/invoices', await invoiceBody(c, { supplier: 'August Roofing', amount: '20', invoice_date: '2026-08-05', due_date: '2026-08-30', file: pdf() }), { multipart: true });
 
   let r = await c.get('/app/invoices?month=2026-08');
   assert.match(r.text, /href="\/app\/invoices\?month=2026-07">‹ Previous month/);
@@ -1657,8 +1670,8 @@ test('invoices link to their property and show whether they were deducted, with 
   const prop = idFrom(r.location);
   const pdf = () => new File([Buffer.from('%PDF-1.4\n%x\n')], 'i.pdf');
   await c.get('/app/invoices/new');
-  const charged = idFrom((await c.post('/app/invoices', { supplier: 'Drain Co', amount: '120', invoice_date: '2026-08-02', property_id: String(prop), file: pdf() }, { multipart: true })).location);
-  const notCharged = idFrom((await c.post('/app/invoices', { supplier: 'Paint Co', amount: '40', invoice_date: '2026-08-03', property_id: String(prop), file: pdf() }, { multipart: true })).location);
+  const charged = idFrom((await c.post('/app/invoices', await invoiceBody(c, { supplier: 'Drain Co', amount: '120', invoice_date: '2026-08-02', property_id: String(prop), file: pdf() }), { multipart: true })).location);
+  const notCharged = idFrom((await c.post('/app/invoices', await invoiceBody(c, { supplier: 'Paint Co', amount: '40', invoice_date: '2026-08-03', property_id: String(prop), file: pdf() }), { multipart: true })).location);
   await c.get(`/app/invoices/${charged}`);
   await c.post(`/app/invoices/${charged}/pay`, { paid_date: '2026-08-10', payment_method: 'Bank transfer', charge_landlord: '1' });
   await c.post(`/app/invoices/${notCharged}/pay`, { paid_date: '2026-08-11', payment_method: 'Card' });
@@ -1700,7 +1713,7 @@ test('contractors: every supplier listed with how much has been paid to them in 
   const accountId = db.prepare("SELECT id FROM users WHERE username = 'contractors'").get().id;
   const pdf = () => new File([Buffer.from('%PDF-1.4\n%x\n')], 'i.pdf');
   await c.get('/app/invoices/new');
-  const upload = async (supplier, amount, date) => idFrom((await c.post('/app/invoices', { supplier, amount, invoice_date: date, file: pdf() }, { multipart: true })).location);
+  const upload = async (supplier, amount, date) => idFrom((await c.post('/app/invoices', await invoiceBody(c, { supplier, amount, invoice_date: date, file: pdf() }), { multipart: true })).location);
   const a1 = await upload('Heat Ltd', '100', '2026-06-01');
   const a2 = await upload('heat ltd ', '50', '2026-08-01'); // same contractor despite capitals/spaces
   await upload('Heat Ltd', '30', '2026-08-15'); // left unpaid
@@ -1754,7 +1767,7 @@ test('landlord invoices: bill a landlord, deduct from rent or mark paid, print a
   r = await c.get(`/app/landlord-invoices/new?property_id=${prop}`);
   assert.match(r.text, /name="invoice_number" value="LI-0001"/);
   assert.match(r.text, new RegExp(`<option value="${larry}" selected>Larry Landlord`), 'landlord filled in from the property');
-  r = await c.post('/app/landlord-invoices', { landlord_id: String(larry), property_id: String(prop), invoice_number: 'LI-0001', invoice_date: '2026-08-04', due_date: '2026-08-18', description: 'Tenant find fee', amount: '£300' });
+  r = await c.post('/app/landlord-invoices', { landlord_id: String(larry), property_id: String(prop), invoice_number: 'LI-0001', invoice_date: '2026-08-04', due_date: '2026-08-18', description: 'Tenant find fee', amount: '£300', notes: 'Thank you' });
   const inv1 = idFrom(r.location);
   r = await c.post('/app/landlord-invoices', { landlord_id: '', invoice_number: '', invoice_date: 'x', description: '', amount: 'lots' });
   assert.equal(r.status, 422);
@@ -1817,24 +1830,25 @@ test('contractor invoices: no invoice number or due date on the form; "Added by"
 
   let r = await c.get('/app/invoices/new');
   assert.doesNotMatch(r.text, /name="invoice_number"|name="due_date"/);
-  assert.match(r.text, /<label for="f-property">Property<\/label>[\s\S]*?<\/div>\s*<div class="field">\s*<label for="f-added_by">Added by<\/label>/, 'Added by comes right after Property');
+  assert.match(r.text, /<label for="f-property">Property <span class="req">\*<\/span><\/label>[\s\S]*?<\/div>\s*<div class="field">\s*<label for="f-added_by">Added by <span class="req">\*<\/span><\/label>/, 'Added by comes right after Property');
   assert.match(r.text, new RegExp(`<option value="${companyId}" selected>Test User</option><option value="${pat}" >Pat Clerk</option>`), 'defaults to whoever is signed in');
 
   const pdf = new File([Buffer.from('%PDF-1.4\n%x\n')], 'i.pdf');
-  r = await c.post('/app/invoices', { supplier: 'Lock Co', amount: '75', invoice_date: '2026-09-01', added_by: String(pat), file: pdf }, { multipart: true });
+  r = await c.post('/app/invoices', await invoiceBody(c, { supplier: 'Lock Co', amount: '75', invoice_date: '2026-09-01', added_by: String(pat), file: pdf }), { multipart: true });
   const id = idFrom(r.location);
   assert.equal(db.prepare('SELECT added_by FROM invoices WHERE id = ?').get(id).added_by, pat);
   assert.match((await c.get(`/app/invoices/${id}`)).text, /<dt>Added by<\/dt><dd>Pat Clerk<\/dd>/);
   // Someone from another company can't be picked.
   const other = await registerAndLogin('added-by-2@example.com', 'Other Added');
   const otherId = db.prepare("SELECT id FROM users WHERE username = 'added-by-2'").get().id;
-  r = await c.post('/app/invoices', { supplier: 'Lock Co', amount: '5', added_by: String(otherId), file: new File([Buffer.from('%PDF-1.4\n')], 'j.pdf') }, { multipart: true });
+  r = await c.post('/app/invoices', await invoiceBody(c, { supplier: 'Lock Co', amount: '5', added_by: String(otherId), file: new File([Buffer.from('%PDF-1.4\n')], 'j.pdf') }), { multipart: true });
   assert.equal(r.status, 422);
   assert.ok(other);
   // Editing keeps an existing invoice number / due date.
   db.prepare("UPDATE invoices SET invoice_number = 'INV-9', due_date = '2026-09-30' WHERE id = ?").run(id);
   await c.get(`/app/invoices/${id}/edit`);
-  await c.post(`/app/invoices/${id}`, { supplier: 'Lock Co', amount: '80', invoice_date: '2026-09-01', added_by: String(pat) }, { multipart: true });
+  const cur = db.prepare('SELECT maintenance_job_id, property_id FROM invoices WHERE id = ?').get(id);
+  await c.post(`/app/invoices/${id}`, { supplier: 'Lock Co', amount: '80', invoice_date: '2026-09-01', added_by: String(pat), maintenance_job_id: String(cur.maintenance_job_id), property_id: String(cur.property_id), description: 'Lock change' }, { multipart: true });
   assert.deepEqual({ ...db.prepare('SELECT invoice_number, due_date, amount_pence FROM invoices WHERE id = ?').get(id) }, { invoice_number: 'INV-9', due_date: '2026-09-30', amount_pence: 8000 });
 });
 
@@ -1861,7 +1875,7 @@ test('"Deduct from landlord" straight from adding a contractor or landlord invoi
   // Contractor invoice.
   r = await c.get('/app/invoices/new');
   assert.match(r.text, /name="then" value="deduct"[^>]*>Upload &amp; deduct from landlord/);
-  r = await c.post('/app/invoices', { supplier: 'Quick Fix', amount: '90', invoice_date: '2026-08-12', property_id: String(prop), then: 'deduct', file: pdf() }, { multipart: true });
+  r = await c.post('/app/invoices', await invoiceBody(c, { supplier: 'Quick Fix', amount: '90', invoice_date: '2026-08-12', property_id: String(prop), then: 'deduct', file: pdf() }), { multipart: true });
   const inv = idFrom(r.location.split('?')[0]);
   assert.match(decodeURIComponent(r.location), /Deducted £90\.00 from Nora Now for August 2026/);
   const row = db.prepare('SELECT * FROM invoices WHERE id = ?').get(inv);
@@ -1870,18 +1884,18 @@ test('"Deduct from landlord" straight from adding a contractor or landlord invoi
   const exp = db.prepare('SELECT * FROM transactions WHERE id = ?').get(row.payment_txn_id);
   assert.deepEqual([exp.txn_type, exp.landlord_id, exp.amount_pence], ['expense', nora, 9000]);
   // Without a landlord to charge, it says so and nothing is saved.
-  r = await c.post('/app/invoices', { supplier: 'Quick Fix', amount: '10', property_id: String(lonely), then: 'deduct', file: pdf() }, { multipart: true });
+  r = await c.post('/app/invoices', await invoiceBody(c, { supplier: 'Quick Fix', amount: '10', property_id: String(lonely), then: 'deduct', file: pdf() }), { multipart: true });
   assert.equal(r.status, 422);
   assert.match(r.text, /choose a property \(or job\) that has a landlord/);
   assert.equal(db.prepare('SELECT COUNT(*) n FROM invoices WHERE property_id = ?').get(lonely).n, 0);
   // Plain upload still leaves it unpaid.
-  r = await c.post('/app/invoices', { supplier: 'Quick Fix', amount: '20', property_id: String(prop), then: 'save', file: pdf() }, { multipart: true });
+  r = await c.post('/app/invoices', await invoiceBody(c, { supplier: 'Quick Fix', amount: '20', property_id: String(prop), then: 'save', file: pdf() }), { multipart: true });
   assert.equal(db.prepare('SELECT status FROM invoices WHERE id = ?').get(idFrom(r.location)).status, 'unpaid');
 
   // Landlord invoice.
   r = await c.get('/app/landlord-invoices/new');
   assert.match(r.text, /name="then" value="deduct"[^>]*>Create &amp; deduct from rent/);
-  r = await c.post('/app/landlord-invoices', { landlord_id: String(nora), property_id: String(prop), invoice_number: 'LI-0001', invoice_date: '2026-08-15', description: 'Inspection', amount: '60', then: 'deduct' });
+  r = await c.post('/app/landlord-invoices', { landlord_id: String(nora), property_id: String(prop), invoice_number: 'LI-0001', invoice_date: '2026-08-15', due_date: '2026-08-29', description: 'Inspection', amount: '60', notes: 'Annual inspection', then: 'deduct' });
   assert.match(decodeURIComponent(r.location), /Created and deducted £60\.00 from Nora Now's rent for August 2026/);
   const li = db.prepare("SELECT * FROM landlord_invoices WHERE invoice_number = 'LI-0001' AND landlord_id = ?").get(nora);
   assert.equal(li.paid_how, 'Deducted from rent');
@@ -1892,4 +1906,25 @@ test('"Deduct from landlord" straight from adding a contractor or landlord invoi
   await c.post('/app/monthly/generate', { month: '2026-08', landlord_id: String(nora) });
   const s = db.prepare("SELECT fees_pence, expenses_pence FROM monthly_statements WHERE landlord_id = ? AND month = '2026-08'").get(nora);
   assert.deepEqual({ ...s }, { fees_pence: 6000, expenses_pence: 9000 });
+});
+
+test('every section must be filled in when adding a contractor or landlord invoice', async () => {
+  const c = await registerAndLogin('all-required@example.com', 'Required Lets');
+  let r = await c.get('/app/invoices/new');
+  for (const name of ['file', 'supplier', 'amount', 'invoice_date', 'maintenance_job_id', 'property_id', 'added_by', 'description']) {
+    assert.match(r.text, new RegExp(`name="${name}"[^>]*required|required[^>]*name="${name}"`), `${name} is required on the contractor invoice form`);
+  }
+  r = await c.post('/app/invoices', { supplier: 'Bare Minimum', amount: '10', file: new File([Buffer.from('%PDF-1.4\n')], 'x.pdf') }, { multipart: true });
+  assert.equal(r.status, 422);
+  assert.match(r.text, /Enter the invoice date[\s\S]*?Choose the maintenance job[\s\S]*?Choose the property[\s\S]*?Add a note/);
+  assert.equal(db.prepare("SELECT COUNT(*) n FROM invoices WHERE supplier = 'Bare Minimum'").get().n, 0);
+
+  r = await c.get('/app/landlord-invoices/new');
+  for (const name of ['landlord_id', 'property_id', 'invoice_number', 'amount', 'invoice_date', 'due_date', 'description', 'notes']) {
+    assert.match(r.text, new RegExp(`name="${name}"[^>]*required|required[^>]*name="${name}"`), `${name} is required on the landlord invoice form`);
+  }
+  const ll = idFrom((await c.post('/app/landlords', { name: 'Req Landlord' })).location);
+  r = await c.post('/app/landlord-invoices', { landlord_id: String(ll), invoice_number: 'LI-0001', invoice_date: '2026-08-01', description: 'Fee', amount: '5' });
+  assert.equal(r.status, 422);
+  assert.match(r.text, /Choose the property[\s\S]*?Enter the due date[\s\S]*?Add notes for the invoice/);
 });

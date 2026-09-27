@@ -28,36 +28,37 @@
       <% if (errors.amount) { %><div class="field-err"><%= errors.amount %></div><% } %>
     </div>
     <div class="field">
-      <label for="f-invoice_date">Invoice date</label>
-      <input id="f-invoice_date" type="date" name="invoice_date" value="<%= values.invoice_date || '' %>">
+      <label for="f-invoice_date">Invoice date <span class="req">*</span></label>
+      <input id="f-invoice_date" type="date" name="invoice_date" value="<%= values.invoice_date || '' %>" required>
       <% if (errors.invoice_date) { %><div class="field-err"><%= errors.invoice_date %></div><% } %>
     </div>
     <div class="field">
-      <label for="f-job">Maintenance job</label>
-      <select id="f-job" name="maintenance_job_id">
-        <option value="">— None —</option>
+      <label for="f-job">Maintenance job <span class="req">*</span></label>
+      <select id="f-job" name="maintenance_job_id" required>
+        <option value="">Choose…</option>
         <% jobs.forEach(j => { %><option value="<%= j.id %>" <%= Number(values.maintenance_job_id) === j.id ? 'selected' : '' %>><%= j.label %></option><% }) %>
       </select>
-      <div class="help">The property is taken from the job.</div>
+      <div class="help">The property is taken from the job. <a href="/app/maintenance/new" target="_blank" rel="noopener">+ New maintenance job</a></div>
       <% if (errors.maintenance_job_id) { %><div class="field-err"><%= errors.maintenance_job_id %></div><% } %>
     </div>
     <div class="field">
-      <label for="f-property">Property</label>
-      <select id="f-property" name="property_id">
-        <option value="">— None —</option>
+      <label for="f-property">Property <span class="req">*</span></label>
+      <select id="f-property" name="property_id" required>
+        <option value="">Choose…</option>
         <% properties.forEach(p => { %><option value="<%= p.id %>" <%= Number(values.property_id) === p.id ? 'selected' : '' %>><%= p.label %></option><% }) %>
       </select>
       <% if (errors.property_id) { %><div class="field-err"><%= errors.property_id %></div><% } %>
     </div>
     <div class="field">
-      <label for="f-added_by">Added by</label>
-      <select id="f-added_by" name="added_by">
+      <label for="f-added_by">Added by <span class="req">*</span></label>
+      <select id="f-added_by" name="added_by" required>
         <% people.forEach(m => { %><option value="<%= m.id %>" <%= Number(values.added_by) === m.id ? 'selected' : '' %>><%= m.name %></option><% }) %>
       </select>
     </div>
     <div class="field wide">
-      <label for="f-description">Notes</label>
-      <textarea id="f-description" name="description" rows="3"><%= values.description || '' %></textarea>
+      <label for="f-description">Notes <span class="req">*</span></label>
+      <textarea id="f-description" name="description" rows="3" required><%= values.description || '' %></textarea>
+      <% if (errors.description) { %><div class="field-err"><%= errors.description %></div><% } %>
     </div>
     <div class="form-actions wide">
       <button class="btn primary" type="submit" name="then" value="save"><%= invoice ? 'Save changes' : 'Upload invoice' %></button>

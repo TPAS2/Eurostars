@@ -19,9 +19,9 @@
       <% if (errors.landlord_id) { %><div class="field-err"><%= errors.landlord_id %></div><% } %>
     </div>
     <div class="field">
-      <label for="f-property">Property</label>
-      <select id="f-property" name="property_id">
-        <option value="">— None —</option>
+      <label for="f-property">Property <span class="req">*</span></label>
+      <select id="f-property" name="property_id" required>
+        <option value="">Choose…</option>
         <% properties.forEach(p => { %><option value="<%= p.id %>" <%= String(values.property_id) === String(p.id) ? 'selected' : '' %>><%= p.address_line1 %></option><% }) %>
       </select>
       <% if (errors.property_id) { %><div class="field-err"><%= errors.property_id %></div><% } %>
@@ -42,8 +42,8 @@
       <% if (errors.invoice_date) { %><div class="field-err"><%= errors.invoice_date %></div><% } %>
     </div>
     <div class="field">
-      <label for="f-due">Due date</label>
-      <input id="f-due" type="date" name="due_date" value="<%= values.due_date || '' %>">
+      <label for="f-due">Due date <span class="req">*</span></label>
+      <input id="f-due" type="date" name="due_date" value="<%= values.due_date || '' %>" required>
       <% if (errors.due_date) { %><div class="field-err"><%= errors.due_date %></div><% } %>
     </div>
     <div class="field wide">
@@ -52,8 +52,9 @@
       <% if (errors.description) { %><div class="field-err"><%= errors.description %></div><% } %>
     </div>
     <div class="field wide">
-      <label for="f-notes">Notes (shown on the invoice)</label>
-      <textarea id="f-notes" name="notes" rows="3"><%= values.notes || '' %></textarea>
+      <label for="f-notes">Notes (shown on the invoice) <span class="req">*</span></label>
+      <textarea id="f-notes" name="notes" rows="3" required><%= values.notes || '' %></textarea>
+      <% if (errors.notes) { %><div class="field-err"><%= errors.notes %></div><% } %>
     </div>
     <div class="form-actions wide">
       <button class="btn primary" type="submit" name="then" value="save"><%= inv ? 'Save' : 'Create invoice' %></button>
