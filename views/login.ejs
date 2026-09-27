@@ -1,15 +1,18 @@
 <%- include('partials/header', { bodyClass: 'auth' }) %>
-<div class="card narrow">
+<%- include('partials/auth-open') %>
+<div class="card narrow auth-card">
   <a class="brand" href="/"><span class="logo"><%= appName.charAt(0).toUpperCase() %></span><%= appName %></a>
-  <h1>Sign in</h1>
+  <h1>Welcome back</h1>
+  <p class="muted auth-sub">Sign in to your agency.</p>
   <% if (error) { %><div class="notice err"><%= error %></div><% } else if (timedOut) { %><div class="notice warn">You were signed out after <%= idleMinutes >= 60 && idleMinutes % 60 === 0 ? (idleMinutes / 60 === 1 ? '1 hour' : idleMinutes / 60 + ' hours') : idleMinutes + ' minutes' %> without activity. Anything you'd typed has been kept. Sign in to carry on where you left off.</div><% } %>
   <form method="post" action="/login" class="stack">
     <% if (next) { %><input type="hidden" name="next" value="<%= next %>"><% } %>
     <label>Agency <input id="login" name="login" value="<%= login %>" required autofocus autocomplete="username" autocapitalize="none" spellcheck="false"></label>
     <label>Your name <input id="member" name="member" value="<%= typeof member !== 'undefined' ? member : '' %>" required autocomplete="off" autocapitalize="none" spellcheck="false"></label>
     <label>Password <input id="password" type="password" name="password" required autocomplete="current-password"></label>
-    <button class="btn primary" type="submit">Sign in</button>
+    <button class="btn primary auth-submit" type="submit">Sign in <span aria-hidden="true">→</span></button>
   </form>
   <% if (allowRegistration) { %><p class="muted small">New here? <a href="/register">Create an account</a></p><% } %>
 </div>
+<%- include('partials/auth-close') %>
 <%- include('partials/footer') %>

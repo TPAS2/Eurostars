@@ -140,6 +140,7 @@ module.exports = function authRoutes(db, config) {
     db.prepare("UPDATE users SET last_login_at = datetime('now'), login_count = login_count + 1 WHERE id = ?").run(user.id);
     db.prepare("DELETE FROM sessions WHERE expires_at <= datetime('now')").run();
     auth.createSession(db, res, user.id, config.secureCookies);
+    res.append('Set-Cookie', auth.introCookie(true, config.secureCookies));
   }
 
   router.get('/register', (req, res) => {

@@ -100,6 +100,12 @@ function loadSession(db, { idleMinutes = 60, secure = false } = {}) {
         delete req.user.stale;
       }
     }
+    // Just signed in: the first page shown plays the welcome animation once.
+    res.locals.intro = false;
+    if (req.user && req.method === 'GET' && parseCookies(req.headers.cookie)[INTRO_COOKIE]) {
+      res.locals.intro = true;
+      res.append('Set-Cookie', introCookie(false, secure));
+    }
     res.locals.idleMinutes = idleMinutes;
     res.locals.user = req.user || null;
     res.locals.csrfToken = req.csrfToken || '';
@@ -187,7 +193,15 @@ function rateLimiter({ windowMs, max }) {
   };
 }
 
+const INTRO_COOKIE = 'rift_intro';
+function introCookie(on, secure) {
+  const attrs = [`${INTRO_COOKIE}=${on ? '1' : ''}`, 'Path=/', 'HttpOnly', 'SameSite=Lax', `Max-Age=${on ? 120 : 0}`];
+  if (secure) attrs.push('Secure');
+  return attrs.join('; ');
+}
+
 module.exports = {
+  introCookie,
   hashPassword,
   verifyPassword,
   DUMMY_HASH,

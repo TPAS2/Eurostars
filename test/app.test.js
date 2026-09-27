@@ -2181,3 +2181,15 @@ test('admin can change how often automatic backups run', async () => {
   assert.match(decodeURIComponent(r.location), /Automatic backups are off/);
   assert.equal(require('../src/backup').intervalHours(db, { backupIntervalHours: 24 }), 0);
 });
+
+test('signing in plays the welcome animation once, on the first page', async () => {
+  const c = new Client();
+  let r = await c.get('/login');
+  assert.match(r.text, /Welcome back/);
+  assert.match(r.text, /Lettings, <span>sorted/);
+  r = await c.post('/login', { login: 'admin', member: 'Theo', password: 'owner-password-123' });
+  r = await c.get(r.location);
+  assert.match(r.text, /data-intro/);
+  r = await c.get('/admin');
+  assert.doesNotMatch(r.text, /data-intro/);
+});

@@ -497,3 +497,16 @@ document.addEventListener('click', (e) => {
   document.addEventListener('visibilitychange', () => { if (!document.hidden) check(); });
   window.addEventListener('focus', check);
 })();
+
+// Welcome animation after signing in: click or press any key to skip; removed once finished.
+(function () {
+  document.addEventListener('DOMContentLoaded', () => {
+    const intro = document.querySelector('[data-intro]');
+    if (!intro) return;
+    const done = () => intro.remove();
+    const skip = () => { intro.classList.add('skip'); setTimeout(done, 320); };
+    intro.addEventListener('click', skip);
+    document.addEventListener('keydown', skip, { once: true });
+    setTimeout(done, 3200);
+  });
+})();

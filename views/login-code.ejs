@@ -1,5 +1,6 @@
 <%- include('partials/header', { bodyClass: 'auth' }) %>
-<div class="card narrow">
+<%- include('partials/auth-open') %>
+<div class="card narrow auth-card">
   <a class="brand" href="/login"><span class="logo"><%= appName.charAt(0).toUpperCase() %></span><%= appName %></a>
   <h1>Enter your code</h1>
   <p class="muted small">Open your authenticator app and type the 6-digit code for <%= appName %>.</p>
@@ -11,4 +12,5 @@
   <p class="muted small">Lost your phone? Type one of your recovery codes instead.</p>
   <p class="muted small"><a href="/login">Back to sign in</a></p>
 </div>
+<%- include('partials/auth-close') %>
 <%- include('partials/footer') %>
