@@ -658,3 +658,6 @@ details.fold[open] > summary { margin-bottom: 12px; }
   .auth-side-inner { padding: 18px 20px; }
   .auth-main { padding-top: 80px; }
 }
+/* Keep the light line clear of the logo in the welcome animation. */
+.intro-seam { -webkit-mask-image: linear-gradient(180deg, #000 calc(50% - 90px), transparent calc(50% - 55px), transparent calc(50% + 55px), #000 calc(50% + 90px)); mask-image: linear-gradient(180deg, #000 calc(50% - 90px), transparent calc(50% - 55px), transparent calc(50% + 55px), #000 calc(50% + 90px)); }
+.intro-center { z-index: 2; }
