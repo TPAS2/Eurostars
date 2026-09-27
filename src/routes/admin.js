@@ -88,7 +88,11 @@ module.exports = function adminRoutes(db, config) {
         WHERE c.is_admin = 0
         ORDER BY c.agency_name COLLATE NOCASE, m.company_id IS NOT NULL, m.name COLLATE NOCASE`
     ).all();
-    res.render('admin/accounts', { title: 'Account details', section: 'accounts', logins, fmt });
+    const companies = db.prepare('SELECT id, username, agency_name FROM users WHERE company_id IS NULL AND is_admin = 0 ORDER BY agency_name COLLATE NOCASE').all();
+    res.render('admin/accounts', {
+      title: 'Account details', section: 'accounts', logins, companies, fmt, minPassword: MIN_PASSWORD,
+      flash: req.query.flash || '', error: req.query.error || '', picked: Number(req.query.company) || 0,
+    });
   });
 
   function target(req, res) {
@@ -192,18 +196,30 @@ module.exports = function adminRoutes(db, config) {
   router.post('/users/:id/people', (req, res) => {
     const u = target(req, res);
     if (!u) return;
+    addPerson(req, u, (msg, ok) => res.redirect(`/admin/users/${u.id}?${ok ? 'flash' : 'error'}=${encodeURIComponent(msg)}#people`));
+  });
+
+  // The same, from the Account details page: the agency is picked from a list.
+  router.post('/accounts/people', (req, res) => {
+    const back = (msg, ok) => res.redirect(`/admin/accounts?${ok ? 'flash' : 'error'}=${encodeURIComponent(msg)}#people`);
+    const id = Number(req.body.company_id);
+    const u = Number.isInteger(id) && db.prepare(`${USAGE_SQL} WHERE u.id = ? AND u.company_id IS NULL AND u.is_admin = 0`).get(id);
+    if (!u) return back('Choose which agency they work for.');
+    addPerson(req, u, back);
+  });
+
+  function addPerson(req, u, back) {
     const name = String(req.body.name || '').trim().slice(0, 200);
     const loginName = String(req.body.login_name || '').trim().slice(0, 60);
     const password = String(req.body.password || '');
-    const back = (msg, ok) => res.redirect(`/admin/users/${u.id}?${ok ? 'flash' : 'error'}=${encodeURIComponent(msg)}#people`);
     if (!name) return back('Enter the person\'s full name.');
     if (!LOGIN_NAME_RE.test(loginName)) return back('Their sign-in name must be 1–30 letters, numbers, dashes or underscores (no spaces or dots).');
     if (db.prepare('SELECT 1 FROM users WHERE (company_id = ? OR id = ?) AND login_name = ? COLLATE NOCASE').get(u.id, u.id, loginName)) return back(`${u.agency_name} already has someone called "${loginName}".`);
     if (password.length < MIN_PASSWORD || password.length > 200) return back(`Their password must be at least ${MIN_PASSWORD} characters.`);
     db.prepare('INSERT INTO users (username, company_id, login_name, name, agency_name, password_hash) VALUES (?, ?, ?, ?, ?, ?)')
       .run(`${u.username}.${loginName}`, u.id, loginName, name, u.agency_name, auth.hashPassword(password));
-    back(`Added ${name}. They sign in with username "${u.username}", name "${loginName}" and the password you chose.`, true);
-  });
+    back(`Added ${name} to ${u.agency_name}. They sign in with username "${u.username}", name "${loginName}" and the password you chose.`, true);
+  }
 
   function person(req, res) {
     const id = Number(req.params.pid);

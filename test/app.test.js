@@ -2233,3 +2233,24 @@ test('older databases with one-email-per-account are converted, keeping every ro
   assert.throws(() => migrated.prepare("INSERT INTO users (username, name, agency_name, password_hash) VALUES ('OLDCO', 'Dup', 'Dup', 'x')").run(), /UNIQUE/);
   migrated.close();
 });
+
+test('Account details page: People section under All logins adds someone to a chosen agency', async () => {
+  await registerAndLogin('people-here@example.com', 'People Here Lets');
+  const co = db.prepare("SELECT * FROM users WHERE username = 'people-here'").get();
+  const admin = new Client();
+  await admin.login('admin', 'owner-password-123');
+  let r = await admin.get('/admin/accounts');
+  assert.ok(r.text.indexOf('All logins') < r.text.indexOf('id="people"'));
+  assert.match(r.text, new RegExp(`<option value="${co.id}"`));
+  r = await admin.post('/admin/accounts/people', { company_id: '', name: 'Nobody', login_name: 'nobody', password: 'long-enough-1' });
+  assert.match(decodeURIComponent(r.location), /Choose which agency/);
+  r = await admin.post('/admin/accounts/people', { company_id: String(co.id), name: 'Jo Bloggs', login_name: 'jo', password: 'long-enough-1' });
+  assert.match(r.location, /^\/admin\/accounts\?flash=/);
+  assert.match(decodeURIComponent(r.location), /Added Jo Bloggs to People Here Lets/);
+  const jo = db.prepare("SELECT * FROM users WHERE company_id = ? AND login_name = 'jo'").get(co.id);
+  assert.ok(jo);
+  assert.match((await admin.get('/admin/accounts')).text, /Jo Bloggs/);
+  const staff = new Client();
+  const s = await staff.post('/login', { login: 'people-here', member: 'jo', password: 'long-enough-1' });
+  assert.match(s.location, /^\/app/);
+});

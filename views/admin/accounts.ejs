@@ -5,6 +5,8 @@
     <p class="muted">Every agency's logins: the username and name each person types to sign in.</p>
   </div>
 </header>
+<% if (flash) { %><div class="notice ok"><%= flash %></div><% } %>
+<% if (error) { %><div class="notice err"><%= error %></div><% } %>
 
 <section class="card" id="account-details">
   <div class="card-head">
@@ -22,13 +24,47 @@
         <td><code><%= l.username %></code></td>
         <td><code><%= l.login_name %></code></td>
         <td><%= l.name %><% if (l.is_main) { %> <span class="badge">main contact</span><% } %></td>
-        <td><span class="muted">••••••••</span> <a class="small" href="/admin/users/<%= l.company_id %><%= l.is_main ? '#reset-password' : '#people' %>">Reset</a></td>
+        <td><span class="muted">••••••••</span> <a class="small" href="/admin/users/<%= l.company_id %><%= l.is_main ? '#details' : '#people' %>">Reset</a></td>
         <td class="nowrap"><%= fmt.ukDateTime(l.last_login_at) %></td>
         <td><span class="badge <%= active ? 's-active' : 's-suspended' %>"><%= active ? 'active' : 'suspended' %></span></td>
       </tr>
     <% }) %>
     </tbody>
   </table></div>
+  <% } %>
+</section>
+
+<section class="card" id="people">
+  <h2>People</h2>
+  <p class="muted small">Add someone to an agency. They sign in with that agency's username, plus their own sign-in name and password. To change what they can see, use <a href="/admin/access">Tab access</a>.</p>
+  <% if (!companies.length) { %><p class="muted">Add an agency account first.</p><% } else { %>
+  <form method="post" action="/admin/accounts/people" class="form-grid" data-no-keep>
+    <%- include('../partials/csrf') %>
+    <div class="field">
+      <label for="p-company">Agency <span class="req">*</span></label>
+      <select id="p-company" name="company_id" required>
+        <option value="">Choose an agency…</option>
+        <% companies.forEach(c => { %><option value="<%= c.id %>" <%= picked === c.id ? 'selected' : '' %>><%= c.agency_name %> (<%= c.username %>)</option><% }) %>
+      </select>
+    </div>
+    <div class="field">
+      <label for="p-name">Full name <span class="req">*</span></label>
+      <input id="p-name" name="name" required autocomplete="off" placeholder="e.g. John Price">
+    </div>
+    <div class="field">
+      <label for="p-login">Sign-in name <span class="req">*</span></label>
+      <input id="p-login" name="login_name" required maxlength="30" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="e.g. john">
+      <div class="help">What they type in "Your name" when signing in. Capitals count.</div>
+    </div>
+    <div class="field">
+      <label for="p-password">Password <span class="req">*</span></label>
+      <div class="input-row">
+        <input id="p-password" name="password" type="text" required minlength="<%= minPassword %>" autocomplete="off">
+        <button class="btn" type="button" data-generate="#p-password">Suggest one</button>
+      </div>
+    </div>
+    <div class="form-actions wide"><button class="btn primary" type="submit">Add person</button></div>
+  </form>
   <% } %>
 </section>
 
