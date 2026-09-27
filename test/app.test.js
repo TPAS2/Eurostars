@@ -2292,3 +2292,12 @@ test('properties list columns: Property name, Council, Landlord, Tenant, Status'
   assert.deepEqual(heads.slice(0, 5), ['Property name', 'Council', 'Landlord', 'Tenant', 'Status']);
   assert.match(r.text, /3 Column Close[\s\S]*Col Council[\s\S]*Col Landlord[\s\S]*Cora Tenant/);
 });
+
+test('rent run: an empty Metro Bulk Payment Instruction box under the month box', async () => {
+  const c = await registerAndLogin('metro-bulk@example.com', 'Metro Bulk Lets');
+  const r = await c.get('/app/rent-run?month=2026-08');
+  const monthBox = r.text.indexOf('id="month-end"');
+  const metro = r.text.indexOf('id="metro-bulk"');
+  assert.ok(monthBox > 0 && metro > monthBox && metro < r.text.indexOf('<h2>Landlords</h2>'));
+  assert.match(r.text, /<h2>Metro Bulk Payment Instruction<\/h2><\/div>\s*<\/section>/);
+});
