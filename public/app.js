@@ -510,3 +510,13 @@ document.addEventListener('click', (e) => {
     setTimeout(done, 3200);
   });
 })();
+
+// A link to a folded section (e.g. #activity) opens it.
+(function () {
+  const openTarget = () => {
+    const el = location.hash && document.getElementById(location.hash.slice(1));
+    if (el && el.tagName === 'DETAILS') el.open = true;
+  };
+  document.addEventListener('DOMContentLoaded', openTarget);
+  window.addEventListener('hashchange', openTarget);
+})();
