@@ -147,7 +147,7 @@ module.exports = function invoiceRoutes(db, config) {
     const invoices = db.prepare(
       `${INVOICE_LIST_SQL}
         WHERE ${where}
-        ORDER BY i.status = 'paid', COALESCE(i.due_date, i.invoice_date, i.created_at) LIMIT 500`
+        ORDER BY COALESCE(i.invoice_date, i.created_at) DESC, i.id DESC LIMIT 500`
     ).all(...params);
     const totals = db.prepare(
       `SELECT COALESCE(SUM(CASE WHEN status = 'unpaid' THEN amount_pence END), 0) AS unpaid,

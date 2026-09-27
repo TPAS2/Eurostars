@@ -1,14 +1,13 @@
 <%# locals: invoices, showProperty, today, backTo, statementLink %>
 <div class="table-wrap">
-<table class="clickable">
-  <thead><tr><th>Supplier</th><th>Invoice no.</th><% if (showProperty) { %><th>Property / job</th><% } %><th>Due</th><th class="num">Amount</th><th>Status</th><th>Deducted</th><th></th></tr></thead>
+<table class="clickable centered">
+  <thead><tr><th>Invoice date</th><th>Supplier</th><% if (showProperty) { %><th>Property / job</th><% } %><th class="num">Amount</th><th>Status</th><th>Deducted</th><th></th></tr></thead>
   <tbody>
   <% invoices.forEach(i => { const overdue = i.status === 'unpaid' && i.due_date && i.due_date < today; %>
     <tr data-href="/app/invoices/<%= i.id %>">
+      <td><%= fmt.ukDate(i.invoice_date || i.created_at.slice(0, 10)) %></td>
       <td><a href="/app/invoices/<%= i.id %>"><strong><%= i.supplier %></strong></a></td>
-      <td><%= i.invoice_number || '' %></td>
       <% if (showProperty) { %><td><% if (i.property_id) { %><a href="/app/properties/<%= i.property_id %>"><%= i.address_line1 %></a><% } %><% if (i.job_title) { %><div class="muted small"><a class="muted" href="/app/maintenance/<%= i.maintenance_job_id %>"><%= i.job_title %></a></div><% } %></td><% } %>
-      <td><%= fmt.ukDate(i.due_date) %></td>
       <td class="num"><%= fmt.money(i.amount_pence) %></td>
       <td>
         <% if (i.status === 'paid') { %><span class="badge s-active">paid <%= fmt.ukDate(i.paid_date) %></span>

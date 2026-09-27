@@ -529,3 +529,5 @@ form.inline { display: inline-flex; margin: 0; }
 
 /* Several phone numbers / emails on a council: one per line. */
 table.list-councils td { white-space: pre-line; }
+
+table.centered td.row-actions { text-align: center; }

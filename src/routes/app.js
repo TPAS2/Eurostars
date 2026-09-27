@@ -580,7 +580,7 @@ module.exports = function appRoutes(db) {
     let invoices = null;
     if (def.key === 'maintenance' || def.key === 'properties' || def.key === 'contractors') {
       const fk = { maintenance: 'maintenance_job_id', properties: 'property_id', contractors: 'contractor_id' }[def.key];
-      invoices = db.prepare(`${INVOICE_LIST_SQL} WHERE i.account_id = ? AND i.${fk} = ? ORDER BY i.status = 'paid', i.due_date`).all(a, row.id);
+      invoices = db.prepare(`${INVOICE_LIST_SQL} WHERE i.account_id = ? AND i.${fk} = ? ORDER BY COALESCE(i.invoice_date, i.created_at) DESC, i.id DESC`).all(a, row.id);
     }
     // On a tenant's page: their current tenancy (or tenancies), with its council, property and agreement.
     let tenantBoxes = null;

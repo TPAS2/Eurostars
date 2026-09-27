@@ -260,9 +260,9 @@ test('maintenance invoices: upload, list unpaid, pay, undo', async () => {
 
   // Unpaid/overdue list shows it with a Pay link; job page lists it.
   r = await c.get('/app/invoices?status=overdue');
-  assert.match(r.text, /INV-42/);
+  assert.match(r.text, /Heat Ltd/);
   assert.match(r.text, new RegExp(`/app/invoices/${invoiceId}#pay`));
-  assert.match((await c.get(`/app/maintenance/${jobId}`)).text, /INV-42/);
+  assert.match((await c.get(`/app/maintenance/${jobId}`)).text, /Heat Ltd/);
 
   // File can be viewed by its owner only, sandboxed.
   r = await c.get(`/app/invoices/${invoiceId}/file`);
