@@ -524,3 +524,5 @@ form.inline { display: inline-flex; margin: 0; }
 .invoice-doc .doc-to { text-align: right; }
 .invoice-doc .doc-to h2 { margin: 0 0 4px; letter-spacing: .12em; }
 .bill-to { margin: 0 0 14px; }
+
+.btn.deduct-btn { background: var(--ok); border-color: var(--ok); color: #fff; }

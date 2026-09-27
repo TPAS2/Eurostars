@@ -55,7 +55,10 @@
       <label for="f-notes">Notes (shown on the invoice)</label>
       <textarea id="f-notes" name="notes" rows="3"><%= values.notes || '' %></textarea>
     </div>
-    <div class="form-actions wide"><button class="btn primary" type="submit"><%= inv ? 'Save' : 'Create invoice' %></button></div>
+    <div class="form-actions wide">
+      <button class="btn primary" type="submit" name="then" value="save"><%= inv ? 'Save' : 'Create invoice' %></button>
+      <% if (!inv) { %><button class="btn primary deduct-btn" type="submit" name="then" value="deduct" title="Takes it off the landlord's rent for the month of the invoice date">Create &amp; deduct from rent</button><% } %>
+    </div>
   </form>
 </section>
 <%- include('../partials/footer') %>

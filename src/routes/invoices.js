@@ -180,12 +180,29 @@ module.exports = function invoiceRoutes(db, config) {
       stored = saveFile(a, req.file);
       if (stored.error) { errors.file = stored.error; stored = null; }
     }
-    if (Object.keys(errors).length) return renderForm(req, res, { invoice: null, values: req.body, errors, status: 422 });
+    // "Upload & deduct from landlord": needs a property with a landlord to charge.
+    const deduct = req.body.then === 'deduct';
+    let landlord = null;
+    if (deduct) {
+      landlord = v.property_id && db.prepare('SELECT l.id, l.name FROM properties p JOIN landlords l ON l.id = p.landlord_id WHERE p.id = ? AND p.account_id = ?').get(v.property_id, a);
+      if (!landlord) errors.property_id = 'To deduct from a landlord, choose a property (or job) that has a landlord.';
+    }
+    if (Object.keys(errors).length) {
+      if (stored) removeFile(a, stored.file_name);
+      return renderForm(req, res, { invoice: null, values: req.body, errors, status: 422 });
+    }
     const row = { ...v, ...stored, contractor_id: contractorFor(db, a, v.supplier) };
     const cols = Object.keys(row);
     const info = db.prepare(`INSERT INTO invoices (account_id, ${cols.join(', ')}) VALUES (?, ${cols.map(() => '?').join(', ')})`)
       .run(a, ...cols.map((c) => row[c]));
-    res.redirect(`/app/invoices/${info.lastInsertRowid}`);
+    const id = Number(info.lastInsertRowid);
+    if (deduct) {
+      const inv = db.prepare('SELECT * FROM invoices WHERE id = ?').get(id);
+      const paidDate = v.invoice_date || fmt.today();
+      payInvoice(a, inv, { paidDate, method: 'Other', reference: 'Deducted from landlord', chargeLandlord: true });
+      return res.redirect(`/app/invoices/${id}?flash=` + encodeURIComponent(`Deducted ${fmt.money(v.amount_pence)} from ${landlord.name} for ${require('../statements').monthLabel(paidDate.slice(0, 7))}.`));
+    }
+    res.redirect(`/app/invoices/${id}`);
   });
 
   router.get('/:id', (req, res) => {
@@ -275,8 +292,13 @@ module.exports = function invoiceRoutes(db, config) {
     const reference = String(req.body.payment_reference || '').trim().slice(0, 100) || null;
     if (!fmt.isIsoDate(paidDate)) return back('Enter the payment date.');
     if (!PAYMENT_METHODS.includes(method)) return back('Choose how it was paid.');
-    const chargeLandlord = req.body.charge_landlord === '1';
+    payInvoice(a, inv, { paidDate, method, reference, chargeLandlord: req.body.charge_landlord === '1' });
+    res.redirect(`/app/invoices/${inv.id}?flash=` + encodeURIComponent(`Paid ${fmt.money(inv.amount_pence)} to ${inv.supplier}.`));
+  });
 
+  // Mark an invoice paid; with chargeLandlord, the cost is deducted from the property's landlord
+  // (an expense on their statement for the month of paidDate).
+  function payInvoice(a, inv, { paidDate, method, reference = null, chargeLandlord }) {
     transaction(db, () => {
       let txnId = null;
       if (chargeLandlord) {
@@ -297,8 +319,7 @@ module.exports = function invoiceRoutes(db, config) {
           .run(inv.amount_pence, inv.maintenance_job_id, a);
       }
     });
-    res.redirect(`/app/invoices/${inv.id}?flash=` + encodeURIComponent(`Paid ${fmt.money(inv.amount_pence)} to ${inv.supplier}.`));
-  });
+  }
 
   router.post('/:id/unpay', (req, res) => {
     const inv = loadInvoice(req, res);

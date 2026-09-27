@@ -1847,3 +1847,49 @@ test('contractor invoice form offers the saved contractors as a type-to-narrow l
   assert.match(r.text, /<datalist id="contractor-list"><option value="Ace Plumbing">Plumber<\/option><option value="Bright Sparks">Electrician<\/option><\/datalist>/);
   assert.match(r.text, /<h1>Upload contractor invoice<\/h1>/);
 });
+
+test('"Deduct from landlord" straight from adding a contractor or landlord invoice', async () => {
+  const c = await registerAndLogin('deduct-now@example.com', 'Deduct Now Lets');
+  let r = await c.post('/app/landlords', { name: 'Nora Now' });
+  const nora = idFrom(r.location);
+  r = await c.post('/app/properties', { address_line1: '3 Quick Street', landlord_id: String(nora), status: 'let' });
+  const prop = idFrom(r.location);
+  r = await c.post('/app/properties', { address_line1: 'No Landlord House', status: 'vacant' });
+  const lonely = idFrom(r.location);
+  const pdf = () => new File([Buffer.from('%PDF-1.4\n%x\n')], 'i.pdf');
+
+  // Contractor invoice.
+  r = await c.get('/app/invoices/new');
+  assert.match(r.text, /name="then" value="deduct"[^>]*>Upload &amp; deduct from landlord/);
+  r = await c.post('/app/invoices', { supplier: 'Quick Fix', amount: '90', invoice_date: '2026-08-12', property_id: String(prop), then: 'deduct', file: pdf() }, { multipart: true });
+  const inv = idFrom(r.location.split('?')[0]);
+  assert.match(decodeURIComponent(r.location), /Deducted £90\.00 from Nora Now for August 2026/);
+  const row = db.prepare('SELECT * FROM invoices WHERE id = ?').get(inv);
+  assert.equal(row.status, 'paid');
+  assert.equal(row.paid_date, '2026-08-12');
+  const exp = db.prepare('SELECT * FROM transactions WHERE id = ?').get(row.payment_txn_id);
+  assert.deepEqual([exp.txn_type, exp.landlord_id, exp.amount_pence], ['expense', nora, 9000]);
+  // Without a landlord to charge, it says so and nothing is saved.
+  r = await c.post('/app/invoices', { supplier: 'Quick Fix', amount: '10', property_id: String(lonely), then: 'deduct', file: pdf() }, { multipart: true });
+  assert.equal(r.status, 422);
+  assert.match(r.text, /choose a property \(or job\) that has a landlord/);
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM invoices WHERE property_id = ?').get(lonely).n, 0);
+  // Plain upload still leaves it unpaid.
+  r = await c.post('/app/invoices', { supplier: 'Quick Fix', amount: '20', property_id: String(prop), then: 'save', file: pdf() }, { multipart: true });
+  assert.equal(db.prepare('SELECT status FROM invoices WHERE id = ?').get(idFrom(r.location)).status, 'unpaid');
+
+  // Landlord invoice.
+  r = await c.get('/app/landlord-invoices/new');
+  assert.match(r.text, /name="then" value="deduct"[^>]*>Create &amp; deduct from rent/);
+  r = await c.post('/app/landlord-invoices', { landlord_id: String(nora), property_id: String(prop), invoice_number: 'LI-0001', invoice_date: '2026-08-15', description: 'Inspection', amount: '60', then: 'deduct' });
+  assert.match(decodeURIComponent(r.location), /Created and deducted £60\.00 from Nora Now's rent for August 2026/);
+  const li = db.prepare("SELECT * FROM landlord_invoices WHERE invoice_number = 'LI-0001' AND landlord_id = ?").get(nora);
+  assert.equal(li.paid_how, 'Deducted from rent');
+  assert.equal(db.prepare('SELECT txn_type FROM transactions WHERE id = ?').get(li.txn_id).txn_type, 'fee');
+
+  // Both come off Nora's August statement.
+  await c.get('/app/monthly?month=2026-08');
+  await c.post('/app/monthly/generate', { month: '2026-08', landlord_id: String(nora) });
+  const s = db.prepare("SELECT fees_pence, expenses_pence FROM monthly_statements WHERE landlord_id = ? AND month = '2026-08'").get(nora);
+  assert.deepEqual({ ...s }, { fees_pence: 6000, expenses_pence: 9000 });
+});

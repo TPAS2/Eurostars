@@ -110,7 +110,14 @@ module.exports = function landlordInvoiceRoutes(db, mailer = { enabled: false })
     if (Object.keys(errors).length) return renderForm(req, res, { inv: null, values: req.body, errors, status: 422 });
     const cols = Object.keys(v);
     const info = db.prepare(`INSERT INTO landlord_invoices (account_id, ${cols.join(', ')}) VALUES (?, ${cols.map(() => '?').join(', ')})`).run(a, ...cols.map((c) => v[c]));
-    res.redirect(`/app/landlord-invoices/${info.lastInsertRowid}`);
+    const id = Number(info.lastInsertRowid);
+    // "Create & deduct from rent": taken off their rent for the month of the invoice date.
+    if (req.body.then === 'deduct') {
+      deduct(a, { id, ...v }, v.invoice_date);
+      const ll = db.prepare('SELECT name FROM landlords WHERE id = ?').get(v.landlord_id);
+      return res.redirect(`/app/landlord-invoices/${id}?flash=${encodeURIComponent(`Created and deducted ${fmt.money(v.amount_pence)} from ${ll.name}'s rent for ${st.monthLabel(v.invoice_date.slice(0, 7))}.`)}`);
+    }
+    res.redirect(`/app/landlord-invoices/${id}`);
   });
 
   router.get('/:id(\\d+)', (req, res) => {
@@ -159,6 +166,18 @@ module.exports = function landlordInvoiceRoutes(db, mailer = { enabled: false })
 
   // ---------- settling ----------
 
+  // Taken off the landlord's rent: a fee on their statement for the month of `date`.
+  function deduct(a, inv, date) {
+    transaction(db, () => {
+      const txn = db.prepare(
+        `INSERT INTO transactions (account_id, txn_date, txn_type, landlord_id, property_id, description, amount_pence)
+         VALUES (?, ?, 'fee', ?, ?, ?, ?)`
+      ).run(a, date, inv.landlord_id, inv.property_id, `Invoice ${inv.invoice_number} — ${inv.description}`.slice(0, 200), inv.amount_pence);
+      db.prepare("UPDATE landlord_invoices SET status = 'paid', paid_date = ?, paid_how = 'Deducted from rent', txn_id = ? WHERE id = ? AND account_id = ?")
+        .run(date, Number(txn.lastInsertRowid), inv.id, a);
+    });
+  }
+
   router.post('/:id(\\d+)/settle', (req, res) => {
     const inv = load(req, res);
     if (!inv) return;
@@ -168,15 +187,7 @@ module.exports = function landlordInvoiceRoutes(db, mailer = { enabled: false })
     const date = String(req.body.date || '');
     if (!fmt.isIsoDate(date)) return back('Enter the date.');
     if (req.body.how === 'deduct') {
-      // Taken off their rent: a fee on their statement for that month.
-      transaction(db, () => {
-        const txn = db.prepare(
-          `INSERT INTO transactions (account_id, txn_date, txn_type, landlord_id, property_id, description, amount_pence)
-           VALUES (?, ?, 'fee', ?, ?, ?, ?)`
-        ).run(a, date, inv.landlord_id, inv.property_id, `Invoice ${inv.invoice_number} — ${inv.description}`.slice(0, 200), inv.amount_pence);
-        db.prepare("UPDATE landlord_invoices SET status = 'paid', paid_date = ?, paid_how = 'Deducted from rent', txn_id = ? WHERE id = ? AND account_id = ?")
-          .run(date, Number(txn.lastInsertRowid), inv.id, a);
-      });
+      deduct(a, inv, date);
       return back(`Deducted ${fmt.money(inv.amount_pence)} from ${inv.landlord_name}'s rent for ${st.monthLabel(date.slice(0, 7))}.`, true);
     }
     db.prepare("UPDATE landlord_invoices SET status = 'paid', paid_date = ?, paid_how = 'Paid by landlord' WHERE id = ? AND account_id = ?").run(date, inv.id, a);

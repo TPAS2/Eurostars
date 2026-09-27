@@ -60,7 +60,8 @@
       <textarea id="f-description" name="description" rows="3"><%= values.description || '' %></textarea>
     </div>
     <div class="form-actions wide">
-      <button class="btn primary" type="submit"><%= invoice ? 'Save changes' : 'Upload invoice' %></button>
+      <button class="btn primary" type="submit" name="then" value="save"><%= invoice ? 'Save changes' : 'Upload invoice' %></button>
+      <% if (!invoice) { %><button class="btn primary deduct-btn" type="submit" name="then" value="deduct" title="Records it as paid on the invoice date and takes it off the property's landlord's money for that month">Upload &amp; deduct from landlord</button><% } %>
       <a class="btn" href="<%= invoice ? '/app/invoices/' + invoice.id : '/app/invoices' %>">Cancel</a>
       <span class="save-status" aria-live="polite"></span>
     </div>
