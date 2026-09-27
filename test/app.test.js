@@ -210,7 +210,7 @@ test('full lettings workflow: landlord → property → tenant → rent → fee 
   assert.match(decodeURIComponent(r.location), /Raised 0 rent charges/);
 
   r = await c.get('/app');
-  assert.match(r.text, /£1,000\.00/, 'arrears shown on dashboard');
+  assert.doesNotMatch(r.text, /Arrears|Rent arrears/, 'no arrears on the dashboard');
 
   // Rent received: the landlord is inferred and a 10% fee is booked automatically.
   r = await c.post('/app/transactions', { txn_date: '2026-09-02', txn_type: 'rent_received', tenancy_id: tenancyId, amount_pence: '1000' });

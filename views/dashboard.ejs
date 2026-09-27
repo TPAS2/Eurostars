@@ -40,9 +40,8 @@
   <a class="tile" href="/app/landlords"><span class="label">Landlords</span><span class="value"><%= stats.landlords %></span><span class="sub"><%= stats.tenants %> tenants</span></a>
   <a class="tile" href="/app/tenants"><span class="label">Active tenancies</span><span class="value"><%= stats.activeTenancies %></span><span class="sub">&nbsp;</span></a>
   <a class="tile" href="/app/transactions"><span class="label">Rent received this month</span><span class="value"><%= fmt.money(stats.rentThisMonth) %></span><span class="sub">Client account <%= fmt.money(stats.clientBalance) %></span></a>
-  <div class="tile <%= stats.arrearsTotal > 0 ? 'alert' : '' %>"><span class="label">Arrears</span><span class="value"><%= fmt.money(stats.arrearsTotal) %></span><span class="sub"><%= arrears.length %> tenanc<%= arrears.length === 1 ? 'y' : 'ies' %></span></div>
   <a class="tile <%= stats.openJobs > 0 ? 'warn' : '' %>" href="/app/maintenance"><span class="label">Open maintenance</span><span class="value"><%= stats.openJobs %></span><span class="sub">&nbsp;</span></a>
-  <a class="tile <%= stats.overdueInvoices > 0 ? 'alert' : stats.unpaidInvoices > 0 ? 'warn' : '' %>" href="/app/invoices?status=unpaid"><span class="label">Unpaid invoices</span><span class="value"><%= fmt.money(stats.unpaidInvoicesTotal) %></span><span class="sub"><%= stats.unpaidInvoices %> unpaid · <%= stats.overdueInvoices %> overdue</span></a>
+  <a class="tile <%= stats.overdueInvoices > 0 ? 'alert' : stats.unpaidInvoices > 0 ? 'warn' : '' %>" href="/app/invoices?status=unpaid"><span class="label">Unpaid invoices</span><span class="value"><%= fmt.money(stats.unpaidInvoicesTotal) %></span><span class="sub"><%= stats.unpaidInvoices %> contractor invoice<%= stats.unpaidInvoices === 1 ? '' : 's' %></span></a>
 </section>
 
 <section class="card">
@@ -58,14 +57,6 @@
 </section>
 
 <div class="grid-2">
-  <section class="card">
-    <h2>Rent arrears</h2>
-    <% if (!arrears.length) { %><p class="muted">No arrears. Nice.</p><% } else { %>
-    <table><thead><tr><th>Property</th><th>Tenant</th><th class="num">Owed</th></tr></thead><tbody>
-    <% arrears.forEach(r => { %><tr><td><a href="/app/tenancies/<%= r.id %>"><%= r.address_line1 %></a></td><td><%= r.tenant_name %></td><td class="num neg"><%= fmt.money(r.owed) %></td></tr><% }) %>
-    </tbody></table><% } %>
-  </section>
-
   <section class="card">
     <h2>Coming up in 1–2 months</h2>
     <% if (!compliance.length) { %><p class="muted">Nothing else due in the next two months.</p><% } else { %>

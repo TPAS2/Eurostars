@@ -268,8 +268,6 @@ module.exports = function appRoutes(db) {
         "SELECT COALESCE(SUM(amount_pence),0) n FROM transactions WHERE account_id = ? AND txn_type = 'rent_received' AND substr(txn_date,1,7) = ?"
       ).get(a, today.slice(0, 7)).n,
     };
-    const arrears = ledger.arrears(db, a);
-    stats.arrearsTotal = arrears.reduce((s, r) => s + r.owed, 0);
     const compliance = db.prepare(
       `SELECT c.id, c.item_type, c.expiry_date, p.address_line1, p.id AS property_id
          FROM compliance_items c JOIN properties p ON p.id = c.property_id
@@ -305,7 +303,7 @@ module.exports = function appRoutes(db) {
         LIMIT 10`
     ).all(a);
     res.render('dashboard', {
-      title: 'Dashboard', section: 'dashboard', stats, arrears: arrears.slice(0, 10), compliance: comingUp, notifications, endingTenancies, jobs,
+      title: 'Dashboard', section: 'dashboard', stats, compliance: comingUp, notifications, endingTenancies, jobs,
       today, month: today.slice(0, 7), fmt, flash: req.query.flash || '',
     });
   });
