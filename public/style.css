@@ -572,3 +572,4 @@ details.fold > summary h2 { margin: 0; }
 details.fold > summary::after { content: '▾'; margin-left: auto; font-size: 1.1rem; color: var(--muted); transition: transform .15s; }
 details.fold:not([open]) > summary::after { transform: rotate(-90deg); }
 details.fold[open] > summary { margin-bottom: 12px; }
+.w-hours { width: 7em; }

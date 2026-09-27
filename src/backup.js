@@ -214,13 +214,16 @@ function backupPath(config, name) {
 }
 
 // Back up on a timer; skips a run if a recent enough backup already exists.
-// How often automatic backups run, in hours (0 = off). The admin sets it on the Backups page;
-// until then BACKUP_INTERVAL_HOURS applies.
-const INTERVAL_CHOICES = [0, 1, 6, 12, 24, 48, 168];
+// How often automatic backups run, in whole hours (0 = off, up to 30 days). The admin sets it on
+// the Backups page; until then BACKUP_INTERVAL_HOURS applies.
+const MAX_INTERVAL_HOURS = 720;
+function validInterval(n) {
+  return Number.isInteger(n) && n >= 0 && n <= MAX_INTERVAL_HOURS;
+}
 function intervalHours(db, config) {
   const row = db.prepare("SELECT value FROM app_settings WHERE key = 'backup_interval_hours'").get();
   const n = row ? Number(row.value) : NaN;
-  return INTERVAL_CHOICES.includes(n) ? n : config.backupIntervalHours;
+  return validInterval(n) ? n : config.backupIntervalHours;
 }
 function setIntervalHours(db, hours) {
   db.prepare("INSERT INTO app_settings (key, value) VALUES ('backup_interval_hours', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").run(String(hours));
@@ -245,4 +248,4 @@ function scheduleBackups(db, config, log = console.log) {
   setInterval(tick, 15 * 60 * 1000).unref();
 }
 
-module.exports = { INTERVAL_CHOICES, intervalHours, setIntervalHours, createBackup, listBackups, backupPath, scheduleBackups, writeTarGz, encryptFile, decryptFile, isEncrypted };
+module.exports = { MAX_INTERVAL_HOURS, validInterval, intervalHours, setIntervalHours, createBackup, listBackups, backupPath, scheduleBackups, writeTarGz, encryptFile, decryptFile, isEncrypted };

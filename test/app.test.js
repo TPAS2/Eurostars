@@ -2168,9 +2168,15 @@ test('admin can change how often automatic backups run', async () => {
   r = await admin.post('/admin/backups/frequency', { hours: '6' });
   assert.match(decodeURIComponent(r.location), /every 6 hours/);
   assert.equal(require('../src/backup').intervalHours(db, { backupIntervalHours: 24 }), 6);
-  assert.match((await admin.get('/admin/backups')).text, /<option value="6" selected>Every 6 hours/);
-  r = await admin.post('/admin/backups/frequency', { hours: '5' });
-  assert.match(decodeURIComponent(r.location), /Choose a backup frequency/);
+  assert.match((await admin.get('/admin/backups')).text, /name="hours"[^>]*value="6"/);
+  r = await admin.post('/admin/backups/frequency', { hours: '36' });
+  assert.match(decodeURIComponent(r.location), /every 36 hours/);
+  assert.equal(require('../src/backup').intervalHours(db, { backupIntervalHours: 24 }), 36);
+  for (const bad of ['1.5', '-2', '721', 'abc', '']) {
+    r = await admin.post('/admin/backups/frequency', { hours: bad });
+    assert.match(decodeURIComponent(r.location), /Enter a whole number of hours/, bad);
+  }
+  assert.equal(require('../src/backup').intervalHours(db, { backupIntervalHours: 24 }), 36);
   r = await admin.post('/admin/backups/frequency', { hours: '0' });
   assert.match(decodeURIComponent(r.location), /Automatic backups are off/);
   assert.equal(require('../src/backup').intervalHours(db, { backupIntervalHours: 24 }), 0);

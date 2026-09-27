@@ -18,7 +18,7 @@ const MIN_PASSWORD = 8;
 // Owner-only area: every user of the software, their usage and login history.
 // It deliberately shows usage counts, not the contents of agencies' records.
 function backupEvery(hours) {
-  return { 1: 'every hour', 24: 'every day', 48: 'every 2 days', 168: 'every week' }[hours] || `every ${hours} hours`;
+  return hours === 1 ? 'every hour' : `every ${hours} hours`;
 }
 
 module.exports = function adminRoutes(db, config) {
@@ -444,7 +444,7 @@ module.exports = function adminRoutes(db, config) {
   router.get('/backups', (req, res) => {
     res.render('admin/backups', {
       title: 'Backups', section: 'backups', backups: backup.listBackups(config), config, fmt,
-      intervalHours: backup.intervalHours(db, config), intervalChoices: backup.INTERVAL_CHOICES,
+      intervalHours: backup.intervalHours(db, config), maxInterval: backup.MAX_INTERVAL_HOURS,
       flash: req.query.flash || '', error: req.query.error || '',
     });
   });
@@ -457,8 +457,9 @@ module.exports = function adminRoutes(db, config) {
   });
 
   router.post('/backups/frequency', (req, res) => {
-    const hours = Number(req.body.hours);
-    if (!backup.INTERVAL_CHOICES.includes(hours)) return res.redirect('/admin/backups?error=' + encodeURIComponent('Choose a backup frequency from the list.'));
+    const raw = String(req.body.hours ?? '').trim();
+    const hours = /^\d+$/.test(raw) ? Number(raw) : NaN;
+    if (!backup.validInterval(hours)) return res.redirect('/admin/backups?error=' + encodeURIComponent(`Enter a whole number of hours from 1 to ${backup.MAX_INTERVAL_HOURS}, or 0 to turn automatic backups off.`));
     backup.setIntervalHours(db, hours);
     res.redirect('/admin/backups?flash=' + encodeURIComponent(hours ? `Automatic backups will now run ${backupEvery(hours)}.` : 'Automatic backups are off. Use "Back up now" to make one.'));
   });
