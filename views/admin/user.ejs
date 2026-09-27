@@ -48,13 +48,6 @@
       <label for="d-agency_name">Company name <span class="req">*</span></label>
       <input id="d-agency_name" name="agency_name" value="<%= u.agency_name %>" required>
     </div>
-    <% if (!u.is_admin) { %>
-    <div class="field">
-      <label for="d-username">Username <span class="req">*</span></label>
-      <input id="d-username" name="username" value="<%= u.username %>" required maxlength="30" autocomplete="off" autocapitalize="none" spellcheck="false">
-      <div class="help">What everyone at this company types as the username. Capitals count.</div>
-    </div>
-    <% } %>
     <div class="field">
       <label for="d-login_name">Contact's sign-in name <span class="req">*</span></label>
       <input id="d-login_name" name="login_name" value="<%= u.login_name || '' %>" required maxlength="30" autocomplete="off" autocapitalize="none" spellcheck="false"<%= u.is_admin ? ' readonly' : '' %>>

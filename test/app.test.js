@@ -2135,3 +2135,15 @@ test('the admin account picks up the Rift name instead of the old Nexus one', ()
   ensureAdmin(dbx, { ...cfg, appName: 'Rift' }, () => {});
   assert.equal(dbx.prepare('SELECT agency_name FROM users WHERE is_admin = 1').get().agency_name, 'Theo Lettings');
 });
+
+test('account details on the admin panel have no username box, and saving keeps the username', async () => {
+  await registerAndLogin('no-username-box@example.com', 'No Box Lets');
+  const co = db.prepare("SELECT * FROM users WHERE username = 'no-username-box'").get();
+  const admin = new Client();
+  await admin.login('admin', 'owner-password-123');
+  const r = await admin.get(`/admin/users/${co.id}`);
+  assert.doesNotMatch(r.text, /name="username"/);
+  const saved = await admin.post(`/admin/users/${co.id}/details`, { login_name: co.login_name, name: 'New Contact', agency_name: co.agency_name, email: co.email });
+  assert.match(decodeURIComponent(saved.location), /Account details saved/);
+  assert.deepEqual({ ...db.prepare('SELECT username, name FROM users WHERE id = ?').get(co.id) }, { username: 'no-username-box', name: 'New Contact' });
+});
