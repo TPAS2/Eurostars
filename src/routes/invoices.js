@@ -91,7 +91,8 @@ module.exports = function invoiceRoutes(db, config) {
     if (Number.isNaN(v.amount_pence) || v.amount_pence <= 0) errors.amount = 'Enter the invoice total, e.g. 180.00.';
     v.maintenance_job_id = null;
     v.property_id = null;
-    if (body.maintenance_job_id) {
+    const noJob = body.maintenance_job_id === 'none';
+    if (body.maintenance_job_id && !noJob) {
       const job = owned('maintenance_jobs', body.maintenance_job_id, accountId);
       if (!job) errors.maintenance_job_id = 'Choose a valid job.';
       else { v.maintenance_job_id = job.id; v.property_id = job.property_id; }
@@ -103,7 +104,7 @@ module.exports = function invoiceRoutes(db, config) {
     }
     // Every section of the form must be filled in.
     if (!v.invoice_date && !errors.invoice_date) errors.invoice_date = 'Enter the invoice date.';
-    if (!v.maintenance_job_id && !errors.maintenance_job_id) errors.maintenance_job_id = 'Choose the maintenance job.';
+    if (!v.maintenance_job_id && !noJob && !errors.maintenance_job_id) errors.maintenance_job_id = 'Choose the maintenance job, or None if there isn’t one.';
     if (!v.property_id && !errors.property_id) errors.property_id = 'Choose the property.';
     if (!v.description) errors.description = 'Add a note about this invoice.';
     return { v, errors };

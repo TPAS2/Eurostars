@@ -1928,3 +1928,33 @@ test('every section must be filled in when adding a contractor or landlord invoi
   assert.equal(r.status, 422);
   assert.match(r.text, /Choose the property[\s\S]*?Enter the due date[\s\S]*?Add notes for the invoice/);
 });
+
+test('contractor invoice job can be None; councils take several phone numbers and emails', async () => {
+  const c = await registerAndLogin('none-job@example.com', 'None Job Lets');
+  const prop = idFrom((await c.post('/app/properties', { address_line1: '1 No Job Road', status: 'vacant' })).location);
+  let r = await c.get('/app/invoices/new');
+  assert.match(r.text, /<option value="none" >None – no job<\/option>/);
+  const pdf = new File([Buffer.from('%PDF-1.4\n%x\n')], 'i.pdf');
+  r = await c.post('/app/invoices', { supplier: 'Key Cutters', amount: '12', invoice_date: '2026-09-02', maintenance_job_id: 'none', property_id: String(prop), description: 'Spare keys', file: pdf }, { multipart: true });
+  assert.equal(r.status, 302, r.text);
+  const inv = db.prepare('SELECT maintenance_job_id, property_id FROM invoices WHERE id = ?').get(idFrom(r.location));
+  assert.equal(inv.maintenance_job_id, null);
+  assert.equal(inv.property_id, prop);
+  // Leaving it on "Choose…" is still not allowed.
+  r = await c.post('/app/invoices', { supplier: 'Key Cutters', amount: '12', invoice_date: '2026-09-02', maintenance_job_id: '', property_id: String(prop), description: 'x', file: pdf }, { multipart: true });
+  assert.match(r.text, /Choose the maintenance job, or None/);
+  // Editing an invoice with no job shows None selected.
+  const keyInvoice = db.prepare("SELECT id FROM invoices WHERE supplier = 'Key Cutters'").get().id;
+  assert.match((await c.get(`/app/invoices/${keyInvoice}/edit`)).text, /<option value="none" selected>None – no job/);
+
+  // Councils: several phone numbers and emails.
+  r = await c.post('/app/councils', { name: 'Multi Council', council_tax_phone: '0113 222 4404\n0113 222 4405', council_tax_email: 'tax@multi.gov.uk, benefits@multi.gov.uk' });
+  const council = idFrom(r.location);
+  const row = db.prepare('SELECT council_tax_phone, council_tax_email FROM councils WHERE id = ?').get(council);
+  assert.equal(row.council_tax_phone, '0113 222 4404\n0113 222 4405');
+  assert.equal(row.council_tax_email, 'tax@multi.gov.uk\nbenefits@multi.gov.uk');
+  assert.match((await c.get(`/app/councils/${council}`)).text, /tax@multi\.gov\.uk\nbenefits@multi\.gov\.uk/);
+  r = await c.post('/app/councils', { name: 'Bad Council', council_tax_email: 'good@x.gov.uk\nnot-an-email' });
+  assert.equal(r.status, 422);
+  assert.match(r.text, /Check &#34;not-an-email&#34;: not a valid email address/);
+});

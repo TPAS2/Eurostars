@@ -71,6 +71,14 @@ module.exports = function appRoutes(db) {
       }
       const max = f.type === 'textarea' ? 10000 : 500;
       if (raw.length > max) { errors[f.name] = `${f.label} is too long.`; continue; }
+      // Several emails or phone numbers: one per line (commas and semicolons work too).
+      if (f.multi) {
+        const items = raw.split(/[\n,;]+/).map((x) => x.trim()).filter(Boolean);
+        const bad = f.multi === 'email' ? items.filter((x) => !EMAIL_RE.test(x)) : items.filter((x) => !/^[+\d][\d\s()+-]{5,}$/.test(x));
+        if (bad.length) errors[f.name] = `Check ${bad.map((b) => `"${b}"`).join(', ')}: ${f.multi === 'email' ? 'not a valid email address' : 'not a valid phone number'}.`;
+        values[f.name] = items.join('\n');
+        continue;
+      }
       switch (f.type) {
         case 'email':
           if (!EMAIL_RE.test(raw)) errors[f.name] = 'Enter a valid email address.';

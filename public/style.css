@@ -526,3 +526,6 @@ form.inline { display: inline-flex; margin: 0; }
 .bill-to { margin: 0 0 14px; }
 
 .btn.deduct-btn { background: var(--ok); border-color: var(--ok); color: #fff; }
+
+/* Several phone numbers / emails on a council: one per line. */
+table.list-councils td { white-space: pre-line; }

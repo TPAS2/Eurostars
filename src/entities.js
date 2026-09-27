@@ -72,8 +72,8 @@ const ENTITIES = {
     searchBar: true,
     fields: [
       { name: 'name', label: 'Council', type: 'text', required: true },
-      { name: 'council_tax_phone', label: 'Phone number', type: 'tel' },
-      { name: 'council_tax_email', label: 'Email', type: 'email' },
+      { name: 'council_tax_phone', label: 'Phone number', type: 'textarea', multi: 'tel', inline: true, help: 'Add as many as you need, one per line.' },
+      { name: 'council_tax_email', label: 'Email', type: 'textarea', multi: 'email', inline: true, help: 'Add as many as you need, one per line.' },
       { name: 'website', label: 'Website', type: 'text' },
       { name: 'notes', label: 'Notes', type: 'textarea', inline: true },
     ],

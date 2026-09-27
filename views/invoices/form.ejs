@@ -36,9 +36,10 @@
       <label for="f-job">Maintenance job <span class="req">*</span></label>
       <select id="f-job" name="maintenance_job_id" required>
         <option value="">Choose…</option>
+        <option value="none" <%= values.maintenance_job_id === 'none' || (invoice && !values.maintenance_job_id) ? 'selected' : '' %>>None – no job</option>
         <% jobs.forEach(j => { %><option value="<%= j.id %>" <%= Number(values.maintenance_job_id) === j.id ? 'selected' : '' %>><%= j.label %></option><% }) %>
       </select>
-      <div class="help">The property is taken from the job. <a href="/app/maintenance/new" target="_blank" rel="noopener">+ New maintenance job</a></div>
+      <div class="help">The property is taken from the job. Choose None if it isn’t for a logged repair. <a href="/app/maintenance/new" target="_blank" rel="noopener">+ New maintenance job</a></div>
       <% if (errors.maintenance_job_id) { %><div class="field-err"><%= errors.maintenance_job_id %></div><% } %>
     </div>
     <div class="field">
