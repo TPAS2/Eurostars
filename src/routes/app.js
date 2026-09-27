@@ -493,6 +493,18 @@ module.exports = function appRoutes(db) {
     let totalsRow = null;
     const maps = refLabelMaps(def, a);
     let tenantFilter = null;
+    if (def.key === 'landlords') {
+      // The councils their properties are in, one per line.
+      const byLandlord = new Map();
+      for (const r of db.prepare(
+        `SELECT DISTINCT p.landlord_id, c.name FROM properties p JOIN councils c ON c.id = p.council_id
+          WHERE p.account_id = ? AND p.landlord_id IS NOT NULL ORDER BY c.name COLLATE NOCASE`
+      ).all(a)) {
+        if (!byLandlord.has(r.landlord_id)) byLandlord.set(r.landlord_id, []);
+        byLandlord.get(r.landlord_id).push(r.name);
+      }
+      for (const row of rows) row.councils = { text: (byLandlord.get(row.id) || []).join('\n') };
+    }
     if (def.key === 'tenants') {
       // Each tenant with their current tenancy (or their latest one if none is current).
       const latest = new Map();
@@ -588,10 +600,8 @@ module.exports = function appRoutes(db) {
     const maps = refLabelMaps(def, a);
     const children = (def.children || []).map((c) => {
       const cdef = ENTITIES[c.entity];
-      let crows = db.prepare(`SELECT * FROM ${cdef.table} WHERE account_id = ? AND ${c.fk} = ? ORDER BY ${cdef.order} LIMIT 100`).all(a, row.id);
-      // On a property, gas, electrical and insurance have their own panel.
-      if (def.key === 'properties' && c.entity === 'compliance') crows = crows.filter((r) => !KEY_CERTS.some((k) => k.type === r.item_type));
-      return { def: cdef, fk: c.fk, rows: crows, maps: refLabelMaps(cdef, a), title: def.key === 'properties' && c.entity === 'compliance' ? 'Other compliance' : null };
+      const crows = db.prepare(`SELECT * FROM ${cdef.table} WHERE account_id = ? AND ${c.fk} = ? ORDER BY ${cdef.order} LIMIT 100`).all(a, row.id);
+      return { def: cdef, fk: c.fk, rows: crows, maps: refLabelMaps(cdef, a), title: null };
     });
     const certs = def.key === 'properties' ? keyCertificates(a, row.id) : null;
     let extra = null;

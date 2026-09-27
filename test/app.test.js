@@ -733,8 +733,8 @@ test('property certificates: gas, electrical and insurance with current, previou
   assert.match(box('Electrical certificate'), /cert-badge-expired[\s\S]*Sparks Ltd/);
   assert.match(box('Insurance'), /cert-badge-expiring[\s\S]*Homelet[\s\S]*POL-77/);
   assert.match(box('Insurance'), /Added<\/dt><dd>\d{2}\/\d{2}\/\d{4}/);
-  // The three key types aren't repeated in the "Other compliance" list.
-  assert.doesNotMatch(r.text.split('id="certificates"')[1].split('</section>').slice(1).join(''), /New Gas Co/);
+  // There's no separate "Other compliance" list on a property any more.
+  assert.doesNotMatch(r.text, /Other compliance/);
 });
 
 test('dashboard notifications list certificates expiring within a month', async () => {
@@ -2001,8 +2001,8 @@ test('Tenants and Tenancies are one tab', async () => {
   assert.equal((await c.get('/app/tenancies')).location, '/app/tenants');
 
   r = await c.get('/app/tenants');
-  assert.match(r.text, /<th[^>]*>Property<\/th>\s*<th[^>]*>Council<\/th>\s*<th[^>]*>Rent<\/th>\s*<th[^>]*>Tenancy<\/th>\s*<th[^>]*>Status<\/th>/);
-  assert.match(r.text, new RegExp(`Current Carol[\\s\\S]*?5 Joined Road[\\s\\S]*?Merge Council[\\s\\S]*?£950\\.00 pcm[\\s\\S]*?href="/app/tenancies/${tenancy}">01/08/2026 – ongoing[\\s\\S]*?badge s-active">active`));
+  assert.match(r.text, /<th[^>]*>Property<\/th>\s*<th[^>]*>Rent<\/th>\s*<th[^>]*>Tenancy<\/th>\s*<th[^>]*>Status<\/th>\s*<th[^>]*>Phone<\/th>\s*<th[^>]*>Council<\/th>/);
+  assert.match(r.text, new RegExp(`Current Carol[\\s\\S]*?5 Joined Road[\\s\\S]*?£950\\.00 pcm[\\s\\S]*?href="/app/tenancies/${tenancy}">01/08/2026 – ongoing[\\s\\S]*?badge s-active">active[\\s\\S]*?Merge Council`));
   assert.match(r.text, /Waiting Wendy[\s\S]*?No tenancy yet/);
   assert.doesNotMatch(r.text, /Past Pete/, 'current tenants by default');
   r = await c.get('/app/tenants?show=past');
@@ -2062,4 +2062,17 @@ test('maintenance jobs: upload photos and files, view, download, remove', async 
   // Deleting the job removes its files.
   await c.post(`/app/maintenance/${job}/delete`, {});
   assert.equal(db.prepare('SELECT COUNT(*) n FROM maintenance_files WHERE job_id = ?').get(job).n, 0);
+});
+
+test('landlords list shows their councils to the right of phone', async () => {
+  const c = await registerAndLogin('ll-councils@example.com', 'LL Councils Lets');
+  const leeds = idFrom((await c.post('/app/councils', { name: 'Leeds City Council' })).location);
+  const york = idFrom((await c.post('/app/councils', { name: 'York Council' })).location);
+  const ll = idFrom((await c.post('/app/landlords', { name: 'Two Council Tom', phone: '07700 900001' })).location);
+  await c.post('/app/properties', { address_line1: 'A1', landlord_id: String(ll), council_id: String(leeds), status: 'let' });
+  await c.post('/app/properties', { address_line1: 'A2', landlord_id: String(ll), council_id: String(york), status: 'let' });
+  await c.post('/app/properties', { address_line1: 'A3', landlord_id: String(ll), council_id: String(leeds), status: 'let' });
+  const r = await c.get('/app/landlords');
+  assert.match(r.text, /<th[^>]*>Phone<\/th>\s*<th[^>]*>Councils<\/th>/);
+  assert.match(r.text, /07700 900001[\s\S]*?<span class="cell-text">Leeds City Council\nYork Council<\/span>/);
 });

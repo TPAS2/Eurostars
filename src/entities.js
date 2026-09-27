@@ -26,7 +26,8 @@ const ENTITIES = {
       { name: 'address', label: 'Correspondence address', type: 'textarea', inline: true, startRow: true },
       { name: 'notes', label: 'Notes', type: 'textarea', inline: true },
     ],
-    columns: ['name', 'code', 'statement_type', 'email', 'phone'],
+    columns: ['name', 'code', 'statement_type', 'email', 'phone', 'councils'],
+    computed: { councils: { label: 'Councils' } },
     children: [
       { entity: 'properties', fk: 'landlord_id' },
       { entity: 'transactions', fk: 'landlord_id' },
@@ -57,7 +58,6 @@ const ENTITIES = {
     columns: ['address_line1', 'council_id', 'town', 'landlord_id', 'status'],
     children: [
       { entity: 'tenancies', fk: 'property_id' },
-      { entity: 'compliance', fk: 'property_id' },
       { entity: 'maintenance', fk: 'property_id' },
       { entity: 'transactions', fk: 'property_id' },
     ],
@@ -95,7 +95,7 @@ const ENTITIES = {
       { name: 'phone', label: 'Phone', type: 'tel' },
       { name: 'notes', label: 'Notes', type: 'textarea' },
     ],
-    columns: ['name', 'cur_property', 'cur_council', 'cur_rent', 'cur_term', 'cur_status', 'phone'],
+    columns: ['name', 'cur_property', 'cur_rent', 'cur_term', 'cur_status', 'phone', 'cur_council'],
     computed: {
       cur_property: { label: 'Property' }, cur_council: { label: 'Council' }, cur_rent: { label: 'Rent' },
       cur_term: { label: 'Tenancy' }, cur_status: { label: 'Status' },
