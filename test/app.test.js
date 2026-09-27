@@ -2199,3 +2199,37 @@ test('signing in plays the welcome animation once, on the first page', async () 
   r = await c.get('/admin');
   assert.doesNotMatch(r.text, /data-intro/);
 });
+
+test('several accounts can share one email address', async () => {
+  await registerAndLogin('shared@example.com', 'First Shared Lets');
+  const c = new Client();
+  const r = await c.post('/register', { username: 'shared-two', name: 'Test User', agency_name: 'Second Shared Lets', email: 'shared@example.com', password: 'password-1234', password_confirm: 'password-1234' });
+  assert.equal(r.status, 302, r.text);
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM users WHERE email = 'shared@example.com'").get().n, 2);
+
+  // The admin can give another account the same email too.
+  const admin = new Client();
+  await admin.login('admin', 'owner-password-123');
+  const other = await registerAndLogin('someone-else@example.com', 'Third Shared Lets');
+  const third = db.prepare("SELECT * FROM users WHERE username = 'someone-else'").get();
+  const saved = await admin.post(`/admin/users/${third.id}/details`, { login_name: third.login_name, name: third.name, agency_name: third.agency_name, email: 'SHARED@example.com' });
+  assert.match(decodeURIComponent(saved.location), /Account details saved/);
+  assert.ok(other);
+});
+
+test('older databases with one-email-per-account are converted, keeping every row', () => {
+  const { DatabaseSync } = require('node:sqlite');
+  const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'rift-email-')), 'old.db');
+  const old = new DatabaseSync(file);
+  old.exec(`CREATE TABLE users (id INTEGER PRIMARY KEY, username TEXT NOT NULL UNIQUE COLLATE NOCASE, email TEXT UNIQUE COLLATE NOCASE,
+    name TEXT NOT NULL, agency_name TEXT NOT NULL, password_hash TEXT NOT NULL, is_admin INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'active', created_at TEXT NOT NULL DEFAULT (datetime('now')), last_login_at TEXT, login_count INTEGER NOT NULL DEFAULT 0)`);
+  old.prepare("INSERT INTO users (username, email, name, agency_name, password_hash) VALUES ('oldco', 'a@b.com', 'Old', 'Old Co', 'x')").run();
+  old.close();
+  const migrated = openDatabase(file);
+  assert.equal(migrated.prepare("SELECT username FROM users WHERE email = 'a@b.com'").get().username, 'oldco');
+  migrated.prepare("INSERT INTO users (username, email, name, agency_name, password_hash) VALUES ('newco', 'A@b.com', 'New', 'New Co', 'x')").run();
+  assert.equal(migrated.prepare("SELECT COUNT(*) AS n FROM users WHERE email = 'a@b.com'").get().n, 2);
+  assert.throws(() => migrated.prepare("INSERT INTO users (username, name, agency_name, password_hash) VALUES ('OLDCO', 'Dup', 'Dup', 'x')").run(), /UNIQUE/);
+  migrated.close();
+});

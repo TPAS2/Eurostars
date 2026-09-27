@@ -62,7 +62,7 @@ function loadConfig(env = process.env) {
 function ensureAdmin(db, config, log = console.log) {
   // Usernames are unique ignoring case; the stored case is updated to match ADMIN_USERNAME.
   const byUsername = db.prepare('SELECT id, username FROM users WHERE username = ? COLLATE NOCASE AND company_id IS NULL').get(config.adminUsername);
-  const byEmail = config.adminEmail ? db.prepare('SELECT id, username FROM users WHERE email = ?').get(config.adminEmail) : null;
+  const byEmail = config.adminEmail ? db.prepare('SELECT id, username FROM users WHERE email = ? AND company_id IS NULL ORDER BY is_admin DESC, id').get(config.adminEmail) : null;
   let admin = byUsername || byEmail;
   if (config.adminPassword && config.adminPassword.length < 6) throw new Error('ADMIN_PASSWORD must be at least 6 characters.');
   if (config.adminPassword && config.adminPassword.length < 10) {

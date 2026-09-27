@@ -10,7 +10,7 @@ PRAGMA foreign_keys = ON;
 CREATE TABLE IF NOT EXISTS users (
   id              INTEGER PRIMARY KEY,
   username        TEXT NOT NULL UNIQUE COLLATE NOCASE,
-  email           TEXT UNIQUE COLLATE NOCASE,          -- optional contact address
+  email           TEXT COLLATE NOCASE,                 -- optional contact address (several accounts may share one)
   name            TEXT NOT NULL,
   agency_name     TEXT NOT NULL,
   password_hash   TEXT NOT NULL,
@@ -383,6 +383,7 @@ function openDatabase(file) {
   for (const inv of db.prepare('SELECT id, account_id, supplier FROM invoices WHERE contractor_id IS NULL AND trim(supplier) != \'\'').all()) {
     db.prepare('UPDATE invoices SET contractor_id = ? WHERE id = ?').run(contractorFor(db, inv.account_id, inv.supplier), inv.id);
   }
+  allowSharedEmails(db);
   return db;
 }
 
@@ -447,6 +448,24 @@ function migrateUsersToUsernames(db) {
     }
     db.exec('DROP TABLE users');
     db.exec('ALTER TABLE users_new RENAME TO users');
+  });
+  db.exec('PRAGMA foreign_keys = ON');
+}
+
+// Emails used to be unique per account; now several accounts may share one. SQLite can't
+// drop a column constraint, so the users table is rebuilt (same columns and rows) once.
+function allowSharedEmails(db) {
+  const row = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'users'").get();
+  if (!row || !/\bemail\s+TEXT\s+UNIQUE\b/i.test(row.sql)) return;
+  const cols = db.prepare("SELECT name FROM pragma_table_info('users')").all().map((c) => `"${c.name}"`).join(', ');
+  const indexes = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'index' AND tbl_name = 'users' AND sql IS NOT NULL").all();
+  db.exec('PRAGMA foreign_keys = OFF');
+  transaction(db, () => {
+    db.exec(row.sql.replace(/CREATE TABLE\s+("?users"?)/i, 'CREATE TABLE users_new').replace(/\bemail\s+TEXT\s+UNIQUE\b/i, 'email TEXT'));
+    db.exec(`INSERT INTO users_new (${cols}) SELECT ${cols} FROM users`);
+    db.exec('DROP TABLE users');
+    db.exec('ALTER TABLE users_new RENAME TO users');
+    for (const ix of indexes) db.exec(ix.sql);
   });
   db.exec('PRAGMA foreign_keys = ON');
 }

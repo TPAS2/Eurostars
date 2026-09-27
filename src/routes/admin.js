@@ -123,7 +123,6 @@ module.exports = function adminRoutes(db, config) {
       || db.prepare('SELECT 1 FROM users WHERE username = ? COLLATE NOCASE').get(values.username)) errors.username = 'That username is taken.';
     if (!LOGIN_NAME_RE.test(values.login_name)) errors.login_name = 'Use 1–30 letters, numbers, dashes or underscores (no spaces or dots).';
     if (values.email && !EMAIL_RE.test(values.email)) errors.email = 'Enter a valid email address, or leave it blank.';
-    else if (values.email && db.prepare('SELECT 1 FROM users WHERE email = ?').get(values.email)) errors.email = 'Another account uses this email.';
     if (password.length < MIN_PASSWORD) errors.password = `Use at least ${MIN_PASSWORD} characters.`;
     if (password.length > 200) errors.password = 'Password is too long.';
     if (Object.keys(errors).length) {
@@ -161,7 +160,6 @@ module.exports = function adminRoutes(db, config) {
     else if (!values.name) error = 'Enter the contact name.';
     else if (!values.agency_name) error = 'Enter the company name.';
     else if (values.email && !EMAIL_RE.test(values.email)) error = 'Enter a valid email address, or leave it blank.';
-    else if (values.email && db.prepare('SELECT 1 FROM users WHERE email = ? AND id != ?').get(values.email, u.id)) error = 'Another account already uses this email.';
     // A new password, if one was typed (blank keeps the current one).
     const password = String(req.body.password || '');
     if (!error && password && (password.length < MIN_PASSWORD || password.length > 200)) error = `The new password must be at least ${MIN_PASSWORD} characters.`;

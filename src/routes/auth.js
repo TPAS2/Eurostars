@@ -170,8 +170,7 @@ module.exports = function authRoutes(db, config) {
     if (!values.name) errors.name = 'Enter your name.';
     if (!values.agency_name) errors.agency_name = 'Enter your agency or business name.';
     if (values.email && !EMAIL_RE.test(values.email)) errors.email = 'Enter a valid email address, or leave it blank.';
-    else if (values.email && ((config.adminEmail && values.email === config.adminEmail)
-      || db.prepare('SELECT 1 FROM users WHERE email = ?').get(values.email))) {
+    else if (values.email && config.adminEmail && values.email.toLowerCase() === config.adminEmail.toLowerCase()) {
       errors.email = 'An account with this email already exists.';
     }
     if (password.length < 10) errors.password = 'Use at least 10 characters.';
