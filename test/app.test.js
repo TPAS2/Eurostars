@@ -1970,7 +1970,7 @@ test('contractor invoices: unpaid and paid boxes for the chosen month either sid
   await c.post(`/app/invoices/${paid}/pay`, { paid_date: '2026-08-10', payment_method: 'Card' });
   const r = await c.get('/app/invoices?month=2026-08');
   const labels = [...r.text.matchAll(/<span class="label">([^<]+)<\/span><span class="value">([^<]+)</g)].map((m) => `${m[1]}=${m[2]}`);
-  assert.deepEqual(labels, ['Unpaid · August 2026=£40.00', 'Unpaid · all months=£47.00', 'Overdue · all months=£0.00', 'Paid · August 2026=£100.00']);
+  assert.deepEqual(labels, ['Unpaid · August 2026=£40.00', 'Unpaid · all months=£47.00', 'Paid · August 2026=£100.00']);
   assert.doesNotMatch((await c.get('/app/invoices?month=all')).text, /Paid · /, 'no month boxes when showing all months');
 });
 

@@ -12,14 +12,13 @@
 <section class="tiles">
   <% const plural = (n) => `${n} invoice${n === 1 ? '' : 's'}`; %>
   <% if (monthTotals) { %><a class="tile <%= monthTotals.unpaid_n ? 'warn' : '' %>" href="/app/invoices?month=<%= month %>&status=unpaid"><span class="label">Unpaid · <%= monthLabel %></span><span class="value"><%= fmt.money(monthTotals.unpaid) %></span><span class="sub"><%= plural(monthTotals.unpaid_n) %></span></a><% } %>
-  <a class="tile <%= totals.unpaid_n ? 'warn' : '' %>" href="/app/invoices?status=unpaid&month=all"><span class="label">Unpaid · all months</span><span class="value"><%= fmt.money(totals.unpaid) %></span><span class="sub"><%= plural(totals.unpaid_n) %></span></a>
-  <a class="tile <%= totals.overdue_n ? 'alert' : '' %>" href="/app/invoices?status=overdue&month=all"><span class="label">Overdue · all months</span><span class="value"><%= fmt.money(totals.overdue) %></span><span class="sub"><%= plural(totals.overdue_n) %></span></a>
+  <a class="tile <%= totals.unpaid_n ? 'warn' : '' %>" href="/app/invoices?status=unpaid&month=all"><span class="label">Unpaid · all months</span><span class="value"><%= fmt.money(totals.unpaid) %></span><span class="sub"><%= plural(totals.unpaid_n) %><%= totals.overdue_n ? ` · ${fmt.money(totals.overdue)} past due` : '' %></span></a>
   <% if (monthTotals) { %><a class="tile ok" href="/app/invoices?month=<%= month %>&status=paid"><span class="label">Paid · <%= monthLabel %></span><span class="value"><%= fmt.money(monthTotals.paid) %></span><span class="sub"><%= plural(monthTotals.paid_n) %></span></a><% } %>
 </section>
 
 <section class="card">
   <nav class="tabs">
-    <% [['all', 'All'], ['unpaid', 'Unpaid'], ['overdue', 'Overdue'], ['paid', 'Paid']].forEach(([k, label]) => { %>
+    <% [['all', 'All'], ['unpaid', 'Unpaid'], ['paid', 'Paid']].forEach(([k, label]) => { %>
       <a href="/app/invoices?<%= new URLSearchParams(Object.assign({ month }, k === 'all' ? {} : { status: k })) %>" class="<%= status === k ? 'active' : '' %>"><%= label %></a>
     <% }) %>
   </nav>
