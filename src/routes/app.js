@@ -302,9 +302,8 @@ module.exports = function appRoutes(db) {
         ORDER BY CASE m.priority WHEN 'emergency' THEN 0 WHEN 'high' THEN 1 WHEN 'normal' THEN 2 ELSE 3 END, m.reported_date
         LIMIT 10`
     ).all(a);
-    const rentRun = (req.user.hidden_tabs || []).includes('rentrun') ? null : require('../monthend').rentRunReminder(db, a, today);
     res.render('dashboard', {
-      title: 'Dashboard', section: 'dashboard', stats, compliance: comingUp, notifications, endingTenancies, jobs, rentRun,
+      title: 'Dashboard', section: 'dashboard', stats, compliance: comingUp, notifications, endingTenancies, jobs,
       today, month: today.slice(0, 7), fmt, flash: req.query.flash || '',
     });
   });

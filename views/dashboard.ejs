@@ -11,7 +11,6 @@
   </div>
 </header>
 <% if (flash) { %><div class="notice ok"><%= flash %></div><% } %>
-<%- include('partials/rent-run-reminder', { rentRun, link: true }) %>
 
 <section class="card notifications <%= notifications.length ? 'has-items' : '' %>" id="notifications">
   <div class="card-head">

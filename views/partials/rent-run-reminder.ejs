@@ -1,9 +1,0 @@
-<%# locals: rentRun (from monthend.rentRunReminder), link (bool) %>
-<% if (rentRun) { %>
-<div class="notice <%= rentRun.dueToday ? 'warn' : 'err' %> rent-run-reminder" role="status">
-  <strong><%= rentRun.dueToday ? 'The rent run is due today' : 'The rent run was due on the 19th' %></strong>
-  for <%= rentRun.monthLabel %>:
-  <%= !rentRun.calculated ? 'rents not calculated yet' : `${rentRun.notEmailed} landlord statement${rentRun.notEmailed === 1 ? '' : 's'} still to email` %>.
-  <% if (link) { %><a href="/app/rent-run?month=<%= rentRun.month %>">Go to the rent run</a><% } %>
-</div>
-<% } %>

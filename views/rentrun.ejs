@@ -11,7 +11,6 @@
 </header>
 <% if (flash) { %><div class="notice ok"><%= flash %></div><% } %>
 <% if (error) { %><div class="notice err"><%= error %></div><% } %>
-<%- include('partials/rent-run-reminder', { rentRun, link: rentRun && rentRun.month !== month }) %>
 <% const byEmail = rows.filter(r => r.statement_type !== 'Cheque'); const byCheque = rows.length - byEmail.length; const withEmail = byEmail.filter(r => r.email).length; const emailed = rows.filter(r => r.emailed_at).length; const generated = rows.filter(r => r.id).length; %>
 
 <section class="card" id="month-end">
