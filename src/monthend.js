@@ -5,7 +5,7 @@
 // statement pages always show the same figures.
 
 const fmt = require('./format');
-const { monthLabel } = require('./statements');
+const { monthLabel, previousMonth } = require('./statements');
 
 const pounds = (pence) => (Number(pence || 0) / 100).toFixed(2);
 
@@ -144,4 +144,24 @@ function reportEmail({ agencyName, report }) {
   return { subject, text, html, filename: `statements-${report.month}.csv` };
 }
 
-module.exports = { statementsReport, reportCsv, statementEmail, reportEmail, csvCell };
+// The rent run is done on the 19th, for the month just gone. From the 19th, remind people
+// until every statement is calculated and every Email landlord (with an address) has been sent theirs.
+const RENT_RUN_DAY = 19;
+function rentRunReminder(db, accountId, today = fmt.today()) {
+  const day = Number(today.slice(8, 10));
+  if (day < RENT_RUN_DAY) return null;
+  const month = previousMonth(today);
+  const rows = db.prepare(
+    `SELECT l.statement_type, l.email, s.id, s.emailed_at FROM landlords l
+       LEFT JOIN monthly_statements s ON s.landlord_id = l.id AND s.account_id = l.account_id AND s.month = ?
+      WHERE l.account_id = ?`
+  ).all(month, accountId);
+  if (!rows.length) return null;
+  const calculated = rows.every((r) => r.id);
+  const toEmail = rows.filter((r) => r.statement_type !== 'Cheque' && r.email);
+  const notEmailed = toEmail.filter((r) => !r.emailed_at).length;
+  if (calculated && !notEmailed) return null;
+  return { month, monthLabel: monthLabel(month), dueToday: day === RENT_RUN_DAY, calculated, notEmailed };
+}
+
+module.exports = { RENT_RUN_DAY, rentRunReminder, statementsReport, reportCsv, statementEmail, reportEmail, csvCell };

@@ -2292,3 +2292,22 @@ test('properties list columns: Property name, Council, Landlord, Tenant, Status'
   assert.deepEqual(heads.slice(0, 5), ['Property name', 'Council', 'Landlord', 'Tenant', 'Status']);
   assert.match(r.text, /3 Column Close[\s\S]*Col Council[\s\S]*Col Landlord[\s\S]*Cora Tenant/);
 });
+
+test('rent run reminder from the 19th until statements are calculated and emailed', async () => {
+  const { rentRunReminder } = require('../src/monthend');
+  const c = await registerAndLogin('rent-19th@example.com', 'Nineteenth Lets');
+  const co = db.prepare("SELECT id FROM users WHERE username = 'rent-19th'").get();
+  assert.equal(rentRunReminder(db, co.id, '2026-09-19'), null, 'no landlords, no reminder');
+  const r = await c.post('/app/landlords', { name: 'Rem Landlord', email: 'rem@example.com', statement_type: 'Email' });
+  const lid = idFrom(r.location);
+  assert.equal(rentRunReminder(db, co.id, '2026-09-18'), null, 'nothing before the 19th');
+  let rem = rentRunReminder(db, co.id, '2026-09-19');
+  assert.deepEqual({ month: rem.month, dueToday: rem.dueToday, calculated: rem.calculated }, { month: '2026-08', dueToday: true, calculated: false });
+  assert.equal(rentRunReminder(db, co.id, '2026-09-25').dueToday, false);
+  await c.post('/app/monthly/calculate', { month: '2026-08' });
+  rem = rentRunReminder(db, co.id, '2026-09-20');
+  assert.equal(rem.calculated, true);
+  assert.equal(rem.notEmailed, 1);
+  db.prepare("UPDATE monthly_statements SET emailed_at = datetime('now') WHERE account_id = ? AND landlord_id = ?").run(co.id, lid);
+  assert.equal(rentRunReminder(db, co.id, '2026-09-20'), null, 'done: no reminder');
+});

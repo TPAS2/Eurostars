@@ -64,6 +64,7 @@ module.exports = function monthlyRoutes(db, writer, mailer = { enabled: false })
     const template = db.prepare('SELECT filename, uploaded_at FROM payment_templates WHERE account_id = ?').get(a) || null;
     res.render('rentrun', {
       title: 'Rent run', section: 'rentrun', month, monthLabel: st.monthLabel(month), rows, template,
+      rentRun: require('../monthend').rentRunReminder(db, a),
       emailEnabled: mailer.enabled, reportTo: (me && me.email) || '', fmt,
       flash: String(req.query.flash || '').slice(0, 1000), error: String(req.query.error || '').slice(0, 1000),
     });
