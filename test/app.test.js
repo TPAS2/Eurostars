@@ -2292,3 +2292,36 @@ test('properties list columns: Property name, Council, Landlord, Tenant, Status'
   assert.deepEqual(heads.slice(0, 5), ['Property name', 'Council', 'Landlord', 'Tenant', 'Status']);
   assert.match(r.text, /3 Column Close[\s\S]*Col Council[\s\S]*Col Landlord[\s\S]*Cora Tenant/);
 });
+
+test('rent run: Edit sender changes who statement emails come from', async () => {
+  const sentMail = [];
+  const c = await registerAndLogin('sender-edit@example.com', 'Sender Edit Lets');
+  const co = db.prepare("SELECT id FROM users WHERE username = 'sender-edit'").get();
+  let r = await c.get('/app/rent-run?month=2026-08');
+  assert.match(r.text, /Email all landlords<\/button>\s*<\/form>\s*<button class="btn" type="button" data-toggle="#sender-settings"[^>]*>Edit sender/);
+  r = await c.post('/app/monthly/email/settings', { month: '2026-08', from_email: 'not-an-email', from_name: '', reply_to: '' });
+  assert.match(decodeURIComponent(r.location.replace(/\+/g, ' ')), /isn’t a valid email/);
+  r = await c.post('/app/monthly/email/settings', { month: '2026-08', from_email: 'statements@agency.example', from_name: 'Sender Edit Team', reply_to: 'office@gmail.com' });
+  assert.match(decodeURIComponent(r.location.replace(/\+/g, ' ')), /Saved who statement emails come from/);
+  const row = db.prepare('SELECT statement_from_email, statement_from_name, statement_reply_to FROM users WHERE id = ?').get(co.id);
+  assert.deepEqual({ ...row }, { statement_from_email: 'statements@agency.example', statement_from_name: 'Sender Edit Team', statement_reply_to: 'office@gmail.com' });
+  r = await c.get('/app/rent-run?month=2026-08');
+  assert.match(r.text, /From: <strong>Sender Edit Team<\/strong> &lt;statements@agency\.example&gt; · replies to office@gmail\.com/);
+  assert.ok(sentMail);
+});
+
+test('mailer uses the chosen From address when one is given', async () => {
+  const { createMailer } = require('../src/mailer');
+  const calls = [];
+  const realFetch = global.fetch;
+  global.fetch = async (url, opts) => { calls.push(JSON.parse(opts.body)); return { ok: true, json: async () => ({}) }; };
+  try {
+    const m = createMailer({ resendApiKey: 'test-key', emailFrom: 'default@verified.example' });
+    await m.send({ to: 'a@b.com', subject: 'S', text: 't', fromName: 'Agency', from: 'statements@verified.example', replyTo: 'office@gmail.com' });
+    await m.send({ to: 'a@b.com', subject: 'S', text: 't', fromName: 'Agency' });
+    assert.equal(calls[0].from, '"Agency" <statements@verified.example>');
+    assert.equal(calls[0].reply_to, 'office@gmail.com');
+    assert.equal(calls[1].from, '"Agency" <default@verified.example>');
+    assert.equal(m.defaultFrom, 'default@verified.example');
+  } finally { global.fetch = realFetch; }
+});

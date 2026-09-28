@@ -520,3 +520,16 @@ document.addEventListener('click', (e) => {
   document.addEventListener('DOMContentLoaded', openTarget);
   window.addEventListener('hashchange', openTarget);
 })();
+
+// A button with data-toggle="#id" shows and hides that element.
+(function () {
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-toggle]');
+    if (!btn) return;
+    const el = document.querySelector(btn.getAttribute('data-toggle'));
+    if (!el) return;
+    el.hidden = !el.hidden;
+    btn.setAttribute('aria-expanded', String(!el.hidden));
+    if (!el.hidden) { const f = el.querySelector('input:not([type=hidden])'); if (f) f.focus(); }
+  });
+})();

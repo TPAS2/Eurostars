@@ -50,6 +50,30 @@ module.exports = function monthlyRoutes(db, writer, mailer = { enabled: false })
   // ---------- month end ----------
 
   // The Rent run page (mounted at /app/rent-run): the month-end buttons and each landlord's status.
+  // Who a company's rent run emails come from: its own settings, else the defaults.
+  function senderFor(accountId) {
+    const c = db.prepare('SELECT agency_name, email, statement_from_email, statement_from_name, statement_reply_to FROM users WHERE id = ?').get(accountId);
+    return {
+      from: c.statement_from_email || '',
+      fromName: c.statement_from_name || c.agency_name,
+      replyTo: c.statement_reply_to || c.email || '',
+      saved: { from: c.statement_from_email || '', name: c.statement_from_name || '', replyTo: c.statement_reply_to || '' },
+      defaults: { from: mailer.defaultFrom || '', name: c.agency_name, replyTo: c.email || '' },
+    };
+  }
+
+  router.post('/email/settings', (req, res) => {
+    const month = st.isMonth(req.body.month) ? String(req.body.month) : st.previousMonth();
+    const from = String(req.body.from_email || '').trim().slice(0, 254);
+    const name = String(req.body.from_name || '').replace(/[\r\n]+/g, ' ').trim().slice(0, 80);
+    const replyTo = String(req.body.reply_to || '').trim().slice(0, 254);
+    if (from && !isEmail(from)) return backTo(res, month, { error: 'The “Send from” address isn’t a valid email address.' });
+    if (replyTo && !isEmail(replyTo)) return backTo(res, month, { error: 'The “Replies go to” address isn’t a valid email address.' });
+    db.prepare('UPDATE users SET statement_from_email = ?, statement_from_name = ?, statement_reply_to = ? WHERE id = ?')
+      .run(from || null, name || null, replyTo || null, req.user.id);
+    backTo(res, month, { flash: 'Saved who statement emails come from.' });
+  });
+
   router.runPage = (req, res) => {
     const a = req.user.id;
     const month = st.isMonth(req.query.month) ? String(req.query.month) : st.previousMonth();
@@ -64,7 +88,7 @@ module.exports = function monthlyRoutes(db, writer, mailer = { enabled: false })
     const template = db.prepare('SELECT filename, uploaded_at FROM payment_templates WHERE account_id = ?').get(a) || null;
     res.render('rentrun', {
       title: 'Rent run', section: 'rentrun', month, monthLabel: st.monthLabel(month), rows, template,
-      emailEnabled: mailer.enabled, reportTo: (me && me.email) || '', fmt,
+      emailEnabled: mailer.enabled, reportTo: (me && me.email) || '', sender: senderFor(a), fmt,
       flash: String(req.query.flash || '').slice(0, 1000), error: String(req.query.error || '').slice(0, 1000),
     });
   };
@@ -101,6 +125,7 @@ module.exports = function monthlyRoutes(db, writer, mailer = { enabled: false })
       .all(...(one ? [a, one] : [a]));
     if (one && !landlords.length) return backTo(res, month, { error: 'Landlord not found.' });
     const agency = db.prepare('SELECT agency_name, email FROM users WHERE id = ?').get(a);
+    const sender = senderFor(a);
 
     const sent = [];
     const noEmail = [];
@@ -119,7 +144,7 @@ module.exports = function monthlyRoutes(db, writer, mailer = { enabled: false })
       }
       const email = monthend.statementEmail({ agencyName: agency.agency_name, statement: s, landlordName: l.name });
       try {
-        await mailer.send({ to: l.email, ...email, fromName: agency.agency_name, replyTo: agency.email });
+        await mailer.send({ to: l.email, ...email, from: sender.from, fromName: sender.fromName, replyTo: sender.replyTo });
         db.prepare("UPDATE monthly_statements SET emailed_at = datetime('now'), emailed_to = ? WHERE id = ?").run(l.email, s.id);
         sent.push(l.name);
       } catch (err) {
@@ -173,9 +198,10 @@ module.exports = function monthlyRoutes(db, writer, mailer = { enabled: false })
     if (!report.landlords.length) return back({ error: `There are no statements for ${report.monthLabel} yet. Calculate them first.` });
     const agency = db.prepare('SELECT agency_name, email FROM users WHERE id = ?').get(req.user.id);
     const email = monthend.reportEmail({ agencyName: agency.agency_name, report });
+    const sender = senderFor(req.user.id);
     try {
       await mailer.send({
-        to, subject: email.subject, text: email.text, html: email.html, fromName: agency.agency_name, replyTo: agency.email,
+        to, subject: email.subject, text: email.text, html: email.html, from: sender.from, fromName: sender.fromName, replyTo: sender.replyTo,
         attachments: [{ filename: email.filename, content: monthend.reportCsv(report), contentType: 'text/csv' }],
       });
     } catch (err) {

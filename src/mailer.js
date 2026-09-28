@@ -63,12 +63,14 @@ function createMailer(config) {
   return {
     enabled: !!transport,
     provider,
-    // Sends one email. fromName is shown as the sender (e.g. the agency's name).
-    async send({ to, subject, text, html, attachments, replyTo, fromName }) {
+    defaultFrom: isEmail(fromAddress) ? fromAddress : '',
+    // Sends one email. fromName is shown as the sender (e.g. the agency's name); from, if a
+    // valid address, replaces EMAIL_FROM (it must be on a domain the email service accepts).
+    async send({ to, subject, text, html, attachments, replyTo, fromName, from: fromOverride }) {
       if (!transport) throw new Error('Email is not set up.');
       if (!isEmail(to)) throw new Error(`Not a valid email address: ${to}`);
       await transport({
-        from: fromHeader(fromName, fromAddress), to: String(to).trim(), subject: String(subject).replace(/[\r\n]+/g, ' '),
+        from: fromHeader(fromName, isEmail(fromOverride) ? String(fromOverride).trim() : fromAddress), to: String(to).trim(), subject: String(subject).replace(/[\r\n]+/g, ' '),
         text, html, attachments, replyTo: isEmail(replyTo) ? replyTo : null,
       });
     },

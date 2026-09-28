@@ -28,10 +28,33 @@
         Sends each landlord whose statement type is Email their <%= monthLabel %> statement. <%= withEmail %> of <%= byEmail.length %> ha<%= byEmail.length === 1 ? 's' : 've' %> an email address<%= emailed ? ` · ${emailed} already emailed` : '' %>.<% if (byCheque) { %> <%= byCheque %> paid by cheque <%= byCheque === 1 ? 'is' : 'are' %> left out: print their statements below.<% } %>
         <% if (!emailEnabled) { %><br><strong class="warn-text">Email isn't set up yet.</strong> Your administrator needs to add the email settings.<% } %>
       </p></div>
-      <form method="post" action="/app/monthly/email" data-busy="Sending emails…" data-confirm="Email <%= monthLabel %> statements to <%= withEmail %> landlord<%= withEmail === 1 ? '' : 's' %>?">
+      <div class="step-actions">
+        <form method="post" action="/app/monthly/email" data-busy="Sending emails…" data-confirm="Email <%= monthLabel %> statements to <%= withEmail %> landlord<%= withEmail === 1 ? '' : 's' %>?">
+          <%- include('partials/csrf') %><input type="hidden" name="month" value="<%= month %>">
+          <% if (emailed) { %><label class="check small"><input type="checkbox" name="skip_sent" value="1" checked> Skip those already emailed</label><% } %>
+          <button class="btn primary" type="submit" <%= emailEnabled && withEmail ? '' : 'disabled' %>>Email all landlords</button>
+        </form>
+        <button class="btn" type="button" data-toggle="#sender-settings" aria-controls="sender-settings" aria-expanded="false">Edit sender</button>
+      </div>
+      <div class="sender-now muted small">From: <strong><%= sender.fromName %></strong> &lt;<%= sender.from || sender.defaults.from || 'not set' %>&gt;<% if (sender.replyTo) { %> · replies to <%= sender.replyTo %><% } %></div>
+      <form method="post" action="/app/monthly/email/settings" id="sender-settings" class="sender-settings form-grid" hidden data-no-keep>
         <%- include('partials/csrf') %><input type="hidden" name="month" value="<%= month %>">
-        <% if (emailed) { %><label class="check small"><input type="checkbox" name="skip_sent" value="1" checked> Skip those already emailed</label><% } %>
-        <button class="btn primary" type="submit" <%= emailEnabled && withEmail ? '' : 'disabled' %>>Email all landlords</button>
+        <div class="field">
+          <label for="s-from">Send from (email)</label>
+          <input id="s-from" name="from_email" type="email" value="<%= sender.saved.from %>" placeholder="<%= sender.defaults.from || 'e.g. statements@youragency.co.uk' %>">
+          <div class="help">Must be on a domain verified with your email service (Resend). Leave blank for <%= sender.defaults.from || 'the default' %>.</div>
+        </div>
+        <div class="field">
+          <label for="s-name">Sender name</label>
+          <input id="s-name" name="from_name" value="<%= sender.saved.name %>" maxlength="80" placeholder="<%= sender.defaults.name %>">
+          <div class="help">What landlords see as who it's from.</div>
+        </div>
+        <div class="field">
+          <label for="s-reply">Replies go to</label>
+          <input id="s-reply" name="reply_to" type="email" value="<%= sender.saved.replyTo %>" placeholder="<%= sender.defaults.replyTo || 'e.g. office@gmail.com' %>">
+          <div class="help">Any address, Gmail is fine. Leave blank for your account email.</div>
+        </div>
+        <div class="form-actions wide"><button class="btn primary" type="submit">Save sender</button></div>
       </form>
     </li>
     <li>

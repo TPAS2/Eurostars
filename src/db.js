@@ -369,6 +369,10 @@ function openDatabase(file) {
   addColumnIfMissing(db, 'landlords', 'statement_type', "TEXT NOT NULL DEFAULT 'Email'");
   addColumnIfMissing(db, 'sessions', 'last_seen_at', 'TEXT');
   addColumnIfMissing(db, 'users', 'hidden_tabs', 'TEXT');
+  // Who rent run emails come from, set per company on the Rent run page (blank = the defaults).
+  addColumnIfMissing(db, 'users', 'statement_from_email', 'TEXT');
+  addColumnIfMissing(db, 'users', 'statement_from_name', 'TEXT');
+  addColumnIfMissing(db, 'users', 'statement_reply_to', 'TEXT');
   addColumnIfMissing(db, 'landlords', 'bank_account_name', 'TEXT');
   addColumnIfMissing(db, 'landlords', 'bank_sort_code', 'TEXT');
   addColumnIfMissing(db, 'landlords', 'bank_account_number', 'TEXT');
