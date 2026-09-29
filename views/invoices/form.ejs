@@ -24,11 +24,14 @@
     </div>
     <div class="field price-trio wide" data-profit>
       <div class="field">
-        <label for="f-charge_landlord">Charge to landlord</label>
-        <select id="f-charge_landlord" name="charge_landlord" data-profit-charge>
-          <option value="yes" <%= values.charge_landlord === 'no' || values.charge_landlord === 0 ? '' : 'selected' %>>Yes</option>
-          <option value="no" <%= values.charge_landlord === 'no' || values.charge_landlord === 0 ? 'selected' : '' %>>No</option>
+        <% const chg = values.charge_landlord === 'no' || values.charge_landlord === 0 ? 'no' : values.charge_landlord === 'yes' || values.charge_landlord === 1 ? 'yes' : ''; %>
+        <label for="f-charge_landlord">Charge to landlord <span class="req">*</span></label>
+        <select id="f-charge_landlord" name="charge_landlord" data-profit-charge required>
+          <option value="" <%= chg ? '' : 'selected' %>>Choose…</option>
+          <option value="yes" <%= chg === 'yes' ? 'selected' : '' %>>Yes</option>
+          <option value="no" <%= chg === 'no' ? 'selected' : '' %>>No</option>
         </select>
+        <% if (errors.charge_landlord) { %><div class="field-err"><%= errors.charge_landlord %></div><% } %>
         <div class="help">No: we pay it, the landlord isn't charged.</div>
       </div>
       <div class="field">
@@ -38,8 +41,8 @@
         <% if (errors.amount) { %><div class="field-err"><%= errors.amount %></div><% } %>
       </div>
       <div class="field">
-        <label for="f-landlord_amount">Price to landlord (£)</label>
-        <input id="f-landlord_amount" name="landlord_amount" inputmode="decimal" placeholder="Same as price to us" value="<%= values.landlord_amount || '' %>" data-profit-price>
+        <label for="f-landlord_amount">Price to landlord (£) <span class="req">*</span></label>
+        <input id="f-landlord_amount" name="landlord_amount" inputmode="decimal" placeholder="0.00" value="<%= values.landlord_amount || '' %>" data-profit-price required>
         <div class="help">What the landlord is charged when it's deducted.</div>
         <% if (errors.landlord_amount) { %><div class="field-err"><%= errors.landlord_amount %></div><% } %>
       </div>

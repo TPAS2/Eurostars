@@ -110,7 +110,7 @@ const idFrom = (location) => Number(location.split('/').pop());
 // (a note, a date, and a maintenance job on the given property, or on a new one).
 let jobHouse = 0;
 async function invoiceBody(client, fields) {
-  const f = { invoice_date: '2026-08-01', description: 'Test invoice', ...fields };
+  const f = { invoice_date: '2026-08-01', description: 'Test invoice', charge_landlord: 'yes', landlord_amount: fields.amount, ...fields };
   if (!f.maintenance_job_id) {
     const pid = f.property_id || String(idFrom((await client.post('/app/properties', { address_line1: `Job house ${++jobHouse}`, status: 'vacant' })).location));
     f.maintenance_job_id = String(idFrom((await client.post('/app/maintenance', { property_id: pid, title: 'Repair', priority: 'normal', status: 'open' })).location));
@@ -1883,7 +1883,7 @@ test('contractor invoices: no invoice number or due date on the form; "Added by"
   db.prepare("UPDATE invoices SET invoice_number = 'INV-9', due_date = '2026-09-30' WHERE id = ?").run(id);
   await c.get(`/app/invoices/${id}/edit`);
   const cur = db.prepare('SELECT maintenance_job_id, property_id FROM invoices WHERE id = ?').get(id);
-  await c.post(`/app/invoices/${id}`, { supplier: 'Lock Co', amount: '80', invoice_date: '2026-09-01', added_by: String(pat), maintenance_job_id: String(cur.maintenance_job_id), property_id: String(cur.property_id), description: 'Lock change' }, { multipart: true });
+  await c.post(`/app/invoices/${id}`, { supplier: 'Lock Co', amount: '80', invoice_date: '2026-09-01', added_by: String(pat), maintenance_job_id: String(cur.maintenance_job_id), property_id: String(cur.property_id), description: 'Lock change', charge_landlord: 'yes', landlord_amount: '80' }, { multipart: true });
   assert.deepEqual({ ...db.prepare('SELECT invoice_number, due_date, amount_pence FROM invoices WHERE id = ?').get(id) }, { invoice_number: 'INV-9', due_date: '2026-09-30', amount_pence: 8000 });
 });
 
@@ -1946,7 +1946,7 @@ test('"Deduct from landlord" straight from adding a contractor or landlord invoi
 test('every section must be filled in when adding a contractor or landlord invoice', async () => {
   const c = await registerAndLogin('all-required@example.com', 'Required Lets');
   let r = await c.get('/app/invoices/new');
-  for (const name of ['supplier', 'amount', 'invoice_date', 'property_id', 'added_by']) {
+  for (const name of ['supplier', 'amount', 'invoice_date', 'property_id', 'added_by', 'charge_landlord', 'landlord_amount']) {
     assert.match(r.text, new RegExp(`name="${name}"[^>]*required|required[^>]*name="${name}"`), `${name} is required on the contractor invoice form`);
   }
   // Notes, the maintenance job and the invoice file are optional.
@@ -1955,12 +1955,12 @@ test('every section must be filled in when adding a contractor or landlord invoi
   }
   r = await c.post('/app/invoices', { supplier: 'Bare Minimum', amount: '10' }, { multipart: true });
   assert.equal(r.status, 422);
-  assert.match(r.text, /Enter the invoice date[\s\S]*?Choose the property/);
+  assert.match(r.text, /Choose whether to charge the landlord[\s\S]*?Enter the invoice date[\s\S]*?Choose the property/);
   assert.doesNotMatch(r.text, /Choose the maintenance job|Add a note|Attach the invoice/);
   assert.equal(db.prepare("SELECT COUNT(*) n FROM invoices WHERE supplier = 'Bare Minimum'").get().n, 0);
   const bareProp = idFrom((await c.post('/app/properties', { address_line1: '1 Bare Street', status: 'vacant' })).location);
   await c.get('/app/invoices/new');
-  r = await c.post('/app/invoices', { supplier: 'Bare Minimum', amount: '10', invoice_date: '2026-09-01', property_id: String(bareProp), maintenance_job_id: '', description: '' }, { multipart: true });
+  r = await c.post('/app/invoices', { supplier: 'Bare Minimum', amount: '10', invoice_date: '2026-09-01', property_id: String(bareProp), maintenance_job_id: '', description: '', charge_landlord: 'yes', landlord_amount: '12' }, { multipart: true });
   assert.equal(r.status, 302, 'saved with no file, no job and no notes');
   const bare = db.prepare("SELECT file_name, maintenance_job_id, description FROM invoices WHERE supplier = 'Bare Minimum'").get();
   assert.deepEqual({ ...bare }, { file_name: null, maintenance_job_id: null, description: null });
@@ -1982,7 +1982,7 @@ test('contractor invoice job can be None; councils take several phone numbers an
   let r = await c.get('/app/invoices/new');
   assert.match(r.text, /<option value="none" selected>None – no job<\/option>/);
   const pdf = new File([Buffer.from('%PDF-1.4\n%x\n')], 'i.pdf');
-  r = await c.post('/app/invoices', { supplier: 'Key Cutters', amount: '12', invoice_date: '2026-09-02', maintenance_job_id: 'none', property_id: String(prop), description: 'Spare keys', file: pdf }, { multipart: true });
+  r = await c.post('/app/invoices', { supplier: 'Key Cutters', amount: '12', invoice_date: '2026-09-02', maintenance_job_id: 'none', property_id: String(prop), description: 'Spare keys', charge_landlord: 'yes', landlord_amount: '12', file: pdf }, { multipart: true });
   assert.equal(r.status, 302, r.text);
   const inv = db.prepare('SELECT maintenance_job_id, property_id FROM invoices WHERE id = ?').get(idFrom(r.location));
   assert.equal(inv.maintenance_job_id, null);
@@ -2441,7 +2441,7 @@ test('contractor invoice: price to us, price to landlord, profit, and charge to 
   const ll = idFrom((await c.post('/app/landlords', { name: 'Pat Profit' })).location);
   const prop = idFrom((await c.post('/app/properties', { address_line1: '5 Margin Row', landlord_id: String(ll), status: 'let' })).location);
   let r = await c.get('/app/invoices/new');
-  assert.match(r.text, /Charge to landlord[\s\S]*?<option value="yes" selected>Yes[\s\S]*?Price to us \(£\)[\s\S]*?Price to landlord \(£\)[\s\S]*?Profit \(£\)/);
+  assert.match(r.text, /Charge to landlord <span class="req">\*<\/span>[\s\S]*?<option value="" selected>Choose…[\s\S]*?Price to us \(£\)[\s\S]*?Price to landlord \(£\)[\s\S]*?Profit \(£\)/);
 
   // Deducted at the price to the landlord; the profit shows on the invoice.
   r = await c.post('/app/invoices', { supplier: 'Gas Safe Co', amount: '120', landlord_amount: '150', charge_landlord: 'yes', invoice_date: '2026-09-10', property_id: String(prop), then: 'deduct' }, { multipart: true });
@@ -2453,12 +2453,18 @@ test('contractor invoice: price to us, price to landlord, profit, and charge to 
   r = await c.get(`/app/invoices/${id}`);
   assert.match(r.text, /Price to us<\/dt><dd><strong>£120\.00[\s\S]*?Price to landlord<\/dt><dd><strong>£150\.00[\s\S]*?Profit<\/dt><dd><strong class="ok-text">£30\.00/);
 
-  // Blank price to landlord: charged the same as the price to us.
+  // Charged to the landlord: the price to landlord must be filled in.
   await c.get('/app/invoices/new');
   r = await c.post('/app/invoices', { supplier: 'Locksmith', amount: '80', landlord_amount: '', charge_landlord: 'yes', invoice_date: '2026-09-11', property_id: String(prop) }, { multipart: true });
+  assert.equal(r.status, 422);
+  assert.match(r.text, /Enter the price to the landlord/);
+  r = await c.post('/app/invoices', { supplier: 'Locksmith', amount: '80', landlord_amount: '80', charge_landlord: 'yes', invoice_date: '2026-09-11', property_id: String(prop) }, { multipart: true });
   const lock = idFrom(r.location);
-  assert.equal(db.prepare('SELECT landlord_price_pence FROM invoices WHERE id = ?').get(lock).landlord_price_pence, null);
   assert.match((await c.get(`/app/invoices/${lock}`)).text, /Profit<\/dt><dd><strong class="">£0\.00/);
+  // Charge to landlord must be chosen.
+  await c.get('/app/invoices/new');
+  r = await c.post('/app/invoices', { supplier: 'Unsure', amount: '10', landlord_amount: '10', invoice_date: '2026-09-11', property_id: String(prop) }, { multipart: true });
+  assert.match(r.text, /Choose whether to charge the landlord/);
 
   // Charge to landlord: No — saved, shown, and the pay box starts unticked.
   await c.get('/app/invoices/new');

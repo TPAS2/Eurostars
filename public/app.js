@@ -549,8 +549,8 @@ document.addEventListener('click', (e) => {
         price.disabled = !charged;
         if (!charged) { out.textContent = 'Not charged'; out.className = 'profit-out muted'; return; }
         const c = pence(cost.value);
-        const p = price.value.trim() ? pence(price.value) : c;
-        if (!cost.value.trim() || Number.isNaN(c) || Number.isNaN(p)) { out.textContent = '—'; out.className = 'profit-out'; return; }
+        const p = pence(price.value);
+        if (!cost.value.trim() || !price.value.trim() || Number.isNaN(c) || Number.isNaN(p)) { out.textContent = '—'; out.className = 'profit-out'; return; }
         out.textContent = money(p - c);
         out.className = `profit-out ${p - c > 0 ? 'ok-text' : p - c < 0 ? 'bad-text' : ''}`;
       };

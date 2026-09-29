@@ -90,13 +90,16 @@ module.exports = function invoiceRoutes(db, config) {
     v.amount_pence = fmt.parseMoney(String(body.amount || '').trim());
     if (Number.isNaN(v.amount_pence) || v.amount_pence <= 0) errors.amount = 'Enter the price to us, e.g. 180.00.';
     // Charge it to the landlord (Yes/No).
-    if (body.charge_landlord !== undefined) v.charge_landlord = body.charge_landlord === 'no' ? 0 : 1;
+    if (body.charge_landlord === 'yes' || body.charge_landlord === 'no') v.charge_landlord = body.charge_landlord === 'no' ? 0 : 1;
+    else if (body.then !== 'deduct') errors.charge_landlord = 'Choose whether to charge the landlord.';
     // The price to the landlord: blank means the same as the price to us (no profit).
     if (body.landlord_amount !== undefined) {
       const raw = String(body.landlord_amount || '').trim();
       v.landlord_price_pence = raw ? fmt.parseMoney(raw) : null;
-      if (raw && (Number.isNaN(v.landlord_price_pence) || v.landlord_price_pence < 0)) errors.landlord_amount = 'Enter the price to the landlord, e.g. 220.00, or leave it blank.';
+      if (raw && (Number.isNaN(v.landlord_price_pence) || v.landlord_price_pence < 0)) errors.landlord_amount = 'Enter the price to the landlord, e.g. 220.00.';
     }
+    // Needed whenever the landlord is charged.
+    if ((v.charge_landlord === 1 || body.then === 'deduct') && v.landlord_price_pence == null && !errors.landlord_amount) errors.landlord_amount = 'Enter the price to the landlord.';
     v.maintenance_job_id = null;
     v.property_id = null;
     const noJob = body.maintenance_job_id === 'none';
