@@ -229,7 +229,7 @@ const DRAFT_DAYS = 7;
       const sent = navigator.sendBeacon && navigator.sendBeacon(form.action, formBody(form));
       if (!sent) { e.preventDefault(); e.returnValue = ''; }
     });
-    if (!pending || sameValues(pending.values, formValues(form))) setStatus(form, 'Changes save automatically', '');
+    if ((!pending || sameValues(pending.values, formValues(form))) && !form.hasAttribute('data-autosave-quiet')) setStatus(form, 'Changes save automatically', '');
   }
 
   function storage() {

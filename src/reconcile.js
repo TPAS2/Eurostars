@@ -39,7 +39,7 @@ function councilTenancies(db, accountId, month, councilId = null) {
 // One row per council on the Councils tab (all of them), with totals.
 function reconciliation(db, accountId, month) {
   const councils = db.prepare('SELECT id, name FROM councils WHERE account_id = ? ORDER BY name COLLATE NOCASE').all(accountId);
-  const saved = new Map(db.prepare('SELECT council_id, notes, owed_pence, received_pence FROM council_rec_notes WHERE account_id = ? AND month = ?')
+  const saved = new Map(db.prepare('SELECT council_id, notes, owed_pence, received_pence, received_date, email_sent_date FROM council_rec_notes WHERE account_id = ? AND month = ?')
     .all(accountId, month).map((n) => [n.council_id, n]));
   const props = new Map(db.prepare('SELECT council_id, COUNT(*) AS n FROM properties WHERE account_id = ? AND council_id IS NOT NULL GROUP BY council_id').all(accountId)
     .map((p) => [p.council_id, p.n]));
@@ -48,6 +48,8 @@ function reconciliation(db, accountId, month) {
     notes: (saved.get(c.id) || {}).notes || '',
     owedEntered: (saved.get(c.id) || {}).owed_pence ?? null,
     receivedEntered: (saved.get(c.id) || {}).received_pence ?? null,
+    receivedDate: (saved.get(c.id) || {}).received_date || '',
+    emailSentDate: (saved.get(c.id) || {}).email_sent_date || '',
   }]));
   for (const t of councilTenancies(db, accountId, month)) {
     const c = byCouncil.get(t.council_id);

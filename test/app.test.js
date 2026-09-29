@@ -2349,3 +2349,22 @@ test('mailer uses the chosen From address when one is given', async () => {
     assert.equal(m.defaultFrom, 'default@verified.example');
   } finally { global.fetch = realFetch; }
 });
+
+test('council reconciliation: Date received and Email sent date columns save, no "Changes save automatically" text', async () => {
+  const c = await registerAndLogin('rec-dates@example.com', 'Rec Dates Lets');
+  let r = await c.post('/app/councils', { name: 'Dates Council' });
+  const council = idFrom(r.location);
+  r = await c.get('/app/council-reconciliation?month=2026-09');
+  assert.match(r.text, /Money in<\/th><th>Date received<\/th><th>Email sent<\/th>/);
+  assert.match(r.text, /name="received_date"[\s\S]*?name="email_sent_date"/);
+  assert.match(r.text, /data-autosave data-autosave-quiet/);
+  r = await c.req('POST', '/app/council-reconciliation/notes', { council_id: String(council), month: '2026-09', notes: '', owed: '', received: '', received_date: '2026-09-17', email_sent_date: '2026-09-18' });
+  const row = db.prepare('SELECT received_date, email_sent_date FROM council_rec_notes WHERE council_id = ?').get(council);
+  assert.deepEqual({ ...row }, { received_date: '2026-09-17', email_sent_date: '2026-09-18' });
+  r = await c.get('/app/council-reconciliation?month=2026-09');
+  assert.match(r.text, /name="received_date" value="2026-09-17"/);
+  assert.match(r.text, /name="email_sent_date" value="2026-09-18"/);
+  // Cleared again: the row goes when nothing is left.
+  await c.req('POST', '/app/council-reconciliation/notes', { council_id: String(council), month: '2026-09', notes: '', owed: '', received: '', received_date: '', email_sent_date: '' });
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM council_rec_notes WHERE council_id = ?').get(council).n, 0);
+});

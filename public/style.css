@@ -675,3 +675,9 @@ table.cfp td, table.cfp th { text-align: left; }
 table.cfp .num { text-align: right; }
 .report-actions .step-email { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .report-actions .step-email input[type=email] { min-width: 260px; }
+.rec-table.centered .date-cell .field { display: flex; justify-content: center; }
+.rec-table .date-cell input { width: auto; }
+.rec-table .money-cell input { width: 96px; }
+.rec-table .date-cell input { width: 138px; padding-left: 6px; padding-right: 4px; }
+.rec-table .notes-col { min-width: 170px; width: auto; }
+.rec-table th, .rec-table td { padding-left: 6px; padding-right: 6px; }

@@ -358,15 +358,25 @@ module.exports = function appRoutes(db) {
     };
     const owed = amount('owed', 'money owed');
     const received = amount('received', 'money in');
+    const date = (field, label) => {
+      const raw = String(req.body[field] ?? '').trim();
+      if (!raw) return null;
+      if (!fmt.isIsoDate(raw)) { errors[field] = `Enter the ${label}, or leave it blank.`; return null; }
+      return raw;
+    };
+    const receivedDate = date('received_date', 'date received');
+    const emailSentDate = date('email_sent_date', 'date the email was sent');
     if (Object.keys(errors).length) {
       return autosave ? res.status(422).json({ ok: false, errors }) : res.redirect(`/app/council-reconciliation?month=${month}`);
     }
-    if (notes || owed !== null || received !== null) {
+    if (notes || owed !== null || received !== null || receivedDate || emailSentDate) {
       db.prepare(
-        `INSERT INTO council_rec_notes (account_id, council_id, month, notes, owed_pence, received_pence) VALUES (?, ?, ?, ?, ?, ?)
+        `INSERT INTO council_rec_notes (account_id, council_id, month, notes, owed_pence, received_pence, received_date, email_sent_date)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT (account_id, council_id, month) DO UPDATE SET notes = excluded.notes, owed_pence = excluded.owed_pence,
-           received_pence = excluded.received_pence, updated_at = datetime('now')`
-      ).run(a, council.id, month, notes, owed, received);
+           received_pence = excluded.received_pence, received_date = excluded.received_date,
+           email_sent_date = excluded.email_sent_date, updated_at = datetime('now')`
+      ).run(a, council.id, month, notes, owed, received, receivedDate, emailSentDate);
     } else {
       db.prepare('DELETE FROM council_rec_notes WHERE account_id = ? AND council_id = ? AND month = ?').run(a, council.id, month);
     }

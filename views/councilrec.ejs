@@ -15,7 +15,7 @@
   <% } else { %>
   <div class="table-wrap"><table class="rec-table centered">
     <thead><tr>
-      <th>Council</th><th class="num">Properties</th><th class="num">Money owed</th><th class="num">Money in</th><th class="num">Still owed</th><th>Status</th><th class="notes-col">Notes</th>
+      <th>Council</th><th class="num">Properties</th><th class="num">Money owed</th><th class="num">Money in</th><th>Date received</th><th>Email sent</th><th class="num">Still owed</th><th>Status</th><th class="notes-col">Notes</th>
     </tr></thead>
     <tbody>
     <% rec.rows.forEach(c => { %>
@@ -31,10 +31,12 @@
           <div class="field"><input form="rec-form-<%= c.id %>" name="received" inputmode="decimal" autocomplete="off" value="<%= c.receivedEntered !== null ? fmt.penceToInput(c.receivedEntered) : '' %>" placeholder="<%= fmt.penceToInput(c.receivedCalculated) %>" aria-label="Money in from <%= c.name %>"></div>
           <% if (c.receivedEntered !== null) { %><div class="muted small">recorded <%= fmt.money(c.receivedCalculated) %></div><% } %>
         </td>
+        <td class="date-cell"><div class="field"><input form="rec-form-<%= c.id %>" type="date" name="received_date" value="<%= c.receivedDate %>" aria-label="Date money received from <%= c.name %>"></div></td>
+        <td class="date-cell"><div class="field"><input form="rec-form-<%= c.id %>" type="date" name="email_sent_date" value="<%= c.emailSentDate %>" aria-label="Date email sent to <%= c.name %>"></div></td>
         <td class="num"><span id="rec-balance-<%= c.id %>" class="<%= c.balance > 0 ? 'bad-text strong' : c.balance < 0 ? 'ok-text' : '' %>"><%= c.balance > 0 ? fmt.money(c.balance) : c.balance < 0 ? fmt.money(-c.balance) + ' over' : '—' %></span></td>
         <td><span id="rec-status-<%= c.id %>" class="<%= st.cls %>"><%= st.text %></span></td>
         <td class="notes-col">
-          <form id="rec-form-<%= c.id %>" method="post" action="/app/council-reconciliation/notes" data-autosave data-autosave-key="rec-notes-<%= c.id %>-<%= month %>" class="rec-notes">
+          <form id="rec-form-<%= c.id %>" method="post" action="/app/council-reconciliation/notes" data-autosave data-autosave-quiet data-autosave-key="rec-notes-<%= c.id %>-<%= month %>" class="rec-notes">
             <%- include('partials/csrf') %>
             <input type="hidden" name="council_id" value="<%= c.id %>">
             <input type="hidden" name="month" value="<%= month %>">
@@ -49,6 +51,7 @@
         <td class="num"><%= t.properties %></td>
         <td class="num" id="rec-total-owed"><%= fmt.money(t.owed) %></td>
         <td class="num" id="rec-total-received"><%= fmt.money(t.received) %></td>
+        <td></td><td></td>
         <td class="num" id="rec-total-balance"><%= t.balance > 0 ? fmt.money(t.balance) : t.balance < 0 ? fmt.money(-t.balance) + ' over' : '—' %></td>
         <td colspan="2"></td>
       </tr>
