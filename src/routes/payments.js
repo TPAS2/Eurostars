@@ -11,6 +11,7 @@ const multer = require('multer');
 const auth = require('../auth');
 const fmt = require('../format');
 const st = require('../statements');
+const { fillMetroForm } = require('../metroForm');
 
 const MAX_BYTES = 10 * 1024 * 1024;
 const TYPES = [
@@ -101,6 +102,7 @@ module.exports = function paymentRoutes(db) {
     const last = db.prepare('SELECT data_json FROM payment_instructions WHERE account_id = ? ORDER BY month DESC LIMIT 1').get(accountId);
     const prev = last ? JSON.parse(last.data_json) : {};
     return {
+      store: prev.store || '', contact_name: prev.contact_name || '',
       from_name: prev.from_name || '', from_sort_code: prev.from_sort_code || '', from_account_number: prev.from_account_number || '',
       payment_date: '', signatory_1: prev.signatory_1 || '', signatory_2: prev.signatory_2 || '', notes: '',
       payees: suggestedPayees(accountId, month), saved_at: null,
@@ -132,6 +134,7 @@ module.exports = function paymentRoutes(db) {
       amount: clip(list('p_amount')[i], 20), reference: clip(list('p_ref')[i], 18),
     })).filter((p) => p.name || p.amount || p.account_number);
     const data = {
+      store: clip(b.store, 60), contact_name: clip(b.contact_name, 60),
       from_name: clip(b.from_name, 60), from_sort_code: clip(b.from_sort_code, 12), from_account_number: clip(b.from_account_number, 12),
       payment_date: fmt.isIsoDate(String(b.payment_date || '')) ? b.payment_date : '',
       signatory_1: clip(b.signatory_1, 60), signatory_2: clip(b.signatory_2, 60), notes: clip(b.notes, 1000), payees,
@@ -156,6 +159,7 @@ module.exports = function paymentRoutes(db) {
       });
     }
     if (b.then === 'print') return res.redirect(`/app/rent-run/instruction/print?month=${month}`);
+    if (b.then === 'metro') return res.redirect(`/app/rent-run/instruction/metro.pdf?month=${month}`);
     res.redirect(`/app/rent-run/instruction?month=${month}&flash=${encodeURIComponent('Saved.')}`);
   });
 
@@ -180,6 +184,39 @@ module.exports = function paymentRoutes(db) {
       title: `Payment instruction · ${st.monthLabel(month)}`, month, monthLabel: st.monthLabel(month), data,
       payees: data.payees.filter((p) => p.include), total: total(data), agencyName: agency.agency_name, fmt, bodyClass: 'print-page',
     });
+  });
+
+  // Metro's blank form, as it came.
+  router.get('/metro-blank.pdf', (req, res) => {
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'inline; filename="Metro bulk payment instruction (blank).pdf"');
+    res.setHeader('Content-Security-Policy', "sandbox; default-src 'none'; object-src 'self'");
+    res.sendFile(require('../metroForm').TEMPLATE);
+  });
+
+  // Metro Bank's own Bulk Payment Instruction form, filled in, plus the list of payments.
+  router.get('/instruction/metro.pdf', async (req, res, next) => {
+    try {
+      const month = monthOf(req.query.month);
+      const data = load(req.user.id, month);
+      const agency = db.prepare('SELECT agency_name, name FROM users WHERE id = ?').get(req.user.id);
+      const payees = data.payees.filter((p) => p.include).map((p) => ({
+        name: p.name, sort_code: p.sort_code, account_number: p.account_number, reference: p.reference,
+        pence: Number.isNaN(fmt.parseMoney(p.amount)) ? 0 : fmt.parseMoney(p.amount),
+      }));
+      const pdf = await fillMetroForm({
+        store: data.store, accountName: data.from_name, contactName: data.contact_name || req.user.name || agency.name,
+        accountNumber: data.from_account_number, valueDate: data.payment_date ? fmt.ukDate(data.payment_date) : '',
+        signatory1: data.signatory_1, signatory2: data.signatory_2, payees,
+        monthLabel: st.monthLabel(month), agencyName: agency.agency_name,
+      });
+      const name = `Metro bulk payment instruction ${month}.pdf`;
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `${req.query.download === '1' ? 'attachment' : 'inline'}; filename="${name}"`);
+      res.setHeader('Content-Security-Policy', "sandbox; default-src 'none'; object-src 'self'");
+      res.setHeader('Cache-Control', 'private, no-store');
+      res.end(Buffer.from(pdf));
+    } catch (err) { next(err); }
   });
 
   return router;

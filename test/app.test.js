@@ -1599,15 +1599,13 @@ test('rent run step 5: payment instruction template and a filled-in instruction 
   await c.post('/app/monthly/calculate', { month: '2026-08' });
 
   r = await c.get('/app/rent-run?month=2026-08');
-  assert.match(r.text, /id="payment-instruction"[\s\S]*?Payment instruction \(Metro Bank\)[\s\S]*?No template saved yet[\s\S]*?Save template[\s\S]*?Fill in &amp; print/);
+  assert.match(r.text, /id="payment-instruction"[\s\S]*?Metro Bank Bulk Payment Instruction[\s\S]*?Check payments[\s\S]*?href="\/app\/rent-run\/instruction\/metro\.pdf\?month=2026-08"[^>]*>Fill in Metro form \(PDF\)/);
   assert.match(r.text, /<table class="centered">/, 'landlords table is centred');
 
   // Save the blank template, then download / print it.
   const pdf = new File([Buffer.from('%PDF-1.4\n%metro form\n')], 'Metro payment instruction.pdf');
   r = await c.post('/app/rent-run/template', { template: pdf, month: '2026-08' }, { multipart: true });
   assert.match(decodeURIComponent(r.location.replace(/\+/g, ' ')), /Saved Metro payment instruction\.pdf as your payment instruction template/);
-  r = await c.get('/app/rent-run?month=2026-08');
-  assert.match(r.text, /Download template[\s\S]*?data-print-frame="\/app\/rent-run\/template"[\s\S]*?Replace template/);
   r = await c.get('/app/rent-run/template?download=1');
   assert.equal(r.status, 200);
   assert.equal(r.headers.get('content-type'), 'application/pdf');
@@ -1634,6 +1632,18 @@ test('rent run step 5: payment instruction template and a filled-in instruction 
   assert.match(r.text, /P Paid<\/td><td>12-34-56<\/td><td>12345678<\/td><td>PP1 Rent Aug<\/td><td class="num">£1,000\.00/);
   assert.doesNotMatch(r.text, /Extra Person/, 'unticked rows are not printed');
   assert.match(r.text, /Total<\/td><td class="num">£1,000\.00/);
+  // Metro's own form, filled in, with the list of payments attached.
+  r = await c.get('/app/rent-run/instruction/metro.pdf?month=2026-08');
+  assert.equal(r.status, 200);
+  assert.equal(r.headers.get('content-type'), 'application/pdf');
+  const { PDFDocument } = require('pdf-lib');
+  const { fillMetroForm, amountInWords } = require('../src/metroForm');
+  const bytes = await fillMetroForm({ store: 'Borehamwood', accountName: 'Pay Lets Client Account', contactName: 'Theo', accountNumber: '87654321',
+    valueDate: '01/09/2026', payees: [{ name: 'P Paid', sort_code: '12-34-56', account_number: '12345678', reference: 'PP1', pence: 100000 }], monthLabel: 'August 2026' });
+  assert.equal((await PDFDocument.load(bytes)).getPageCount(), 2, 'Metro form page plus the payments page');
+  assert.equal(amountInWords(123456), 'One thousand two hundred and thirty-four pounds and fifty-six pence');
+  assert.equal(amountInWords(100000), 'One thousand pounds only');
+  assert.equal((await c.get('/app/rent-run/metro-blank.pdf')).status, 200);
   // Saved: reopening keeps what was typed; a new month remembers "paying from".
   assert.match((await c.get('/app/rent-run/instruction?month=2026-08')).text, /value="Pay Lets Client Account"[\s\S]*?Extra Person/);
   assert.match((await c.get('/app/rent-run/instruction?month=2026-09')).text, /value="Pay Lets Client Account"/);

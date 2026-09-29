@@ -20,6 +20,8 @@
 
   <h2>Paying from</h2>
   <div class="form-grid three">
+    <div class="field"><label for="store">Store (Metro branch)</label><input id="store" name="store" value="<%= data.store %>" placeholder="e.g. Borehamwood"></div>
+    <div class="field"><label for="contact_name">Contact name</label><input id="contact_name" name="contact_name" value="<%= data.contact_name %>" placeholder="<%= user.name %>"></div>
     <div class="field"><label for="from_name">Account name</label><input id="from_name" name="from_name" value="<%= data.from_name %>" placeholder="e.g. Eurostars Client Account"></div>
     <div class="field"><label for="from_sort">Sort code</label><input id="from_sort" name="from_sort_code" value="<%= data.from_sort_code %>" placeholder="12-34-56" inputmode="numeric"></div>
     <div class="field"><label for="from_acc">Account number</label><input id="from_acc" name="from_account_number" value="<%= data.from_account_number %>" placeholder="12345678" inputmode="numeric"></div>
@@ -55,7 +57,8 @@
 
   <div class="form-actions">
     <button class="btn" type="submit" name="then" value="save">Save</button>
-    <button class="btn primary" type="submit" name="then" value="print">Save and print</button>
+    <button class="btn" type="submit" name="then" value="print">Save and print summary</button>
+    <button class="btn primary" type="submit" name="then" value="metro">Save and open Metro form (PDF)</button>
     <% if (data.saved_at) { %><span class="muted small">Last saved <%= data.saved_at === 'now' ? 'just now' : fmt.ukDateTime(data.saved_at) %></span><% } %>
   </div>
 </form>

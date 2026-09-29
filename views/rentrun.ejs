@@ -73,27 +73,13 @@
       </form>
     </li>
     <li id="payment-instruction">
-      <div><strong>Payment instruction (Metro Bank)</strong><p class="muted small">
-        Pay the landlords their money. Save your bank's blank form as a template to download or print as it is, or fill in the instruction here from this month's landlord balances and print that.
-        <% if (template) { %><br>Template: <strong><%= template.filename %></strong> <span class="muted">· saved <%= fmt.ukDateTime(template.uploaded_at) %></span><% } else { %><br><span class="muted">No template saved yet.</span><% } %>
+      <div><strong>Metro Bank Bulk Payment Instruction</strong><p class="muted small">
+        Pay the landlords their money. Rift fills in Metro's Bulk Payment Instruction form for <%= monthLabel %>: your account, the total in figures and words, the number of payments and the value date, with the list of payments attached. Check the payments first, then open the form to print, sign and take to Metro.
       </p></div>
       <div class="step-actions">
-        <% if (template) { %>
-          <a class="btn" href="/app/rent-run/template?download=1">Download template</a>
-          <button class="btn" type="button" data-print-frame="/app/rent-run/template">Print template</button>
-        <% } %>
-        <form method="post" action="/app/rent-run/template" enctype="multipart/form-data" class="inline">
-          <%- include('partials/csrf') %><input type="hidden" name="month" value="<%= month %>">
-          <label class="btn"><%= template ? 'Replace template' : 'Save template' %><input type="file" name="template" accept="application/pdf,image/png,image/jpeg" data-autosubmit hidden></label>
-          <noscript><button class="btn" type="submit">Upload</button></noscript>
-        </form>
-        <a class="btn primary" href="/app/rent-run/instruction?month=<%= month %>">Fill in &amp; print</a>
-        <% if (template) { %>
-        <form method="post" action="/app/rent-run/template/delete" class="inline" data-confirm="Remove the saved template?">
-          <%- include('partials/csrf') %><input type="hidden" name="month" value="<%= month %>">
-          <button class="btn small link" type="submit">Remove template</button>
-        </form>
-        <% } %>
+        <a class="btn" href="/app/rent-run/instruction?month=<%= month %>">Check payments</a>
+        <a class="btn primary" href="/app/rent-run/instruction/metro.pdf?month=<%= month %>" target="_blank" rel="noopener">Fill in Metro form (PDF)</a>
+        <a class="btn small link" href="/app/rent-run/metro-blank.pdf" target="_blank" rel="noopener">Blank form</a>
       </div>
     </li>
   </ol>
