@@ -24,7 +24,11 @@
     <h2>Details</h2>
     <dl class="details">
       <div><dt>Supplier</dt><dd><%= inv.supplier %></dd></div>
-      <div><dt>Amount</dt><dd><strong><%= fmt.money(inv.amount_pence) %></strong></dd></div>
+      <% const toLandlord = inv.landlord_price_pence ?? inv.amount_pence; const profit = toLandlord - inv.amount_pence; %>
+      <div><dt>Charge to landlord</dt><dd><span class="badge plain <%= inv.charge_landlord ? 's-active' : '' %>"><%= inv.charge_landlord ? 'Yes' : 'No' %></span></dd></div>
+      <div><dt>Price to us</dt><dd><strong><%= fmt.money(inv.amount_pence) %></strong></dd></div>
+      <% if (inv.charge_landlord) { %><div><dt>Price to landlord</dt><dd><strong><%= fmt.money(toLandlord) %></strong></dd></div>
+      <div><dt>Profit</dt><dd><strong class="<%= profit > 0 ? 'ok-text' : profit < 0 ? 'bad-text' : '' %>"><%= profit < 0 ? '−' + fmt.money(-profit) : fmt.money(profit) %></strong></dd></div><% } %>
       <div><dt>Invoice date</dt><dd><%= fmt.ukDate(inv.invoice_date) || '—' %></dd></div>
       <% if (inv.due_date) { %><div><dt>Due date</dt><dd class="<%= overdue ? 'neg' : '' %>"><%= fmt.ukDate(inv.due_date) %></dd></div><% } %>
       <div><dt>Property</dt><dd><% if (property) { %><a href="/app/properties/<%= property.id %>"><%= property.address_line1 %></a><% } else { %>—<% } %></dd></div>
@@ -68,8 +72,8 @@
           </select>
         </label>
         <label>Payment reference <input name="payment_reference" placeholder="e.g. bank transfer reference"></label>
-        <label class="check"><input type="checkbox" name="charge_landlord" value="1" <%= landlord ? 'checked' : '' %>>
-          Charge to <%= landlord ? landlord.name + "'s" : "the landlord's" %> client account<% if (!landlord) { %> <span class="muted small">(no landlord linked)</span><% } %></label>
+        <label class="check"><input type="checkbox" name="charge_landlord" value="1" <%= landlord && inv.charge_landlord ? 'checked' : '' %>>
+          Charge <%= fmt.money(inv.landlord_price_pence ?? inv.amount_pence) %> to <%= landlord ? landlord.name + "'s" : "the landlord's" %> client account<% if (!landlord) { %> <span class="muted small">(no landlord linked)</span><% } %></label>
         <button class="btn primary" type="submit">Pay <%= fmt.money(inv.amount_pence) %></button>
       </form>
     <% } %>

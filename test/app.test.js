@@ -2435,3 +2435,44 @@ test('maintenance: a completed job has a landlord invoice to download and email'
   const other = await registerAndLogin('job-invoice-2@example.com', 'Other Invoice Lets');
   assert.equal((await other.get(`/app/maintenance/${job}/invoice.pdf`)).status, 404);
 });
+
+test('contractor invoice: price to us, price to landlord, profit, and charge to landlord Yes/No', async () => {
+  const c = await registerAndLogin('profit@example.com', 'Profit Lets');
+  const ll = idFrom((await c.post('/app/landlords', { name: 'Pat Profit' })).location);
+  const prop = idFrom((await c.post('/app/properties', { address_line1: '5 Margin Row', landlord_id: String(ll), status: 'let' })).location);
+  let r = await c.get('/app/invoices/new');
+  assert.match(r.text, /Charge to landlord[\s\S]*?<option value="yes" selected>Yes[\s\S]*?Price to us \(£\)[\s\S]*?Price to landlord \(£\)[\s\S]*?Profit \(£\)/);
+
+  // Deducted at the price to the landlord; the profit shows on the invoice.
+  r = await c.post('/app/invoices', { supplier: 'Gas Safe Co', amount: '120', landlord_amount: '150', charge_landlord: 'yes', invoice_date: '2026-09-10', property_id: String(prop), then: 'deduct' }, { multipart: true });
+  assert.equal(r.status, 302, r.text);
+  const id = idFrom(r.location.split('?')[0]);
+  const inv = db.prepare('SELECT amount_pence, landlord_price_pence, charge_landlord, status, payment_txn_id FROM invoices WHERE id = ?').get(id);
+  assert.deepEqual({ amount: inv.amount_pence, landlord: inv.landlord_price_pence, charge: inv.charge_landlord, status: inv.status }, { amount: 12000, landlord: 15000, charge: 1, status: 'paid' });
+  assert.equal(db.prepare('SELECT amount_pence FROM transactions WHERE id = ?').get(inv.payment_txn_id).amount_pence, 15000, 'landlord charged the price to landlord');
+  r = await c.get(`/app/invoices/${id}`);
+  assert.match(r.text, /Price to us<\/dt><dd><strong>£120\.00[\s\S]*?Price to landlord<\/dt><dd><strong>£150\.00[\s\S]*?Profit<\/dt><dd><strong class="ok-text">£30\.00/);
+
+  // Blank price to landlord: charged the same as the price to us.
+  await c.get('/app/invoices/new');
+  r = await c.post('/app/invoices', { supplier: 'Locksmith', amount: '80', landlord_amount: '', charge_landlord: 'yes', invoice_date: '2026-09-11', property_id: String(prop) }, { multipart: true });
+  const lock = idFrom(r.location);
+  assert.equal(db.prepare('SELECT landlord_price_pence FROM invoices WHERE id = ?').get(lock).landlord_price_pence, null);
+  assert.match((await c.get(`/app/invoices/${lock}`)).text, /Profit<\/dt><dd><strong class="">£0\.00/);
+
+  // Charge to landlord: No — saved, shown, and the pay box starts unticked.
+  await c.get('/app/invoices/new');
+  r = await c.post('/app/invoices', { supplier: 'Office Repairs', amount: '60', charge_landlord: 'no', invoice_date: '2026-09-12', property_id: String(prop) }, { multipart: true });
+  const noCharge = idFrom(r.location);
+  assert.equal(db.prepare('SELECT charge_landlord FROM invoices WHERE id = ?').get(noCharge).charge_landlord, 0);
+  r = await c.get(`/app/invoices/${noCharge}`);
+  assert.match(r.text, /Charge to landlord<\/dt><dd><span class="badge plain ">No/);
+  assert.match(r.text, /<input type="checkbox" name="charge_landlord" value="1" >/);
+  assert.match((await c.get(`/app/invoices/${noCharge}/edit`)).text, /<option value="no" selected>No/);
+
+  // A bad price to landlord is refused.
+  await c.get('/app/invoices/new');
+  r = await c.post('/app/invoices', { supplier: 'Bad Price', amount: '10', landlord_amount: 'abc', invoice_date: '2026-09-12', property_id: String(prop) }, { multipart: true });
+  assert.equal(r.status, 422);
+  assert.match(r.text, /Enter the price to the landlord/);
+});

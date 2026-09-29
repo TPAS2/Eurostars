@@ -22,10 +22,32 @@
       <div class="help">Pick from your contractors, or type a new name to add one.</div>
       <% if (errors.supplier) { %><div class="field-err"><%= errors.supplier %></div><% } %>
     </div>
-    <div class="field">
-      <label for="f-amount">Amount (£) <span class="req">*</span></label>
-      <input id="f-amount" name="amount" inputmode="decimal" placeholder="0.00" value="<%= values.amount || '' %>" required>
-      <% if (errors.amount) { %><div class="field-err"><%= errors.amount %></div><% } %>
+    <div class="field price-trio wide" data-profit>
+      <div class="field">
+        <label for="f-charge_landlord">Charge to landlord</label>
+        <select id="f-charge_landlord" name="charge_landlord" data-profit-charge>
+          <option value="yes" <%= values.charge_landlord === 'no' || values.charge_landlord === 0 ? '' : 'selected' %>>Yes</option>
+          <option value="no" <%= values.charge_landlord === 'no' || values.charge_landlord === 0 ? 'selected' : '' %>>No</option>
+        </select>
+        <div class="help">No: we pay it, the landlord isn't charged.</div>
+      </div>
+      <div class="field">
+        <label for="f-amount">Price to us (£) <span class="req">*</span></label>
+        <input id="f-amount" name="amount" inputmode="decimal" placeholder="0.00" value="<%= values.amount || '' %>" required data-profit-cost>
+        <div class="help">What the contractor charges us.</div>
+        <% if (errors.amount) { %><div class="field-err"><%= errors.amount %></div><% } %>
+      </div>
+      <div class="field">
+        <label for="f-landlord_amount">Price to landlord (£)</label>
+        <input id="f-landlord_amount" name="landlord_amount" inputmode="decimal" placeholder="Same as price to us" value="<%= values.landlord_amount || '' %>" data-profit-price>
+        <div class="help">What the landlord is charged when it's deducted.</div>
+        <% if (errors.landlord_amount) { %><div class="field-err"><%= errors.landlord_amount %></div><% } %>
+      </div>
+      <div class="field">
+        <label>Profit (£)</label>
+        <output class="profit-out" data-profit-out>—</output>
+        <div class="help">Price to landlord minus price to us.</div>
+      </div>
     </div>
     <div class="field">
       <label for="f-invoice_date">Invoice date <span class="req">*</span></label>

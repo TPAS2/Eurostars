@@ -88,7 +88,15 @@ module.exports = function invoiceRoutes(db, config) {
       if (!ok) errors.added_by = 'Choose who added it.'; else v.added_by = who;
     }
     v.amount_pence = fmt.parseMoney(String(body.amount || '').trim());
-    if (Number.isNaN(v.amount_pence) || v.amount_pence <= 0) errors.amount = 'Enter the invoice total, e.g. 180.00.';
+    if (Number.isNaN(v.amount_pence) || v.amount_pence <= 0) errors.amount = 'Enter the price to us, e.g. 180.00.';
+    // Charge it to the landlord (Yes/No).
+    if (body.charge_landlord !== undefined) v.charge_landlord = body.charge_landlord === 'no' ? 0 : 1;
+    // The price to the landlord: blank means the same as the price to us (no profit).
+    if (body.landlord_amount !== undefined) {
+      const raw = String(body.landlord_amount || '').trim();
+      v.landlord_price_pence = raw ? fmt.parseMoney(raw) : null;
+      if (raw && (Number.isNaN(v.landlord_price_pence) || v.landlord_price_pence < 0)) errors.landlord_amount = 'Enter the price to the landlord, e.g. 220.00, or leave it blank.';
+    }
     v.maintenance_job_id = null;
     v.property_id = null;
     const noJob = body.maintenance_job_id === 'none';
@@ -191,6 +199,7 @@ module.exports = function invoiceRoutes(db, config) {
     }
     // "Upload & deduct from landlord": needs a property with a landlord to charge.
     const deduct = req.body.then === 'deduct';
+    if (deduct) v.charge_landlord = 1;
     let landlord = null;
     if (deduct) {
       landlord = v.property_id && db.prepare('SELECT l.id, l.name FROM properties p JOIN landlords l ON l.id = p.landlord_id WHERE p.id = ? AND p.account_id = ?').get(v.property_id, a);
@@ -232,7 +241,7 @@ module.exports = function invoiceRoutes(db, config) {
   router.get('/:id/edit', (req, res) => {
     const inv = loadInvoice(req, res);
     if (!inv) return;
-    renderForm(req, res, { invoice: inv, values: { ...inv, amount: fmt.penceToInput(inv.amount_pence) }, errors: {} });
+    renderForm(req, res, { invoice: inv, values: { ...inv, amount: fmt.penceToInput(inv.amount_pence), landlord_amount: inv.landlord_price_pence == null ? '' : fmt.penceToInput(inv.landlord_price_pence) }, errors: {} });
   });
 
   router.post('/:id', receiveUpload, (req, res) => {
@@ -307,6 +316,9 @@ module.exports = function invoiceRoutes(db, config) {
 
   // Mark an invoice paid; with chargeLandlord, the cost is deducted from the property's landlord
   // (an expense on their statement for the month of paidDate).
+  // What the landlord pays: the price to the landlord, else the price to us.
+  const landlordPrice = (inv) => (inv.landlord_price_pence ?? inv.amount_pence);
+
   function payInvoice(a, inv, { paidDate, method, reference = null, chargeLandlord }) {
     transaction(db, () => {
       let txnId = null;
@@ -316,7 +328,7 @@ module.exports = function invoiceRoutes(db, config) {
         const info = db.prepare(
           `INSERT INTO transactions (account_id, txn_date, txn_type, landlord_id, property_id, description, amount_pence)
            VALUES (?, ?, 'expense', ?, ?, ?, ?)`
-        ).run(a, paidDate, t.landlord_id || null, t.property_id || null, desc, inv.amount_pence);
+        ).run(a, paidDate, t.landlord_id || null, t.property_id || null, desc, landlordPrice(inv));
         txnId = Number(info.lastInsertRowid);
       }
       db.prepare(
@@ -325,7 +337,7 @@ module.exports = function invoiceRoutes(db, config) {
       ).run(paidDate, method, reference, txnId, inv.id, a);
       if (inv.maintenance_job_id) {
         db.prepare('UPDATE maintenance_jobs SET cost_pence = COALESCE(cost_pence, ?) WHERE id = ? AND account_id = ?')
-          .run(inv.amount_pence, inv.maintenance_job_id, a);
+          .run(landlordPrice(inv), inv.maintenance_job_id, a);
       }
     });
   }

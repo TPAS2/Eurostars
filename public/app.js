@@ -533,3 +533,31 @@ document.addEventListener('click', (e) => {
     if (!el.hidden) { const f = el.querySelector('input:not([type=hidden])'); if (f) f.focus(); }
   });
 })();
+
+// Contractor invoice form: profit = price to landlord − price to us, as you type.
+(function () {
+  const pence = (v) => { const n = Number(String(v || '').replace(/[£,\s]/g, '')); return Number.isFinite(n) ? Math.round(n * 100) : NaN; };
+  const money = (p) => `${p < 0 ? '−' : ''}£${(Math.abs(p) / 100).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  document.addEventListener('DOMContentLoaded', () => {
+    for (const box of document.querySelectorAll('[data-profit]')) {
+      const cost = box.querySelector('[data-profit-cost]');
+      const price = box.querySelector('[data-profit-price]');
+      const out = box.querySelector('[data-profit-out]');
+      const charge = box.querySelector('[data-profit-charge]');
+      const update = () => {
+        const charged = !charge || charge.value !== 'no';
+        price.disabled = !charged;
+        if (!charged) { out.textContent = 'Not charged'; out.className = 'profit-out muted'; return; }
+        const c = pence(cost.value);
+        const p = price.value.trim() ? pence(price.value) : c;
+        if (!cost.value.trim() || Number.isNaN(c) || Number.isNaN(p)) { out.textContent = '—'; out.className = 'profit-out'; return; }
+        out.textContent = money(p - c);
+        out.className = `profit-out ${p - c > 0 ? 'ok-text' : p - c < 0 ? 'bad-text' : ''}`;
+      };
+      cost.addEventListener('input', update);
+      price.addEventListener('input', update);
+      if (charge) charge.addEventListener('change', update);
+      update();
+    }
+  });
+})();

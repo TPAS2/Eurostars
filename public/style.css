@@ -684,3 +684,7 @@ table.cfp .num { text-align: right; }
 .invoice-actions { display: grid; gap: 12px; }
 .invoice-actions .inline-form, .invoice-actions .step-email { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .invoice-actions .step-email input[type=email] { min-width: 260px; }
+.price-trio { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px 16px; }
+.price-trio > .field { margin: 0; }
+.profit-out { display: flex; align-items: center; min-height: 40px; padding: 0 12px; border: 1px dashed var(--border); border-radius: 8px; font-weight: 700; font-size: 1.05rem; background: var(--surface-2); }
+@media (max-width: 760px) { .price-trio { grid-template-columns: 1fr; } }
