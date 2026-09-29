@@ -25,11 +25,9 @@
         <% const st = rowStatus(c); %>
         <td class="num money-cell">
           <div class="field"><input form="rec-form-<%= c.id %>" name="owed" inputmode="decimal" autocomplete="off" value="<%= c.owedEntered !== null ? fmt.penceToInput(c.owedEntered) : '' %>" placeholder="<%= fmt.penceToInput(c.owedCalculated) %>" aria-label="Money owed by <%= c.name %>"></div>
-          <% if (c.owedEntered !== null) { %><div class="muted small">calculated <%= fmt.money(c.owedCalculated) %></div><% } %>
         </td>
         <td class="num money-cell">
           <div class="field"><input form="rec-form-<%= c.id %>" name="received" inputmode="decimal" autocomplete="off" value="<%= c.receivedEntered !== null ? fmt.penceToInput(c.receivedEntered) : '' %>" placeholder="<%= fmt.penceToInput(c.receivedCalculated) %>" aria-label="Money in from <%= c.name %>"></div>
-          <% if (c.receivedEntered !== null) { %><div class="muted small">recorded <%= fmt.money(c.receivedCalculated) %></div><% } %>
         </td>
         <td class="date-cell"><div class="field"><input form="rec-form-<%= c.id %>" type="date" name="received_date" value="<%= c.receivedDate %>" aria-label="Date money received from <%= c.name %>"></div></td>
         <td class="date-cell"><div class="field"><input form="rec-form-<%= c.id %>" type="date" name="email_sent_date" value="<%= c.emailSentDate %>" aria-label="Date email sent to <%= c.name %>"></div></td>

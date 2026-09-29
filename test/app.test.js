@@ -1490,8 +1490,8 @@ test('council reconciliation: every council, money owed and in, notes, totals, m
   assert.equal(body.updates.find((u) => u.id === 'rec-total-owed').text, '£950.00');
   r = await c.get('/app/council-reconciliation?month=2026-08');
   assert.match(r.text, /name="owed"[^>]*value="950\.00"[^>]*placeholder="900\.00"/);
-  assert.match(r.text, /calculated £900\.00/);
-  assert.match(r.text, /recorded £500\.00/);
+  assert.doesNotMatch(r.text, /calculated £/);
+  assert.doesNotMatch(r.text, /recorded £/);
   assert.match(r.text, /id="rec-total-received">£950\.00/);
   saved = await save({ owed: 'lots', received: '' });
   assert.equal(saved.status, 422);
