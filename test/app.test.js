@@ -2368,3 +2368,61 @@ test('council reconciliation: Date received and Email sent date columns save, no
   await c.req('POST', '/app/council-reconciliation/notes', { council_id: String(council), month: '2026-09', notes: '', owed: '', received: '', received_date: '', email_sent_date: '' });
   assert.equal(db.prepare('SELECT COUNT(*) AS n FROM council_rec_notes WHERE council_id = ?').get(council).n, 0);
 });
+
+test('maintenance: a completed job has a landlord invoice to download and email', async () => {
+  const c = await registerAndLogin('job-invoice@example.com', 'Job Invoice Lets');
+  const co = db.prepare("SELECT id FROM users WHERE username = 'job-invoice'").get();
+  db.prepare("UPDATE users SET address = 'Unit 9 Netherhouse Farm', phone = '020 8882 5500', email = 'info@jobinvoice.example' WHERE id = ?").run(co.id);
+  let r = await c.post('/app/landlords', { name: 'Mrs Karen Wright', email: 'karen@example.com' });
+  const ll = idFrom(r.location);
+  r = await c.post('/app/properties', { address_line1: '2 Review Lodge', town: 'Review Road', postcode: 'RM10 9DB', landlord_id: String(ll), status: 'let' });
+  const prop = idFrom(r.location);
+  r = await c.post('/app/maintenance', { property_id: String(prop), title: 'Gas certificate', priority: 'normal', status: 'open', reported_date: '2026-09-01', cost_pence: '120' });
+  const job = idFrom(r.location);
+
+  r = await c.get(`/app/maintenance/${job}`);
+  assert.match(r.text, /Landlord invoice[\s\S]*?once this job is marked <strong>completed/);
+  r = await c.get(`/app/maintenance/${job}/invoice.pdf`);
+  assert.match(decodeURIComponent(r.location || ''), /once the job is marked completed/);
+
+  db.prepare("UPDATE maintenance_jobs SET status = 'completed' WHERE id = ?").run(job);
+  r = await c.get(`/app/maintenance/${job}`);
+  assert.match(r.text, /Download invoice \(PDF\)[\s\S]*?name="to" value="karen@example\.com"[\s\S]*?Email invoice/);
+  r = await c.get(`/app/maintenance/${job}/invoice.pdf?download=1`);
+  assert.equal(r.status, 200);
+  assert.equal(r.headers.get('content-type'), 'application/pdf');
+  assert.match(r.headers.get('content-disposition'), /attachment; filename="2_Review_Lodge_RM10_9DB_-_\w+_\d{4}\.pdf"/);
+  assert.ok(r.buf.subarray(0, 5).toString() === '%PDF-');
+  assert.ok(db.prepare('SELECT invoice_date FROM maintenance_jobs WHERE id = ?').get(job).invoice_date, 'dated when first made');
+
+  // The invoice date can be changed; the PDF uses it.
+  await c.get(`/app/maintenance/${job}`);
+  r = await c.post(`/app/maintenance/${job}/invoice/date`, { invoice_date: '2026-09-10' });
+  assert.match(decodeURIComponent(r.location), /Invoice dated 10\/09\/2026/);
+  const { jobInvoiceData, longDate } = require('../src/jobInvoice');
+  const data = jobInvoiceData(db, co.id, job);
+  assert.deepEqual(data.pdf.property, ['2 Review Lodge', 'Review Road', 'RM10 9DB']);
+  assert.equal(data.pdf.client, 'Mrs Karen Wright');
+  assert.deepEqual(data.pdf.items, ['Gas certificate']);
+  assert.equal(data.pdf.totalPence, 12000);
+  assert.equal(data.filename, '2_Review_Lodge_RM10_9DB_-_September_2026.pdf');
+  assert.deepEqual(longDate('2026-09-10'), { day: '10', suffix: 'th', rest: 'September 2026' });
+  assert.equal(longDate('2026-09-22').suffix, 'nd');
+
+  // Email it to the landlord, with the PDF attached.
+  await c.get(`/app/maintenance/${job}`);
+  sentMail.length = 0;
+  r = await c.post(`/app/maintenance/${job}/invoice/email`, { to: 'karen@example.com' });
+  assert.match(decodeURIComponent(r.location), /Emailed the invoice to karen@example\.com/);
+  assert.equal(sentMail.length, 1);
+  assert.equal(sentMail[0].to, 'karen@example.com');
+  assert.equal(sentMail[0].attachments[0].filename, '2_Review_Lodge_RM10_9DB_-_September_2026.pdf');
+  assert.equal(sentMail[0].attachments[0].content.subarray(0, 5).toString(), '%PDF-');
+  assert.match(sentMail[0].text, /£120\.00/);
+  r = await c.get(`/app/maintenance/${job}`);
+  assert.match(r.text, /Emailed to karen@example\.com on[\s\S]*?Email again/);
+
+  // Another company can't get it.
+  const other = await registerAndLogin('job-invoice-2@example.com', 'Other Invoice Lets');
+  assert.equal((await other.get(`/app/maintenance/${job}/invoice.pdf`)).status, 404);
+});

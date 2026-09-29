@@ -97,6 +97,7 @@ function ensureAdmin(db, config, log = console.log) {
 function createApp(config, db, { writer = null, mailer = null } = {}) {
   mailer = mailer || createMailer(config);
   const app = express();
+  app.locals.emailEnabled = !!(mailer && mailer.enabled);
   app.set('view engine', 'ejs');
   app.set('views', path.join(__dirname, '..', 'views'));
   app.disable('x-powered-by');
@@ -144,6 +145,7 @@ function createApp(config, db, { writer = null, mailer = null } = {}) {
   app.use('/app/tenancies', auth.requireLogin, require('./routes/agreements')(db));
   app.use('/app/rent-run', auth.requireLogin, require('./routes/payments')(db));
   app.use('/app/maintenance', auth.requireLogin, require('./routes/jobFiles')(db));
+  app.use('/app/maintenance', auth.requireLogin, require('./routes/jobInvoice')(db, mailer));
   app.use('/app/landlord-invoices', auth.requireLogin, require('./routes/landlordInvoices')(db, mailer));
   app.use(auth.rejectUncheckedMultipart);
   const monthly = require('./routes/monthly')(db, writer, mailer);

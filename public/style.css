@@ -681,3 +681,6 @@ table.cfp .num { text-align: right; }
 .rec-table .date-cell input { width: 138px; padding-left: 6px; padding-right: 4px; }
 .rec-table .notes-col { min-width: 170px; width: auto; }
 .rec-table th, .rec-table td { padding-left: 6px; padding-right: 6px; }
+.invoice-actions { display: grid; gap: 12px; }
+.invoice-actions .inline-form, .invoice-actions .step-email { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.invoice-actions .step-email input[type=email] { min-width: 260px; }

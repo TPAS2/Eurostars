@@ -50,17 +50,7 @@ module.exports = function monthlyRoutes(db, writer, mailer = { enabled: false })
   // ---------- month end ----------
 
   // The Rent run page (mounted at /app/rent-run): the month-end buttons and each landlord's status.
-  // Who a company's rent run emails come from: its own settings, else the defaults.
-  function senderFor(accountId) {
-    const c = db.prepare('SELECT agency_name, email, statement_from_email, statement_from_name, statement_reply_to FROM users WHERE id = ?').get(accountId);
-    return {
-      from: c.statement_from_email || '',
-      fromName: c.statement_from_name || c.agency_name,
-      replyTo: c.statement_reply_to || c.email || '',
-      saved: { from: c.statement_from_email || '', name: c.statement_from_name || '', replyTo: c.statement_reply_to || '' },
-      defaults: { from: mailer.defaultFrom || '', name: c.agency_name, replyTo: c.email || '' },
-    };
-  }
+  const senderFor = (accountId) => require('../sender').senderFor(db, mailer, accountId);
 
   router.post('/email/settings', (req, res) => {
     const month = st.isMonth(req.body.month) ? String(req.body.month) : st.previousMonth();

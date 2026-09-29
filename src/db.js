@@ -385,6 +385,11 @@ function openDatabase(file) {
   addColumnIfMissing(db, 'invoices', 'contractor_id', 'INTEGER REFERENCES contractors(id) ON DELETE SET NULL');
   addColumnIfMissing(db, 'council_rec_notes', 'received_date', 'TEXT');
   addColumnIfMissing(db, 'council_rec_notes', 'email_sent_date', 'TEXT');
+  // The landlord's maintenance invoice for a finished job: its date (set the first time it's
+  // made) and when it was last emailed.
+  addColumnIfMissing(db, 'maintenance_jobs', 'invoice_date', 'TEXT');
+  addColumnIfMissing(db, 'maintenance_jobs', 'invoice_emailed_at', 'TEXT');
+  addColumnIfMissing(db, 'maintenance_jobs', 'invoice_emailed_to', 'TEXT');
   // Every invoice supplier becomes a contractor (once), so the Contractors tab starts complete.
   for (const inv of db.prepare('SELECT id, account_id, supplier FROM invoices WHERE contractor_id IS NULL AND trim(supplier) != \'\'').all()) {
     db.prepare('UPDATE invoices SET contractor_id = ? WHERE id = ?').run(contractorFor(db, inv.account_id, inv.supplier), inv.id);

@@ -671,6 +671,12 @@ module.exports = function appRoutes(db) {
                       FROM maintenance_files f LEFT JOIN users u ON u.id = f.uploaded_by
                      WHERE f.account_id = ? AND f.job_id = ? ORDER BY f.id DESC`).all(a, row.id)
       : null;
+    // On a maintenance job: the landlord's invoice, once the job is completed.
+    const jobInvoice = def.key === 'maintenance' ? db.prepare(
+      `SELECT j.status, j.cost_pence, j.invoice_date, j.invoice_emailed_at, j.invoice_emailed_to, l.id AS landlord_id, l.name AS landlord_name, l.email AS landlord_email
+         FROM maintenance_jobs j JOIN properties p ON p.id = j.property_id LEFT JOIN landlords l ON l.id = p.landlord_id AND l.account_id = j.account_id
+        WHERE j.id = ? AND j.account_id = ?`
+    ).get(row.id, a) : null;
     // On a tenant's page: their current tenancy (or tenancies), with its council, property and agreement.
     let tenantBoxes = null;
     if (def.key === 'tenants' || def.key === 'tenancies') {
@@ -692,7 +698,7 @@ module.exports = function appRoutes(db) {
     const photo = def.key === 'councils'
       ? db.prepare("SELECT strftime('%s', updated_at) AS v FROM council_photos WHERE council_id = ? AND account_id = ?").get(row.id, a) || { v: null }
       : null;
-    res.render('show', { title: rowTitle(def, row, maps), section: sectionOf(def), def, row, maps, display, rowTitle, children, extra, invoices, related: relatedLists(def, row, a), certs, photo, tenantBoxes, statementLink, jobFiles, error: req.query.error ? String(req.query.error).slice(0, 200) : null, flash: req.query.flash ? String(req.query.flash).slice(0, 200) : null, fmt, today: fmt.today() });
+    res.render('show', { title: rowTitle(def, row, maps), section: sectionOf(def), def, row, maps, display, rowTitle, children, extra, invoices, related: relatedLists(def, row, a), certs, photo, tenantBoxes, statementLink, jobFiles, jobInvoice, error: req.query.error ? String(req.query.error).slice(0, 200) : null, flash: req.query.flash ? String(req.query.flash).slice(0, 200) : null, fmt, today: fmt.today() });
   });
 
   router.get('/:entity/:id/edit', (req, res) => {

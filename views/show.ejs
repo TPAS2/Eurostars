@@ -123,6 +123,39 @@
   <% }) %>
 <% } %>
 
+<% if (jobInvoice) { const ji = jobInvoice; const done = ji.status === 'completed'; %>
+<section class="card" id="landlord-invoice">
+  <div class="card-head"><h2>Landlord invoice</h2></div>
+  <% if (!done) { %>
+    <p class="muted">The maintenance invoice for <%= ji.landlord_name || 'the landlord' %> is ready to download and email once this job is marked <strong>completed</strong>.</p>
+  <% } else { %>
+    <p class="muted small">
+      Maintenance invoice to <strong><%= ji.landlord_name || 'no landlord set on the property' %></strong> for <strong><%= fmt.money(ji.cost_pence || 0) %></strong><%= ji.cost_pence ? '' : ' (add the cost to the job first)' %>.
+      <% if (ji.invoice_emailed_at) { %><br>Emailed to <%= ji.invoice_emailed_to %> on <%= fmt.ukDateTime(ji.invoice_emailed_at) %>.<% } %>
+    </p>
+    <div class="invoice-actions">
+      <div class="step-actions">
+        <a class="btn" href="/app/maintenance/<%= row.id %>/invoice.pdf" target="_blank" rel="noopener">View invoice</a>
+        <a class="btn primary" href="/app/maintenance/<%= row.id %>/invoice.pdf?download=1">Download invoice (PDF)</a>
+      </div>
+      <form method="post" action="/app/maintenance/<%= row.id %>/invoice/date" class="inline-form" data-no-keep>
+        <%- include('partials/csrf') %>
+        <label for="inv-date" class="small">Invoice date</label>
+        <input id="inv-date" type="date" name="invoice_date" value="<%= ji.invoice_date || today %>" required>
+        <button class="btn small" type="submit">Save date</button>
+      </form>
+      <form method="post" action="/app/maintenance/<%= row.id %>/invoice/email" class="step-email" data-busy="Sending…" data-no-keep>
+        <%- include('partials/csrf') %>
+        <label for="inv-to" class="small">Email to</label>
+        <input id="inv-to" type="email" name="to" value="<%= ji.landlord_email || '' %>" placeholder="landlord@example.com" required>
+        <button class="btn primary" type="submit" <%= emailEnabled ? '' : 'disabled' %>><%= ji.invoice_emailed_at ? 'Email again' : 'Email invoice' %></button>
+      </form>
+      <% if (!emailEnabled) { %><p class="muted small">Email isn't set up yet, so the invoice can only be downloaded for now.</p><% } %>
+    </div>
+  <% } %>
+</section>
+<% } %>
+
 <% if (jobFiles) { %>
 <section class="card" id="files">
   <div class="card-head">
