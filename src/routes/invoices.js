@@ -102,11 +102,9 @@ module.exports = function invoiceRoutes(db, config) {
       if (!p) errors.property_id = 'Choose a valid property.';
       else v.property_id = p.id;
     }
-    // Every section of the form must be filled in.
+    // Required: supplier, amount, invoice date and property. The job, notes and file are optional.
     if (!v.invoice_date && !errors.invoice_date) errors.invoice_date = 'Enter the invoice date.';
-    if (!v.maintenance_job_id && !noJob && !errors.maintenance_job_id) errors.maintenance_job_id = 'Choose the maintenance job, or None if there isn’t one.';
     if (!v.property_id && !errors.property_id) errors.property_id = 'Choose the property.';
-    if (!v.description) errors.description = 'Add a note about this invoice.';
     return { v, errors };
   }
 
@@ -186,9 +184,8 @@ module.exports = function invoiceRoutes(db, config) {
     const a = req.user.id;
     const { v, errors } = parseInvoice(req.body, a);
     if (req.uploadError) errors.file = req.uploadError;
-    else if (!req.file) errors.file = 'Attach the invoice (PDF or photo).';
     let stored = null;
-    if (!Object.keys(errors).length) {
+    if (!Object.keys(errors).length && req.file) {
       stored = saveFile(a, req.file);
       if (stored.error) { errors.file = stored.error; stored = null; }
     }

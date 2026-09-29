@@ -1946,13 +1946,25 @@ test('"Deduct from landlord" straight from adding a contractor or landlord invoi
 test('every section must be filled in when adding a contractor or landlord invoice', async () => {
   const c = await registerAndLogin('all-required@example.com', 'Required Lets');
   let r = await c.get('/app/invoices/new');
-  for (const name of ['file', 'supplier', 'amount', 'invoice_date', 'maintenance_job_id', 'property_id', 'added_by', 'description']) {
+  for (const name of ['supplier', 'amount', 'invoice_date', 'property_id', 'added_by']) {
     assert.match(r.text, new RegExp(`name="${name}"[^>]*required|required[^>]*name="${name}"`), `${name} is required on the contractor invoice form`);
   }
-  r = await c.post('/app/invoices', { supplier: 'Bare Minimum', amount: '10', file: new File([Buffer.from('%PDF-1.4\n')], 'x.pdf') }, { multipart: true });
+  // Notes, the maintenance job and the invoice file are optional.
+  for (const name of ['file', 'maintenance_job_id', 'description']) {
+    assert.doesNotMatch(r.text, new RegExp(`name="${name}"[^>]*required|required[^>]*name="${name}"`), `${name} is optional`);
+  }
+  r = await c.post('/app/invoices', { supplier: 'Bare Minimum', amount: '10' }, { multipart: true });
   assert.equal(r.status, 422);
-  assert.match(r.text, /Enter the invoice date[\s\S]*?Choose the maintenance job[\s\S]*?Choose the property[\s\S]*?Add a note/);
+  assert.match(r.text, /Enter the invoice date[\s\S]*?Choose the property/);
+  assert.doesNotMatch(r.text, /Choose the maintenance job|Add a note|Attach the invoice/);
   assert.equal(db.prepare("SELECT COUNT(*) n FROM invoices WHERE supplier = 'Bare Minimum'").get().n, 0);
+  const bareProp = idFrom((await c.post('/app/properties', { address_line1: '1 Bare Street', status: 'vacant' })).location);
+  await c.get('/app/invoices/new');
+  r = await c.post('/app/invoices', { supplier: 'Bare Minimum', amount: '10', invoice_date: '2026-09-01', property_id: String(bareProp), maintenance_job_id: '', description: '' }, { multipart: true });
+  assert.equal(r.status, 302, 'saved with no file, no job and no notes');
+  const bare = db.prepare("SELECT file_name, maintenance_job_id, description FROM invoices WHERE supplier = 'Bare Minimum'").get();
+  assert.deepEqual({ ...bare }, { file_name: null, maintenance_job_id: null, description: null });
+  assert.equal((await c.get(`/app/invoices/${idFrom(r.location)}`)).status, 200);
 
   r = await c.get('/app/landlord-invoices/new');
   for (const name of ['landlord_id', 'property_id', 'invoice_number', 'amount', 'invoice_date', 'due_date', 'description', 'notes']) {
@@ -1968,16 +1980,13 @@ test('contractor invoice job can be None; councils take several phone numbers an
   const c = await registerAndLogin('none-job@example.com', 'None Job Lets');
   const prop = idFrom((await c.post('/app/properties', { address_line1: '1 No Job Road', status: 'vacant' })).location);
   let r = await c.get('/app/invoices/new');
-  assert.match(r.text, /<option value="none" >None – no job<\/option>/);
+  assert.match(r.text, /<option value="none" selected>None – no job<\/option>/);
   const pdf = new File([Buffer.from('%PDF-1.4\n%x\n')], 'i.pdf');
   r = await c.post('/app/invoices', { supplier: 'Key Cutters', amount: '12', invoice_date: '2026-09-02', maintenance_job_id: 'none', property_id: String(prop), description: 'Spare keys', file: pdf }, { multipart: true });
   assert.equal(r.status, 302, r.text);
   const inv = db.prepare('SELECT maintenance_job_id, property_id FROM invoices WHERE id = ?').get(idFrom(r.location));
   assert.equal(inv.maintenance_job_id, null);
   assert.equal(inv.property_id, prop);
-  // Leaving it on "Choose…" is still not allowed.
-  r = await c.post('/app/invoices', { supplier: 'Key Cutters', amount: '12', invoice_date: '2026-09-02', maintenance_job_id: '', property_id: String(prop), description: 'x', file: pdf }, { multipart: true });
-  assert.match(r.text, /Choose the maintenance job, or None/);
   // Editing an invoice with no job shows None selected.
   const keyInvoice = db.prepare("SELECT id FROM invoices WHERE supplier = 'Key Cutters'").get().id;
   assert.match((await c.get(`/app/invoices/${keyInvoice}/edit`)).text, /<option value="none" selected>None – no job/);

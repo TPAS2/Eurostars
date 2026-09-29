@@ -10,9 +10,9 @@
   <form method="post" action="/app/invoices<%= invoice ? '/' + invoice.id : '' %>" enctype="multipart/form-data" class="form-grid" data-draft="invoice-<%= invoice ? invoice.id : 'new' %>">
     <%- include('../partials/csrf') %>
     <div class="field wide">
-      <label for="f-file">Invoice file <% if (!invoice) { %><span class="req">*</span><% } %></label>
-      <input id="f-file" type="file" name="file" accept="application/pdf,image/png,image/jpeg,image/webp" <%= invoice ? '' : 'required' %>>
-      <div class="help">PDF, PNG, JPG or WebP, up to 10 MB.<% if (invoice && invoice.file_original) { %> Current file: <%= invoice.file_original %>. Choose a new file to replace it.<% } %></div>
+      <label for="f-file">Invoice file</label>
+      <input id="f-file" type="file" name="file" accept="application/pdf,image/png,image/jpeg,image/webp">
+      <div class="help">Optional. PDF, PNG, JPG or WebP, up to 10 MB.<% if (invoice && invoice.file_original) { %> Current file: <%= invoice.file_original %>. Choose a new file to replace it.<% } %></div>
       <% if (errors.file) { %><div class="field-err"><%= errors.file %></div><% } %>
     </div>
     <div class="field">
@@ -33,13 +33,12 @@
       <% if (errors.invoice_date) { %><div class="field-err"><%= errors.invoice_date %></div><% } %>
     </div>
     <div class="field">
-      <label for="f-job">Maintenance job <span class="req">*</span></label>
-      <select id="f-job" name="maintenance_job_id" required>
-        <option value="">Choose…</option>
-        <option value="none" <%= values.maintenance_job_id === 'none' || (invoice && !values.maintenance_job_id) ? 'selected' : '' %>>None – no job</option>
+      <label for="f-job">Maintenance job</label>
+      <select id="f-job" name="maintenance_job_id">
+        <option value="none" <%= !values.maintenance_job_id || values.maintenance_job_id === 'none' ? 'selected' : '' %>>None – no job</option>
         <% jobs.forEach(j => { %><option value="<%= j.id %>" <%= Number(values.maintenance_job_id) === j.id ? 'selected' : '' %>><%= j.label %></option><% }) %>
       </select>
-      <div class="help">The property is taken from the job. Choose None if it isn’t for a logged repair. <a href="/app/maintenance/new" target="_blank" rel="noopener">+ New maintenance job</a></div>
+      <div class="help">Optional. The property is taken from the job. <a href="/app/maintenance/new" target="_blank" rel="noopener">+ New maintenance job</a></div>
       <% if (errors.maintenance_job_id) { %><div class="field-err"><%= errors.maintenance_job_id %></div><% } %>
     </div>
     <div class="field">
@@ -57,8 +56,8 @@
       </select>
     </div>
     <div class="field wide">
-      <label for="f-description">Notes <span class="req">*</span></label>
-      <textarea id="f-description" name="description" rows="3" required><%= values.description || '' %></textarea>
+      <label for="f-description">Notes</label>
+      <textarea id="f-description" name="description" rows="3"><%= values.description || '' %></textarea>
       <% if (errors.description) { %><div class="field-err"><%= errors.description %></div><% } %>
     </div>
     <div class="form-actions wide">
