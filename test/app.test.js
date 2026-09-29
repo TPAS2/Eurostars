@@ -76,10 +76,11 @@ class Client {
       else this.jar[name] = value;
     }
     this.cookie = Object.entries(this.jar).map(([k, v]) => `${k}=${v}`).join('; ');
-    const text = await res.text();
+    const buf = Buffer.from(await res.arrayBuffer());
+    const text = buf.toString('utf8');
     const m = text.match(/name="_csrf" value="([^"]+)"/);
     if (m) this.csrf = m[1];
-    return { status: res.status, location: res.headers.get('location'), text, headers: res.headers };
+    return { status: res.status, location: res.headers.get('location'), text, buf, headers: res.headers };
   }
   get(url) { return this.req('GET', url); }
   post(url, body, opts) { return this.req('POST', url, body, opts); }
@@ -1229,7 +1230,7 @@ test('signed out after an hour without use, then back to the same page', async (
   assert.equal((await d.get('/app')).location, '/login');
 });
 
-test('month end: calculate rents, email landlords, CSV report with preview, email the report', async () => {
+test('month end: calculate rents, email landlords, CFP report (Excel) with preview, email the report', async () => {
   const c = await registerAndLogin('month-end@example.com', 'Month End Lets');
   const accountId = db.prepare("SELECT id FROM users WHERE username = 'month-end'").get().id;
   db.prepare("UPDATE users SET email = 'office@monthend.example' WHERE id = ?").run(accountId);
@@ -1245,7 +1246,7 @@ test('month end: calculate rents, email landlords, CSV report with preview, emai
   assert.match((await c.get('/app')).text, /aria-label="Rent run"/, 'Rent run is in the menu');
   r = await c.get('/app/rent-run?month=2026-08');
   assert.match(r.text, /<h1>Rent run<\/h1>/);
-  for (const b of ['Calculate all rents', 'Email all landlords', 'Preview report', 'Download CSV', 'Email report']) assert.match(r.text, new RegExp(b), `has the ${b} button`);
+  for (const b of ['Calculate all rents', 'Email all landlords', 'Preview report', 'Download Excel', 'Email report']) assert.match(r.text, new RegExp(b), `has the ${b} button`);
   assert.match(r.text, /name="to" value="office@monthend.example"/, 'report goes to the agency by default');
 
   // 1. Calculate: raises the month's rent and works out every statement.
@@ -1288,31 +1289,44 @@ test('month end: calculate rents, email landlords, CSV report with preview, emai
   await c.post('/app/monthly/email', { month: '2026-08', landlord_id: String(ann) });
   assert.equal(sentMail.length, 1);
 
-  // 3. Report preview and CSV.
+  // 3. The CFP report: preview and Excel download, laid out like the agency's own workbook.
+  await c.post('/app/rent-run/instruction', { month: '2026-08', payment_date: '2026-09-17', p_include: [], p_landlord: [], p_name: [], p_sort: [], p_account: [], p_amount: [], p_ref: [] });
   r = await c.get('/app/monthly/report?month=2026-08');
-  assert.match(r.text, /Statements report/);
-  assert.match(r.text, /Ann Able[\s\S]*?1 First Street[\s\S]*?£1,000\.00[\s\S]*?−£100\.00[\s\S]*?£900\.00/);
-  assert.match(r.text, /Grand total/);
-  r = await c.get('/app/monthly/report.csv?month=2026-08');
+  assert.match(r.text, /Month End Lets Aug 2026 CFP Report/);
+  assert.match(r.text, /MONTH END LETS AUG 2026 CFP REPORT/);
+  assert.match(r.text, /17\/09\/2026<\/td><td><a[^>]*>Ann Able<\/a><\/td><td class="num">£900\.00<\/td><td>AA1<\/td>/);
+  assert.match(r.text, /Download Excel/);
+  r = await c.get('/app/monthly/report.xlsx?month=2026-08');
   assert.equal(r.status, 200);
-  assert.match(r.headers.get('content-type'), /text\/csv/);
-  assert.match(r.headers.get('content-disposition'), /statements-2026-08\.csv/);
-  const csv = r.text.replace(/^﻿/, '').trim().split('\r\n');
-  assert.equal(csv[0], 'Month,Landlord,Landlord code,Landlord email,Property,Rent due,Rent received,Management fees,Costs,Net for month,Rent outstanding,Balance at start,Paid to landlord,Balance held at end');
-  assert.ok(csv.includes('2026-08,Ann Able,AA1,ann@example.com,1 First Street,1000.00,1000.00,100.00,0.00,900.00,0.00,,,'));
-  assert.ok(csv.includes('2026-08,Ann Able,AA1,ann@example.com,Landlord total,1000.00,1000.00,100.00,0.00,900.00,0.00,0.00,0.00,900.00'));
-  assert.ok(csv.some((l) => l.startsWith("2026-08,'=Bad Formula,")), 'a name starting with = cannot run as a spreadsheet formula');
-  assert.ok(csv[csv.length - 1].startsWith('2026-08,ALL LANDLORDS,,,Grand total,1000.00,1000.00,100.00,0.00,900.00'));
+  assert.match(r.headers.get('content-type'), /spreadsheetml/);
+  assert.match(r.headers.get('content-disposition'), /Month_End_Lets_Aug_2026_CFP_Report\.xlsx/);
+  const ExcelJS = require('exceljs');
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.load(r.buf);
+  const ws = wb.worksheets[0];
+  assert.equal(ws.name, 'Month End Lets Aug 2026 CFP Rep');
+  assert.equal(ws.getCell('A1').value, 'MONTH END LETS AUG 2026 CFP REPORT');
+  assert.deepEqual([1, 2, 3, 4].map((i) => ws.getRow(3).getCell(i).value), ['Date', 'Name', 'Debit', 'LCODE']);
+  assert.equal(ws.getCell('B4').value, 'Ann Able');
+  assert.equal(ws.getCell('C4').value, 900);
+  assert.equal(ws.getCell('D4').value, 'AA1');
+  assert.equal(new Date(ws.getCell('A4').value).toISOString().slice(0, 10), '2026-09-17');
+  assert.equal(ws.getCell('C6').value.formula, 'SUM(C4:C5)');
+  assert.equal(ws.getCell('C6').value.result, 900);
 
-  // 4. Email the report, with the CSV attached.
-  await c.get('/app/monthly/report?month=2026-08');
+  // 4. Preview, then email the same report with the workbook attached.
+  r = await c.get('/app/monthly/report?month=2026-08&step=4');
+  assert.match(r.text, /Email this report to[\s\S]*?Email report/);
   sentMail.length = 0;
   r = await c.post('/app/monthly/report/email', { month: '2026-08', to: 'boss@example.com', back: 'report' });
-  assert.match(r.location, /^\/app\/monthly\/report\?month=2026-08&flash=/);
+  assert.match(r.location, /^\/app\/monthly\/report\?month=2026-08&step=4&flash=/);
   assert.equal(sentMail.length, 1);
   assert.equal(sentMail[0].to, 'boss@example.com');
-  assert.equal(sentMail[0].attachments[0].filename, 'statements-2026-08.csv');
-  assert.match(sentMail[0].attachments[0].content, /Ann Able/);
+  assert.equal(sentMail[0].subject, 'Month End Lets Aug 2026 CFP Report');
+  assert.equal(sentMail[0].attachments[0].filename, 'Month_End_Lets_Aug_2026_CFP_Report.xlsx');
+  const attached = new ExcelJS.Workbook();
+  await attached.xlsx.load(sentMail[0].attachments[0].content);
+  assert.equal(attached.worksheets[0].getCell('B4').value, 'Ann Able');
   r = await c.post('/app/monthly/report/email', { month: '2026-08', to: 'not-an-email' });
   assert.match(decodeURIComponent(r.location.replace(/\+/g, ' ')), /Enter the email address/);
 
@@ -1329,7 +1343,7 @@ test('month end: calculate rents, email landlords, CSV report with preview, emai
 
   // Another company can't see this report.
   const other = await registerAndLogin('month-end-2@example.com', 'Other End');
-  r = await other.get('/app/monthly/report.csv?month=2026-08');
+  r = await other.get('/app/monthly/report?month=2026-08');
   assert.doesNotMatch(r.text, /Ann Able/);
 });
 
@@ -1401,7 +1415,7 @@ test('the admin chooses which tabs each person sees; hidden tabs are blocked', a
   const labels = [...rail.matchAll(/aria-label="([^"]+)"/g)].map((m) => m[1]).slice(1);
   assert.deepEqual(labels, ['Properties', 'Tenants', 'Maintenance']);
   assert.equal((await c.get('/app/properties')).status, 200);
-  for (const blocked of ['/app/landlords', '/app/landlords/new', '/app/rent-run', '/app/monthly/report.csv?month=2026-08', '/app/invoices', '/app/councils', '/app/council-reconciliation']) {
+  for (const blocked of ['/app/landlords', '/app/landlords/new', '/app/rent-run', '/app/monthly/report.xlsx?month=2026-08', '/app/invoices', '/app/councils', '/app/council-reconciliation']) {
     r = await c.get(blocked);
     assert.equal(r.status, 403, blocked);
   }

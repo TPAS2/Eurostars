@@ -144,4 +144,68 @@ function reportEmail({ agencyName, report }) {
   return { subject, text, html, filename: `statements-${report.month}.csv` };
 }
 
-module.exports = { statementsReport, reportCsv, statementEmail, reportEmail, csvCell };
+// ---------- the CFP report (Excel) ----------
+// One line per landlord being paid: Date, Name, Debit, LCODE, with a total, laid out like the
+// agency's own "… CFP REPORT" workbook. Debit is what's held for the landlord at the end of
+// the month; Date is the payment date from step 5, or today.
+
+const SHORT_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'June', 'July', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec'];
+
+function cfpReport(db, accountId, month, today = fmt.today()) {
+  const agency = db.prepare('SELECT agency_name FROM users WHERE id = ?').get(accountId);
+  const instr = db.prepare('SELECT data_json FROM payment_instructions WHERE account_id = ? AND month = ?').get(accountId, month);
+  const payDate = (instr && JSON.parse(instr.data_json).payment_date) || today;
+  const rows = db.prepare(
+    `SELECT l.id AS landlord_id, l.name, l.code, s.id AS statement_id, s.closing_pence
+       FROM monthly_statements s JOIN landlords l ON l.id = s.landlord_id AND l.account_id = s.account_id
+      WHERE s.account_id = ? AND s.month = ? AND s.closing_pence > 0
+      ORDER BY l.code IS NULL OR l.code = '', l.code COLLATE NOCASE, l.name COLLATE NOCASE`
+  ).all(accountId, month).map((r) => ({ ...r, date: payDate, debit: r.closing_pence }));
+  const [y, m] = month.split('-').map(Number);
+  const label = `${agency.agency_name} ${SHORT_MONTHS[m - 1]} ${y} CFP Report`;
+  return {
+    month, monthLabel: monthLabel(month), date: payDate, rows, total: rows.reduce((t, r) => t + r.debit, 0),
+    label, title: label.toUpperCase(),
+    sheetName: label.replace(/[\\/?*[\]:]/g, ' ').slice(0, 31),
+    filename: `${label.replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '_')}.xlsx`,
+  };
+}
+
+// The workbook: title in A1, headings in row 3, one row per payment, a blank row, then the total.
+async function cfpWorkbook(report) {
+  const ExcelJS = require('exceljs');
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet(report.sheetName);
+  const font = { name: 'Aptos Narrow', size: 11 };
+  ws.columns = [{ width: 11.9 }, { width: 31.4 }, { width: 11.2 }, { width: 9 }];
+  ws.getCell('A1').value = report.title;
+  ws.getCell('A1').font = { ...font, bold: true };
+  ['Date', 'Name', 'Debit', 'LCODE'].forEach((h, i) => { const c = ws.getRow(3).getCell(i + 1); c.value = h; c.font = { ...font, bold: true }; });
+  report.rows.forEach((r, i) => {
+    const row = ws.getRow(4 + i);
+    const [yy, mm, dd] = r.date.split('-').map(Number);
+    row.getCell(1).value = new Date(Date.UTC(yy, mm - 1, dd));
+    row.getCell(1).numFmt = 'mm-dd-yy';
+    row.getCell(2).value = r.name;
+    row.getCell(3).value = r.debit / 100;
+    row.getCell(4).value = r.code || '';
+    for (let c = 1; c <= 4; c++) row.getCell(c).font = font;
+  });
+  const last = 3 + report.rows.length;
+  const totalCell = ws.getCell(`C${last + 2}`);
+  totalCell.value = { formula: `SUM(C4:C${last + 1})`, result: report.total / 100 };
+  totalCell.font = font;
+  return Buffer.from(await wb.xlsx.writeBuffer());
+}
+
+function cfpEmail({ agencyName, report }) {
+  const subject = report.label;
+  const text = [
+    `Attached is the ${report.title} (${report.rows.length} landlord${report.rows.length === 1 ? '' : 's'}, total ${fmt.money(report.total)}).`, '',
+    agencyName,
+  ].join('\n');
+  const html = `<!doctype html><html><body style="font-family:Arial,Helvetica,sans-serif;color:#111827;"><p>${esc(text).replace(/\n/g, '<br>')}</p></body></html>`;
+  return { subject, text, html, filename: report.filename };
+}
+
+module.exports = { statementsReport, reportCsv, statementEmail, reportEmail, csvCell, cfpReport, cfpWorkbook, cfpEmail };

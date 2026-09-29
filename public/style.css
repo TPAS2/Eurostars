@@ -668,3 +668,10 @@ details.fold[open] > summary { margin-bottom: 12px; }
 .sender-settings .field input { width: 100%; }
 .sender-settings .form-actions { grid-column: 1 / -1; }
 @media (max-width: 760px) { .sender-settings.form-grid { grid-template-columns: 1fr; } }
+
+.sheet-preview .sheet-title { font-weight: 700; margin: 0 0 12px; letter-spacing: .02em; }
+table.cfp { max-width: 720px; }
+table.cfp td, table.cfp th { text-align: left; }
+table.cfp .num { text-align: right; }
+.report-actions .step-email { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.report-actions .step-email input[type=email] { min-width: 260px; }

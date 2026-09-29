@@ -160,55 +160,61 @@ module.exports = function monthlyRoutes(db, writer, mailer = { enabled: false })
     backTo(res, month, { flash: parts.join(' '), error });
   }));
 
-  // Step 3: the report, as a page to check and as a CSV download.
+  // Steps 3 and 4: the CFP report (an Excel workbook), as a page to check, a download and an email.
   router.get('/report', (req, res) => {
     const month = st.isMonth(req.query.month) ? String(req.query.month) : st.previousMonth();
-    const report = monthend.statementsReport(db, req.user.id, month);
+    const report = monthend.cfpReport(db, req.user.id, month);
+    const missing = db.prepare(
+      `SELECT COUNT(*) AS n FROM landlords l WHERE l.account_id = ?
+         AND NOT EXISTS (SELECT 1 FROM monthly_statements s WHERE s.landlord_id = l.id AND s.account_id = l.account_id AND s.month = ?)`
+    ).get(req.user.id, month).n;
     const me = db.prepare('SELECT COALESCE(m.email, c.email) AS email FROM users m JOIN users c ON c.id = COALESCE(m.company_id, m.id) WHERE m.id = ?').get(req.user.person_id);
     res.render('monthly/report', {
-      title: `Statements report · ${report.monthLabel}`, section: 'rentrun', report, fmt, emailEnabled: mailer.enabled, reportTo: (me && me.email) || '',
+      title: report.label, section: 'rentrun', report, missing, fmt, emailEnabled: mailer.enabled, reportTo: (me && me.email) || '',
+      step: req.query.step === '4' ? 4 : 3,
       flash: String(req.query.flash || '').slice(0, 500), error: String(req.query.error || '').slice(0, 500),
     });
   });
 
-  router.get('/report.csv', (req, res) => {
+  router.get('/report.xlsx', wrap(async (req, res) => {
     const month = st.isMonth(req.query.month) ? String(req.query.month) : st.previousMonth();
-    const report = monthend.statementsReport(db, req.user.id, month);
-    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="statements-${month}.csv"`);
+    const report = monthend.cfpReport(db, req.user.id, month);
+    const xlsx = await monthend.cfpWorkbook(report);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${report.filename}"`);
     res.setHeader('Cache-Control', 'private, no-store');
-    res.send(monthend.reportCsv(report));
-  });
+    res.end(xlsx);
+  }));
 
-  // Step 4: email the CSV report.
+  // Step 4: email the report, with the workbook attached.
   router.post('/report/email', wrap(async (req, res) => {
     const month = monthFrom(req);
     const back = (opts) => {
       if (req.body.back === 'report') {
-        const q = new URLSearchParams({ month: month || st.previousMonth(), ...opts });
+        const q = new URLSearchParams({ month: month || st.previousMonth(), step: '4', ...opts });
         return res.redirect(`/app/monthly/report?${q}`);
       }
       return backTo(res, month || st.previousMonth(), opts);
     };
     if (!month) return back({ error: 'Choose a valid month.' });
-    if (!mailer.enabled) return back({ error: 'Email isn’t set up yet, so the report wasn’t sent. Download the CSV instead.' });
+    if (!mailer.enabled) return back({ error: 'Email isn’t set up yet, so the report wasn’t sent. Download it instead.' });
     const to = String(req.body.to || '').trim();
     if (!isEmail(to)) return back({ error: 'Enter the email address to send the report to.' });
-    const report = monthend.statementsReport(db, req.user.id, month);
-    if (!report.landlords.length) return back({ error: `There are no statements for ${report.monthLabel} yet. Calculate them first.` });
+    const report = monthend.cfpReport(db, req.user.id, month);
+    if (!report.rows.length) return back({ error: `There's nothing to report for ${report.monthLabel} yet. Calculate the rents first.` });
     const agency = db.prepare('SELECT agency_name, email FROM users WHERE id = ?').get(req.user.id);
-    const email = monthend.reportEmail({ agencyName: agency.agency_name, report });
+    const email = monthend.cfpEmail({ agencyName: agency.agency_name, report });
     const sender = senderFor(req.user.id);
     try {
       await mailer.send({
         to, subject: email.subject, text: email.text, html: email.html, from: sender.from, fromName: sender.fromName, replyTo: sender.replyTo,
-        attachments: [{ filename: email.filename, content: monthend.reportCsv(report), contentType: 'text/csv' }],
+        attachments: [{ filename: email.filename, content: await monthend.cfpWorkbook(report), contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }],
       });
     } catch (err) {
       console.error('Report email failed:', err.message);
       return back({ error: `The report couldn’t be sent: ${String(err.message).slice(0, 120)}` });
     }
-    back({ flash: `Emailed the ${report.monthLabel} statements report to ${to}.` });
+    back({ flash: `Emailed the ${report.label} to ${to}.` });
   }));
 
   router.get('/:id', (req, res) => {

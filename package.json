@@ -19,6 +19,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.128.0",
     "ejs": "^3.1.10",
+    "exceljs": "^4.4.0",
     "express": "^4.21.2",
     "multer": "^2.4.0",
     "nodemailer": "^7.0.13",

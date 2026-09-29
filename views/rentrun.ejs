@@ -58,14 +58,15 @@
       </form>
     </li>
     <li>
-      <div><strong>Statements report</strong><p class="muted small">Every landlord's statement for <%= monthLabel %> in one CSV spreadsheet, one line per property with totals. Check it in the preview first.</p></div>
+      <div><strong>CFP report</strong><p class="muted small">The Excel workbook of every landlord being paid for <%= monthLabel %>: date, name, amount and landlord code, with the total. Check it in the preview first.</p></div>
       <div class="step-actions">
         <a class="btn" href="/app/monthly/report?month=<%= month %>">Preview report</a>
-        <a class="btn primary <%= generated ? '' : 'disabled' %>" href="/app/monthly/report.csv?month=<%= month %>" <%- generated ? '' : 'aria-disabled="true" tabindex="-1"' %>>Download CSV</a>
+        <a class="btn primary <%= generated ? '' : 'disabled' %>" href="/app/monthly/report.xlsx?month=<%= month %>" <%- generated ? '' : 'aria-disabled="true" tabindex="-1"' %>>Download Excel</a>
       </div>
     </li>
     <li>
-      <div><strong>Email the report</strong><p class="muted small">Sends the CSV report as an attachment.</p></div>
+      <div><strong>Email the report</strong><p class="muted small">Sends the same CFP report, as the Excel workbook attached.</p></div>
+      <a class="btn" href="/app/monthly/report?month=<%= month %>&step=4">Preview report</a>
       <form method="post" action="/app/monthly/report/email" class="step-email" data-busy="Sending…">
         <%- include('partials/csrf') %><input type="hidden" name="month" value="<%= month %>">
         <input type="email" name="to" value="<%= reportTo %>" placeholder="name@example.com" aria-label="Send the report to" required>
