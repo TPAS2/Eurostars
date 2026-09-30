@@ -27,9 +27,8 @@
       <% if (errors.property_id) { %><div class="field-err"><%= errors.property_id %></div><% } %>
     </div>
     <div class="field">
-      <label for="f-number">Invoice number <span class="req">*</span></label>
-      <input id="f-number" name="invoice_number" value="<%= values.invoice_number || '' %>" required>
-      <% if (errors.invoice_number) { %><div class="field-err"><%= errors.invoice_number %></div><% } %>
+      <label>Invoice number</label>
+      <div class="static-value"><strong><%= inv ? inv.invoice_number : values.invoice_number %></strong> <span class="muted small">set automatically</span></div>
     </div>
     <div class="field">
       <label for="f-amount">Amount (£) <span class="req">*</span></label>

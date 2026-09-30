@@ -1818,13 +1818,14 @@ test('landlord invoices: bill a landlord, deduct from rent or mark paid, print a
   assert.match((await c.get('/app/invoices')).text, /<h1>Contractors invoices<\/h1>/);
 
   r = await c.get(`/app/landlord-invoices/new?property_id=${prop}`);
-  assert.match(r.text, /name="invoice_number" value="LI-0001"/);
+  assert.match(r.text, /Invoice number<\/label>\s*<div class="static-value"><strong>LI-0001<\/strong> <span class="muted small">set automatically/);
+  assert.doesNotMatch(r.text, /name="invoice_number"/);
   assert.match(r.text, new RegExp(`<option value="${larry}" selected>Larry Landlord`), 'landlord filled in from the property');
   r = await c.post('/app/landlord-invoices', { landlord_id: String(larry), property_id: String(prop), invoice_number: 'LI-0001', invoice_date: '2026-08-04', due_date: '2026-08-18', description: 'Tenant find fee', amount: '£300', notes: 'Thank you' });
   const inv1 = idFrom(r.location);
   r = await c.post('/app/landlord-invoices', { landlord_id: '', invoice_number: '', invoice_date: 'x', description: '', amount: 'lots' });
   assert.equal(r.status, 422);
-  assert.match((await c.get('/app/landlord-invoices/new')).text, /value="LI-0002"/, 'numbers count up');
+  assert.match((await c.get('/app/landlord-invoices/new')).text, /<strong>LI-0002<\/strong>/, 'numbers count up');
 
   // The invoice page is printable, with who it's billed to.
   r = await c.get(`/app/landlord-invoices/${inv1}`);
@@ -1985,7 +1986,7 @@ test('every section must be filled in when adding a contractor or landlord invoi
   assert.equal((await c.get(`/app/invoices/${idFrom(r.location)}`)).status, 200);
 
   r = await c.get('/app/landlord-invoices/new');
-  for (const name of ['landlord_id', 'property_id', 'invoice_number', 'amount', 'invoice_date', 'description']) {
+  for (const name of ['landlord_id', 'property_id', 'amount', 'invoice_date', 'description']) {
     assert.match(r.text, new RegExp(`name="${name}"[^>]*required|required[^>]*name="${name}"`), `${name} is required on the landlord invoice form`);
   }
   const ll = idFrom((await c.post('/app/landlords', { name: 'Req Landlord' })).location);
@@ -2776,4 +2777,12 @@ test('landlord invoice: Download invoice gives a PDF', async () => {
   assert.equal(r.buf.subarray(0, 5).toString(), '%PDF-');
   const other = await registerAndLogin('li-download-2@example.com', 'Other LI Lets');
   assert.equal((await other.get(`/app/landlord-invoices/${id}/invoice.pdf`)).status, 404);
+});
+
+test('invoice tabs: month boxes on Landlord invoices like Contractors invoices, and centred boxes on both', async () => {
+  const c = await registerAndLogin('li-tiles@example.com', 'LI Tiles Lets');
+  let r = await c.get('/app/landlord-invoices?month=2026-09');
+  assert.match(r.text, /<section class="tiles centered-tiles">[\s\S]*?Unpaid · September 2026[\s\S]*?Unpaid · all months[\s\S]*?Paid · September 2026/);
+  r = await c.get('/app/invoices?month=2026-09');
+  assert.match(r.text, /<section class="tiles centered-tiles">[\s\S]*?Unpaid · all months/);
 });

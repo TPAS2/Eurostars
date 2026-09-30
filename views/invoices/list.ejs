@@ -9,7 +9,7 @@
 <% if (flash) { %><div class="notice ok"><%= flash %></div><% } %>
 <%- include('../partials/month-nav', { base: '/app/invoices', keep: status === 'all' ? {} : { status }, allowAll: true }) %>
 
-<section class="tiles">
+<section class="tiles centered-tiles">
   <% const plural = (n) => `${n} invoice${n === 1 ? '' : 's'}`; %>
   <% if (monthTotals) { %><a class="tile <%= monthTotals.unpaid_n ? 'warn' : '' %>" href="/app/invoices?month=<%= month %>&status=unpaid"><span class="label">Unpaid · <%= monthLabel %></span><span class="value"><%= fmt.money(monthTotals.unpaid) %></span><span class="sub"><%= plural(monthTotals.unpaid_n) %></span></a><% } %>
   <a class="tile <%= totals.unpaid_n ? 'warn' : '' %>" href="/app/invoices?status=unpaid&month=all"><span class="label">Unpaid · all months</span><span class="value"><%= fmt.money(totals.unpaid) %></span><span class="sub"><%= plural(totals.unpaid_n) %><%= totals.overdue_n ? ` · ${fmt.money(totals.overdue)} past due` : '' %></span></a>

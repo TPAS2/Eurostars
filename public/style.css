@@ -724,3 +724,5 @@ table.council-db td { white-space: nowrap; font-size: .85rem; }
 .lodge-note { position: absolute; left: 36px; bottom: 8px; color: #f00; font-weight: 700; }
 .lodge-total { display: flex; justify-content: space-between; padding: 12px 29px 26px 10px; font-size: 16px; border-top: 0; }
 @media print { .lodge-sheet { border: 0; box-shadow: none; padding: 0; } .lodge-page { padding-top: 0; } }
+.centered-tiles .tile { text-align: center; align-items: center; }
+.static-value { padding: 9px 0; }

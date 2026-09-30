@@ -46,7 +46,6 @@ module.exports = function landlordInvoiceRoutes(db, mailer = { enabled: false })
     const v = {
       landlord_id: Number(body.landlord_id) || null,
       property_id: Number(body.property_id) || null,
-      invoice_number: clip(body.invoice_number, 30),
       invoice_date: clip(body.invoice_date, 10),
       due_date: clip(body.due_date, 10) || null,
       description: clip(body.description, 500),
@@ -57,7 +56,6 @@ module.exports = function landlordInvoiceRoutes(db, mailer = { enabled: false })
     // Every section of the form must be filled in.
     if (!v.property_id) errors.property_id = 'Choose the property.';
     if (v.property_id && !db.prepare('SELECT 1 FROM properties WHERE id = ? AND account_id = ?').get(v.property_id, accountId)) errors.property_id = 'Choose a valid property.';
-    if (!v.invoice_number) errors.invoice_number = 'Enter an invoice number.';
     if (!fmt.isIsoDate(v.invoice_date)) errors.invoice_date = 'Enter the invoice date.';
     if (v.due_date && !fmt.isIsoDate(v.due_date)) errors.due_date = 'Enter a valid due date.';
     if (!v.description) errors.description = 'Say what the invoice is for.';
@@ -88,9 +86,15 @@ module.exports = function landlordInvoiceRoutes(db, mailer = { enabled: false })
               COALESCE(SUM(CASE WHEN status = 'unpaid' AND due_date < ? THEN amount_pence END), 0) AS overdue
          FROM landlord_invoices WHERE account_id = ?`
     ).get(today, a);
+    // The chosen month's unpaid and paid invoices (by invoice date), like the contractor invoices.
+    const monthTotals = month === 'all' ? null : db.prepare(
+      `SELECT COALESCE(SUM(CASE WHEN status = 'unpaid' THEN amount_pence END), 0) AS unpaid, COUNT(CASE WHEN status = 'unpaid' THEN 1 END) AS unpaid_n,
+              COALESCE(SUM(CASE WHEN status = 'paid' THEN amount_pence END), 0) AS paid, COUNT(CASE WHEN status = 'paid' THEN 1 END) AS paid_n
+         FROM landlord_invoices WHERE account_id = ? AND substr(invoice_date, 1, 7) = ?`
+    ).get(a, month);
     const shift = (by) => { const [y, m] = (month === 'all' ? thisMonth : month).split('-').map(Number); return new Date(Date.UTC(y, m - 1 + by, 1)).toISOString().slice(0, 7); };
     res.render('landlordinvoices/list', {
-      title: 'Landlord invoices', section: 'landlordinvoices', invoices, totals, status, month, prev: shift(-1), next: shift(1), thisMonth,
+      title: 'Landlord invoices', section: 'landlordinvoices', invoices, totals, monthTotals, status, month, prev: shift(-1), next: shift(1), thisMonth,
       monthLabel: month === 'all' ? 'All months' : st.monthLabel(month), statementLink, today, fmt, flash: clip(req.query.flash, 300),
     });
   });
@@ -109,7 +113,8 @@ module.exports = function landlordInvoiceRoutes(db, mailer = { enabled: false })
   router.post('/', (req, res) => {
     const a = req.user.id;
     const { v, errors } = parse(req.body, a);
-    if (Object.keys(errors).length) return renderForm(req, res, { inv: null, values: req.body, errors, status: 422 });
+    if (Object.keys(errors).length) return renderForm(req, res, { inv: null, values: { ...req.body, invoice_number: nextNumber(a) }, errors, status: 422 });
+    v.invoice_number = nextNumber(a); // LI- and the next number, set by Rift
     const cols = Object.keys(v);
     const info = db.prepare(`INSERT INTO landlord_invoices (account_id, ${cols.join(', ')}) VALUES (?, ${cols.map(() => '?').join(', ')})`).run(a, ...cols.map((c) => v[c]));
     const id = Number(info.lastInsertRowid);
@@ -144,7 +149,8 @@ module.exports = function landlordInvoiceRoutes(db, mailer = { enabled: false })
     if (!inv) return;
     const a = req.user.id;
     const { v, errors } = parse(req.body, a);
-    if (Object.keys(errors).length) return renderForm(req, res, { inv, values: req.body, errors, status: 422 });
+    if (Object.keys(errors).length) return renderForm(req, res, { inv, values: { ...req.body, invoice_number: inv.invoice_number }, errors, status: 422 });
+    v.invoice_number = inv.invoice_number;
     const cols = Object.keys(v);
     transaction(db, () => {
       db.prepare(`UPDATE landlord_invoices SET ${cols.map((c) => `${c} = ?`).join(', ')} WHERE id = ? AND account_id = ?`).run(...cols.map((c) => v[c]), inv.id, a);

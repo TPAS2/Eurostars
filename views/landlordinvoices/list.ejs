@@ -9,8 +9,10 @@
 <% if (flash) { %><div class="notice ok"><%= flash %></div><% } %>
 <%- include('../partials/month-nav', { base: '/app/landlord-invoices', keep: status === 'all' ? {} : { status }, allowAll: true }) %>
 
-<section class="tiles">
+<section class="tiles centered-tiles">
+  <% if (monthTotals) { %><a class="tile <%= monthTotals.unpaid_n ? 'warn' : '' %>" href="/app/landlord-invoices?month=<%= month %>&status=unpaid"><span class="label">Unpaid · <%= monthLabel %></span><span class="value"><%= fmt.money(monthTotals.unpaid) %></span><span class="sub"><%= monthTotals.unpaid_n %> invoice<%= monthTotals.unpaid_n === 1 ? '' : 's' %></span></a><% } %>
   <a class="tile <%= totals.unpaid_n ? 'warn' : '' %>" href="/app/landlord-invoices?status=unpaid&month=all"><span class="label">Unpaid · all months</span><span class="value"><%= fmt.money(totals.unpaid) %></span><span class="sub"><%= totals.unpaid_n %> invoice<%= totals.unpaid_n === 1 ? '' : 's' %><%= totals.overdue ? ` · ${fmt.money(totals.overdue)} past due` : '' %></span></a>
+  <% if (monthTotals) { %><a class="tile ok" href="/app/landlord-invoices?month=<%= month %>&status=paid"><span class="label">Paid · <%= monthLabel %></span><span class="value"><%= fmt.money(monthTotals.paid) %></span><span class="sub"><%= monthTotals.paid_n %> invoice<%= monthTotals.paid_n === 1 ? '' : 's' %></span></a><% } %>
 </section>
 
 <section class="card">
