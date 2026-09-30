@@ -661,7 +661,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const p = pence % 100;
     let w = `${whole(pounds)} pound${pounds === 1 ? '' : 's'}`;
     w += p ? ` and ${whole(p)} ${p === 1 ? 'penny' : 'pence'}` : ' only';
-    return w.charAt(0).toUpperCase() + w.slice(1);
+    return w.toUpperCase();
   };
   // "5000", "£5,000.5", "5000-50" → pence; anything else → null.
   const toPence = (v) => {

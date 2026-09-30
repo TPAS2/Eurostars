@@ -1629,7 +1629,7 @@ test('rent run step 5: payment instruction template and a filled-in instruction 
   assert.match(r.text, /<\/ol>\s*<\/section>\s*<section class="card step5" id="payment-instruction">[\s\S]*?Metro Bank Bulk Payment Instruction[\s\S]*?class="btn small blank-form"[^>]*>Blank form/);
   assert.doesNotMatch(r.text, /Check payments/);
   assert.match(r.text, /name="totalFigures" value="£1,000-00"/, 'total worked out from the payments');
-  assert.match(r.text, /name="totalWords" value="One thousand pounds only"/);
+  assert.match(r.text, /name="totalWords" value="ONE THOUSAND POUNDS ONLY"/);
   assert.match(r.text, /name="count" value="1"/);
   assert.doesNotMatch(r.text, /name="store"/, 'no Store box');
   assert.match(r.text, /name="contact_name" value="Test User"/, 'contact name suggested');
@@ -1674,8 +1674,8 @@ test('rent run step 5: payment instruction template and a filled-in instruction 
   const bytes = await fillMetroForm({ store: 'Borehamwood', accountName: 'Pay Lets Client Account', contactName: 'Theo', accountNumber: '87654321',
     valueDate: '01/09/2026', payees: [{ name: 'P Paid', sort_code: '12-34-56', account_number: '12345678', reference: 'PP1', pence: 100000 }], monthLabel: 'August 2026' });
   assert.equal((await PDFDocument.load(bytes)).getPageCount(), 2, 'Metro form page plus the payments page');
-  assert.equal(amountInWords(123456), 'One thousand two hundred and thirty-four pounds and fifty-six pence');
-  assert.equal(amountInWords(100000), 'One thousand pounds only');
+  assert.equal(amountInWords(123456), 'ONE THOUSAND TWO HUNDRED AND THIRTY-FOUR POUNDS AND FIFTY-SIX PENCE');
+  assert.equal(amountInWords(100000), 'ONE THOUSAND POUNDS ONLY');
   assert.equal((await c.get('/app/rent-run/metro-blank.pdf')).status, 200);
   // Saved: reopening keeps what was typed; a new month remembers "paying from".
   assert.match((await c.get('/app/rent-run/instruction?month=2026-08')).text, /value="Pay Lets Client Account"[\s\S]*?Extra Person/);

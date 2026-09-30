@@ -799,3 +799,7 @@ table.council-db tr.new-row .cell-input { border-color: var(--border); backgroun
 .mini-tile { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 14px; display: flex; flex-direction: column; min-width: 150px; box-shadow: var(--shadow); }
 .mini-tile .label { font-size: .75rem; color: var(--muted); }
 .mini-tile .value { font-size: 1.1rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+/* Rent run step 5: shown in capitals, as they're written on Metro's form */
+.step5-grid input:not([type="date"]) { text-transform: uppercase; }
+.step5-grid input::placeholder { text-transform: none; }

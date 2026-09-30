@@ -59,7 +59,7 @@ function amountInWords(pence) {
   let words = `${wholeNumberWords(pounds)} pound${pounds === 1 ? '' : 's'}`;
   if (p) words += ` and ${wholeNumberWords(p)} ${p === 1 ? 'penny' : 'pence'}`;
   else words += ' only';
-  return words.charAt(0).toUpperCase() + words.slice(1);
+  return words.toUpperCase();
 }
 
 // Cheque style for the bank form: £5,000-00 (a dash before the pence).
@@ -91,7 +91,8 @@ async function fillMetroForm(data) {
   const put = (key, text, { size = 10.5, f = font } = {}) => {
     if (!text) return;
     const b = BOX[key];
-    const { t, s } = fit(f, text, size, b.w - 10);
+    // Everything on the bank's form is written in capitals.
+    const { t, s } = fit(f, String(text).toUpperCase(), size, b.w - 10);
     page.drawText(t, { x: b.x + 5, y: b.y + (BOX_HEIGHT - s * 0.7) / 2, size: s, font: f, color: ink });
   };
   put('store', data.store);
