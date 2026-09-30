@@ -2399,6 +2399,27 @@ test('council reconciliation: Date received and Email sent date columns save, no
   assert.equal(db.prepare('SELECT COUNT(*) AS n FROM council_rec_notes WHERE council_id = ?').get(council).n, 0);
 });
 
+test('council reconciliation: still owed for the month and all months in the top right', async () => {
+  const c = await registerAndLogin('rec-owed@example.com', 'Rec Owed Lets');
+  const council = idFrom((await c.post('/app/councils', { name: 'Owed Council' })).location);
+  const save = (month, fields) => fetch(`${base}/app/council-reconciliation/notes`, {
+    method: 'POST', headers: { cookie: c.cookie, 'content-type': 'application/x-www-form-urlencoded', 'X-Autosave': '1' },
+    body: new URLSearchParams({ _csrf: c.csrf, council_id: String(council), month, notes: '', ...fields }).toString(),
+  });
+  await save('2026-07', { owed: '500', received: '200' });
+  const res = await save('2026-08', { owed: '100', received: '0' });
+  const json = await res.json();
+  const upd = Object.fromEntries(json.updates.map((u) => [u.id, u.text]));
+  assert.equal(upd['rec-owed-month'], '£100.00');
+  assert.equal(upd['rec-owed-all'], '£400.00', 'July’s £300 plus August’s £100');
+  const page = (await c.get('/app/council-reconciliation?month=2026-08')).text;
+  assert.match(page, /Still owed · August 2026<\/span><span class="value bad-text" id="rec-owed-month">£100\.00/);
+  assert.match(page, /Still owed · all months<\/span><span class="value bad-text" id="rec-owed-all">£400\.00/);
+  // An overpayment later offsets what's owed overall.
+  await save('2026-09', { owed: '0', received: '450' });
+  assert.match((await c.get('/app/council-reconciliation?month=2026-09')).text, /id="rec-owed-all">£50\.00 over/);
+});
+
 test('maintenance: a completed job has a landlord invoice to download and email', async () => {
   const c = await registerAndLogin('job-invoice@example.com', 'Job Invoice Lets');
   const co = db.prepare("SELECT id FROM users WHERE username = 'job-invoice'").get();

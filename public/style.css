@@ -782,3 +782,15 @@ table.council-db tr.new-row .cell-input { border-color: var(--border); backgroun
 /* Dark mode switch (dashboard) */
 .theme-switch { display: inline-flex; align-items: center; min-height: 38px; color: var(--muted); font-weight: 600; }
 .theme-switch .squish-switch:focus-visible .squish-switch__track { outline: 2px solid var(--brand); outline-offset: 2px; }
+
+/* Small totals in the top right of a page header */
+.page-head.with-head-tiles { align-items: flex-start; flex-wrap: nowrap; }
+.page-head.with-head-tiles .head-text { flex: 1 1 auto; min-width: 0; }
+.head-tiles { display: flex; gap: 10px; flex: 0 0 auto; }
+@media (max-width: 760px) {
+  .page-head.with-head-tiles { flex-wrap: wrap; }
+  .head-tiles { flex-wrap: wrap; }
+}
+.mini-tile { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 14px; display: flex; flex-direction: column; min-width: 150px; box-shadow: var(--shadow); }
+.mini-tile .label { font-size: .75rem; color: var(--muted); }
+.mini-tile .value { font-size: 1.1rem; font-weight: 700; font-variant-numeric: tabular-nums; }

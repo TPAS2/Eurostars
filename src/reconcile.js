@@ -72,6 +72,29 @@ function reconciliation(db, accountId, month) {
   return { rows, totals };
 }
 
+// Still owed by all councils over every month up to and including uptoMonth: from the first
+// month with a council tenancy, payment or saved figure. Overpayments offset arrears.
+function owedAllMonths(db, accountId, uptoMonth) {
+  const first = db.prepare(
+    `SELECT MIN(m) AS m FROM (
+       SELECT MIN(substr(ty.start_date, 1, 7)) AS m FROM tenancies ty JOIN properties p ON p.id = ty.property_id
+        WHERE ty.account_id = ? AND p.council_id IS NOT NULL
+       UNION ALL
+       SELECT MIN(month) FROM council_rec_notes WHERE account_id = ?)`
+  ).get(accountId, accountId).m;
+  if (!first || first > uptoMonth) return { balance: 0, months: 0 };
+  let balance = 0;
+  let months = 0;
+  let [y, mo] = first.split('-').map(Number);
+  for (let month = first; month <= uptoMonth && months < 600; months += 1) {
+    balance += reconciliation(db, accountId, month).totals.balance;
+    mo += 1;
+    if (mo > 12) { mo = 1; y += 1; }
+    month = `${y}-${String(mo).padStart(2, '0')}`;
+  }
+  return { balance, months, from: first };
+}
+
 // How a council's row reads: the "still owed" text and status badge.
 function rowStatus(c) {
   if (!c.owed && !c.received) return { text: 'Nothing due', cls: 'muted small' };
@@ -80,4 +103,4 @@ function rowStatus(c) {
   return { text: 'Not paid', cls: 'badge bad plain' };
 }
 
-module.exports = { reconciliation, councilTenancies, rowStatus };
+module.exports = { reconciliation, councilTenancies, rowStatus, owedAllMonths };
