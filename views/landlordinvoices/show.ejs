@@ -27,13 +27,14 @@
 <% if (error) { %><div class="notice err no-print"><%= error %></div><% } %>
 
 <% if (schedule) { %>
-<section class="card no-print">
-  <h2>Paid over <%= inv.months %> months</h2>
+<section class="card no-print" id="schedule">
+  <h2>Paid over <%= schedule.length %> months</h2>
   <p class="muted small"><%= inv.txn_id ? 'Taken off their rent one month at a time:' : 'When deducted, it comes off their rent one month at a time, starting from the date you choose:' %></p>
   <div class="table-wrap"><table class="centered">
-    <thead><tr><th>Payment</th><th>Month</th><th class="num">Amount</th><% if (inv.txn_id) { %><th>Status</th><% } %></tr></thead>
+    <thead><tr><th>Payment</th><th>Month</th><th class="num">Amount</th><% if (inv.txn_id) { %><th>Status</th><th></th><% } %></tr></thead>
     <tbody>
-    <% schedule.forEach(p => { %><tr><td><%= p.n %> of <%= inv.months %></td><td><%= p.month %></td><td class="num"><%= fmt.money(p.pence) %></td><% if (inv.txn_id) { %><td><span class="badge plain <%= p.done ? 's-active' : 'warn' %>"><%= p.done ? 'Deducted' : 'Due' %></span></td><% } %></tr><% }) %>
+    <% schedule.forEach(p => { %><tr><td><%= p.n %> of <%= schedule.length %></td><td><%= p.month %></td><td class="num"><%= fmt.money(p.pence) %></td><% if (inv.txn_id) { %><td><span class="badge plain <%= p.done ? 's-active' : 'warn' %>"><%= p.done ? 'Deducted' : 'Due' %></span></td><td><a class="btn small" href="/app/landlord-invoices/<%= inv.id %>/instalments/<%= p.txnId %>/edit">Edit</a></td><% } %></tr><% }) %>
+    <% const sched = schedule.reduce((t, p) => t + p.pence, 0); if (inv.txn_id && sched !== inv.amount_pence) { %><tr><td colspan="5" class="warn-text small">These payments add up to <%= fmt.money(sched) %>, not the invoice's <%= fmt.money(inv.amount_pence) %>.</td></tr><% } %>
     </tbody>
   </table></div>
 </section>

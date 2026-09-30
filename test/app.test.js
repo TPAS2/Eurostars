@@ -2853,3 +2853,24 @@ test('landlord invoice paid over several months: deducted a month at a time, und
   await c.post(`/app/landlord-invoices/${id}/delete`, {});
   assert.equal(fees().length, 0, 'deleting removes them all');
 });
+
+test('landlord invoice instalments: an Edit button beside each deducted payment changes its amount or date', async () => {
+  const c = await registerAndLogin('li-inst-edit@example.com', 'LI Inst Edit Lets');
+  const ll = idFrom((await c.post('/app/landlords', { name: 'Ed Instalment' })).location);
+  const prop = idFrom((await c.post('/app/properties', { address_line1: '5 Edit Road', landlord_id: String(ll), status: 'let' })).location);
+  await c.get('/app/landlord-invoices/new');
+  let r = await c.post('/app/landlord-invoices', { landlord_id: String(ll), property_id: String(prop), invoice_date: '2026-01-10', description: 'Roof', amount: '90', months: '3', then: 'deduct' });
+  const id = idFrom(r.location.split('?')[0]);
+  const txns = db.prepare("SELECT id FROM transactions WHERE landlord_id = ? AND txn_type = 'fee' ORDER BY txn_date").all(ll).map((t) => t.id);
+  r = await c.get(`/app/landlord-invoices/${id}`);
+  assert.match(r.text, new RegExp(`Deducted</span></td><td><a class="btn small" href="/app/landlord-invoices/${id}/instalments/${txns[0]}/edit">Edit</a>`));
+  await c.get(`/app/landlord-invoices/${id}/instalments/${txns[1]}/edit`);
+  r = await c.post(`/app/landlord-invoices/${id}/instalments/${txns[1]}`, { date: '2026-02-20', amount: '45' });
+  assert.match(decodeURIComponent(r.location), /Payment 2 changed to £45\.00 on 20\/02\/2026/);
+  assert.deepEqual({ ...db.prepare('SELECT txn_date, amount_pence FROM transactions WHERE id = ?').get(txns[1]) }, { txn_date: '2026-02-20', amount_pence: 4500 });
+  r = await c.get(`/app/landlord-invoices/${id}`);
+  assert.match(r.text, /add up to £105\.00, not the invoice's £90\.00/);
+  // Only this invoice's payments can be edited.
+  const other = db.prepare("INSERT INTO transactions (account_id, txn_date, txn_type, landlord_id, amount_pence) VALUES (?, '2026-01-01', 'fee', ?, 1)").run(db.prepare("SELECT id FROM users WHERE username = 'li-inst-edit'").get().id, ll);
+  assert.equal((await c.get(`/app/landlord-invoices/${id}/instalments/${Number(other.lastInsertRowid)}/edit`)).status, 404);
+});

@@ -1,0 +1,29 @@
+<%- include('../partials/header') %>
+<header class="page-head">
+  <div>
+    <a class="crumb" href="/app/landlord-invoices/<%= inv.id %>#schedule">← <%= inv.invoice_number %></a>
+    <h1>Payment <%= n %> of <%= inv.months %></h1>
+    <p class="muted"><%= inv.landlord_name %> · <%= inv.description %> · invoice total <%= fmt.money(inv.amount_pence) %></p>
+  </div>
+</header>
+<section class="card">
+  <form method="post" action="/app/landlord-invoices/<%= inv.id %>/instalments/<%= t.id %>" class="form-grid" data-no-keep>
+    <%- include('../partials/csrf') %>
+    <div class="field">
+      <label for="i-date">Date taken from their rent</label>
+      <input id="i-date" type="date" name="date" value="<%= values.date || '' %>" required>
+      <div class="help">It comes off their statement for this date's month.</div>
+      <% if (errors.date) { %><div class="field-err"><%= errors.date %></div><% } %>
+    </div>
+    <div class="field">
+      <label for="i-amount">Amount (£)</label>
+      <input id="i-amount" name="amount" inputmode="decimal" value="<%= values.amount || '' %>" required>
+      <% if (errors.amount) { %><div class="field-err"><%= errors.amount %></div><% } %>
+    </div>
+    <div class="form-actions wide">
+      <button class="btn primary" type="submit">Save</button>
+      <a class="btn" href="/app/landlord-invoices/<%= inv.id %>#schedule">Cancel</a>
+    </div>
+  </form>
+</section>
+<%- include('../partials/footer') %>

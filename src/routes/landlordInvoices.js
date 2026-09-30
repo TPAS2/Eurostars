@@ -153,10 +153,7 @@ module.exports = function landlordInvoiceRoutes(db, mailer = { enabled: false })
     res.render('landlordinvoices/show', {
       title: `Landlord invoice ${inv.invoice_number}`, section: 'landlordinvoices', inv, agency, statementLink, emailEnabled: mailer.enabled,
       doc: invoiceDoc(req.user.id, inv).data, longDate: require('../jobInvoice').longDate,
-      schedule: inv.months > 1 ? instalments(inv.amount_pence, inv.months).map((pence, i) => {
-        const date = addMonths(inv.paid_date || inv.invoice_date, i);
-        return { n: i + 1, pence, month: st.monthLabel(date.slice(0, 7)), done: !!inv.txn_id && date <= fmt.today() };
-      }) : null,
+      schedule: schedule(inv),
       today: fmt.today(), fmt, flash: clip(req.query.flash, 300), error: clip(req.query.error, 300),
     });
   });
@@ -218,6 +215,50 @@ module.exports = function landlordInvoiceRoutes(db, mailer = { enabled: false })
         .run(date, ids[0], ids.length > 1 ? JSON.stringify(ids.slice(1)) : null, inv.id, a);
     });
   }
+
+  // The invoice's instalments: the actual deductions once made, else the planned split.
+  function deductionIds(inv) { return [inv.txn_id, ...JSON.parse(inv.instalment_txn_ids || '[]')].filter(Boolean); }
+  function schedule(inv) {
+    if (inv.months <= 1 && !inv.instalment_txn_ids) return null;
+    if (inv.txn_id) {
+      return deductionIds(inv).map((id, i) => db.prepare('SELECT id, txn_date, amount_pence FROM transactions WHERE id = ? AND account_id = ?').get(id, inv.account_id))
+        .filter(Boolean).map((t, i) => ({ n: i + 1, txnId: t.id, pence: t.amount_pence, date: t.txn_date, month: st.monthLabel(t.txn_date.slice(0, 7)), done: t.txn_date <= fmt.today() }));
+    }
+    return instalments(inv.amount_pence, inv.months).map((pence, i) => {
+      const date = addMonths(inv.invoice_date, i);
+      return { n: i + 1, pence, date, month: st.monthLabel(date.slice(0, 7)), done: false };
+    });
+  }
+
+  // Change one instalment's amount or date.
+  function instalment(req, res) {
+    const inv = load(req, res);
+    if (!inv) return {};
+    const tid = Number(req.params.tid);
+    if (!deductionIds(inv).includes(tid)) { res.status(404).render('error', { title: 'Not found', message: 'That payment was not found.' }); return {}; }
+    return { inv, t: db.prepare('SELECT * FROM transactions WHERE id = ? AND account_id = ?').get(tid, req.user.id) };
+  }
+  router.get('/:id(\\d+)/instalments/:tid(\\d+)/edit', (req, res) => {
+    const { inv, t } = instalment(req, res);
+    if (!inv) return;
+    const n = deductionIds(inv).indexOf(t.id) + 1;
+    res.render('landlordinvoices/instalment', { title: `Edit payment ${n} of ${inv.months} · ${inv.invoice_number}`, section: 'landlordinvoices', inv, t, n, fmt, errors: {}, values: { date: t.txn_date, amount: fmt.penceToInput(t.amount_pence) } });
+  });
+  router.post('/:id(\\d+)/instalments/:tid(\\d+)', (req, res) => {
+    const { inv, t } = instalment(req, res);
+    if (!inv) return;
+    const n = deductionIds(inv).indexOf(t.id) + 1;
+    const date = String(req.body.date || '').trim();
+    const pence = fmt.parseMoney(String(req.body.amount || '').trim());
+    const errors = {};
+    if (!fmt.isIsoDate(date)) errors.date = 'Enter a valid date.';
+    if (Number.isNaN(pence) || pence <= 0) errors.amount = 'Enter the amount, like 40 or 40.00.';
+    if (Object.keys(errors).length) {
+      return res.status(422).render('landlordinvoices/instalment', { title: `Edit payment ${n} of ${inv.months} · ${inv.invoice_number}`, section: 'landlordinvoices', inv, t, n, fmt, errors, values: req.body });
+    }
+    db.prepare('UPDATE transactions SET txn_date = ?, amount_pence = ? WHERE id = ? AND account_id = ?').run(date, pence, t.id, req.user.id);
+    res.redirect(`/app/landlord-invoices/${inv.id}?flash=${encodeURIComponent(`Payment ${n} changed to ${fmt.money(pence)} on ${fmt.ukDate(date)}.`)}#schedule`);
+  });
 
   // Removes every deduction made for the invoice.
   function removeDeductions(a, inv) {
