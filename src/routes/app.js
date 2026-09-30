@@ -413,6 +413,20 @@ module.exports = function appRoutes(db) {
     });
   }
 
+  // End a tenancy: set its end date (today unless another is given) and mark it ended.
+  router.post('/tenancies/:id/end', (req, res) => {
+    const a = req.user.id;
+    const t = db.prepare('SELECT * FROM tenancies WHERE id = ? AND account_id = ?').get(Number(req.params.id), a);
+    if (!t) return res.status(404).render('error', { title: 'Not found', message: 'That tenancy was not found.' });
+    const back = (key, msg) => res.redirect(`/app/properties/${t.property_id}?${key}=${encodeURIComponent(msg)}`);
+    const end = String(req.body.end_date || '').trim() || fmt.today();
+    if (!fmt.isIsoDate(end)) return back('error', 'Enter a valid end date.');
+    if (t.start_date && end < t.start_date) return back('error', `The end date can’t be before the start date (${fmt.ukDate(t.start_date)}).`);
+    if (t.booking_date && end < t.booking_date) return back('error', `The end date can’t be before the booking date (${fmt.ukDate(t.booking_date)}).`);
+    db.prepare("UPDATE tenancies SET end_date = ?, status = 'ended' WHERE id = ? AND account_id = ?").run(end, t.id, a);
+    back('flash', `Tenancy ended on ${fmt.ukDate(end)}.`);
+  });
+
   router.get('/properties/:id/add-tenant', (req, res) => {
     const property = ownedProperty(req, res);
     if (!property) return;
@@ -533,15 +547,21 @@ module.exports = function appRoutes(db) {
     if (def.key === 'tenants') {
       // Each tenant with their current tenancy (or their latest one if none is current).
       const latest = new Map();
+      const lastEnded = new Map(); // each tenant's most recent ended tenancy
       for (const t of db.prepare(
         `SELECT ty.id, ty.tenant_id, ty.status, ty.start_date, ty.end_date, ty.rent_pence, ty.rent_frequency,
                 p.id AS property_id, p.address_line1, c.id AS council_id, c.name AS council_name
            FROM tenancies ty JOIN properties p ON p.id = ty.property_id LEFT JOIN councils c ON c.id = p.council_id
           WHERE ty.account_id = ?
           ORDER BY ty.status = 'active' DESC, ty.status = 'pending' DESC, ty.start_date DESC`
-      ).all(a)) if (!latest.has(t.tenant_id)) latest.set(t.tenant_id, t);
+      ).all(a)) {
+        if (!latest.has(t.tenant_id)) latest.set(t.tenant_id, t);
+        if (t.status === 'ended' && (!lastEnded.has(t.tenant_id) || t.start_date > lastEnded.get(t.tenant_id).start_date)) lastEnded.set(t.tenant_id, t);
+      }
+      tenantFilter = ['current', 'past', 'all'].includes(req.query.show) ? req.query.show : 'current';
       for (const row of rows) {
-        const t = latest.get(row.id);
+        // On Past tenants, show the tenancy that ended.
+        const t = tenantFilter === 'past' && lastEnded.has(row.id) ? lastEnded.get(row.id) : latest.get(row.id);
         row.tenancy_status = t ? t.status : null;
         row.cur_property = t ? { text: t.address_line1, href: `/app/properties/${t.property_id}` } : { text: '' };
         row.cur_council = t && t.council_id ? { text: t.council_name, href: `/app/councils/${t.council_id}` } : { text: '' };
@@ -549,9 +569,9 @@ module.exports = function appRoutes(db) {
         row.cur_term = t ? { text: `${fmt.ukDate(t.start_date)} – ${t.end_date ? fmt.ukDate(t.end_date) : 'ongoing'}`, href: `/app/tenancies/${t.id}` } : { text: 'No tenancy yet' };
         row.cur_status = t ? { text: fmt.humanize(t.status), cls: `badge s-${t.status}` } : { text: '' };
       }
-      tenantFilter = ['current', 'past', 'all'].includes(req.query.show) ? req.query.show : 'current';
       if (tenantFilter === 'current') rows = rows.filter((r) => r.tenancy_status !== 'ended');
-      if (tenantFilter === 'past') rows = rows.filter((r) => r.tenancy_status === 'ended');
+      // Past tenants: anyone with an ended tenancy (even if they now rent somewhere else too).
+      if (tenantFilter === 'past') rows = rows.filter((r) => lastEnded.has(r.id));
     }
     if (def.key === 'contractors') {
       // Invoices and money paid to each contractor, all time.

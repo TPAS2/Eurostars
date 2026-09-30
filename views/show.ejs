@@ -275,7 +275,7 @@
     <% } %>
   </div>
   <% if (!c.rows.length) { %><p class="muted">None yet.</p><% } else { %>
-    <%- include('partials/table', { def: c.def, rows: c.rows, maps: c.maps, hideField: c.fk }) %>
+    <%- include('partials/table', { def: c.def, rows: c.rows, maps: c.maps, hideField: c.fk, endTenancy: def.key === 'properties' && c.def.key === 'tenancies' }) %>
   <% } %>
 </section>
 <% }) %>

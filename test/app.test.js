@@ -2556,3 +2556,29 @@ test('tenancies: booking and start dates cannot be after the end date', async ()
   assert.match(r.text, /The start date can’t be after the end date/);
   assert.doesNotMatch(r.text, /The booking date can’t be after/);
 });
+
+test('property page: End tenancy button sets the end date and status; ended tenants show under Past', async () => {
+  const c = await registerAndLogin('end-tenancy@example.com', 'End Tenancy Lets');
+  const prop = idFrom((await c.post('/app/properties', { address_line1: '3 Ending Way', status: 'let' })).location);
+  const prop2 = idFrom((await c.post('/app/properties', { address_line1: '4 Next Door', status: 'let' })).location);
+  await c.post(`/app/properties/${prop}/add-tenant`, { tenant_mode: 'new', name: 'Leaving Lucy', booking_date: '2026-01-01', start_date: '2026-02-01', rent_pence: '900', rent_frequency: 'monthly', status: 'active' });
+  const t = db.prepare("SELECT ty.id, ty.tenant_id FROM tenancies ty JOIN tenants t ON t.id = ty.tenant_id WHERE t.name = 'Leaving Lucy'").get();
+  // Lucy also rents another place (still current there).
+  await c.post(`/app/properties/${prop2}/add-tenant`, { tenant_mode: 'existing', tenant_id: String(t.tenant_id), booking_date: '2026-09-01', start_date: '2026-10-01', rent_pence: '800', rent_frequency: 'monthly', status: 'active' });
+  await c.post(`/app/properties/${prop}/add-tenant`, { tenant_mode: 'new', name: 'Staying Sam', booking_date: '2026-01-01', start_date: '2026-02-01', rent_pence: '900', rent_frequency: 'monthly', status: 'active' });
+
+  let r = await c.get(`/app/properties/${prop}`);
+  assert.match(r.text, new RegExp(`action="/app/tenancies/${t.id}/end"[\\s\\S]*?End tenancy`));
+  r = await c.post(`/app/tenancies/${t.id}/end`, { end_date: '2026-01-15' });
+  assert.match(decodeURIComponent(r.location), /can’t be before the start date/);
+  r = await c.post(`/app/tenancies/${t.id}/end`, { end_date: '2026-09-30' });
+  assert.match(decodeURIComponent(r.location), /Tenancy ended on 30\/09\/2026/);
+  assert.deepEqual({ ...db.prepare('SELECT end_date, status FROM tenancies WHERE id = ?').get(t.id) }, { end_date: '2026-09-30', status: 'ended' });
+  r = await c.get(`/app/properties/${prop}`);
+  assert.doesNotMatch(r.text, new RegExp(`action="/app/tenancies/${t.id}/end"`), 'no button once ended');
+
+  r = await c.get('/app/tenants?show=past');
+  assert.match(r.text, /Leaving Lucy[\s\S]*?3 Ending Way/, 'past list shows the tenancy that ended');
+  assert.doesNotMatch(r.text, /Staying Sam/);
+  assert.match((await c.get('/app/tenants?show=current')).text, /Staying Sam/);
+});
