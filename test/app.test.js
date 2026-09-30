@@ -709,6 +709,7 @@ test('account details: companies can only view them; the admin edits them', asyn
   assert.equal(after.username, 'myaccount');
   assert.ok(require('../src/auth').verifyPassword('password-1234', after.password_hash));
   assert.match((await c.get('/app/account')).text, /After Lets[\s\S]*0117 000 1111/);
+  assert.doesNotMatch((await c.get('/app/account')).text, /Company address/);
 
   r = await admin.post(`/admin/users/${u.id}/details`, { name: '', agency_name: 'After Lets' });
   assert.match(decodeURIComponent(r.location), /Enter the contact name/);
