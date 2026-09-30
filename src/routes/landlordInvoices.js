@@ -207,10 +207,6 @@ module.exports = function landlordInvoiceRoutes(db, mailer = { enabled: false })
       deduct(a, inv, date);
       return back(`Deducted ${fmt.money(inv.amount_pence)} from ${inv.landlord_name}'s rent for ${st.monthLabel(date.slice(0, 7))}.`, true);
     }
-    if (req.body.how === 'us') {
-      db.prepare("UPDATE landlord_invoices SET status = 'paid', paid_date = ?, paid_how = 'Paid by us' WHERE id = ? AND account_id = ?").run(date, inv.id, a);
-      return back(`Marked ${inv.invoice_number} as paid by us. ${inv.landlord_name} isn't charged.`, true);
-    }
     db.prepare("UPDATE landlord_invoices SET status = 'paid', paid_date = ?, paid_how = 'Paid by landlord' WHERE id = ? AND account_id = ?").run(date, inv.id, a);
     back(`Marked ${inv.invoice_number} as paid by ${inv.landlord_name}.`, true);
   });

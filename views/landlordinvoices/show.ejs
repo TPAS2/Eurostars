@@ -33,7 +33,6 @@
     <%- include('../partials/csrf') %>
     <label class="check"><input type="radio" name="how" value="deduct" checked> <span><strong>Deduct from <%= inv.landlord_name %>'s rent</strong><br><span class="muted small">Shows as a deduction on their statement for the month of this date.</span></span></label>
     <label class="check"><input type="radio" name="how" value="paid"> <span><strong>Paid by the landlord</strong><br><span class="muted small">They paid you directly; nothing is taken from their rent.</span></span></label>
-    <label class="check"><input type="radio" name="how" value="us"> <span><strong>Paid by us</strong><br><span class="muted small">We cover it; the landlord isn't charged and nothing is taken from their rent.</span></span></label>
     <label>Date <input type="date" name="date" value="<%= today %>" required></label>
     <button class="btn primary" type="submit">Settle <%= fmt.money(inv.amount_pence) %></button>
   </form>

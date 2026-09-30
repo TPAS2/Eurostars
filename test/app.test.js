@@ -2754,22 +2754,6 @@ test('rent run step 5 box: edit the Metro form details; typed-over totals are ke
   assert.equal(r.location, '/app/rent-run/instruction/metro.pdf?month=2026-08');
 });
 
-test('landlord invoice can be settled as Paid by us: marked settled, landlord not charged', async () => {
-  const c = await registerAndLogin('paid-by-us@example.com', 'Paid By Us Lets');
-  const ll = idFrom((await c.post('/app/landlords', { name: 'Uma Owner' })).location);
-  const prop = idFrom((await c.post('/app/properties', { address_line1: '1 Cover Street', landlord_id: String(ll), status: 'let' })).location);
-  await c.get('/app/landlord-invoices/new');
-  let r = await c.post('/app/landlord-invoices', { landlord_id: String(ll), property_id: String(prop), invoice_number: 'LI-9001', invoice_date: '2026-09-01', description: 'Inspection', amount: '50' });
-  const id = idFrom(r.location.split('?')[0]);
-  r = await c.get(`/app/landlord-invoices/${id}`);
-  assert.match(r.text, /name="how" value="us"[\s\S]*?Paid by us/);
-  r = await c.post(`/app/landlord-invoices/${id}/settle`, { how: 'us', date: '2026-09-05' });
-  assert.match(decodeURIComponent(r.location), /paid by us/);
-  const inv = db.prepare('SELECT status, paid_how, txn_id FROM landlord_invoices WHERE id = ?').get(id);
-  assert.deepEqual({ ...inv }, { status: 'paid', paid_how: 'Paid by us', txn_id: null });
-  assert.equal(db.prepare('SELECT COUNT(*) n FROM transactions WHERE landlord_id = ?').get(ll).n, 0, 'nothing taken from their rent');
-});
-
 test('landlord invoice: Download invoice gives a PDF', async () => {
   const c = await registerAndLogin('li-download@example.com', 'LI Download Lets');
   const ll = idFrom((await c.post('/app/landlords', { name: 'Dan Download' })).location);
@@ -2825,7 +2809,7 @@ test('landlords have a Date started, shown in their info box', async () => {
   assert.match(r.text, /<dt>Date started<\/dt>[\s\S]*?01\/04\/2019/);
 });
 
-test('landlord invoice number can be changed; Paid by us drops the deduction note', async () => {
+test('landlord invoice number can be changed; no Paid by us option', async () => {
   const c = await registerAndLogin('li-number@example.com', 'LI Number Lets');
   const ll = idFrom((await c.post('/app/landlords', { name: 'Nia Number' })).location);
   const prop = idFrom((await c.post('/app/properties', { address_line1: '3 Count Road', landlord_id: String(ll), status: 'let' })).location);
@@ -2837,10 +2821,6 @@ test('landlord invoice number can be changed; Paid by us drops the deduction not
   r = await c.post('/app/landlord-invoices', { landlord_id: String(ll), property_id: String(prop), invoice_number: 'LI-0500', invoice_date: '2026-09-01', description: 'Dup', amount: '1' });
   assert.equal(r.status, 422);
   assert.match(r.text, /LI-0500 is already used/);
-  // Unpaid: the deduction note shows. Paid by us: it doesn't.
-  assert.match((await c.get(`/app/landlord-invoices/${id}`)).text, /Payment will be deducted from the rent payment/);
-  r = await c.post(`/app/landlord-invoices/${id}/settle`, { how: 'us', date: '2026-09-05' });
-  assert.match(decodeURIComponent(r.location || ''), /paid by us/, r.location);
-  r = await c.get(`/app/landlord-invoices/${id}`);
-  assert.doesNotMatch(r.text, /Payment will be deducted|class="lodge-note"/);
+  // No "Paid by us" option: if the agency pays, no invoice is raised.
+  assert.doesNotMatch((await c.get(`/app/landlord-invoices/${id}`)).text, /Paid by us|value="us"/);
 });
