@@ -63,7 +63,7 @@ async function buildJobInvoice(data) {
   // Heading: company name (blue), "(Maintenance Invoice)" (grey), address and contact lines.
   const c = data.company;
   text(String(c.name || '').toUpperCase(), 90, 57, 22, helv, rgb(0, 0, 1));
-  text('(Maintenance Invoice)', 99, 74, 14, helvB, rgb(0.6, 0.6, 0.6));
+  text(data.subtitle || '(Maintenance Invoice)', 99, 74, 14, helvB, rgb(0.6, 0.6, 0.6));
   const address = String(c.address || '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean).join(', ');
   if (address) text(address, 90, 87, 10, helv, rgb(0.5, 0.5, 0.5));
   const contact = [c.phone ? `Tel: ${c.phone}` : '', c.email ? 'Email: ' : ''].filter(Boolean).join(' ');
@@ -125,7 +125,7 @@ async function buildJobInvoice(data) {
   const total = money(data.totalPence || 0);
   text(total, 500 - helvB.widthOfTextAtSize(total, 12), 659, 12, helvB);
 
-  doc.setTitle(`${c.name || ''} (Maintenance Invoice)`);
+  doc.setTitle(`${c.name || ''} ${data.subtitle || '(Maintenance Invoice)'}`);
   return doc.save();
 }
 

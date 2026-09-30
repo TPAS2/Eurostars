@@ -31,7 +31,7 @@
         <td><%= fmt.ukDate(i.invoice_date) %></td>
         <td><%= i.description %></td>
         <td class="num"><%= fmt.money(i.amount_pence) %></td>
-        <td><% if (i.status === 'paid') { %><span class="badge s-active plain"><%= i.paid_how === 'Deducted from rent' ? 'Deducted' : 'Paid' %> <%= fmt.ukDate(i.paid_date) %></span><% } else if (overdue) { %><span class="badge bad plain">Overdue</span><% } else { %><span class="badge warn plain">Unpaid</span><% } %></td>
+        <td><% if (i.status === 'paid') { %><span class="badge s-active plain"><%= i.paid_how === 'Deducted from rent' ? 'Deducted' : i.paid_how === 'Paid by us' ? 'Paid by us' : 'Paid' %> <%= fmt.ukDate(i.paid_date) %></span><% } else if (overdue) { %><span class="badge bad plain">Overdue</span><% } else { %><span class="badge warn plain">Unpaid</span><% } %></td>
         <td><% if (i.txn_id) { %><span class="yes-no yes">Yes</span><% if (link) { %> <a class="small" href="<%= link %>">View statement</a><% } %><% } else { %><span class="yes-no no">No</span><% } %></td>
       </tr>
     <% }) %>

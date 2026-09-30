@@ -1828,7 +1828,7 @@ test('landlord invoices: bill a landlord, deduct from rent or mark paid, print a
 
   // The invoice page is printable, with who it's billed to.
   r = await c.get(`/app/landlord-invoices/${inv1}`);
-  assert.match(r.text, /INVOICE[\s\S]*?LI-0001[\s\S]*?Bill to[\s\S]*?Larry Landlord[\s\S]*?1 Home Road[\s\S]*?Tenant find fee[\s\S]*?8 Bill Street[\s\S]*?£300\.00/);
+  assert.match(r.text, /\(Maintenance Invoice\)[\s\S]*?Client<\/strong>:<\/span><span>Larry Landlord[\s\S]*?Property Address:[\s\S]*?8 Bill Street[\s\S]*?INVOICE[\s\S]*?<li>Tenant find fee<\/li>[\s\S]*?TOTAL<\/strong><strong>£300\.00/);
   assert.match(r.text, /data-print/);
 
   // Deduct from rent: a fee on the landlord's statement for that month.
@@ -2742,4 +2742,38 @@ test('rent run step 5 box: edit the Metro form details; typed-over totals are ke
   assert.equal(d.valueDate, '17/09/2026');
   r = await c.post('/app/rent-run/instruction/form', { month: '2026-08', store: 'Borehamwood', then: 'metro' });
   assert.equal(r.location, '/app/rent-run/instruction/metro.pdf?month=2026-08');
+});
+
+test('landlord invoice can be settled as Paid by us: marked settled, landlord not charged', async () => {
+  const c = await registerAndLogin('paid-by-us@example.com', 'Paid By Us Lets');
+  const ll = idFrom((await c.post('/app/landlords', { name: 'Uma Owner' })).location);
+  const prop = idFrom((await c.post('/app/properties', { address_line1: '1 Cover Street', landlord_id: String(ll), status: 'let' })).location);
+  await c.get('/app/landlord-invoices/new');
+  let r = await c.post('/app/landlord-invoices', { landlord_id: String(ll), property_id: String(prop), invoice_number: 'LI-9001', invoice_date: '2026-09-01', description: 'Inspection', amount: '50' });
+  const id = idFrom(r.location.split('?')[0]);
+  r = await c.get(`/app/landlord-invoices/${id}`);
+  assert.match(r.text, /name="how" value="us"[\s\S]*?Paid by us/);
+  r = await c.post(`/app/landlord-invoices/${id}/settle`, { how: 'us', date: '2026-09-05' });
+  assert.match(decodeURIComponent(r.location), /paid by us/);
+  const inv = db.prepare('SELECT status, paid_how, txn_id FROM landlord_invoices WHERE id = ?').get(id);
+  assert.deepEqual({ ...inv }, { status: 'paid', paid_how: 'Paid by us', txn_id: null });
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM transactions WHERE landlord_id = ?').get(ll).n, 0, 'nothing taken from their rent');
+});
+
+test('landlord invoice: Download invoice gives a PDF', async () => {
+  const c = await registerAndLogin('li-download@example.com', 'LI Download Lets');
+  const ll = idFrom((await c.post('/app/landlords', { name: 'Dan Download' })).location);
+  const prop = idFrom((await c.post('/app/properties', { address_line1: '2 Paper Lane', postcode: 'N1 1AA', landlord_id: String(ll), status: 'let' })).location);
+  await c.get('/app/landlord-invoices/new');
+  let r = await c.post('/app/landlord-invoices', { landlord_id: String(ll), property_id: String(prop), invoice_number: 'LI-7001', invoice_date: '2026-09-01', description: 'Inventory check', notes: 'Room by room', amount: '85' });
+  const id = idFrom(r.location.split('?')[0]);
+  r = await c.get(`/app/landlord-invoices/${id}`);
+  assert.match(r.text, new RegExp(`href="/app/landlord-invoices/${id}/invoice.pdf">Download invoice`));
+  r = await c.get(`/app/landlord-invoices/${id}/invoice.pdf`);
+  assert.equal(r.status, 200);
+  assert.equal(r.headers.get('content-type'), 'application/pdf');
+  assert.match(r.headers.get('content-disposition'), /attachment; filename="2_Paper_Lane_N1_1AA_-_September_2026\.pdf"/);
+  assert.equal(r.buf.subarray(0, 5).toString(), '%PDF-');
+  const other = await registerAndLogin('li-download-2@example.com', 'Other LI Lets');
+  assert.equal((await other.get(`/app/landlord-invoices/${id}/invoice.pdf`)).status, 404);
 });

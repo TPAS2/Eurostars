@@ -701,3 +701,26 @@ table.council-db td { white-space: nowrap; font-size: .85rem; }
 #add-entry details.fold[open] > summary { margin-bottom: 12px; }
 .step5 .step-no { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--brand); color: var(--brand-ink); font-size: .9rem; margin-right: 8px; }
 .step5-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+/* Landlord invoice on screen, laid out like the agency's Word invoice. */
+.lodge-sheet { background: #fff; color: #000; overflow-x: auto; }
+.lodge-page { width: 612px; min-height: 700px; margin: 0 auto; padding: 36px 0 24px 90px; box-sizing: content-box; font-family: Arial, Helvetica, sans-serif; }
+.lodge-page > * { width: 432px; }
+.lodge-name { font-size: 29px; color: #0000ff; line-height: 1.1; }
+.lodge-sub { font-size: 18px; font-weight: 700; color: #999; padding-left: 12px; }
+.lodge-addr { font-size: 13px; color: #808080; }
+.lodge-contact { font-size: 13px; color: #999; margin-bottom: 26px; }
+.lodge-contact a { color: #0563c1; text-decoration: underline; }
+.lodge-box { border: 1px solid #000; margin-bottom: 14px; box-sizing: border-box; }
+.lodge-row { display: grid; grid-template-columns: 144px 1fr; padding: 8px 0 8px 36px; font-size: 14px; min-height: 36px; }
+.lodge-row strong { font-size: 15px; }
+.lodge-row sup { font-size: 9px; }
+.lodge-prop { min-height: 75px; }
+.lodge-prop strong { font-size: 14px; }
+.lodge-main { height: 499px; position: relative; margin-bottom: 0; font-family: 'Times New Roman', Times, serif; font-size: 16px; }
+.lodge-invoice { font-family: Arial, Helvetica, sans-serif; font-weight: 700; text-decoration: underline; text-align: center; margin-top: 38px; font-size: 16px; }
+.lodge-main ul { margin: 36px 0 0; padding-left: 48px; }
+.lodge-main li { margin-bottom: 6px; }
+.lodge-note { position: absolute; left: 36px; bottom: 8px; color: #f00; font-weight: 700; }
+.lodge-total { display: flex; justify-content: space-between; padding: 12px 29px 26px 10px; font-size: 16px; border-top: 0; }
+@media print { .lodge-sheet { border: 0; box-shadow: none; padding: 0; } .lodge-page { padding-top: 0; } }

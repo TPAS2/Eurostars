@@ -10,6 +10,7 @@
     </p>
   </div>
   <div class="actions">
+    <a class="btn primary" href="/app/landlord-invoices/<%= inv.id %>/invoice.pdf">Download invoice</a>
     <button class="btn" type="button" data-print>Print</button>
     <% if (emailEnabled && inv.landlord_email) { %>
     <form method="post" action="/app/landlord-invoices/<%= inv.id %>/email" data-busy="Sending…" data-confirm="Email <%= inv.invoice_number %> to <%= inv.landlord_email %>?">
@@ -32,6 +33,7 @@
     <%- include('../partials/csrf') %>
     <label class="check"><input type="radio" name="how" value="deduct" checked> <span><strong>Deduct from <%= inv.landlord_name %>'s rent</strong><br><span class="muted small">Shows as a deduction on their statement for the month of this date.</span></span></label>
     <label class="check"><input type="radio" name="how" value="paid"> <span><strong>Paid by the landlord</strong><br><span class="muted small">They paid you directly; nothing is taken from their rent.</span></span></label>
+    <label class="check"><input type="radio" name="how" value="us"> <span><strong>Paid by us</strong><br><span class="muted small">We cover it; the landlord isn't charged and nothing is taken from their rent.</span></span></label>
     <label>Date <input type="date" name="date" value="<%= today %>" required></label>
     <button class="btn primary" type="submit">Settle <%= fmt.money(inv.amount_pence) %></button>
   </form>
@@ -49,32 +51,22 @@
 </section>
 <% } %>
 
-<section class="card invoice-doc">
-  <div class="doc-head">
-    <div>
-      <div class="doc-agency"><%= agency.agency_name %></div>
-      <% if (agency.address) { %><div class="pre small"><%= agency.address %></div><% } %>
-      <div class="small"><%= [agency.phone, agency.email].filter(Boolean).join(' · ') %></div>
+<% const c = doc.company; const addr = String(c.address || '').split(/\r?\n/).map(l => l.trim()).filter(Boolean).join(', '); const d = doc.date ? longDate(doc.date) : null; %>
+<section class="card lodge-sheet">
+  <div class="lodge-page">
+    <div class="lodge-name"><%= String(c.name || '').toUpperCase() %></div>
+    <div class="lodge-sub">(Maintenance Invoice)</div>
+    <% if (addr) { %><div class="lodge-addr"><%= addr %></div><% } %>
+    <div class="lodge-contact"><% if (c.phone) { %>Tel: <%= c.phone %> <% } %><% if (c.email) { %>Email: <a href="mailto:<%= c.email %>"><%= c.email %></a><% } %></div>
+    <div class="lodge-box lodge-row"><strong>Date:</strong><span><% if (d) { %><%= d.day %><sup><%= d.suffix %></sup> <%= d.rest %><% } %></span></div>
+    <div class="lodge-box lodge-row"><span><strong>Client</strong>:</span><span><%= doc.client %></span></div>
+    <div class="lodge-box lodge-row lodge-prop"><strong>Property Address:</strong><span><% doc.property.forEach(l => { %><strong><%= l %></strong><br><% }) %></span></div>
+    <div class="lodge-box lodge-main">
+      <div class="lodge-invoice">INVOICE</div>
+      <ul><% doc.items.forEach(i => { %><li><%= i %></li><% }) %></ul>
+      <div class="lodge-note"><%= doc.note %></div>
     </div>
-    <div class="doc-to">
-      <h2>INVOICE</h2>
-      <div><strong><%= inv.invoice_number %></strong></div>
-      <div class="small">Date <%= fmt.ukDate(inv.invoice_date) %><% if (inv.due_date) { %> · Due <%= fmt.ukDate(inv.due_date) %><% } %></div>
-    </div>
+    <div class="lodge-box lodge-total"><strong>TOTAL</strong><strong><%= fmt.money(doc.totalPence) %></strong></div>
   </div>
-  <div class="bill-to">
-    <div class="muted small">Bill to</div>
-    <strong><%= inv.landlord_name %></strong><% if (inv.landlord_code) { %> <span class="muted">(<%= inv.landlord_code %>)</span><% } %>
-    <% if (inv.landlord_address) { %><div class="pre small"><%= inv.landlord_address %></div><% } %>
-  </div>
-  <div class="table-wrap"><table>
-    <thead><tr><th>Description</th><th>Property</th><th class="num">Amount</th></tr></thead>
-    <tbody>
-      <tr><td><%= inv.description %></td><td><%= inv.address_line1 || '' %></td><td class="num"><%= fmt.money(inv.amount_pence) %></td></tr>
-      <tr class="total"><td colspan="2">Total</td><td class="num"><%= fmt.money(inv.amount_pence) %></td></tr>
-    </tbody>
-  </table></div>
-  <% if (inv.notes) { %><p class="pre small"><%= inv.notes %></p><% } %>
-  <p class="small"><% if (inv.status === 'paid') { %>Settled: <%= inv.paid_how.toLowerCase() %> on <%= fmt.ukDate(inv.paid_date) %>.<% } else { %>Unless agreed otherwise, this will be deducted from your rent.<% } %></p>
 </section>
 <%- include('../partials/footer') %>

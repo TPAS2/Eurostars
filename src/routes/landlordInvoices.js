@@ -128,6 +128,7 @@ module.exports = function landlordInvoiceRoutes(db, mailer = { enabled: false })
     const agency = db.prepare('SELECT agency_name, email, phone, address FROM users WHERE id = ?').get(req.user.id);
     res.render('landlordinvoices/show', {
       title: `Landlord invoice ${inv.invoice_number}`, section: 'landlordinvoices', inv, agency, statementLink, emailEnabled: mailer.enabled,
+      doc: invoiceDoc(req.user.id, inv).data, longDate: require('../jobInvoice').longDate,
       today: fmt.today(), fmt, flash: clip(req.query.flash, 300), error: clip(req.query.error, 300),
     });
   });
@@ -192,8 +193,48 @@ module.exports = function landlordInvoiceRoutes(db, mailer = { enabled: false })
       deduct(a, inv, date);
       return back(`Deducted ${fmt.money(inv.amount_pence)} from ${inv.landlord_name}'s rent for ${st.monthLabel(date.slice(0, 7))}.`, true);
     }
+    if (req.body.how === 'us') {
+      db.prepare("UPDATE landlord_invoices SET status = 'paid', paid_date = ?, paid_how = 'Paid by us' WHERE id = ? AND account_id = ?").run(date, inv.id, a);
+      return back(`Marked ${inv.invoice_number} as paid by us. ${inv.landlord_name} isn't charged.`, true);
+    }
     db.prepare("UPDATE landlord_invoices SET status = 'paid', paid_date = ?, paid_how = 'Paid by landlord' WHERE id = ? AND account_id = ?").run(date, inv.id, a);
     back(`Marked ${inv.invoice_number} as paid by ${inv.landlord_name}.`, true);
+  });
+
+  // The invoice's details for the PDF, laid out like the agency's own (maintenance) invoice.
+  const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  function invoiceDoc(accountId, inv) {
+    const co = db.prepare('SELECT agency_name, address, phone, email FROM users WHERE id = ?').get(accountId);
+    const p = inv.property_id ? db.prepare('SELECT address_line1, town, postcode FROM properties WHERE id = ?').get(inv.property_id) : null;
+    const note = inv.status !== 'paid' ? 'Payment will be deducted from the rent payment'
+      : inv.paid_how === 'Deducted from rent' ? 'Payment has been deducted from the rent payment'
+      : inv.paid_how === 'Paid by us' ? 'No charge - paid by us' : 'Paid - thank you';
+    const [y, m] = String(inv.invoice_date || '').split('-').map(Number);
+    const name = `${[p && p.address_line1, p && p.postcode].filter(Boolean).join(' ') || inv.invoice_number}${y ? ` - ${MONTHS[m - 1]} ${y}` : ''}`;
+    return {
+      filename: `${name.replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '_') || 'invoice'}.pdf`,
+      data: {
+        company: { name: co.agency_name, address: co.address, phone: co.phone, email: co.email },
+        date: inv.invoice_date, client: inv.landlord_name,
+        property: p ? [p.address_line1, p.town, p.postcode].map((s) => String(s || '').trim()).filter(Boolean) : [],
+        items: [inv.description, ...String(inv.notes || '').split(/\r?\n/)].map((s) => String(s || '').trim()).filter(Boolean),
+        totalPence: inv.amount_pence, note,
+      },
+    };
+  }
+
+  router.get('/:id(\\d+)/invoice.pdf', async (req, res, next) => {
+    try {
+      const inv = load(req, res);
+      if (!inv) return;
+      const doc = invoiceDoc(req.user.id, inv);
+      const pdf = await require('../jobInvoice').buildJobInvoice(doc.data);
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `${req.query.inline === '1' ? 'inline' : 'attachment'}; filename="${doc.filename}"`);
+      res.setHeader('Content-Security-Policy', "sandbox; default-src 'none'");
+      res.setHeader('Cache-Control', 'private, no-store');
+      res.end(Buffer.from(pdf));
+    } catch (err) { next(err); }
   });
 
   router.post('/:id(\\d+)/unsettle', (req, res) => {
@@ -219,15 +260,17 @@ module.exports = function landlordInvoiceRoutes(db, mailer = { enabled: false })
       const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
       const lines = [
         `Dear ${inv.landlord_name},`, '',
-        `Please find our invoice ${inv.invoice_number} below.`, '',
+        `Please find our invoice ${inv.invoice_number} attached.`, '',
         `Date: ${fmt.ukDate(inv.invoice_date)}`, inv.due_date ? `Due: ${fmt.ukDate(inv.due_date)}` : null,
         inv.address_line1 ? `Property: ${inv.address_line1}` : null,
         `For: ${inv.description}`, `Amount: ${fmt.money(inv.amount_pence)}`, '',
         inv.status === 'paid' ? `Status: settled (${inv.paid_how.toLowerCase()} on ${fmt.ukDate(inv.paid_date)}).` : 'Unless you tell us otherwise, we will deduct this from your rent.', '',
         agency.agency_name,
       ].filter((l) => l !== null);
+      const doc = invoiceDoc(req.user.id, inv);
       await mailer.send({
         to: inv.landlord_email, subject: `Invoice ${inv.invoice_number} from ${agency.agency_name}`, fromName: agency.agency_name, replyTo: agency.email,
+        attachments: [{ filename: doc.filename, content: Buffer.from(await require('../jobInvoice').buildJobInvoice(doc.data)), contentType: 'application/pdf' }],
         text: lines.join('\n'), html: `<!doctype html><html><body style="font-family:Arial,sans-serif;color:#111">${lines.map((l) => (l ? `<p style="margin:0 0 6px">${esc(l)}</p>` : '<br>')).join('')}</body></html>`,
       });
       db.prepare("UPDATE landlord_invoices SET emailed_at = datetime('now') WHERE id = ?").run(inv.id);
