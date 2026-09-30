@@ -12,6 +12,16 @@ const { isEmail } = require('../mailer');
 module.exports = function landlordInvoiceRoutes(db, mailer = { enabled: false }) {
   const router = express.Router();
   const clip = (v, n) => String(v ?? '').trim().slice(0, n);
+  const MAX_MONTHS = 24;
+  // Splits pence into n parts; any odd pence go on the first.
+  const instalments = (pence, n) => { const base = Math.floor(pence / n); return Array.from({ length: n }, (_, i) => base + (i === 0 ? pence - base * n : 0)); };
+  // The same day n months later (the last day if that month is shorter).
+  const addMonths = (iso, n) => {
+    const [y, m, d] = iso.split('-').map(Number);
+    const last = new Date(Date.UTC(y, m - 1 + n + 1, 0)).getUTCDate();
+    const t = new Date(Date.UTC(y, m - 1 + n, Math.min(d, last)));
+    return t.toISOString().slice(0, 10);
+  };
 
   const LIST_SQL = `
     SELECT li.*, l.name AS landlord_name, l.code AS landlord_code, l.email AS landlord_email, l.address AS landlord_address,
@@ -61,6 +71,10 @@ module.exports = function landlordInvoiceRoutes(db, mailer = { enabled: false })
     if (!v.description) errors.description = 'Say what the invoice is for.';
     v.amount_pence = fmt.parseMoney(body.amount);
     if (Number.isNaN(v.amount_pence) || v.amount_pence <= 0) errors.amount = 'Enter the amount, like 120 or 120.00.';
+    // Paid over how many months (the rent deduction is split across them).
+    const months = Number(body.months || 1);
+    if (!Number.isInteger(months) || months < 1 || months > MAX_MONTHS) errors.months = `Choose 1 to ${MAX_MONTHS} months.`;
+    else v.months = months;
     return { v, errors };
   }
 
@@ -126,7 +140,8 @@ module.exports = function landlordInvoiceRoutes(db, mailer = { enabled: false })
     if (req.body.then === 'deduct') {
       deduct(a, { id, ...v }, v.invoice_date);
       const ll = db.prepare('SELECT name FROM landlords WHERE id = ?').get(v.landlord_id);
-      return res.redirect(`/app/landlord-invoices/${id}?flash=${encodeURIComponent(`Created and deducted ${fmt.money(v.amount_pence)} from ${ll.name}'s rent for ${st.monthLabel(v.invoice_date.slice(0, 7))}.`)}`);
+      const when = v.months > 1 ? `over ${v.months} months from ${st.monthLabel(v.invoice_date.slice(0, 7))}` : `for ${st.monthLabel(v.invoice_date.slice(0, 7))}`;
+      return res.redirect(`/app/landlord-invoices/${id}?flash=${encodeURIComponent(`Created and deducted ${fmt.money(v.amount_pence)} from ${ll.name}'s rent ${when}.`)}`);
     }
     res.redirect(`/app/landlord-invoices/${id}`);
   });
@@ -138,6 +153,10 @@ module.exports = function landlordInvoiceRoutes(db, mailer = { enabled: false })
     res.render('landlordinvoices/show', {
       title: `Landlord invoice ${inv.invoice_number}`, section: 'landlordinvoices', inv, agency, statementLink, emailEnabled: mailer.enabled,
       doc: invoiceDoc(req.user.id, inv).data, longDate: require('../jobInvoice').longDate,
+      schedule: inv.months > 1 ? instalments(inv.amount_pence, inv.months).map((pence, i) => {
+        const date = addMonths(inv.paid_date || inv.invoice_date, i);
+        return { n: i + 1, pence, month: st.monthLabel(date.slice(0, 7)), done: !!inv.txn_id && date <= fmt.today() };
+      }) : null,
       today: fmt.today(), fmt, flash: clip(req.query.flash, 300), error: clip(req.query.error, 300),
     });
   });
@@ -162,12 +181,12 @@ module.exports = function landlordInvoiceRoutes(db, mailer = { enabled: false })
     const cols = Object.keys(v);
     transaction(db, () => {
       db.prepare(`UPDATE landlord_invoices SET ${cols.map((c) => `${c} = ?`).join(', ')} WHERE id = ? AND account_id = ?`).run(...cols.map((c) => v[c]), inv.id, a);
-      // Already deducted: keep the deduction matching the invoice.
-      if (inv.txn_id) {
-        db.prepare('UPDATE transactions SET landlord_id = ?, property_id = ?, amount_pence = ?, description = ? WHERE id = ? AND account_id = ?')
-          .run(v.landlord_id, v.property_id, v.amount_pence, `Invoice ${v.invoice_number} — ${v.description}`.slice(0, 200), inv.txn_id, a);
-      }
     });
+    // Already deducted: redo the deductions so they match the invoice (amount, months).
+    if (inv.txn_id) {
+      removeDeductions(a, inv);
+      deduct(a, { ...inv, ...v }, inv.paid_date);
+    }
     res.redirect(`/app/landlord-invoices/${inv.id}`);
   });
 
@@ -175,7 +194,7 @@ module.exports = function landlordInvoiceRoutes(db, mailer = { enabled: false })
     const inv = load(req, res);
     if (!inv) return;
     transaction(db, () => {
-      if (inv.txn_id) db.prepare('DELETE FROM transactions WHERE id = ? AND account_id = ?').run(inv.txn_id, req.user.id);
+      removeDeductions(req.user.id, inv);
       db.prepare('DELETE FROM landlord_invoices WHERE id = ? AND account_id = ?').run(inv.id, req.user.id);
     });
     res.redirect(`/app/landlord-invoices?flash=${encodeURIComponent(`Deleted invoice ${inv.invoice_number}.`)}`);
@@ -184,15 +203,26 @@ module.exports = function landlordInvoiceRoutes(db, mailer = { enabled: false })
   // ---------- settling ----------
 
   // Taken off the landlord's rent: a fee on their statement for the month of `date`.
+  // Take the invoice off the landlord's rent: in one go, or split over several months
+  // (one deduction a month from the given date; any odd pence go on the first).
   function deduct(a, inv, date) {
+    const n = Math.max(1, Number(inv.months) || 1);
+    const parts = instalments(inv.amount_pence, n);
     transaction(db, () => {
-      const txn = db.prepare(
+      const ids = parts.map((pence, i) => Number(db.prepare(
         `INSERT INTO transactions (account_id, txn_date, txn_type, landlord_id, property_id, description, amount_pence)
          VALUES (?, ?, 'fee', ?, ?, ?, ?)`
-      ).run(a, date, inv.landlord_id, inv.property_id, `Invoice ${inv.invoice_number} — ${inv.description}`.slice(0, 200), inv.amount_pence);
-      db.prepare("UPDATE landlord_invoices SET status = 'paid', paid_date = ?, paid_how = 'Deducted from rent', txn_id = ? WHERE id = ? AND account_id = ?")
-        .run(date, Number(txn.lastInsertRowid), inv.id, a);
+      ).run(a, addMonths(date, i), inv.landlord_id, inv.property_id,
+        `Invoice ${inv.invoice_number} — ${inv.description}${n > 1 ? ` (${i + 1} of ${n})` : ''}`.slice(0, 200), pence).lastInsertRowid));
+      db.prepare("UPDATE landlord_invoices SET status = 'paid', paid_date = ?, paid_how = 'Deducted from rent', txn_id = ?, instalment_txn_ids = ? WHERE id = ? AND account_id = ?")
+        .run(date, ids[0], ids.length > 1 ? JSON.stringify(ids.slice(1)) : null, inv.id, a);
     });
+  }
+
+  // Removes every deduction made for the invoice.
+  function removeDeductions(a, inv) {
+    const ids = [inv.txn_id, ...JSON.parse(inv.instalment_txn_ids || '[]')].filter(Boolean);
+    for (const id of ids) db.prepare('DELETE FROM transactions WHERE id = ? AND account_id = ?').run(id, a);
   }
 
   router.post('/:id(\\d+)/settle', (req, res) => {
@@ -205,6 +235,7 @@ module.exports = function landlordInvoiceRoutes(db, mailer = { enabled: false })
     if (!fmt.isIsoDate(date)) return back('Enter the date.');
     if (req.body.how === 'deduct') {
       deduct(a, inv, date);
+      if (inv.months > 1) return back(`Deducting ${fmt.money(inv.amount_pence)} from ${inv.landlord_name}'s rent over ${inv.months} months, from ${st.monthLabel(date.slice(0, 7))}.`, true);
       return back(`Deducted ${fmt.money(inv.amount_pence)} from ${inv.landlord_name}'s rent for ${st.monthLabel(date.slice(0, 7))}.`, true);
     }
     db.prepare("UPDATE landlord_invoices SET status = 'paid', paid_date = ?, paid_how = 'Paid by landlord' WHERE id = ? AND account_id = ?").run(date, inv.id, a);
@@ -216,8 +247,9 @@ module.exports = function landlordInvoiceRoutes(db, mailer = { enabled: false })
   function invoiceDoc(accountId, inv) {
     const co = db.prepare('SELECT agency_name, address, phone, email FROM users WHERE id = ?').get(accountId);
     const p = inv.property_id ? db.prepare('SELECT address_line1, town, postcode FROM properties WHERE id = ?').get(inv.property_id) : null;
-    const note = inv.status !== 'paid' ? 'Payment will be deducted from the rent payment'
-      : inv.paid_how === 'Deducted from rent' ? 'Payment has been deducted from the rent payment'
+    const over = inv.months > 1 ? ` over ${inv.months} months (${fmt.money(Math.floor(inv.amount_pence / inv.months))} a month)` : '';
+    const note = inv.status !== 'paid' ? `Payment will be deducted from the rent payment${over}`
+      : inv.paid_how === 'Deducted from rent' ? `Payment ${inv.months > 1 ? 'is being' : 'has been'} deducted from the rent payment${over}`
       : inv.paid_how === 'Paid by us' ? '' : 'Paid - thank you';
     const [y, m] = String(inv.invoice_date || '').split('-').map(Number);
     const name = `${[p && p.address_line1, p && p.postcode].filter(Boolean).join(' ') || inv.invoice_number}${y ? ` - ${MONTHS[m - 1]} ${y}` : ''}`;
@@ -251,8 +283,8 @@ module.exports = function landlordInvoiceRoutes(db, mailer = { enabled: false })
     const inv = load(req, res);
     if (!inv) return;
     transaction(db, () => {
-      if (inv.txn_id) db.prepare('DELETE FROM transactions WHERE id = ? AND account_id = ?').run(inv.txn_id, req.user.id);
-      db.prepare("UPDATE landlord_invoices SET status = 'unpaid', paid_date = NULL, paid_how = NULL, txn_id = NULL WHERE id = ? AND account_id = ?").run(inv.id, req.user.id);
+      removeDeductions(req.user.id, inv);
+      db.prepare("UPDATE landlord_invoices SET status = 'unpaid', paid_date = NULL, paid_how = NULL, txn_id = NULL, instalment_txn_ids = NULL WHERE id = ? AND account_id = ?").run(inv.id, req.user.id);
     });
     res.redirect(`/app/landlord-invoices/${inv.id}?flash=${encodeURIComponent('Undone. The invoice is unpaid again.')}`);
   });

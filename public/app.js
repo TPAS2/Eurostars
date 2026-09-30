@@ -561,3 +561,24 @@ document.addEventListener('click', (e) => {
     }
   });
 })();
+
+// Landlord invoice form: "£x a month" hint when paying over several months.
+(function () {
+  document.addEventListener('DOMContentLoaded', () => {
+    const sel = document.querySelector('[data-instalments]');
+    const amount = document.getElementById('f-amount');
+    const help = document.querySelector('[data-instalment-help]');
+    if (!sel || !amount || !help) return;
+    const base = help.textContent;
+    const update = () => {
+      const n = Number(sel.value) || 1;
+      const pence = Math.round(Number(String(amount.value).replace(/[£,\s]/g, '')) * 100);
+      if (n < 2 || !Number.isFinite(pence) || pence <= 0) { help.textContent = base; return; }
+      const each = Math.floor(pence / n);
+      help.textContent = `£${(each / 100).toFixed(2)} a month for ${n} months${pence - each * n ? ` (first month £${((each + pence - each * n) / 100).toFixed(2)})` : ''}.`;
+    };
+    sel.addEventListener('change', update);
+    amount.addEventListener('input', update);
+    update();
+  });
+})();

@@ -2824,3 +2824,32 @@ test('landlord invoice number can be changed; no Paid by us option', async () =>
   // No "Paid by us" option: if the agency pays, no invoice is raised.
   assert.doesNotMatch((await c.get(`/app/landlord-invoices/${id}`)).text, /Paid by us|value="us"/);
 });
+
+test('landlord invoice paid over several months: deducted a month at a time, undone and re-split on edit', async () => {
+  const c = await registerAndLogin('li-months@example.com', 'LI Months Lets');
+  const ll = idFrom((await c.post('/app/landlords', { name: 'Ivy Instalment' })).location);
+  const prop = idFrom((await c.post('/app/properties', { address_line1: '4 Split Street', landlord_id: String(ll), status: 'let' })).location);
+  let r = await c.get('/app/landlord-invoices/new');
+  assert.match(r.text, /name="months"[\s\S]*?<option value="3" >3 months/);
+  r = await c.post('/app/landlord-invoices', { landlord_id: String(ll), property_id: String(prop), invoice_date: '2026-09-15', description: 'New boiler', amount: '100', months: '3', then: 'deduct' });
+  assert.match(decodeURIComponent(r.location), /over 3 months from September 2026/);
+  const id = idFrom(r.location.split('?')[0]);
+  const fees = () => db.prepare("SELECT txn_date, amount_pence, description FROM transactions WHERE landlord_id = ? AND txn_type = 'fee' ORDER BY txn_date").all(ll).map((t) => ({ ...t }));
+  assert.deepEqual(fees().map((t) => [t.txn_date, t.amount_pence]), [['2026-09-15', 3334], ['2026-10-15', 3333], ['2026-11-15', 3333]]);
+  assert.match(fees()[1].description, /\(2 of 3\)/);
+  r = await c.get(`/app/landlord-invoices/${id}`);
+  assert.match(r.text, /Paid over 3 months[\s\S]*?1 of 3<\/td><td>September 2026<\/td><td class="num">£33\.34[\s\S]*?3 of 3<\/td><td>November 2026/);
+  assert.match(r.text, /deducted from the rent payment over 3 months/);
+  // Editing to 2 months re-splits the deductions.
+  await c.get(`/app/landlord-invoices/${id}/edit`);
+  await c.post(`/app/landlord-invoices/${id}`, { landlord_id: String(ll), property_id: String(prop), invoice_date: '2026-09-15', description: 'New boiler', amount: '100', months: '2' });
+  assert.deepEqual(fees().map((t) => [t.txn_date, t.amount_pence]), [['2026-09-15', 5000], ['2026-10-15', 5000]]);
+  // Undo removes every deduction.
+  await c.post(`/app/landlord-invoices/${id}/unsettle`, {});
+  assert.equal(fees().length, 0);
+  // Month-end dates stay in the right month.
+  await c.post(`/app/landlord-invoices/${id}/settle`, { how: 'deduct', date: '2026-01-31' });
+  assert.deepEqual(fees().map((t) => t.txn_date), ['2026-01-31', '2026-02-28']);
+  await c.post(`/app/landlord-invoices/${id}/delete`, {});
+  assert.equal(fees().length, 0, 'deleting removes them all');
+});

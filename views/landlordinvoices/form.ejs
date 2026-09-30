@@ -38,6 +38,14 @@
       <% if (errors.amount) { %><div class="field-err"><%= errors.amount %></div><% } %>
     </div>
     <div class="field">
+      <label for="f-months">Pay over</label>
+      <select id="f-months" name="months" data-instalments>
+        <% for (let n = 1; n <= 24; n++) { %><option value="<%= n %>" <%= Number(values.months || 1) === n ? 'selected' : '' %>><%= n === 1 ? 'One payment' : `${n} months` %></option><% } %>
+      </select>
+      <div class="help" data-instalment-help>Deducted from their rent in one go, or split over several months (one deduction a month from the invoice date).</div>
+      <% if (errors.months) { %><div class="field-err"><%= errors.months %></div><% } %>
+    </div>
+    <div class="field">
       <label for="f-date">Invoice date <span class="req">*</span></label>
       <input id="f-date" type="date" name="invoice_date" value="<%= values.invoice_date || '' %>" required>
       <% if (errors.invoice_date) { %><div class="field-err"><%= errors.invoice_date %></div><% } %>

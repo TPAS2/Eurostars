@@ -416,6 +416,9 @@ function openDatabase(file) {
   // made) and when it was last emailed.
   // Contractor invoices: what the landlord is charged (blank = the same as the price to us).
   addColumnIfMissing(db, 'invoices', 'landlord_price_pence', 'INTEGER');
+  // Landlord invoices paid over several months: how many, and the deductions after the first.
+  addColumnIfMissing(db, 'landlord_invoices', 'months', 'INTEGER NOT NULL DEFAULT 1');
+  addColumnIfMissing(db, 'landlord_invoices', 'instalment_txn_ids', 'TEXT');
   addColumnIfMissing(db, 'invoices', 'charge_landlord', 'INTEGER NOT NULL DEFAULT 1');
   addColumnIfMissing(db, 'maintenance_jobs', 'invoice_date', 'TEXT');
   addColumnIfMissing(db, 'maintenance_jobs', 'invoice_emailed_at', 'TEXT');
