@@ -2874,3 +2874,15 @@ test('landlord invoice instalments: an Edit button beside each deducted payment 
   const other = db.prepare("INSERT INTO transactions (account_id, txn_date, txn_type, landlord_id, amount_pence) VALUES (?, '2026-01-01', 'fee', ?, 1)").run(db.prepare("SELECT id FROM users WHERE username = 'li-inst-edit'").get().id, ll);
   assert.equal((await c.get(`/app/landlord-invoices/${id}/instalments/${Number(other.lastInsertRowid)}/edit`)).status, 404);
 });
+
+test('Landlord invoices list: an Edit button to the right of Deducted', async () => {
+  const c = await registerAndLogin('li-list-edit@example.com', 'LI List Edit Lets');
+  const ll = idFrom((await c.post('/app/landlords', { name: 'Lea List' })).location);
+  const prop = idFrom((await c.post('/app/properties', { address_line1: '6 List Lane', landlord_id: String(ll), status: 'let' })).location);
+  await c.get('/app/landlord-invoices/new');
+  const r = await c.post('/app/landlord-invoices', { landlord_id: String(ll), property_id: String(prop), invoice_date: '2026-09-01', description: 'Keys', amount: '10' });
+  const id = idFrom(r.location.split('?')[0]);
+  const list = (await c.get('/app/landlord-invoices?month=2026-09')).text;
+  assert.match(list, /<th>Deducted<\/th><th><\/th>/);
+  assert.match(list, new RegExp(`yes-no no">No</span></td>\\s*<td class="num"><a class="btn small" href="/app/landlord-invoices/${id}/edit">Edit</a>`));
+});
