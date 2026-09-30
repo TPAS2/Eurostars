@@ -12,6 +12,17 @@
     <%- include('partials/csrf') %>
     <% def.fields.forEach(f => { %>
       <%- include('partials/field', { f, value: values[f.name], error: errors[f.name], opts: options[f.name] }) %>
+      <% if (typeof tenantCouncil !== 'undefined' && tenantCouncil && f.name === 'phone') { %>
+      <div class="field">
+        <label for="f-tenant_council_id">Council</label>
+        <select id="f-tenant_council_id" name="tenant_council_id">
+          <option value="">— None —</option>
+          <% tenantCouncil.options.forEach(o => { %><option value="<%= o.id %>" <%= Number(tenantCouncil.council_id) === o.id ? 'selected' : '' %>><%= o.label %></option><% }) %>
+        </select>
+        <div class="help">The council for <%= tenantCouncil.address_line1 %>, the property they rent. Changing it updates the property.</div>
+        <% if (errors.tenant_council_id) { %><div class="field-err"><%= errors.tenant_council_id %></div><% } %>
+      </div>
+      <% } %>
     <% }) %>
     <div class="form-actions wide">
       <% if (row) { %>

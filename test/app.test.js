@@ -2600,3 +2600,25 @@ test('tenants: All lists every tenancy including ended ones; Edit buttons for te
   const ended = db.prepare("SELECT id FROM tenancies WHERE tenant_id = ? AND status = 'ended'").get(mo).id;
   assert.match(r.text, new RegExp(`href="/app/tenancies/${ended}/edit">Edit</a>`), 'ended tenancy editable from the list');
 });
+
+test('tenant Edit form: a Council dropdown that changes the council of the property they rent', async () => {
+  const c = await registerAndLogin('tenant-council@example.com', 'Tenant Council Lets');
+  const leeds = idFrom((await c.post('/app/councils', { name: 'Leeds' })).location);
+  const york = idFrom((await c.post('/app/councils', { name: 'York' })).location);
+  const prop = idFrom((await c.post('/app/properties', { address_line1: '6 Council Close', council_id: String(leeds), status: 'let' })).location);
+  await c.post(`/app/properties/${prop}/add-tenant`, { tenant_mode: 'new', name: 'Cal Tenant', booking_date: '2026-01-01', start_date: '2026-02-01', rent_pence: '900', rent_frequency: 'monthly', status: 'active' });
+  const tenant = db.prepare("SELECT id FROM tenants WHERE name = 'Cal Tenant'").get().id;
+  let r = await c.get(`/app/tenants/${tenant}/edit`);
+  assert.match(r.text, /name="phone"[\s\S]*?<label for="f-tenant_council_id">Council<\/label>[\s\S]*?<option value="\d+" selected>Leeds<\/option>/);
+  r = await c.post(`/app/tenants/${tenant}`, { name: 'Cal Tenant', email: '', phone: '', notes: '', tenant_council_id: String(york) });
+  assert.equal(r.status, 302);
+  assert.equal(db.prepare('SELECT council_id FROM properties WHERE id = ?').get(prop).council_id, york);
+  assert.match((await c.get(`/app/tenants/${tenant}`)).text, /<dt>Council<\/dt>\s*<dd><a[^>]*>York/);
+  // Someone else's council is refused.
+  const other = await registerAndLogin('tenant-council-2@example.com', 'Other Council Lets');
+  const theirs = idFrom((await other.post('/app/councils', { name: 'Theirs' })).location);
+  await c.get(`/app/tenants/${tenant}/edit`);
+  r = await c.post(`/app/tenants/${tenant}`, { name: 'Cal Tenant', email: '', phone: '', notes: '', tenant_council_id: String(theirs) });
+  assert.equal(r.status, 422);
+  assert.equal(db.prepare('SELECT council_id FROM properties WHERE id = ?').get(prop).council_id, york);
+});

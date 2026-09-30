@@ -162,7 +162,18 @@ module.exports = function appRoutes(db) {
   function renderForm(res, def, { row, values, errors, accountId, status = 200 }) {
     const options = {};
     for (const f of def.fields) if (f.type === 'ref') options[f.name] = refOptions(f.ref, accountId);
-    res.status(status).render('form', { title: row ? `Edit ${def.singular.toLowerCase()}` : `New ${def.singular.toLowerCase()}`, def, row, values, errors, options, fmt, section: sectionOf(def) });
+    const tenantCouncil = def.key === 'tenants' && row ? tenantProperty(accountId, row.id) : null;
+    if (tenantCouncil) tenantCouncil.options = refOptions('councils', accountId);
+    res.status(status).render('form', { title: row ? `Edit ${def.singular.toLowerCase()}` : `New ${def.singular.toLowerCase()}`, def, row, values, errors, options, tenantCouncil, fmt, section: sectionOf(def) });
+  }
+
+  // The property of a tenant's current tenancy (or latest one), whose council the tenant's Edit form can change.
+  function tenantProperty(accountId, tenantId) {
+    return db.prepare(
+      `SELECT p.id AS property_id, p.address_line1, p.council_id FROM tenancies ty JOIN properties p ON p.id = ty.property_id
+        WHERE ty.account_id = ? AND ty.tenant_id = ?
+        ORDER BY ty.status = 'active' DESC, ty.status = 'pending' DESC, ty.start_date DESC LIMIT 1`
+    ).get(accountId, tenantId) || null;
   }
 
   // Keep derived data consistent after a record is saved.
@@ -724,10 +735,20 @@ module.exports = function appRoutes(db) {
     const a = req.user.id;
     const autosave = req.get('X-Autosave') === '1';
     const { values, errors } = parseForm(def, req.body, a);
+    // A tenant's Edit form can change the council of the property they rent.
+    let councilChange = null;
+    if (def.key === 'tenants' && req.body.tenant_council_id !== undefined) {
+      const tp = tenantProperty(a, row.id);
+      const raw = String(req.body.tenant_council_id || '');
+      const council = raw ? db.prepare('SELECT id FROM councils WHERE id = ? AND account_id = ?').get(Number(raw), a) : null;
+      if (raw && !council) errors.tenant_council_id = 'Choose a valid council.';
+      else if (tp) councilChange = { property_id: tp.property_id, council_id: council ? council.id : null };
+    }
     if (Object.keys(errors).length) {
       if (autosave) return res.status(422).json({ ok: false, errors });
       return renderForm(res, def, { row, values, errors, accountId: a, status: 422 });
     }
+    if (councilChange) db.prepare('UPDATE properties SET council_id = ? WHERE id = ? AND account_id = ?').run(councilChange.council_id, councilChange.property_id, a);
     prepareValues(def, a, values);
     const cols = Object.keys(values);
     transaction(db, () => {
