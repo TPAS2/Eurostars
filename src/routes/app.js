@@ -694,6 +694,23 @@ module.exports = function appRoutes(db) {
       const fk = { maintenance: 'maintenance_job_id', properties: 'property_id', contractors: 'contractor_id' }[def.key];
       invoices = db.prepare(`${INVOICE_LIST_SQL} WHERE i.account_id = ? AND i.${fk} = ? ORDER BY COALESCE(i.invoice_date, i.created_at) DESC, i.id DESC`).all(a, row.id);
     }
+    // A contractor's page: small boxes with what's been paid to them (a chosen month, and all time).
+    let contractorStats = null;
+    if (def.key === 'contractors') {
+      const thisMonth = fmt.today().slice(0, 7);
+      const month = statements.isMonth(req.query.month) ? String(req.query.month) : thisMonth;
+      const sum = (rows, test) => rows.filter(test).reduce((t, i) => t + i.amount_pence, 0);
+      const paid = invoices.filter((i) => i.status === 'paid');
+      const inMonth = paid.filter((i) => String(i.paid_date || '').slice(0, 7) === month);
+      const months = [...new Set([thisMonth, ...invoices.map((i) => String(i.paid_date || i.invoice_date || '').slice(0, 7)).filter(statements.isMonth)])].sort().reverse();
+      contractorStats = {
+        month, months: months.map((m) => ({ value: m, label: statements.monthLabel(m) })), monthLabel: statements.monthLabel(month),
+        paidMonth: sum(inMonth, () => true), paidMonthN: inMonth.length,
+        paidAll: sum(paid, () => true), paidAllN: paid.length,
+        unpaid: sum(invoices, (i) => i.status === 'unpaid'), unpaidN: invoices.filter((i) => i.status === 'unpaid').length,
+        invoicesN: invoices.length, last: paid.map((i) => i.paid_date).filter(Boolean).sort().pop() || null,
+      };
+    }
     // On a maintenance job: its photos and files (without the file contents).
     const jobFiles = def.key === 'maintenance'
       ? db.prepare(`SELECT f.id, f.filename, f.mime, f.size, f.uploaded_at, u.name AS uploaded_by_name
@@ -727,7 +744,7 @@ module.exports = function appRoutes(db) {
     const photo = def.key === 'councils'
       ? db.prepare("SELECT strftime('%s', updated_at) AS v FROM council_photos WHERE council_id = ? AND account_id = ?").get(row.id, a) || { v: null }
       : null;
-    res.render('show', { title: rowTitle(def, row, maps), section: sectionOf(def), def, row, maps, display, rowTitle, children, extra, invoices, related: relatedLists(def, row, a), certs, photo, tenantBoxes, statementLink, jobFiles, jobInvoice, error: req.query.error ? String(req.query.error).slice(0, 200) : null, flash: req.query.flash ? String(req.query.flash).slice(0, 200) : null, fmt, today: fmt.today() });
+    res.render('show', { title: rowTitle(def, row, maps), section: sectionOf(def), def, row, maps, display, rowTitle, children, extra, invoices, related: relatedLists(def, row, a), certs, photo, tenantBoxes, statementLink, jobFiles, jobInvoice, contractorStats, error: req.query.error ? String(req.query.error).slice(0, 200) : null, flash: req.query.flash ? String(req.query.flash).slice(0, 200) : null, fmt, today: fmt.today() });
   });
 
   router.get('/:entity/:id/edit', (req, res) => {

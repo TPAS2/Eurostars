@@ -2796,3 +2796,23 @@ test('invoice tabs: month boxes on Landlord invoices like Contractors invoices, 
   r = await c.get('/app/invoices?month=2026-09');
   assert.match(r.text, /<section class="tiles centered-tiles">[\s\S]*?Unpaid · all months/);
 });
+
+test('contractor page: boxes for paid in a chosen month, paid all time, unpaid and last paid', async () => {
+  const c = await registerAndLogin('contractor-tiles@example.com', 'Contractor Tiles Lets');
+  const prop = idFrom((await c.post('/app/properties', { address_line1: '1 Tile Street', status: 'let' })).location);
+  const body = (amount, date) => ({ supplier: 'Tile Fixers', amount, landlord_amount: amount, charge_landlord: 'no', invoice_date: date, property_id: String(prop) });
+  await c.get('/app/invoices/new');
+  const a = idFrom((await c.post('/app/invoices', body('100', '2026-08-05'), { multipart: true })).location);
+  const b = idFrom((await c.post('/app/invoices', body('40', '2026-09-03'), { multipart: true })).location);
+  await c.post('/app/invoices', body('25', '2026-09-20'), { multipart: true });
+  db.prepare("UPDATE invoices SET status = 'paid', paid_date = '2026-08-10' WHERE id = ?").run(a);
+  db.prepare("UPDATE invoices SET status = 'paid', paid_date = '2026-09-06' WHERE id = ?").run(b);
+  const contractor = db.prepare("SELECT id FROM contractors WHERE name = 'Tile Fixers'").get().id;
+  let r = await c.get(`/app/contractors/${contractor}?month=2026-09`);
+  assert.match(r.text, /Paid in[\s\S]*?<option value="2026-09" selected>September 2026[\s\S]*?class="value">£40\.00/);
+  assert.match(r.text, /Paid all time<\/span><span class="value">£140\.00/);
+  assert.match(r.text, /Unpaid<\/span><span class="value">£25\.00/);
+  assert.match(r.text, /Last paid<\/span><span class="value sm">06\/09\/2026/);
+  r = await c.get(`/app/contractors/${contractor}?month=2026-08`);
+  assert.match(r.text, /<option value="2026-08" selected>August 2026[\s\S]*?class="value">£100\.00/);
+});

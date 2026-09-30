@@ -20,6 +20,24 @@
 
 <% if (error) { %><div class="notice err"><%= error %></div><% } %>
 <% if (flash) { %><div class="notice ok"><%= flash %></div><% } %>
+<% if (typeof contractorStats !== 'undefined' && contractorStats) { const cs = contractorStats; const plural = (n) => `${n} invoice${n === 1 ? '' : 's'}`; %>
+<section class="tiles centered-tiles contractor-tiles">
+  <div class="tile">
+    <span class="label">Paid in
+      <form method="get" data-autogo class="tile-month">
+        <select name="month" aria-label="Month">
+          <% cs.months.forEach(m => { %><option value="<%= m.value %>" <%= m.value === cs.month ? 'selected' : '' %>><%= m.label %></option><% }) %>
+        </select>
+        <noscript><button class="btn small" type="submit">Show</button></noscript>
+      </form>
+    </span>
+    <span class="value"><%= fmt.money(cs.paidMonth) %></span><span class="sub"><%= plural(cs.paidMonthN) %></span>
+  </div>
+  <div class="tile ok"><span class="label">Paid all time</span><span class="value"><%= fmt.money(cs.paidAll) %></span><span class="sub"><%= plural(cs.paidAllN) %></span></div>
+  <div class="tile <%= cs.unpaidN ? 'warn' : '' %>"><span class="label">Unpaid</span><span class="value"><%= fmt.money(cs.unpaid) %></span><span class="sub"><%= plural(cs.unpaidN) %></span></div>
+  <div class="tile"><span class="label">Last paid</span><span class="value sm"><%= cs.last ? fmt.ukDate(cs.last) : '—' %></span><span class="sub"><%= plural(cs.invoicesN) %> in total</span></div>
+</section>
+<% } %>
 <section class="card">
   <% if (extra) { %><div class="callout <%= extra.alert ? 'alert' : '' %>"><span><%= extra.label %></span><strong><%= extra.value %></strong></div><% } %>
   <% if (photo) { %>
