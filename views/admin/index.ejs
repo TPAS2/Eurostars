@@ -34,7 +34,7 @@
   </div>
   <div class="table-wrap">
   <table>
-    <thead><tr><th>User</th><th>Username</th><th class="num">People</th><th>Agency</th><th>Joined</th><th>Last login</th><th>Last active</th><th class="num">Actions (7 days)</th><th class="num">Logins</th><th class="num">Landlords</th><th class="num">Properties</th><th class="num">Tenancies</th><th>Status</th></tr></thead>
+    <thead><tr><th>User</th><th>Username</th><th class="num">People</th><th>Agency</th><th>Joined</th><th>Last login</th><th>Last active</th><th class="num">Actions (7 days)</th><th class="num">Logins</th><th>Status</th></tr></thead>
     <tbody>
     <% users.forEach(u => { %>
       <tr>
@@ -47,9 +47,6 @@
         <td><%= u.last_active ? fmt.ukDateTime(u.last_active) : 'No activity' %></td>
         <td class="num"><%= u.actions_7d %><% if (u.changes_7d) { %><div class="muted small"><%= u.changes_7d %> change<%= u.changes_7d === 1 ? '' : 's' %></div><% } %></td>
         <td class="num"><%= u.login_count %></td>
-        <td class="num"><%= u.landlords %></td>
-        <td class="num"><%= u.properties %></td>
-        <td class="num"><%= u.active_tenancies %></td>
         <td><span class="badge s-<%= u.status %>"><%= u.status %></span></td>
       </tr>
     <% }) %>

@@ -2652,3 +2652,12 @@ test('a tenancy with an end date that has come is ended automatically', async ()
   await c.get('/app');
   assert.equal(db.prepare('SELECT status FROM tenancies WHERE id = ?').get(fay).status, 'ended');
 });
+
+test('admin panel users box has no Landlords, Properties or Tenancies columns', async () => {
+  const admin = new Client();
+  await admin.login('admin', 'owner-password-123');
+  const r = await admin.get('/admin');
+  const head = r.text.slice(r.text.indexOf('<th>User</th>'), r.text.indexOf('</tr>', r.text.indexOf('<th>User</th>')));
+  assert.match(head, /Logins/);
+  assert.doesNotMatch(head, /Landlords|Properties|Tenancies/);
+});
