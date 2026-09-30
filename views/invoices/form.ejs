@@ -9,18 +9,26 @@
   <% if (Object.keys(errors).length) { %><div class="notice err">Please fix the highlighted fields.</div><% } %>
   <form method="post" action="/app/invoices<%= invoice ? '/' + invoice.id : '' %>" enctype="multipart/form-data" class="form-grid" data-draft="invoice-<%= invoice ? invoice.id : 'new' %>">
     <%- include('../partials/csrf') %>
-    <div class="field wide">
-      <label for="f-file">Invoice file</label>
-      <input id="f-file" type="file" name="file" accept="application/pdf,image/png,image/jpeg,image/webp">
-      <div class="help">Optional. PDF, PNG, JPG or WebP, up to 10 MB.<% if (invoice && invoice.file_original) { %> Current file: <%= invoice.file_original %>. Choose a new file to replace it.<% } %></div>
-      <% if (errors.file) { %><div class="field-err"><%= errors.file %></div><% } %>
-    </div>
-    <div class="field">
-      <label for="f-supplier">Supplier / contractor <span class="req">*</span></label>
-      <input id="f-supplier" name="supplier" value="<%= values.supplier || '' %>" list="contractor-list" autocomplete="off" placeholder="Start typing to pick a contractor" required>
-      <datalist id="contractor-list"><% contractors.forEach(c => { %><option value="<%= c.name %>"><%= c.trade || '' %></option><% }) %></datalist>
-      <div class="help">Pick from your contractors, or type a new name to add one.</div>
-      <% if (errors.supplier) { %><div class="field-err"><%= errors.supplier %></div><% } %>
+    <div class="field wide top-trio">
+      <div class="field">
+        <label for="f-file">Invoice file</label>
+        <input id="f-file" type="file" name="file" accept="application/pdf,image/png,image/jpeg,image/webp">
+        <div class="help">Optional. PDF, PNG, JPG or WebP, up to 10 MB.<% if (invoice && invoice.file_original) { %> Current file: <%= invoice.file_original %>. Choose a new file to replace it.<% } %></div>
+        <% if (errors.file) { %><div class="field-err"><%= errors.file %></div><% } %>
+      </div>
+      <div class="field">
+        <label for="f-supplier">Supplier / contractor <span class="req">*</span></label>
+        <input id="f-supplier" name="supplier" value="<%= values.supplier || '' %>" list="contractor-list" autocomplete="off" placeholder="Start typing to pick a contractor" required>
+        <datalist id="contractor-list"><% contractors.forEach(c => { %><option value="<%= c.name %>"><%= c.trade || '' %></option><% }) %></datalist>
+        <div class="help">Pick from your contractors, or type a new name to add one.</div>
+        <% if (errors.supplier) { %><div class="field-err"><%= errors.supplier %></div><% } %>
+      </div>
+      <div class="field">
+        <label for="f-added_by">Added by <span class="req">*</span></label>
+        <select id="f-added_by" name="added_by" required>
+          <% people.forEach(m => { %><option value="<%= m.id %>" <%= Number(values.added_by) === m.id ? 'selected' : '' %>><%= m.name %></option><% }) %>
+        </select>
+      </div>
     </div>
     <div class="field price-trio wide" data-profit>
       <div class="field">
@@ -82,12 +90,6 @@
       </select>
       <div class="help">Who it's charged to. Filled in from the property; change it if needed.</div>
       <% if (errors.landlord_id) { %><div class="field-err"><%= errors.landlord_id %></div><% } %>
-    </div>
-    <div class="field">
-      <label for="f-added_by">Added by <span class="req">*</span></label>
-      <select id="f-added_by" name="added_by" required>
-        <% people.forEach(m => { %><option value="<%= m.id %>" <%= Number(values.added_by) === m.id ? 'selected' : '' %>><%= m.name %></option><% }) %>
-      </select>
     </div>
     <div class="field wide">
       <label for="f-work_required">What's required</label>

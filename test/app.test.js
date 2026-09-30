@@ -1873,7 +1873,7 @@ test('landlord invoices: bill a landlord, deduct from rent or mark paid, print a
   assert.equal(db.prepare('SELECT COUNT(*) n FROM landlord_invoices WHERE id = ?').get(inv1).n, 0);
 });
 
-test('contractor invoices: no invoice number or due date on the form; "Added by" beside Property', async () => {
+test('contractor invoices: no invoice number or due date on the form; file, supplier and "Added by" on one line', async () => {
   const c = await registerAndLogin('added-by@example.com', 'Added By Lets');
   const companyId = db.prepare("SELECT id FROM users WHERE username = 'added-by'").get().id;
   const admin = new Client();
@@ -1884,7 +1884,7 @@ test('contractor invoices: no invoice number or due date on the form; "Added by"
 
   let r = await c.get('/app/invoices/new');
   assert.doesNotMatch(r.text, /name="invoice_number"|name="due_date"/);
-  assert.match(r.text, /<label for="f-property">Property <span class="req">\*<\/span><\/label>[\s\S]*?<\/div>\s*<div class="field">\s*<label for="f-added_by">Added by <span class="req">\*<\/span><\/label>/, 'Added by comes right after Property');
+  assert.match(r.text, /<div class="field wide top-trio">\s*<div class="field">\s*<label for="f-file">[\s\S]*?<label for="f-supplier">[\s\S]*?<label for="f-added_by">Added by <span class="req">\*<\/span><\/label>/, 'Invoice file, Supplier and Added by share one line');
   assert.match(r.text, new RegExp(`<option value="${companyId}" selected>Test User</option><option value="${pat}" >Pat Clerk</option>`), 'defaults to whoever is signed in');
 
   const pdf = new File([Buffer.from('%PDF-1.4\n%x\n')], 'i.pdf');
