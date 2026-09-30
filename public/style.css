@@ -688,3 +688,5 @@ table.cfp .num { text-align: right; }
 .price-trio > .field { margin: 0; }
 .profit-out { display: flex; align-items: center; min-height: 40px; padding: 0 12px; border: 1px dashed var(--border); border-radius: 8px; font-weight: 700; font-size: 1.05rem; background: var(--surface-2); }
 @media (max-width: 760px) { .price-trio { grid-template-columns: 1fr; } }
+.is-upcoming .notice-dot { background: var(--border); }
+.is-upcoming .notice-when { color: var(--muted); }

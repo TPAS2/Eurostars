@@ -754,7 +754,7 @@ test('property certificates: gas, electrical and insurance with current, previou
   assert.doesNotMatch(r.text, /Other compliance/);
 });
 
-test('dashboard notifications list certificates expiring within a month', async () => {
+test('dashboard notifications list certificates expiring within two months, urgent ones first', async () => {
   const fmt = require('../src/format');
   const c = await registerAndLogin('notify@example.com', 'Notify Lets');
   let r = await c.get('/app');
@@ -766,16 +766,18 @@ test('dashboard notifications list certificates expiring within a month', async 
   const add = (item_type, days) => c.post('/app/compliance', { property_id: pid, item_type, expiry_date: fmt.addDays(fmt.today(), days) });
   await add('Gas Safety (CP12)', 12);   // due in 12 days -> notify
   await add('EICR', -3);                // expired -> notify
-  await add('Insurance', 45);           // 45 days -> "coming up", not a notification
+  await add('Insurance', 45);           // 45 days -> listed, not urgent
   await add('EPC', 400);                // far off -> neither
 
   r = await c.get('/app');
   const notes = r.text.match(/id="notifications"[\s\S]*?<\/section>/)[0];
   assert.match(notes, /Gas certificate<\/strong> for <a[^>]*>2 Dock Lane[\s\S]*expires in 12 days/);
   assert.match(notes, /Electrical certificate \(EICR\)[\s\S]*expired 3 days ago/);
-  assert.doesNotMatch(notes, /Insurance|EPC/);
-  assert.match(notes, /class="count alert-count">2</);
-  assert.match(r.text, /Coming up in 1–2 months[\s\S]*Insurance/);
+  assert.match(notes, /class="is-upcoming">[\s\S]*?Insurance<\/strong>[\s\S]*?expires in 45 days/);
+  assert.doesNotMatch(notes, /EPC/);
+  assert.match(notes, /Electrical[\s\S]*Gas certificate[\s\S]*Insurance/, 'soonest first');
+  assert.match(notes, /class="count alert-count">3</);
+  assert.doesNotMatch(r.text, /Coming up in 1–2 months/);
 
   // Renewing the gas certificate clears its notification.
   await add('Gas Safety (CP12)', 365);
@@ -2495,5 +2497,8 @@ test('dashboard has no Raise rent box and no Tenancies ending list', async () =>
   const r = await c.get('/app');
   assert.doesNotMatch(r.text, /Raise rent|rent\/raise/);
   assert.doesNotMatch(r.text, /Tenancies ending/);
-  assert.match(r.text, /Coming up in 1–2 months[\s\S]*?Open maintenance/);
+  assert.match(r.text, /Notifications/);
+  assert.doesNotMatch(r.text, /<h2>Open maintenance<\/h2>/);
+  assert.match(r.text, /class="label">Open maintenance</, 'the Open maintenance box at the top stays');
+  assert.doesNotMatch(r.text, /Coming up in 1–2 months/);
 });

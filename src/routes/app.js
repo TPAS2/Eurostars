@@ -276,28 +276,20 @@ module.exports = function appRoutes(db) {
                           AND c2.item_type = c.item_type AND c2.expiry_date > c.expiry_date)
         ORDER BY c.expiry_date LIMIT 20`
     ).all(a, soon);
-    // Notifications: certificates expired or expiring within a month. The 60-day list
-    // below then only shows what's coming up after that.
+    // Notifications: certificates expired or expiring within two months, soonest first. Those
+    // expired or due within a month are highlighted as urgent.
     const monthAhead = fmt.addDays(today, 30);
     const certName = { 'Gas Safety (CP12)': 'Gas certificate', EICR: 'Electrical certificate (EICR)' };
     const daysBetween = (from, to) => Math.round((Date.parse(to) - Date.parse(from)) / 86400000);
-    const notifications = compliance.filter((c) => c.expiry_date <= monthAhead).map((c) => {
+    const notifications = compliance.map((c) => {
       const days = daysBetween(today, c.expiry_date);
       return {
-        ...c, name: certName[c.item_type] || c.item_type, expired: days < 0,
+        ...c, name: certName[c.item_type] || c.item_type, expired: days < 0, urgent: c.expiry_date <= monthAhead,
         when: days < 0 ? `expired ${-days} day${days === -1 ? '' : 's'} ago` : days === 0 ? 'expires today' : `expires in ${days} day${days === 1 ? '' : 's'}`,
       };
     });
-    const comingUp = compliance.filter((c) => c.expiry_date > monthAhead);
-    const jobs = db.prepare(
-      `SELECT m.id, m.title, m.priority, m.status, m.reported_date, p.address_line1
-         FROM maintenance_jobs m JOIN properties p ON p.id = m.property_id
-        WHERE m.account_id = ? AND m.status != 'completed'
-        ORDER BY CASE m.priority WHEN 'emergency' THEN 0 WHEN 'high' THEN 1 WHEN 'normal' THEN 2 ELSE 3 END, m.reported_date
-        LIMIT 10`
-    ).all(a);
     res.render('dashboard', {
-      title: 'Dashboard', section: 'dashboard', stats, compliance: comingUp, notifications, jobs,
+      title: 'Dashboard', section: 'dashboard', stats, notifications,
       today, month: today.slice(0, 7), fmt, flash: req.query.flash || '',
     });
   });

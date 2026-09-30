@@ -14,15 +14,16 @@
 
 <section class="card notifications <%= notifications.length ? 'has-items' : '' %>" id="notifications">
   <div class="card-head">
-    <h2>Notifications <% if (notifications.length) { %><span class="count alert-count"><%= notifications.length %></span><% } %></h2>
-    <span class="muted small">Certificates and insurance expiring within a month</span>
+    <% const urgent = notifications.filter(n => n.urgent).length; %>
+    <h2>Notifications <% if (notifications.length) { %><span class="count <%= urgent ? 'alert-count' : '' %>"><%= notifications.length %></span><% } %></h2>
+    <span class="muted small">Certificates and insurance expiring within two months</span>
   </div>
   <% if (!notifications.length) { %>
-    <p class="muted">Nothing needs attention. Everything is in date for at least the next month.</p>
+    <p class="muted">Nothing needs attention. Everything is in date for at least the next two months.</p>
   <% } else { %>
   <ul class="notice-list">
     <% notifications.forEach(n => { %>
-    <li class="<%= n.expired ? 'is-expired' : 'is-expiring' %>">
+    <li class="<%= n.expired ? 'is-expired' : n.urgent ? 'is-expiring' : 'is-upcoming' %>">
       <span class="notice-dot" aria-hidden="true"></span>
       <div class="notice-text">
         <strong><%= n.name %></strong> for <a href="/app/properties/<%= n.property_id %>#certificates"><%= n.address_line1 %></a>
@@ -45,22 +46,4 @@
 </section>
 
 
-<div class="grid-2">
-  <section class="card">
-    <h2>Coming up in 1–2 months</h2>
-    <% if (!compliance.length) { %><p class="muted">Nothing else due in the next two months.</p><% } else { %>
-    <table><thead><tr><th>Certificate</th><th>Property</th><th>Expires</th></tr></thead><tbody>
-    <% compliance.forEach(c => { const expired = c.expiry_date < today; %><tr><td><a href="/app/compliance/<%= c.id %>"><%= c.item_type %></a></td><td><a href="/app/properties/<%= c.property_id %>"><%= c.address_line1 %></a></td><td><span class="badge <%= expired ? 'bad' : 'warn' %>"><%= expired ? 'Expired ' : '' %><%= fmt.ukDate(c.expiry_date) %></span></td></tr><% }) %>
-    </tbody></table><% } %>
-  </section>
-
-  <section class="card">
-    <h2>Open maintenance</h2>
-    <% if (!jobs.length) { %><p class="muted">No open jobs.</p><% } else { %>
-    <table><thead><tr><th>Issue</th><th>Property</th><th>Priority</th></tr></thead><tbody>
-    <% jobs.forEach(j => { %><tr><td><a href="/app/maintenance/<%= j.id %>"><%= j.title %></a></td><td><%= j.address_line1 %></td><td><span class="badge p-<%= j.priority %>"><%= j.priority %></span></td></tr><% }) %>
-    </tbody></table><% } %>
-  </section>
-
-</div>
 <%- include('partials/footer') %>
