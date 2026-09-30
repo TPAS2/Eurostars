@@ -115,7 +115,8 @@ function metroData(user, month, typed = null) {
     pence: Number.isNaN(fmt.parseMoney(p.amount)) ? 0 : fmt.parseMoney(p.amount),
   }));
   return {
-    store: '', accountName: data.from_name, // Store: left blank on the form for now contactName: data.contact_name || user.name || agency.name,
+    // Store is left blank on the form for now.
+    store: '', accountName: data.from_name, contactName: data.contact_name || user.name || agency.name,
     accountNumber: data.from_account_number, valueDate: data.payment_date ? fmt.ukDate(data.payment_date) : '',
     signatory1: '', signatory2: '', payees, // signed by hand after printing
     totalFigures: tidyFigures(data.totalFigures_override) || undefined, totalWords: data.totalWords_override || undefined, count: data.count_override || undefined,

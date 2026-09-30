@@ -23,9 +23,8 @@ const BOX = {
   count: { x: 162.4, y: 513.7, w: 166.0 },
   signatory1: { x: 62.9, y: 391.2, w: 237.3 },
   signatory2: { x: 315.7, y: 391.8, w: 237.3 },
-  // The Date box under each signature.
+  // The Date box under the first signature.
   signatureDate1: { x: 111.0, y: 370.0, w: 188.3 },
-  signatureDate2: { x: 364.0, y: 370.7, w: 188.3 },
 };
 const BOX_HEIGHT = 18.2;
 
@@ -84,7 +83,8 @@ async function fillMetroForm(data) {
   const doc = await PDFDocument.load(fs.readFileSync(TEMPLATE));
   const font = await doc.embedFont(StandardFonts.Helvetica);
   const bold = await doc.embedFont(StandardFonts.HelveticaBold);
-  const ink = rgb(0.05, 0.1, 0.35);
+  // Everything written on the form is in one blue, like a ballpoint pen.
+  const ink = rgb(0.07, 0.2, 0.68);
   const total = data.payees.reduce((t, p) => t + p.pence, 0);
 
   const page = doc.getPage(0);
@@ -102,9 +102,8 @@ async function fillMetroForm(data) {
   // Typed-over figures (from the Rent run's step 5 box) win over the worked-out ones.
   put('totalFigures', data.totalFigures ?? (data.payees.length ? money(total) : ''), { f: bold });
   put('valueDate', data.valueDate);
-  // The same date under both signatures.
+  // The same date under the first signature (the second is left for a second signer).
   put('signatureDate1', data.valueDate);
-  put('signatureDate2', data.valueDate);
   put('totalWords', data.totalWords ?? (data.payees.length ? amountInWords(total) : ''), { size: 9.5 });
   put('count', data.count ?? (data.payees.length ? String(data.payees.length) : ''));
   // Printed names under each signature, so the bank can read who signed.
@@ -112,7 +111,7 @@ async function fillMetroForm(data) {
     if (!name) continue;
     const b = BOX[key];
     const { t, s } = fit(font, name, 8, b.w - 10);
-    page.drawText(t, { x: b.x + 5, y: b.y + 4, size: s, font, color: rgb(0.3, 0.3, 0.35) });
+    page.drawText(t, { x: b.x + 5, y: b.y + 4, size: s, font, color: ink });
   }
 
   // The attached Bulk Payment file: every payment, 32 to a page.

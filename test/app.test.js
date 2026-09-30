@@ -2832,6 +2832,9 @@ test('rent run step 5 box: edit the Metro form details; typed-over totals are ke
   const { metroData } = require('../src/paymentInstruction')(db);
   const d = metroData({ id: co, name: 'Test User' }, '2026-08');
   assert.equal(d.store, '', 'store left blank on the form');
+  assert.equal(d.contactName, 'Theo', 'the contact name goes on the form');
+  assert.equal(d.accountName, 'Step Five Client Account');
+  assert.equal(d.accountNumber, '87654321');
   assert.equal(d.totalFigures, '£5,000-00', 'typed-over total goes on the form');
   assert.deepEqual([d.signatory1, d.signatory2], ['', ''], 'no names printed in the signature boxes');
   assert.equal(d.valueDate, '17/09/2026');
