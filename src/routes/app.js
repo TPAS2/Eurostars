@@ -132,8 +132,10 @@ module.exports = function appRoutes(db) {
           }
       }
     }
-    if (def.key === 'tenancies' && values.start_date && values.end_date && values.end_date < values.start_date) {
-      errors.end_date = 'End date must be after the start date.';
+    // A tenancy can't be booked or start after it ends.
+    if (def.key === 'tenancies' && values.end_date) {
+      if (values.start_date && values.start_date > values.end_date) errors.start_date = 'The start date can’t be after the end date.';
+      if (values.booking_date && values.booking_date > values.end_date) errors.booking_date = 'The booking date can’t be after the end date.';
     }
     if (def.key === 'transactions' && ['rent_charge', 'rent_received'].includes(values.txn_type) && !values.tenancy_id) {
       errors.tenancy_id = 'Rent charges and receipts must be linked to a tenancy.';

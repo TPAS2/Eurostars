@@ -2538,3 +2538,21 @@ test('councils: a Database button per council, with the Live and Previous tenant
   const other = await registerAndLogin('council-db-2@example.com', 'Other DB Lets');
   assert.equal((await other.get(`/app/councils/${council}/database.xlsx`)).status, 404);
 });
+
+test('tenancies: booking and start dates cannot be after the end date', async () => {
+  const c = await registerAndLogin('tenancy-dates@example.com', 'Tenancy Dates Lets');
+  const prop = idFrom((await c.post('/app/properties', { address_line1: '8 Date Row', status: 'vacant' })).location);
+  let r = await c.post(`/app/properties/${prop}/add-tenant`, { tenant_mode: 'new', name: 'Early Ender', booking_date: '2026-09-01', start_date: '2026-10-01', end_date: '2026-08-31', rent_pence: '900', rent_frequency: 'monthly', status: 'active' });
+  assert.equal(r.status, 422);
+  assert.match(r.text, /The booking date can’t be after the end date/);
+  assert.match(r.text, /The start date can’t be after the end date/);
+  r = await c.post(`/app/properties/${prop}/add-tenant`, { tenant_mode: 'new', name: 'Fine Tenant', booking_date: '2026-09-01', start_date: '2026-10-01', end_date: '2027-09-30', rent_pence: '900', rent_frequency: 'monthly', status: 'active' });
+  assert.equal(r.status, 302);
+  const tenancy = db.prepare("SELECT ty.id, ty.tenant_id FROM tenancies ty JOIN tenants t ON t.id = ty.tenant_id WHERE t.name = 'Fine Tenant'").get();
+  // Editing it to end before it starts is refused too.
+  await c.get(`/app/tenancies/${tenancy.id}/edit`);
+  r = await c.post(`/app/tenancies/${tenancy.id}`, { property_id: String(prop), tenant_id: String(tenancy.tenant_id), booking_date: '2026-09-01', start_date: '2026-10-01', end_date: '2026-09-15', rent_pence: '900', rent_frequency: 'monthly', status: 'active' });
+  assert.equal(r.status, 422);
+  assert.match(r.text, /The start date can’t be after the end date/);
+  assert.doesNotMatch(r.text, /The booking date can’t be after/);
+});
