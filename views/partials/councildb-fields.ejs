@@ -1,0 +1,8 @@
+<%# locals: headings, values, errors, skipCancel %>
+<% headings.forEach(h => { if (skipCancel && h.key === 'cancellation_date') return; %>
+  <div class="field">
+    <label for="e-<%= h.key %>"><%= h.label.charAt(0) + h.label.slice(1).toLowerCase() %><%= h.money ? ' (£)' : '' %></label>
+    <input id="e-<%= h.key %>" name="<%= h.key %>" value="<%= values[h.key] || '' %>" <%- h.date ? 'type="date"' : h.money ? 'inputmode="decimal" placeholder="0.00"' : h.key === 'email' ? 'type="email"' : h.key === 'contact_number' ? 'type="tel"' : '' %>>
+    <% if (errors[h.key]) { %><div class="field-err"><%= errors[h.key] %></div><% } %>
+  </div>
+<% }) %>

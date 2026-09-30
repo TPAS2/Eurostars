@@ -1,0 +1,20 @@
+<%- include('partials/header') %>
+<header class="page-head">
+  <div>
+    <a class="crumb" href="/app/councils/<%= council.id %>/database#<%= e.ended ? 'previous' : 'live' %>">← <%= council.name %> database</a>
+    <h1>Edit entry</h1>
+    <p class="muted"><%= e.ended ? 'Previous tenant' : 'Live' %></p>
+  </div>
+</header>
+<section class="card">
+  <% if (errors.form) { %><div class="notice err"><%= errors.form %></div><% } %>
+  <form method="post" action="/app/councils/<%= council.id %>/database/entries/<%= e.id %>" class="form-grid three" data-no-keep>
+    <%- include('partials/csrf') %>
+    <%- include('partials/councildb-fields', { headings, values, errors, skipCancel: !e.ended }) %>
+    <div class="form-actions wide">
+      <button class="btn primary" type="submit">Save</button>
+      <a class="btn" href="/app/councils/<%= council.id %>/database#<%= e.ended ? 'previous' : 'live' %>">Cancel</a>
+    </div>
+  </form>
+</section>
+<%- include('partials/footer') %>

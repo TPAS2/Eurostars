@@ -4,25 +4,26 @@
 // a "Live" sheet and a "Previous tenant" sheet with the same yellow headings. Empty for now.
 
 const HEADINGS = [
-  { label: 'OUR REF', width: 9.1 },
-  { label: 'PROPERTY ADDRESS', width: 30.9 },
-  { label: 'SCHEME', width: 10.4 },
-  { label: 'PROPERTY SIZE', width: 12.7 },
-  { label: 'PROPERTY REFERENCE', width: 13.1 },
-  { label: 'DATE OF RESERVATION', width: 15.4, date: true },
-  { label: 'DATE OF BOOKING', width: 14.3, date: true },
-  { label: 'CANCELLATION DATE', width: 23.3, date: true },
-  { label: 'PRICE PER NIGHT', width: 14.3, money: true },
-  { label: "CLIENT'S NAME", width: 30.4 },
-  { label: 'CONTACT NUMBER', width: 20.6 },
-  { label: 'NO. OF PEOPLE', width: 20 },
-  { label: 'EMAIL', width: 41.0 },
+  { key: 'our_ref', label: 'OUR REF', width: 9.1 },
+  { key: 'property_address', label: 'PROPERTY ADDRESS', width: 30.9 },
+  { key: 'scheme', label: 'SCHEME', width: 10.4 },
+  { key: 'property_size', label: 'PROPERTY SIZE', width: 12.7 },
+  { key: 'property_reference', label: 'PROPERTY REFERENCE', width: 13.1 },
+  { key: 'reservation_date', label: 'DATE OF RESERVATION', width: 15.4, date: true },
+  { key: 'booking_date', label: 'DATE OF BOOKING', width: 14.3, date: true },
+  { key: 'cancellation_date', label: 'CANCELLATION DATE', width: 23.3, date: true },
+  { key: 'price_pence', label: 'PRICE PER NIGHT', width: 14.3, money: true },
+  { key: 'client_name', label: "CLIENT'S NAME", width: 30.4 },
+  { key: 'contact_number', label: 'CONTACT NUMBER', width: 20.6 },
+  { key: 'people', label: 'NO. OF PEOPLE', width: 20 },
+  { key: 'email', label: 'EMAIL', width: 41.0 },
 ];
 const SHEETS = ['Live', 'Previous tenant'];
 const EMPTY_ROWS = 20;
 const MONEY = '_-"£"* #,##0.00_-;\\-"£"* #,##0.00_-;_-"£"* "-"??_-;_-@_-';
 
-async function councilWorkbook({ councilName, agencyName }) {
+// entries: { live: [rows], previous: [rows] } from council_db_entries.
+async function councilWorkbook({ councilName, agencyName, entries = { live: [], previous: [] } }) {
   const ExcelJS = require('exceljs');
   const wb = new ExcelJS.Workbook();
   const font = { name: 'Cambria', size: 11 };
@@ -51,10 +52,17 @@ async function councilWorkbook({ councilName, agencyName }) {
       c.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
       c.border = { top: medium, left: medium, bottom: medium, right: medium };
     });
-    // Empty rows ready to fill in.
-    for (let r = top + 2; r < top + 2 + EMPTY_ROWS; r++) {
+    // The entries, then empty rows ready to fill in.
+    const rows = live ? entries.live : entries.previous;
+    for (let r = top + 2; r < top + 2 + rows.length + EMPTY_ROWS; r++) {
+      const e = rows[r - top - 2];
       HEADINGS.forEach((h, i) => {
         const c = ws.getRow(r).getCell(i + 1);
+        if (e && e[h.key] != null && e[h.key] !== '') {
+          if (h.date) { const [y, m, d] = e[h.key].split('-').map(Number); c.value = new Date(Date.UTC(y, m - 1, d)); }
+          else if (h.money) c.value = e[h.key] / 100;
+          else c.value = e[h.key];
+        }
         c.font = font;
         c.border = { top: thin, left: thin, bottom: thin, right: thin };
         c.alignment = { horizontal: i === 1 || i === 9 || i === 12 ? 'left' : 'center', vertical: 'middle' };

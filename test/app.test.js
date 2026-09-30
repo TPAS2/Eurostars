@@ -2661,3 +2661,57 @@ test('admin panel users box has no Landlords, Properties or Tenancies columns', 
   assert.match(head, /Logins/);
   assert.doesNotMatch(head, /Landlords|Properties|Tenancies/);
 });
+
+test('council database: add entries, edit, end (moves to Previous tenant), back to Live, remove, and download', async () => {
+  const c = await registerAndLogin('council-entries@example.com', 'Entries Lets');
+  const council = idFrom((await c.post('/app/councils', { name: 'Enfield' })).location);
+  await c.get(`/app/councils/${council}/database`);
+  let r = await c.post(`/app/councils/${council}/database/entries`, { our_ref: '' });
+  assert.equal(r.status, 422);
+  assert.match(r.text, /Enter at least the reference/);
+  r = await c.post(`/app/councils/${council}/database/entries`, { our_ref: 'AL1001', property_address: '1 Test Road N13', scheme: 'BB', property_size: '2 bed flat', property_reference: 'PR-9', reservation_date: '2026-09-01', booking_date: '2026-09-02', price_pence: '56', client_name: 'Test Client', contact_number: '07000 000000', people: '3', email: 'client@example.com' });
+  assert.match(decodeURIComponent(r.location), /Entry added to Live/);
+  const e = db.prepare('SELECT * FROM council_db_entries WHERE council_id = ?').get(council);
+  assert.equal(e.price_pence, 5600);
+  assert.equal(e.ended, 0);
+  r = await c.get(`/app/councils/${council}/database`);
+  assert.match(r.text, /id="live"[\s\S]*?AL1001[\s\S]*?Test Client[\s\S]*?End<\/button>[\s\S]*?id="previous"/);
+
+  // Edit it.
+  await c.get(`/app/councils/${council}/database/entries/${e.id}/edit`);
+  r = await c.post(`/app/councils/${council}/database/entries/${e.id}`, { our_ref: 'AL1001', property_address: '1 Test Road N13', booking_date: '2026-09-02', client_name: 'Test Client Jr', price_pence: '60' });
+  assert.match(decodeURIComponent(r.location), /Entry saved/);
+  assert.equal(db.prepare('SELECT client_name FROM council_db_entries WHERE id = ?').get(e.id).client_name, 'Test Client Jr');
+
+  // End it: cancellation date set, moves to Previous tenant.
+  await c.get(`/app/councils/${council}/database`);
+  r = await c.post(`/app/councils/${council}/database/entries/${e.id}/end`, { cancellation_date: '2026-08-01' });
+  assert.match(decodeURIComponent(r.location), /can’t be before the booking date/);
+  r = await c.post(`/app/councils/${council}/database/entries/${e.id}/end`, { cancellation_date: '2026-10-16' });
+  assert.match(decodeURIComponent(r.location), /now under Previous tenant/);
+  assert.deepEqual({ ...db.prepare('SELECT ended, cancellation_date FROM council_db_entries WHERE id = ?').get(e.id) }, { ended: 1, cancellation_date: '2026-10-16' });
+  r = await c.get(`/app/councils/${council}/database`);
+  assert.match(r.text, /id="previous"[\s\S]*?Test Client Jr[\s\S]*?16\/10\/2026|id="previous"[\s\S]*?16\/10\/2026[\s\S]*?Test Client Jr/);
+
+  // The download has it on the Previous tenant sheet.
+  r = await c.get(`/app/councils/${council}/database.xlsx`);
+  const ExcelJS = require('exceljs');
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.load(r.buf);
+  const prev = wb.getWorksheet('Previous tenant');
+  assert.equal(prev.getCell('A4').value, 'AL1001');
+  assert.equal(prev.getCell('J4').value, 'Test Client Jr');
+  assert.equal(prev.getCell('I4').value, 60);
+  assert.equal(wb.getWorksheet('Live').getCell('A5').value, null);
+
+  // Back to Live, then remove.
+  await c.get(`/app/councils/${council}/database`);
+  await c.post(`/app/councils/${council}/database/entries/${e.id}/reopen`, {});
+  assert.deepEqual({ ...db.prepare('SELECT ended, cancellation_date FROM council_db_entries WHERE id = ?').get(e.id) }, { ended: 0, cancellation_date: null });
+  await c.post(`/app/councils/${council}/database/entries/${e.id}/delete`, {});
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM council_db_entries WHERE council_id = ?').get(council).n, 0);
+
+  // Another company can't touch these.
+  const other = await registerAndLogin('council-entries-2@example.com', 'Other Entries Lets');
+  assert.equal((await other.get(`/app/councils/${council}/database`)).status, 404);
+});

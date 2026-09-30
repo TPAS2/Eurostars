@@ -139,6 +139,29 @@ CREATE TABLE IF NOT EXISTS app_settings (
   value TEXT
 );
 
+-- Entries on a council's database (Councils → Database): Live until ended, then Previous tenant.
+CREATE TABLE IF NOT EXISTS council_db_entries (
+  id                  INTEGER PRIMARY KEY,
+  account_id          INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  council_id          INTEGER NOT NULL REFERENCES councils(id) ON DELETE CASCADE,
+  our_ref             TEXT,
+  property_address    TEXT,
+  scheme              TEXT,
+  property_size       TEXT,
+  property_reference  TEXT,
+  reservation_date    TEXT,
+  booking_date        TEXT,
+  cancellation_date   TEXT,
+  price_pence         INTEGER,
+  client_name         TEXT,
+  contact_number      TEXT,
+  people              TEXT,
+  email               TEXT,
+  ended               INTEGER NOT NULL DEFAULT 0,
+  created_at          TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_council_db_entries ON council_db_entries(account_id, council_id, ended);
+
 CREATE TABLE IF NOT EXISTS council_rec_notes (
   account_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   council_id  INTEGER NOT NULL REFERENCES councils(id) ON DELETE CASCADE,
