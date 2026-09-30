@@ -162,7 +162,7 @@ module.exports = function authRoutes(db, config) {
     const password = String(req.body.password || '');
     const errors = {};
     if (!USERNAME_RE.test(values.username)) {
-      errors.username = 'Use 3–30 letters, numbers, dots, dashes or underscores, starting with a letter or number.';
+      errors.username = 'Enter a username (up to 60 characters).';
     } else if (RESERVED_USERNAMES.has(values.username.toLowerCase()) || values.username.toLowerCase() === config.adminUsername.toLowerCase()
       || db.prepare('SELECT 1 FROM users WHERE username = ?').get(values.username)) {
       errors.username = 'That username is taken. Try another.';

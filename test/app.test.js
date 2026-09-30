@@ -523,8 +523,15 @@ test('create account with a username and password (email optional)', async () =>
   const other = new Client();
   r = await other.post('/register', { username: 'Harbour.Lets', name: 'X', agency_name: 'X', password: 'password-1234', password_confirm: 'password-1234' });
   assert.equal(r.status, 422);
-  r = await other.post('/register', { username: 'a b', name: 'X', agency_name: 'X', password: 'password-1234', password_confirm: 'password-1234' });
-  assert.equal(r.status, 422);
+  r = await other.post('/register', { username: ' ', name: 'X', agency_name: 'X', password: 'password-1234', password_confirm: 'password-1234' });
+  assert.equal(r.status, 422, 'a blank username is refused');
+  // Spaces are fine: the username can match the company name.
+  const spaced = new Client();
+  r = await spaced.post('/register', { username: 'Atlantic Lodge Housing 2', name: 'Al Lodge', agency_name: 'Atlantic Lodge Housing 2', password: 'password-1234', password_confirm: 'password-1234' });
+  assert.equal(r.status, 302, r.text);
+  const signIn = new Client();
+  r = await signIn.post('/login', { login: 'Atlantic Lodge Housing 2', member: 'Al', password: 'password-1234' });
+  assert.match(r.location, /^\/app/);
 
   // Sign in by username (case-insensitive); admin can also sign in by username.
   const again = new Client();

@@ -122,7 +122,7 @@ module.exports = function adminRoutes(db, config) {
     const errors = {};
     if (!values.agency_name) errors.agency_name = 'Enter the company name.';
     if (!values.name) errors.name = 'Enter the contact name.';
-    if (!USERNAME_RE.test(values.username)) errors.username = 'Use 3–30 letters, numbers, dots, dashes or underscores, starting with a letter or number.';
+    if (!USERNAME_RE.test(values.username)) errors.username = 'Enter a username (up to 60 characters).';
     else if (RESERVED_USERNAMES.has(values.username.toLowerCase()) || values.username.toLowerCase() === config.adminUsername.toLowerCase()
       || db.prepare('SELECT 1 FROM users WHERE username = ? COLLATE NOCASE').get(values.username)) errors.username = 'That username is taken.';
     if (!LOGIN_NAME_RE.test(values.login_name)) errors.login_name = 'Use 1–30 letters, numbers, dashes or underscores (no spaces or dots).';
@@ -153,7 +153,7 @@ module.exports = function adminRoutes(db, config) {
     // The username can be changed too (e.g. to fix its capitals); it stays unique ignoring case.
     if (u.is_admin && values.username !== u.username) error = 'The admin username is set in the server settings (ADMIN_USERNAME), so it can’t be changed here.';
     else if (u.is_admin && values.login_name !== u.login_name) error = 'The admin sign-in name is set in the server settings (ADMIN_LOGIN_NAME), so it can’t be changed here.';
-    else if (!USERNAME_RE.test(values.username)) error = 'The username must be 3–30 letters, numbers, dots, dashes or underscores.';
+    else if (!USERNAME_RE.test(values.username)) error = 'Enter a username (up to 60 characters).';
     else if (!sameName && (RESERVED_USERNAMES.has(values.username.toLowerCase()) || values.username.toLowerCase() === config.adminUsername.toLowerCase()
       || db.prepare('SELECT 1 FROM users WHERE username = ? COLLATE NOCASE AND id != ? AND (company_id IS NULL OR company_id != ?)').get(values.username, u.id, u.id))) {
       error = 'That username is taken.';

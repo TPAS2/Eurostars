@@ -45,7 +45,7 @@
     <%- include('../partials/csrf') %>
     <div class="field">
       <label for="d-username">Agency <span class="req">*</span></label>
-      <input id="d-username" name="username" value="<%= u.username %>" required maxlength="30" autocomplete="off" autocapitalize="none" spellcheck="false"<%= u.is_admin ? ' readonly' : '' %>>
+      <input id="d-username" name="username" value="<%= u.username %>" required maxlength="60" autocomplete="off" autocapitalize="none" spellcheck="false"<%= u.is_admin ? ' readonly' : '' %>>
       <% if (!u.is_admin) { %><div class="help">Everyone at this company types this in the Agency box.</div><% } %>
     </div>
     <div class="field">

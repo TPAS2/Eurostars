@@ -22,7 +22,7 @@
     </div>
     <div class="field">
       <label for="username">Username <span class="req">*</span></label>
-      <input id="username" name="username" value="<%= values.username || '' %>" required minlength="3" maxlength="30" autocomplete="off" autocapitalize="none" spellcheck="false">
+      <input id="username" name="username" value="<%= values.username || '' %>" required maxlength="60" autocomplete="off" autocapitalize="none" spellcheck="false">
       <% if (errors.username) { %><div class="field-err"><%= errors.username %></div><% } else { %><div class="help">The company's username. Capitals count: they must type it exactly.</div><% } %>
     </div>
     <div class="field">

@@ -425,7 +425,8 @@ function signInNameFrom(fullName) {
   return LOGIN_NAME_RE.test(first) ? first : 'User';
 }
 
-const USERNAME_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{2,29}$/;
+// Any characters (spaces included), up to 60, not starting or ending with a space.
+const USERNAME_RE = /^[^\s\x00-\x1f\x7f](?:[^\x00-\x1f\x7f]{0,58}[^\s\x00-\x1f\x7f])?$/;
 
 // Turn any string into a valid username that `isTaken` says is free.
 function uniqueUsername(seed, isTaken) {
