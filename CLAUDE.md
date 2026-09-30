@@ -24,8 +24,9 @@ and holds real people's personal and bank details. It's deployed on Render from 
 ## Stack
 
 - Node 22, Express 4, EJS views, SQLite through `node:sqlite` (`DatabaseSync`).
-- No front-end build except the dashboard's dark mode switch: React source in `client/`,
-  bundled to `public/theme-switch.js` with `npm run build:client` (the bundle is committed).
+- No front-end build except the dashboard's React pieces (dark mode switch, MicroSlats animated
+  background): source in `client/`, bundled to `public/dashboard.js` with `npm run build:client`
+  (the bundle is committed; rebuild after changing `client/`).
 - Libraries: `pdf-lib` (Metro form, invoices), `exceljs` (reports), `jszip` (filling the
   spreadsheet templates in `assets/`), `nodemailer`/Resend for email.
 

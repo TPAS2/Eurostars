@@ -867,3 +867,11 @@ table.transfer-sheet th:nth-child(7) { min-width: 130px; } table.transfer-sheet 
 .bank-alert ul { margin: 6px 0; }
 .bank-alert .small { margin: 6px 0; }
 .bank-flag { color: #c00; font-weight: 700; }
+
+/* Dashboard: the animated MicroSlats background (React Bits), behind everything right of the sidebar */
+.shell { position: relative; z-index: 0; }
+.dashboard-bg { position: fixed; top: 0; right: 0; bottom: 0; left: 76px; z-index: -1; pointer-events: none; opacity: .28; }
+:root[data-theme="dark"] .dashboard-bg { opacity: .5; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .dashboard-bg { opacity: .5; } }
+@media (max-width: 900px) { .dashboard-bg { left: 0; } }
+@media print { .dashboard-bg { display: none; } }

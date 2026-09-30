@@ -1,13 +1,14 @@
 <%- include('partials/header') %>
+<div id="dashboard-bg" class="dashboard-bg" aria-hidden="true"></div>
 <header class="page-head">
   <div>
     <h1 class="co-title"><span class="co-name"><%= user.agency_name %></span><span class="co-sep" aria-hidden="true">/</span><span>Dashboard</span></h1>
     <p class="muted">Welcome back, <%= user.name %>. Here's where things stand today, <%= fmt.ukDate(today) %>.</p>
   </div>
   <div class="actions">
-    <link rel="stylesheet" href="/static/theme-switch.css">
+    <link rel="stylesheet" href="/static/dashboard.css">
     <div id="theme-switch" class="theme-switch" data-csrf="<%= csrfToken %>"></div>
-    <script src="/static/theme-switch.js" defer></script>
+    <script src="/static/dashboard.js" defer></script>
     <a class="btn" href="/app/landlords/new">+ Landlord</a>
     <a class="btn" href="/app/properties/new">+ Property</a>
     <a class="btn primary" href="/app/transactions/new?txn_type=rent_received">Record rent received</a>
