@@ -101,6 +101,7 @@
     <div class="field"><label for="m-sig1">Authorised signatory 1</label><input id="m-sig1" name="signatory_1" value="<%= step5.signatory_1 %>" placeholder="Name printed under the signature"></div>
     <div class="field"><label for="m-sig2">Authorised signatory 2 (if applicable)</label><input id="m-sig2" name="signatory_2" value="<%= step5.signatory_2 %>"></div>
     <div class="form-actions wide">
+      <button class="btn" type="submit" formaction="/app/rent-run/instruction/preview" formtarget="_blank">Preview document</button>
       <button class="btn" type="submit" name="then" value="save">Save</button>
       <button class="btn primary" type="submit" name="then" value="metro" formtarget="_blank">Save &amp; open Metro form (PDF)</button>
       <% if (step5.saved_at) { %><span class="muted small">Last saved <%= fmt.ukDateTime(step5.saved_at) %></span><% } %>

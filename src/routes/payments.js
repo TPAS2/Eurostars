@@ -82,6 +82,19 @@ module.exports = function paymentRoutes(db) {
 
   const { suggestedPayees, load, total, metroData, saveForm } = require('../paymentInstruction')(db);
 
+  // Preview Metro's form with what's typed in the step 5 box, without saving it.
+  router.post('/instruction/preview', async (req, res, next) => {
+    try {
+      const month = monthOf(req.body.month);
+      const pdf = await fillMetroForm(metroData(req.user, month, req.body));
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `inline; filename="Metro bulk payment instruction ${month} (preview).pdf"`);
+      res.setHeader('Content-Security-Policy', "sandbox; default-src 'none'; object-src 'self'");
+      res.setHeader('Cache-Control', 'private, no-store');
+      res.end(Buffer.from(pdf));
+    } catch (err) { next(err); }
+  });
+
   // The Rent run's step 5 box: the details that go on Metro's form.
   router.post('/instruction/form', (req, res) => {
     const month = monthOf(req.body.month);

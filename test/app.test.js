@@ -2886,3 +2886,43 @@ test('Landlord invoices list: an Edit button to the right of Deducted', async ()
   assert.match(list, /<th>Deducted<\/th><th><\/th>/);
   assert.match(list, new RegExp(`yes-no no">No</span></td>\\s*<td class="num"><a class="btn small" href="/app/landlord-invoices/${id}/edit">Edit</a>`));
 });
+
+test('council reconciliation: download as Excel (agency layout) and a print page', async () => {
+  const c = await registerAndLogin('rec-xlsx@example.com', 'Rec Xlsx Lets');
+  const council = idFrom((await c.post('/app/councils', { name: 'Haringey BB' })).location);
+  await c.get('/app/council-reconciliation?month=2026-07');
+  await c.req('POST', '/app/council-reconciliation/notes', { council_id: String(council), month: '2026-07', notes: '', owed: '32457', received: '32457', received_date: '2026-09-14', email_sent_date: '2026-09-01' });
+  let r = await c.get('/app/council-reconciliation?month=2026-07');
+  assert.match(r.text, /href="\/app\/council-reconciliation\.xlsx\?month=2026-07">Download Excel[\s\S]*?href="\/app\/council-reconciliation\/print\?month=2026-07"[^>]*>Print/);
+  r = await c.get('/app/council-reconciliation.xlsx?month=2026-07');
+  assert.equal(r.status, 200);
+  assert.match(r.headers.get('content-disposition'), /Rec_Xlsx_Lets_Payment_Reconciliation_July_2026\.xlsx/);
+  const ExcelJS = require('exceljs');
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.load(r.buf);
+  const ws = wb.worksheets[0];
+  assert.equal(ws.name, 'July 2026');
+  assert.equal(ws.getCell('A2').value, 'RECONCILIATION  REC XLSX LETS');
+  assert.equal(ws.getCell('B4').value, 'JULY 2026');
+  assert.equal(ws.getCell('D5').value, 'PAYMENTS TO REC XLSX LETS BY LOCAL AUTHORITIES');
+  assert.equal(ws.getCell('B7').value, 'Haringey BB');
+  assert.equal(ws.getCell('C7').value, 32457);
+  assert.equal(ws.getCell('E7').value.formula, 'SUM(C7-D7)');
+  assert.equal(new Date(ws.getCell('F7').value).toISOString().slice(0, 10), '2026-09-14');
+  assert.equal(ws.getCell('C9').value.formula, 'SUM(C7:C7)');
+  r = await c.get('/app/council-reconciliation/print?month=2026-07');
+  assert.match(r.text, /RECONCILIATION&nbsp;&nbsp;REC XLSX LETS[\s\S]*?JULY 2026[\s\S]*?Haringey BB[\s\S]*?£32,457\.00[\s\S]*?14\/09\/2026[\s\S]*?01\/09\/2026/);
+  assert.match(r.text, /data-print/);
+});
+
+test('rent run step 5: Preview document shows the Metro form with what is typed, without saving', async () => {
+  const c = await registerAndLogin('step5-preview@example.com', 'Preview Lets');
+  let r = await c.get('/app/rent-run?month=2026-08');
+  assert.match(r.text, /formaction="\/app\/rent-run\/instruction\/preview" formtarget="_blank">Preview document/);
+  r = await c.post('/app/rent-run/instruction/preview', { month: '2026-08', store: 'Unsaved Branch', from_name: 'X', totalFigures: '£1.00' });
+  assert.equal(r.status, 200);
+  assert.equal(r.headers.get('content-type'), 'application/pdf');
+  assert.equal(r.buf.subarray(0, 5).toString(), '%PDF-');
+  const co = db.prepare("SELECT id FROM users WHERE username = 'step5-preview'").get().id;
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM payment_instructions WHERE account_id = ?').get(co).n, 0, 'nothing saved');
+});

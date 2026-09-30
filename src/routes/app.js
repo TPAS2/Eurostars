@@ -339,6 +339,33 @@ module.exports = function appRoutes(db) {
     });
   });
 
+  // The month's reconciliation as an Excel workbook, and as a page to print.
+  router.get('/council-reconciliation.xlsx', async (req, res, next) => {
+    try {
+      const a = req.user.id;
+      const month = statements.isMonth(req.query.month) ? String(req.query.month) : fmt.today().slice(0, 7);
+      const rec = reconcile.reconciliation(db, a, month);
+      const agency = db.prepare('SELECT agency_name FROM users WHERE id = ?').get(a).agency_name;
+      const xlsx = await require('../reconcileWorkbook').reconciliationWorkbook({ agencyName: agency, monthLabel: statements.monthLabel(month), rows: rec.rows });
+      const name = `${agency} Payment Reconciliation ${statements.monthLabel(month)}`.replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '_');
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="${name}.xlsx"`);
+      res.setHeader('Cache-Control', 'private, no-store');
+      res.end(xlsx);
+    } catch (err) { next(err); }
+  });
+
+  router.get('/council-reconciliation/print', (req, res) => {
+    const a = req.user.id;
+    const month = statements.isMonth(req.query.month) ? String(req.query.month) : fmt.today().slice(0, 7);
+    const rec = reconcile.reconciliation(db, a, month);
+    const agency = db.prepare('SELECT agency_name FROM users WHERE id = ?').get(a).agency_name;
+    res.render('councilrec-print', {
+      title: `Reconciliation ${statements.monthLabel(month)}`, month, monthLabel: statements.monthLabel(month), rec, agency,
+      headings: require('../reconcileWorkbook').headings(agency), fmt,
+    });
+  });
+
   // Notes for one council's month (saved automatically as they're typed).
   router.post('/council-reconciliation/notes', (req, res) => {
     const a = req.user.id;

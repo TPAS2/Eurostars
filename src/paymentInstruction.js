@@ -91,9 +91,18 @@ function formFor(user, month) {
   };
 }
 
-// Everything fillMetroForm needs.
-function metroData(user, month) {
+// Everything fillMetroForm needs. `typed` (the step 5 box, unsaved) previews changes.
+function metroData(user, month, typed = null) {
   const data = load(user.id, month);
+  if (typed) {
+    const f = (k, n = 60) => clip(typed[k], n);
+    Object.assign(data, {
+      store: f('store'), from_name: f('from_name'), contact_name: f('contact_name'), from_account_number: f('from_account_number', 12),
+      payment_date: fmt.isIsoDate(String(typed.payment_date || '')) ? typed.payment_date : '',
+      signatory_1: f('signatory_1'), signatory_2: f('signatory_2'),
+      totalFigures_override: f('totalFigures', 200), totalWords_override: f('totalWords', 200), count_override: f('count', 200),
+    });
+  }
   const agency = db.prepare('SELECT agency_name, name FROM users WHERE id = ?').get(user.id);
   const payees = data.payees.filter((p) => p.include).map((p) => ({
     name: p.name, sort_code: p.sort_code, account_number: p.account_number, reference: p.reference,

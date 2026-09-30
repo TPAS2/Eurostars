@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= title %> · <%= appName %></title>
+  <link rel="stylesheet" href="/static/print-instruction.css">
+  <link rel="stylesheet" href="/static/print-rec.css">
+  <script src="/static/app.js" defer></script>
+</head>
+<body class="rec-print">
+  <div class="toolbar no-print">
+    <a href="/app/council-reconciliation?month=<%= month %>">← Back</a>
+    <button type="button" data-print>Print</button>
+  </div>
+  <main class="rec-sheet">
+    <h1>RECONCILIATION&nbsp;&nbsp;<%= agency.toUpperCase() %></h1>
+    <p class="rec-month"><%= monthLabel.toUpperCase() %></p>
+    <table>
+      <thead><tr><% headings.forEach((h, i) => { %><th class="<%= i < 5 ? 'ruled' : '' %>"><%= h %></th><% }) %></tr></thead>
+      <tbody>
+      <% rec.rows.forEach(r => { %>
+        <tr>
+          <td></td>
+          <td><%= r.name %></td>
+          <td class="num"><%= r.owed ? fmt.money(r.owed) : '' %></td>
+          <td class="num <%= r.owed && !r.received ? 'awaiting' : '' %>"><%= r.received ? fmt.money(r.received) : '' %></td>
+          <td class="num"><%= r.balance ? fmt.money(r.balance) : '£ -' %></td>
+          <td class="c"><%= r.receivedDate ? fmt.ukDate(r.receivedDate) : '' %></td>
+          <td class="c"><%= r.emailSentDate ? fmt.ukDate(r.emailSentDate) : (r.owed ? 'Not Sent' : '') %></td>
+        </tr>
+      <% }) %>
+      </tbody>
+      <tfoot><tr><td></td><td></td><td class="num ruled"><%= fmt.money(rec.totals.owed) %></td><td class="num ruled"><%= fmt.money(rec.totals.received) %></td><td class="num big"><%= fmt.money(rec.totals.balance) %></td><td></td><td></td></tr></tfoot>
+    </table>
+  </main>
+</body>
+</html>

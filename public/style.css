@@ -740,3 +740,4 @@ table.council-db tr.new-row .cell-input { border-color: var(--border); backgroun
 /* Line up every cell in a row with its buttons. */
 .table-wrap td { vertical-align: middle; }
 .table-wrap td .btn.small { margin: -2px 0; }
+.rec-actions { display: flex; gap: 8px; justify-content: flex-end; margin: -6px 0 12px; }

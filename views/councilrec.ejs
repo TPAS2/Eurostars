@@ -8,6 +8,10 @@
 </header>
 
 <%- include('partials/month-nav', { base: '/app/council-reconciliation' }) %>
+<div class="rec-actions">
+  <a class="btn primary" href="/app/council-reconciliation.xlsx?month=<%= month %>">Download Excel</a>
+  <a class="btn" href="/app/council-reconciliation/print?month=<%= month %>" target="_blank" rel="noopener">Print</a>
+</div>
 
 <section class="card">
   <% if (!rec.rows.length) { %>
