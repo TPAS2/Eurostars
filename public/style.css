@@ -690,3 +690,4 @@ table.cfp .num { text-align: right; }
 @media (max-width: 760px) { .price-trio { grid-template-columns: 1fr; } }
 .is-upcoming .notice-dot { background: var(--border); }
 .is-upcoming .notice-when { color: var(--muted); }
+table.council-db th { background: #ffff00; color: #000; border: 2px solid #000; font-size: .72rem; white-space: normal; min-width: 90px; }

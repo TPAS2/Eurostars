@@ -1,0 +1,23 @@
+<%- include('partials/header') %>
+<header class="page-head">
+  <div>
+    <a class="crumb" href="/app/councils/<%= council.id %>">← <%= council.name %></a>
+    <h1><%= council.name %> database</h1>
+    <p class="muted">The council's database workbook: a Live sheet and a Previous tenant sheet. Empty for now, ready to fill in.</p>
+  </div>
+  <div class="actions">
+    <a class="btn primary" href="/app/councils/<%= council.id %>/database.xlsx">Download Excel</a>
+  </div>
+</header>
+
+<% sheets.forEach((sheet, si) => { %>
+<section class="card">
+  <div class="card-head"><h2><%= sheet %></h2><span class="muted small"><%= filename %></span></div>
+  <p class="sheet-title"><%= si === 0 ? titleRow : 'PREVIOUS TENANTS' %></p>
+  <div class="table-wrap"><table class="council-db">
+    <thead><tr><% headings.forEach(h => { %><th><%= h.label %></th><% }) %></tr></thead>
+    <tbody><tr><td colspan="<%= headings.length %>" class="muted">No entries yet.</td></tr></tbody>
+  </table></div>
+</section>
+<% }) %>
+<%- include('partials/footer') %>

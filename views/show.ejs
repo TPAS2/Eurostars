@@ -7,7 +7,7 @@
   <div class="actions">
     <% if (def.key === 'properties') { %><a class="btn primary" href="/app/properties/<%= row.id %>/add-tenant">+ Add tenant</a><% } %>
     <% if (def.key === 'landlords') { %><a class="btn primary" href="/app/properties/new?landlord_id=<%= row.id %>">+ Add property</a><% } %>
-    <% if (def.key === 'councils') { %><a class="btn primary" href="/app/properties/new?council_id=<%= row.id %>">+ Add property in this council</a><% } %>
+    <% if (def.key === 'councils') { %><a class="btn" href="/app/councils/<%= row.id %>/database">Database</a><a class="btn primary" href="/app/properties/new?council_id=<%= row.id %>">+ Add property in this council</a><% } %>
     <% if (def.key === 'maintenance') { %><a class="btn primary" href="/app/invoices/new?maintenance_job_id=<%= row.id %>">+ Upload invoice</a><% } %>
     <% if (def.key === 'tenancies') { %><a class="btn primary" href="/app/transactions/new?txn_type=rent_received&tenancy_id=<%= row.id %>">Record rent received</a><% } %>
     <a class="btn" href="/app/<%= def.key %>/<%= row.id %>/edit">Edit</a>

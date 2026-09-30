@@ -77,9 +77,9 @@ const ENTITIES = {
       { name: 'website', label: 'Website', type: 'text' },
       { name: 'notes', label: 'Notes', type: 'textarea', inline: true },
     ],
-    columns: ['name', 'properties', 'council_tax_email', 'council_tax_phone'],
+    columns: ['name', 'properties', 'council_tax_email', 'council_tax_phone', 'database'],
     // Columns worked out when listing rather than stored on the record.
-    computed: { properties: { label: 'Properties' } },
+    computed: { properties: { label: 'Properties' }, database: { label: 'Database' } },
     children: [{ entity: 'properties', fk: 'council_id' }],
   },
 

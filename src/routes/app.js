@@ -590,6 +590,7 @@ module.exports = function appRoutes(db) {
         if (photos.has(row.id)) row.photo_v = photos.get(row.id);
         const list = byCouncil.get(row.id) || [];
         row.properties = { text: String(list.length), count: list.length };
+        row.database = { text: 'Database', href: `/app/councils/${row.id}/database`, cls: 'btn small' };
       }
     }
     res.render('list', { title: def.plural, section: sectionOf(def), def, rows, maps, display, rowTitle, q, searchable: textFields.length > 0, truncated, totalsRow, tenantFilter, monthView });

@@ -2508,3 +2508,30 @@ test('dashboard: Rent received this month sits to the right of Open maintenance'
   const r = await c.get('/app');
   assert.match(r.text, /class="label">Open maintenance<[\s\S]*?class="label">Rent received this month</);
 });
+
+test('councils: a Database button per council, with the Live and Previous tenant headings to download as Excel', async () => {
+  const c = await registerAndLogin('council-db@example.com', 'Council DB Lets');
+  const council = idFrom((await c.post('/app/councils', { name: 'Enfield' })).location);
+  let r = await c.get('/app/councils');
+  assert.match(r.text, new RegExp(`href="/app/councils/${council}/database" class="btn small">Database`));
+  assert.match((await c.get(`/app/councils/${council}`)).text, new RegExp(`href="/app/councils/${council}/database">Database`));
+  r = await c.get(`/app/councils/${council}/database`);
+  assert.match(r.text, /Enfield database[\s\S]*?ENFIELD - COUNCIL DB LETS[\s\S]*?OUR REF[\s\S]*?PROPERTY ADDRESS[\s\S]*?PRICE PER NIGHT[\s\S]*?EMAIL[\s\S]*?PREVIOUS TENANTS/);
+  r = await c.get(`/app/councils/${council}/database.xlsx`);
+  assert.equal(r.status, 200);
+  assert.match(r.headers.get('content-disposition'), /Enfield_Database\.xlsx/);
+  const ExcelJS = require('exceljs');
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.load(r.buf);
+  assert.deepEqual(wb.worksheets.map((w) => w.name), ['Live', 'Previous tenant']);
+  const live = wb.getWorksheet('Live');
+  assert.equal(live.getCell('A1').value, 'ENFIELD - COUNCIL DB LETS');
+  assert.deepEqual(Array.from({ length: 13 }, (_, i) => live.getRow(3).getCell(i + 1).value), ['OUR REF', 'PROPERTY ADDRESS', 'SCHEME', 'PROPERTY SIZE', 'PROPERTY REFERENCE', 'DATE OF RESERVATION', 'DATE OF BOOKING', 'CANCELLATION DATE', 'PRICE PER NIGHT', "CLIENT'S NAME", 'CONTACT NUMBER', 'NO. OF PEOPLE', 'EMAIL']);
+  assert.equal(live.getCell('B5').value, null, 'no data yet');
+  const prev = wb.getWorksheet('Previous tenant');
+  assert.equal(prev.getCell('A1').value, 'PREVIOUS TENANTS');
+  assert.equal(prev.getCell('M2').value, 'EMAIL');
+  // Another company can't open it.
+  const other = await registerAndLogin('council-db-2@example.com', 'Other DB Lets');
+  assert.equal((await other.get(`/app/councils/${council}/database.xlsx`)).status, 404);
+});
