@@ -74,7 +74,7 @@ module.exports = function councilDatabaseRoutes(db) {
     const c = council(req, res);
     if (!c) return;
     const { values, errors } = parse(req.body);
-    if (Object.keys(errors).length) return renderPage(req, res, c, { values: req.body, errors, status: 422 });
+    if (Object.keys(errors).length) return back(res, c, 'error', errors.form || Object.values(errors)[0], '#live');
     const cols = Object.keys(values);
     db.prepare(`INSERT INTO council_db_entries (account_id, council_id, ${cols.join(', ')}) VALUES (?, ?, ${cols.map(() => '?').join(', ')})`)
       .run(req.user.id, c.id, ...cols.map((k) => values[k]));
@@ -95,12 +95,17 @@ module.exports = function councilDatabaseRoutes(db) {
     const e = entry(req, res, c);
     if (!e) return;
     const { values, errors } = parse(req.body);
+    const autosave = req.get('X-Autosave') === '1';
+    // Typed straight into the table: the cancellation date only belongs to ended entries.
+    if (autosave && !e.ended) values.cancellation_date = e.cancellation_date;
+    if (autosave && Object.keys(errors).length) return res.status(422).json({ ok: false, errors });
     if (Object.keys(errors).length) {
       return res.status(422).render('councildb-entry', { title: `Edit entry · ${c.name}`, section: 'councils', council: c, e, headings: HEADINGS, values: req.body, errors });
     }
     const cols = Object.keys(values);
     db.prepare(`UPDATE council_db_entries SET ${cols.map((k) => `${k} = ?`).join(', ')} WHERE id = ? AND account_id = ?`)
       .run(...cols.map((k) => values[k]), e.id, req.user.id);
+    if (autosave) return res.json({ ok: true, savedAt: new Date().toISOString() });
     back(res, c, 'flash', 'Entry saved.', e.ended ? '#previous' : '#live');
   });
 

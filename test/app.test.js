@@ -2675,9 +2675,11 @@ test('council database: add entries, edit, end (moves to Previous tenant), back 
   const c = await registerAndLogin('council-entries@example.com', 'Entries Lets');
   const council = idFrom((await c.post('/app/councils', { name: 'Enfield' })).location);
   await c.get(`/app/councils/${council}/database`);
-  let r = await c.post(`/app/councils/${council}/database/entries`, { our_ref: '' });
-  assert.equal(r.status, 422);
-  assert.match(r.text, /Enter at least the reference/);
+  let r = await c.get(`/app/councils/${council}/database`);
+  assert.doesNotMatch(r.text, /\+ Add entry/);
+  assert.match(r.text, /<tr class="new-row">[\s\S]*?name="our_ref"[\s\S]*?form="new-entry"/, 'new entries typed into the empty row under the headings');
+  r = await c.post(`/app/councils/${council}/database/entries`, { our_ref: '' });
+  assert.match(decodeURIComponent(r.location), /Enter at least the reference/);
   r = await c.post(`/app/councils/${council}/database/entries`, { our_ref: 'AL1001', property_address: '1 Test Road N13', scheme: 'BB', property_size: '2 bed flat', property_reference: 'PR-9', reservation_date: '2026-09-01', booking_date: '2026-09-02', price_pence: '56', client_name: 'Test Client', contact_number: '07000 000000', people: '3', email: 'client@example.com' });
   assert.match(decodeURIComponent(r.location), /Entry added to Live/);
   const e = db.prepare('SELECT * FROM council_db_entries WHERE council_id = ?').get(council);
@@ -2686,6 +2688,14 @@ test('council database: add entries, edit, end (moves to Previous tenant), back 
   r = await c.get(`/app/councils/${council}/database`);
   assert.match(r.text, /id="live"[\s\S]*?AL1001[\s\S]*?Test Client[\s\S]*?End<\/button>[\s\S]*?id="previous"/);
 
+  // Every cell is a box to type into; changes save by themselves.
+  r = await c.get(`/app/councils/${council}/database`);
+  assert.match(r.text, new RegExp(`<input form="entry-${e.id}" name="client_name" type="text" value="Test Client"`));
+  assert.match(r.text, new RegExp(`<form id="entry-${e.id}"[^>]*data-autosave`));
+  const saved = await fetch(`${base}/app/councils/${council}/database/entries/${e.id}`, { method: 'POST', headers: { cookie: c.cookie, 'content-type': 'application/x-www-form-urlencoded', 'X-Autosave': '1' },
+    body: new URLSearchParams({ _csrf: c.csrf, our_ref: 'AL1001', property_address: '1 Test Road N13', booking_date: '2026-09-02', client_name: 'Typed In Table', price_pence: '56' }) });
+  assert.equal((await saved.json()).ok, true);
+  assert.equal(db.prepare('SELECT client_name FROM council_db_entries WHERE id = ?').get(e.id).client_name, 'Typed In Table');
   // Edit it.
   await c.get(`/app/councils/${council}/database/entries/${e.id}/edit`);
   r = await c.post(`/app/councils/${council}/database/entries/${e.id}`, { our_ref: 'AL1001', property_address: '1 Test Road N13', booking_date: '2026-09-02', client_name: 'Test Client Jr', price_pence: '60' });
@@ -2700,7 +2710,7 @@ test('council database: add entries, edit, end (moves to Previous tenant), back 
   assert.match(decodeURIComponent(r.location), /now under Previous tenant/);
   assert.deepEqual({ ...db.prepare('SELECT ended, cancellation_date FROM council_db_entries WHERE id = ?').get(e.id) }, { ended: 1, cancellation_date: '2026-10-16' });
   r = await c.get(`/app/councils/${council}/database`);
-  assert.match(r.text, /id="previous"[\s\S]*?Test Client Jr[\s\S]*?16\/10\/2026|id="previous"[\s\S]*?16\/10\/2026[\s\S]*?Test Client Jr/);
+  assert.match(r.text, /id="previous"[\s\S]*?name="cancellation_date" type="date" value="2026-10-16"[\s\S]*?value="Test Client Jr"/);
 
   // The download has it on the Previous tenant sheet.
   r = await c.get(`/app/councils/${council}/database.xlsx`);

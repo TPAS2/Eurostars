@@ -726,3 +726,12 @@ table.council-db td { white-space: nowrap; font-size: .85rem; }
 @media print { .lodge-sheet { border: 0; box-shadow: none; padding: 0; } .lodge-page { padding-top: 0; } }
 .centered-tiles .tile { text-align: center; align-items: center; }
 .static-value { padding: 9px 0; }
+
+table.council-db.editable td { padding: 4px 3px; }
+table.council-db .cell-input { width: 100%; min-width: 110px; padding: 5px 6px; font-size: .85rem; border: 1px solid var(--border); border-radius: 4px; background: var(--surface); }
+table.council-db .cell-input:hover { border-color: var(--border); }
+table.council-db .cell-input:focus { border-color: var(--brand); background: var(--surface); outline: none; }
+table.council-db .cell-date { min-width: 135px; }
+table.council-db .cell-money { min-width: 80px; text-align: right; }
+table.council-db tr.new-row td { background: var(--surface-2); }
+table.council-db tr.new-row .cell-input { border-color: var(--border); background: var(--surface); }

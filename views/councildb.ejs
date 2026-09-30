@@ -3,7 +3,7 @@
   <div>
     <a class="crumb" href="/app/councils/<%= council.id %>">← <%= council.name %></a>
     <h1><%= council.name %> database</h1>
-    <p class="muted">Add entries to <strong>Live</strong>. When one finishes, click <strong>End</strong> to give it a cancellation date and move it to <strong>Previous tenant</strong>.</p>
+    <p class="muted">Type straight into the tables: changes save by themselves. Add a new line in the empty row at the bottom of <strong>Live</strong>. When one finishes, click <strong>End</strong> to give it a cancellation date and move it to <strong>Previous tenant</strong>.</p>
   </div>
   <div class="actions">
     <a class="btn primary" href="/app/councils/<%= council.id %>/database.xlsx">Download Excel</a>
@@ -12,30 +12,26 @@
 <% if (flash) { %><div class="notice ok"><%= flash %></div><% } %>
 <% if (error) { %><div class="notice err"><%= error %></div><% } %>
 
-<section class="card" id="add-entry">
-  <details class="fold" <%= Object.keys(errors).length ? 'open' : '' %>>
-    <summary><h2>+ Add entry</h2></summary>
-    <% if (errors.form) { %><div class="notice err"><%= errors.form %></div><% } %>
-    <form method="post" action="/app/councils/<%= council.id %>/database/entries" class="form-grid three" data-no-keep>
-      <%- include('partials/csrf') %>
-      <%- include('partials/councildb-fields', { headings, values, errors, skipCancel: true }) %>
-      <div class="form-actions wide"><button class="btn primary" type="submit">Add to Live</button></div>
-    </form>
-  </details>
-</section>
 
+<% const cell = (h, e, formId, editable) => {
+  const v = e ? e[h.key] : '';
+  const val = v == null ? '' : h.money ? fmt.penceToInput(v) : v;
+  if (!editable) return `<td class="muted">${h.date && v ? fmt.ukDate(v) : ''}</td>`;
+  const type = h.date ? 'date' : h.key === 'email' ? 'email' : h.key === 'contact_number' ? 'tel' : 'text';
+  const esc = (x) => String(x).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+  return `<td><input form="${formId}" name="${h.key}" type="${type}" value="${esc(val)}"${h.money ? ' inputmode="decimal" placeholder="0.00"' : ''} aria-label="${esc(h.label)}" class="cell-input${h.date ? ' cell-date' : ''}${h.money ? ' cell-money' : ''}"></td>`;
+}; %>
 <% [['live', 'Live', entries.live, titleRow], ['previous', 'Previous tenant', entries.previous, 'PREVIOUS TENANTS']].forEach(([id, name, list, sheetTitle]) => { %>
 <section class="card" id="<%= id %>">
   <div class="card-head"><h2><%= name %> <span class="count"><%= list.length %></span></h2><span class="muted small"><%= sheetTitle %></span></div>
-  <div class="table-wrap"><table class="council-db">
+  <div class="table-wrap"><table class="council-db editable">
     <thead><tr><% headings.forEach(h => { %><th><%= h.label %></th><% }) %><th></th></tr></thead>
     <tbody>
-    <% if (!list.length) { %><tr><td colspan="<%= headings.length + 1 %>" class="muted">No entries yet.</td></tr><% } %>
-    <% list.forEach(e => { %>
+    <% list.forEach(e => { const fid = `entry-${e.id}`; %>
       <tr>
-        <% headings.forEach(h => { const v = e[h.key]; %><td><%= v == null || v === '' ? '' : h.date ? fmt.ukDate(v) : h.money ? fmt.money(v) : v %></td><% }) %>
+        <% headings.forEach(h => { %><%- cell(h, e, fid, id === 'previous' || h.key !== 'cancellation_date') %><% }) %>
         <td class="db-actions">
-          <a class="btn small" href="/app/councils/<%= council.id %>/database/entries/<%= e.id %>/edit">Edit</a>
+          <form id="<%= fid %>" method="post" action="/app/councils/<%= council.id %>/database/entries/<%= e.id %>" data-autosave data-autosave-quiet data-autosave-key="cdb-<%= e.id %>" class="inline"><%- include('partials/csrf') %><span class="save-status small" aria-live="polite"></span></form>
           <% if (id === 'live') { %>
           <form method="post" action="/app/councils/<%= council.id %>/database/entries/<%= e.id %>/end" class="end-tenancy" data-confirm="End this entry? It moves to Previous tenant with this cancellation date.">
             <%- include('partials/csrf') %>
@@ -49,6 +45,16 @@
         </td>
       </tr>
     <% }) %>
+    <% if (id === 'live') { %>
+      <tr class="new-row">
+        <% headings.forEach(h => { %><%- cell(h, null, 'new-entry', h.key !== 'cancellation_date') %><% }) %>
+        <td class="db-actions">
+          <form id="new-entry" method="post" action="/app/councils/<%= council.id %>/database/entries" class="inline" data-no-keep><%- include('partials/csrf') %><button class="btn small primary" type="submit">Add</button></form>
+        </td>
+      </tr>
+    <% } else if (!list.length) { %>
+      <tr><td colspan="<%= headings.length + 1 %>" class="muted">No entries yet. Ended entries from Live appear here.</td></tr>
+    <% } %>
     </tbody>
   </table></div>
 </section>
