@@ -1965,7 +1965,7 @@ test('"Deduct from landlord" straight from adding a contractor or landlord invoi
 test('every section must be filled in when adding a contractor or landlord invoice', async () => {
   const c = await registerAndLogin('all-required@example.com', 'Required Lets');
   let r = await c.get('/app/invoices/new');
-  for (const name of ['supplier', 'amount', 'invoice_date', 'property_id', 'added_by', 'charge_landlord', 'landlord_amount']) {
+  for (const name of ['supplier', 'invoice_date', 'property_id', 'added_by', 'charge_landlord']) {
     assert.match(r.text, new RegExp(`name="${name}"[^>]*required|required[^>]*name="${name}"`), `${name} is required on the contractor invoice form`);
   }
   // Notes, the maintenance job and the invoice file are optional.
@@ -2530,11 +2530,15 @@ test('contractor invoice: price to us, price to landlord, profit, and charge to 
   r = await c.get(`/app/invoices/${id}`);
   assert.match(r.text, /Price to us<\/dt><dd><strong>£120\.00[\s\S]*?Price to landlord<\/dt><dd><strong>£150\.00[\s\S]*?Profit<\/dt><dd><strong class="ok-text">£30\.00/);
 
-  // Charged to the landlord: the price to landlord must be filled in.
+  // Both prices are optional: blank price to us is £0.00, blank price to landlord is the price to us.
   await c.get('/app/invoices/new');
-  r = await c.post('/app/invoices', { supplier: 'Locksmith', amount: '80', landlord_amount: '', charge_landlord: 'yes', invoice_date: '2026-09-11', property_id: String(prop) }, { multipart: true });
-  assert.equal(r.status, 422);
-  assert.match(r.text, /Enter the price to the landlord/);
+  r = await c.post('/app/invoices', { supplier: 'No Prices', amount: '', landlord_amount: '', charge_landlord: 'yes', invoice_date: '2026-09-11', property_id: String(prop) }, { multipart: true });
+  assert.equal(r.status, 302, r.text);
+  assert.deepEqual({ ...db.prepare("SELECT amount_pence, landlord_price_pence FROM invoices WHERE supplier = 'No Prices'").get() }, { amount_pence: 0, landlord_price_pence: null });
+  assert.doesNotMatch((await c.get('/app/invoices/new')).text, /name="amount"[^>]*required|name="landlord_amount"[^>]*required/);
+  // The list has an Edit button to the left of Pay.
+  const noPrices = db.prepare("SELECT id FROM invoices WHERE supplier = 'No Prices'").get().id;
+  assert.match((await c.get('/app/invoices?month=all')).text, new RegExp(`href="/app/invoices/${noPrices}/edit">Edit</a>\\s*<a class="btn small primary" href="/app/invoices/${noPrices}#pay">Pay</a>`));
   r = await c.post('/app/invoices', { supplier: 'Locksmith', amount: '80', landlord_amount: '80', charge_landlord: 'yes', invoice_date: '2026-09-11', property_id: String(prop) }, { multipart: true });
   const lock = idFrom(r.location);
   assert.match((await c.get(`/app/invoices/${lock}`)).text, /Profit<\/dt><dd><strong class="">£0\.00/);

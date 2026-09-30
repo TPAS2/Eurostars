@@ -88,8 +88,10 @@ module.exports = function invoiceRoutes(db, config) {
       const ok = Number.isInteger(who) && db.prepare('SELECT 1 FROM users WHERE id = ? AND (id = ? OR company_id = ?)').get(who, accountId, accountId);
       if (!ok) errors.added_by = 'Choose who added it.'; else v.added_by = who;
     }
-    v.amount_pence = fmt.parseMoney(String(body.amount || '').trim());
-    if (Number.isNaN(v.amount_pence) || v.amount_pence <= 0) errors.amount = 'Enter the price to us, e.g. 180.00.';
+    // Optional: blank counts as £0.00.
+    const cost = String(body.amount || '').trim();
+    v.amount_pence = cost ? fmt.parseMoney(cost) : 0;
+    if (Number.isNaN(v.amount_pence)) errors.amount = 'Enter the price to us like 180.00, or leave it blank.';
     // Charge it to the landlord (Yes/No).
     if (body.charge_landlord === 'yes' || body.charge_landlord === 'no') v.charge_landlord = body.charge_landlord === 'no' ? 0 : 1;
     else if (body.then !== 'deduct') errors.charge_landlord = 'Choose whether to charge the landlord.';
@@ -97,10 +99,8 @@ module.exports = function invoiceRoutes(db, config) {
     if (body.landlord_amount !== undefined) {
       const raw = String(body.landlord_amount || '').trim();
       v.landlord_price_pence = raw ? fmt.parseMoney(raw) : null;
-      if (raw && (Number.isNaN(v.landlord_price_pence) || v.landlord_price_pence < 0)) errors.landlord_amount = 'Enter the price to the landlord, e.g. 220.00.';
+      if (raw && (Number.isNaN(v.landlord_price_pence) || v.landlord_price_pence < 0)) errors.landlord_amount = 'Enter the price to the landlord like 220.00, or leave it blank.';
     }
-    // Needed whenever the landlord is charged.
-    if ((v.charge_landlord === 1 || body.then === 'deduct') && v.landlord_price_pence == null && !errors.landlord_amount) errors.landlord_amount = 'Enter the price to the landlord.';
     v.maintenance_job_id = null;
     v.property_id = null;
     const noJob = body.maintenance_job_id === 'none';

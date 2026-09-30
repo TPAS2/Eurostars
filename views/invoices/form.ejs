@@ -43,15 +43,15 @@
         <div class="help">No: we pay it, the landlord isn't charged.</div>
       </div>
       <div class="field">
-        <label for="f-amount">Price to us (£) <span class="req">*</span></label>
-        <input id="f-amount" name="amount" inputmode="decimal" placeholder="0.00" value="<%= values.amount || '' %>" required data-profit-cost>
-        <div class="help">What the contractor charges us.</div>
+        <label for="f-amount">Price to us (£)</label>
+        <input id="f-amount" name="amount" inputmode="decimal" placeholder="0.00" value="<%= values.amount || '' %>" data-profit-cost>
+        <div class="help">Optional. What the contractor charges us.</div>
         <% if (errors.amount) { %><div class="field-err"><%= errors.amount %></div><% } %>
       </div>
       <div class="field">
-        <label for="f-landlord_amount">Price to landlord (£) <span class="req">*</span></label>
-        <input id="f-landlord_amount" name="landlord_amount" inputmode="decimal" placeholder="0.00" value="<%= values.landlord_amount || '' %>" data-profit-price required>
-        <div class="help">What the landlord is charged when it's deducted.</div>
+        <label for="f-landlord_amount">Price to landlord (£)</label>
+        <input id="f-landlord_amount" name="landlord_amount" inputmode="decimal" placeholder="0.00" value="<%= values.landlord_amount || '' %>" data-profit-price>
+        <div class="help">Optional. What the landlord is charged; blank means the same as the price to us.</div>
         <% if (errors.landlord_amount) { %><div class="field-err"><%= errors.landlord_amount %></div><% } %>
       </div>
       <div class="field">

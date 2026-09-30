@@ -20,6 +20,7 @@
         <% } else { %><span class="yes-no no">No</span><% } %>
       </td>
       <td class="num row-actions">
+        <a class="btn small" href="/app/invoices/<%= i.id %>/edit">Edit</a>
         <% if (i.status === 'unpaid') { %><a class="btn small primary" href="/app/invoices/<%= i.id %>#pay">Pay</a><% } %>
         <form method="post" action="/app/invoices/<%= i.id %>/delete" data-confirm="Delete the invoice from <%= i.supplier %> (<%= fmt.money(i.amount_pence) %>)?<%= i.payment_txn_id ? ' The charge to the landlord will be removed too.' : '' %>">
           <%- include('../partials/csrf') %>
