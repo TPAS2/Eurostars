@@ -657,7 +657,7 @@ test('councils link to properties, and through them to landlords and tenants', a
   assert.doesNotMatch(council.text, /<dt>Address<\/dt>|Council tax phone|Council tax email/);
   assert.doesNotMatch((await c.get(`/app/properties/${propertyId}`)).text, /Council tax band/);
   assert.match((await c.get(`/app/landlords/${landlordId}`)).text, /Councils[\s\S]*Bristol City Council/);
-  assert.match((await c.get(`/app/tenants/${tenantId}`)).text, /Councils[\s\S]*Bristol City Council[\s\S]*CT-55501/);
+  assert.match((await c.get(`/app/tenants/${tenantId}`)).text, /<dt>Council<\/dt>\s*<dd><a[^>]*>Bristol City Council/);
   assert.match((await c.get(`/app/properties/${propertyId}`)).text, /href="\/app\/councils\/\d+">Bristol City Council/);
   const details = (await c.get(`/app/properties/${propertyId}`)).text.match(/<dl class="details">[\s\S]*?<\/dt>/)[0];
   assert.match(details, /<dt>Council<\/dt>$/, 'Council is the first detail on the property page');
@@ -1570,7 +1570,9 @@ test('tenant page: a second box with the council, property and tenancy agreement
   r = await c.get(`/app/tenants/${tenant}`);
   assert.match(r.text, /<dl class="details">[\s\S]*?<\/dl>[\s\S]*?class="card tenant-box"/, 'second box after the tenant details');
   assert.match(r.text, /Current tenancy/);
-  assert.match(r.text, /<h3>Council<\/h3>[\s\S]*?Leeds City Council[\s\S]*?CT-777[\s\S]*?Tenant[\s\S]*?0113 222 4404/);
+  // On the tenant's page the council sits in the top box, right of Phone, not in the tenancy box.
+  assert.match(r.text, /<dl class="details">[\s\S]*?<dt>Phone<\/dt>[\s\S]*?<dt>Council<\/dt>\s*<dd><a href="\/app\/councils\/\d+">Leeds City Council<\/a>[\s\S]*?<\/dl>/);
+  assert.doesNotMatch(r.text, /<h3>Council<\/h3>/);
   assert.match(r.text, /<h3>Property<\/h3>[\s\S]*?7 Canal Street[\s\S]*?Leeds, LS1 4AB[\s\S]*?Lou Landlord/);
   assert.doesNotMatch(r.text, /Deposit/);
   assert.doesNotMatch((await c.get(`/app/properties/${prop}/add-tenant`)).text, /Deposit/);

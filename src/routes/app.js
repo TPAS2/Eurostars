@@ -232,15 +232,8 @@ module.exports = function appRoutes(db) {
       return [{ title: 'Councils', empty: 'None of this landlord\'s properties has a council set yet.', headers: ['Council', 'Properties'],
         rows: rows.map((c) => [link('councils', c.id, c.name), { text: String(c.n), num: true }]) }];
     }
-    if (def.key === 'tenants') {
-      const rows = councilsVia(
-        `SELECT DISTINCT c.id, c.name, c.council_tax_phone, p.id AS property_id, p.address_line1, p.council_tax_account
-           FROM tenancies ty JOIN properties p ON p.id = ty.property_id JOIN councils c ON c.id = p.council_id
-          WHERE ty.account_id = ? AND ty.tenant_id = ? ORDER BY c.name COLLATE NOCASE`, a, row.id);
-      return [{ title: 'Councils', empty: 'None of this tenant\'s properties has a council set yet.', headers: ['Council', 'Phone number', 'Property', 'Council tax account no.'],
-        rows: rows.map((c) => [link('councils', c.id, c.name), { text: c.council_tax_phone || '' }, link('properties', c.property_id, c.address_line1),
-          { text: c.council_tax_account || '' }]) }];
-    }
+    // A tenant's council is shown in the details box at the top of their page.
+    if (def.key === 'tenants') return [];
     return [];
   }
 

@@ -52,6 +52,12 @@
         <dt><%= f.label %></dt>
         <dd><% if (!d.text) { %><span class="muted">—</span><% } else if (d.href) { %><a href="<%= d.href %>"><%= d.text %></a><% } else if (d.badge) { %><span class="badge s-<%= String(row[f.name]).replace(/\W+/g, '-') %>"><%= d.text %></span><% } else { %><span class="pre"><%= d.text %></span><% } %></dd>
       </div>
+      <% if (def.key === 'tenants' && f.name === 'phone') { const tc = tenantBoxes && tenantBoxes[0]; %>
+      <div>
+        <dt>Council</dt>
+        <dd><% if (tc && tc.council_id) { %><a href="/app/councils/<%= tc.council_id %>"><%= tc.council_name %></a><% } else { %><span class="muted">—</span><% } %></dd>
+      </div>
+      <% } %>
     <% }) %>
   </dl>
   <% if (photo) { %></div><% } %>
@@ -68,6 +74,7 @@
       <% if (def.key === 'tenants') { %><a class="btn small" href="/app/tenancies/<%= t.id %>">Open tenancy</a><% } %>
     </div>
     <div class="tenant-box-grid">
+      <% if (def.key !== 'tenants') { %>
       <div>
         <h3>Council</h3>
         <% if (t.council_id) { %>
@@ -80,6 +87,7 @@
           </dl>
         <% } else { %><p class="muted">No council set for this property. <a href="/app/properties/<%= t.property_id %>/edit">Set council</a></p><% } %>
       </div>
+      <% } %>
       <div>
         <h3>Property</h3>
         <p><a href="/app/properties/<%= t.property_id %>"><strong><%= t.address_line1 %></strong></a></p>
