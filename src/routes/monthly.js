@@ -80,6 +80,8 @@ module.exports = function monthlyRoutes(db, writer, mailer = { enabled: false })
       title: 'Rent run', section: 'rentrun', month, monthLabel: st.monthLabel(month), rows, template,
       emailEnabled: mailer.enabled, reportTo: (me && me.email) || '', sender: senderFor(a), fmt,
       step5: require('../paymentInstruction')(db).formFor(req.user, month),
+      bulkFile: require('../bulkPayment').bulkRows(db, a, month),
+      transferFile: require('../bulkPayment').transferRows(db, a, month),
       metroPresets: db.prepare('SELECT id, name, data_json FROM metro_presets WHERE account_id = ? ORDER BY name COLLATE NOCASE').all(a)
         .map((p) => ({ id: p.id, name: p.name, data: JSON.parse(p.data_json) })),
       metroDocs: db.prepare(

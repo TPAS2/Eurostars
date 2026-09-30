@@ -6,6 +6,7 @@
 const fmt = require('./format');
 const st = require('./statements');
 const { amountInWords, money } = require('./metroForm');
+const { bulkRows } = require('./bulkPayment');
 
 // A typed total in figures ("5000", "£5,000.00", "5000-5") written the bank's way: £5,000-00.
 function tidyFigures(v) {
@@ -55,9 +56,11 @@ function total(data) {
 
 
 // Worked-out figures for the form: total in figures and words, and the number of payments.
-function figures(data) {
-  const pence = total(data);
-  const n = data.payees.filter((p) => p.include).length;
+// They come from step 5's bulk payment file, so the form always matches it.
+function figures(accountId, month) {
+  const file = bulkRows(db, accountId, month);
+  const pence = file.total;
+  const n = file.rows.length;
   return { totalFigures: n ? money(pence) : '', totalWords: n ? amountInWords(pence) : '', count: n ? String(n) : '' };
 }
 
@@ -65,7 +68,7 @@ function figures(data) {
 function saveForm(accountId, month, body, userName) {
   const data = load(accountId, month);
   delete data.saved_at;
-  const auto = figures(data);
+  const auto = figures(accountId, month);
   const f = (k, n = 60) => clip(body[k], n);
   Object.assign(data, {
     store: f('store'), from_name: f('from_name'), contact_name: f('contact_name'), from_account_number: f('from_account_number', 12),
@@ -86,7 +89,7 @@ function saveForm(accountId, month, body, userName) {
 // What the step 5 box shows: saved values, or suggestions (worked-out figures, your name).
 function formFor(user, month) {
   const data = load(user.id, month);
-  const auto = figures(data);
+  const auto = figures(user.id, month);
   const agency = db.prepare('SELECT agency_name FROM users WHERE id = ?').get(user.id);
   return {
     store: data.store || '', from_name: data.from_name || '', contact_name: data.contact_name || user.name || '',

@@ -2,7 +2,7 @@
 <header class="page-head">
   <div>
     <h1>Rent run</h1>
-    <p class="muted">Month end in five steps: calculate the rents, email every landlord their statement, check the report, email it, and the payment instruction to pay the landlords.</p>
+    <p class="muted">Month end: calculate the rents, email every landlord their statement, check and email the Rift report, then the bank transfer sheet, Metro&rsquo;s bulk payment file and the payment instruction to pay the landlords.</p>
   </div>
   <form method="get" data-autogo class="inline-form">
     <input type="month" name="month" value="<%= month %>" aria-label="Month">
@@ -64,7 +64,7 @@
         <a class="btn primary <%= generated ? '' : 'disabled' %>" href="/app/monthly/report.xlsx?month=<%= month %>" <%- generated ? '' : 'aria-disabled="true" tabindex="-1"' %>>Download Excel</a>
       </div>
     </li>
-    <li>
+    <li class="sub" data-step="3.1">
       <div><strong>Email the report</strong><p class="muted small">Sends the same Rift report, as the Excel workbook attached.</p></div>
       <a class="btn" href="/app/monthly/report?month=<%= month %>&step=4">Preview report</a>
       <form method="post" action="/app/monthly/report/email" class="step-email" data-busy="Sending…">
@@ -76,8 +76,37 @@
   </ol>
 </section>
 
+<details class="card step5 fold" id="transfer-sheet">
+  <summary><h2><span class="step-no">4</span> Bank transfer sheet</h2></summary>
+  <p class="muted small">Your Bank Transfer spreadsheet for <%= monthLabel %>, filled in from the Rift report: landlord, LCODE, property, sort code, account number, bank name and amount, with "No payment" for anyone with nothing to pay. It updates whenever the rents are recalculated.</p>
+  <div class="bulk-summary">
+    <span><strong><%= transferFile.rows.length %></strong> row<%= transferFile.rows.length === 1 ? '' : 's' %></span>
+    <span>Total <strong><%= fmt.money(transferFile.total) %></strong></span>
+    <% const noPay = transferFile.rows.filter(r => !r.pence).length; if (noPay) { %><span class="muted"><%= noPay %> no payment</span><% } %>
+  </div>
+  <div class="form-actions">
+    <a class="btn" href="/app/rent-run/transfer?month=<%= month %>">Preview</a>
+    <a class="btn primary <%= transferFile.rows.length ? '' : 'disabled' %>" href="/app/rent-run/transfer.xlsx?month=<%= month %>"<%- transferFile.rows.length ? '' : ' aria-disabled="true" tabindex="-1"' %>>Download Excel</a>
+  </div>
+</details>
+
+<details class="card step5 fold" id="bulk-file">
+  <summary><h2><span class="step-no">5</span> Metro Bank bulk payment file</h2></summary>
+  <p class="muted small">Metro's bulk payment spreadsheet for <%= monthLabel %>, filled in from the Rift report: sort code, beneficiary name, account, reference and amount for every landlord paid by bank. It updates whenever the rents are recalculated.</p>
+  <div class="bulk-summary">
+    <span><strong><%= bulkFile.rows.length %></strong> payment<%= bulkFile.rows.length === 1 ? '' : 's' %></span>
+    <span>Total <strong><%= fmt.money(bulkFile.total) %></strong></span>
+    <% if (bulkFile.problems.length) { %><span class="bad-text"><%= bulkFile.problems.length %> landlord<%= bulkFile.problems.length === 1 ? '' : 's' %> missing bank details</span><% } %>
+    <% if (bulkFile.cheques.length) { %><span class="muted"><%= bulkFile.cheques.length %> paid by cheque (not included)</span><% } %>
+  </div>
+  <div class="form-actions">
+    <a class="btn" href="/app/rent-run/bulk?month=<%= month %>">Preview</a>
+    <a class="btn primary <%= bulkFile.rows.length ? '' : 'disabled' %>" href="/app/rent-run/bulk.xlsm?month=<%= month %>"<%- bulkFile.rows.length ? '' : ' aria-disabled="true" tabindex="-1"' %>>Download Excel (.xlsm)</a>
+  </div>
+</details>
+
 <details class="card step5 fold" id="payment-instruction">
-  <summary><h2><span class="step-no">5</span> Metro Bank Bulk Payment Instruction</h2></summary>
+  <summary><h2><span class="step-no">5.1</span> Metro Bank Bulk Payment Instruction</h2></summary>
   <div class="card-head">
     <div class="step-actions">
       <button class="btn small" type="button" data-toggle="#metro-docs" aria-controls="metro-docs" aria-expanded="false">Previous documents (<%= metroDocs.length %>)</button>
@@ -139,7 +168,7 @@
       <button form="step5-form" class="btn small" type="submit" formaction="/app/rent-run/presets">Save boxes as preset</button>
     </div>
   </div>
-  <p class="muted small">What goes on Metro's form for <%= monthLabel %>. The totals are worked out from the payments; change anything you need, fill in the blanks, then open the form to print, sign and take to Metro.</p>
+  <p class="muted small">What goes on Metro's form for <%= monthLabel %>. The totals are worked out from step 5's bulk payment file; change anything you need, fill in the blanks, then open the form to print, sign and take to Metro.</p>
   <form method="post" action="/app/rent-run/instruction/form" class="form-grid step5-grid" id="step5-form" data-no-keep>
     <%- include('partials/csrf') %><input type="hidden" name="month" value="<%= month %>">
     <h3 class="wide form-subhead">1. Customer details</h3>

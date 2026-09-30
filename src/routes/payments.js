@@ -242,6 +242,50 @@ module.exports = function paymentRoutes(db) {
   });
 
   // Metro's blank form, as it came.
+  // Step 5: Metro's bulk payment file, made from the Rift report: a preview and the .xlsm
+  // (Metro's own template, button and all). Named after the payment date, like Metro's.
+  const bulk = require('../bulkPayment');
+  const payDate = (accountId, month) => load(accountId, month).payment_date || fmt.today();
+  router.get('/bulk', (req, res) => {
+    const month = monthOf(req.query.month);
+    const file = bulk.bulkRows(db, req.user.id, month);
+    res.render('payments/bulk', {
+      title: `Metro bulk payment file · ${file.monthLabel}`, section: 'rentrun', month, file,
+      filename: bulk.fileName(payDate(req.user.id, month), 'xlsm'), maxText: bulk.MAX_TEXT, fmt,
+    });
+  });
+  // Step 4: the Bank Transfer sheet (everyone paid by bank, from the Rift report).
+  router.get('/transfer', (req, res) => {
+    const month = monthOf(req.query.month);
+    const agency = db.prepare('SELECT agency_name FROM users WHERE id = ?').get(req.user.id).agency_name;
+    res.render('payments/transfer', {
+      title: `Bank transfer sheet · ${st.monthLabel(month)}`, section: 'rentrun', month, file: bulk.transferRows(db, req.user.id, month),
+      heading: bulk.transferTitle(agency, month), filename: bulk.transferFileName(agency, month), fmt,
+    });
+  });
+  router.get('/transfer.xlsx', async (req, res, next) => {
+    try {
+      const month = monthOf(req.query.month);
+      const agency = db.prepare('SELECT agency_name FROM users WHERE id = ?').get(req.user.id).agency_name;
+      const xlsx = await bulk.transferWorkbook(bulk.transferRows(db, req.user.id, month), agency);
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="${bulk.transferFileName(agency, month)}"`);
+      res.setHeader('Cache-Control', 'private, no-store');
+      res.end(xlsx);
+    } catch (err) { next(err); }
+  });
+
+  router.get('/bulk.xlsm', async (req, res, next) => {
+    try {
+      const month = monthOf(req.query.month);
+      const file = await bulk.bulkWorkbook(bulk.bulkRows(db, req.user.id, month));
+      res.setHeader('Content-Type', 'application/vnd.ms-excel.sheet.macroEnabled.12');
+      res.setHeader('Content-Disposition', `attachment; filename="${bulk.fileName(payDate(req.user.id, month), 'xlsm')}"`);
+      res.setHeader('Cache-Control', 'private, no-store');
+      res.end(file);
+    } catch (err) { next(err); }
+  });
+
   router.get('/metro-blank.pdf', (req, res) => {
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', 'inline; filename="Metro bulk payment instruction (blank).pdf"');

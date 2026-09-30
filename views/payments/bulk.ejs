@@ -1,0 +1,50 @@
+<%- include('../partials/header') %>
+<header class="page-head">
+  <div>
+    <a class="crumb" href="/app/rent-run?month=<%= month %>#bulk-file">← Rent run</a>
+    <h1>Metro bulk payment file</h1>
+    <p class="muted">Made from the Rift report for <%= file.monthLabel %>: every landlord paid by bank, a row per property where their money splits by property.</p>
+  </div>
+  <div class="actions">
+    <a class="btn primary" href="/app/rent-run/bulk.xlsm?month=<%= month %>">Download Excel (.xlsm)</a>
+  </div>
+</header>
+<% if (file.problems.length) { %>
+<div class="notice warn">
+  <strong>Check these landlords' bank details before uploading:</strong>
+  <ul class="tight"><% file.problems.forEach(p => { %><li><a href="/app/landlords/<%= p.landlord_id %>/edit"><%= p.name %></a>: <%= p.issues.join(', ') %></li><% }) %></ul>
+</div>
+<% } %>
+<% if (file.cheques.length) { %><p class="muted small">Paid by cheque, so not in the file: <%= file.cheques.map(c => `${c.name} (${fmt.money(c.pence)})`).join(', ') %>.</p><% } %>
+
+<section class="card">
+  <div class="card-head"><span class="muted small"><%= filename %></span></div>
+  <div class="bulk-sheet">
+    <div class="table-wrap"><table class="metro-bulk">
+      <thead><tr><th>SORT CODE</th><th>BENEFICIARY NAME</th><th>BENEFICIARY ACCOUNT</th><th>REFERENCE</th><th>AMOUNT</th></tr></thead>
+      <tbody>
+      <% file.rows.forEach(r => { %>
+        <tr>
+          <td class="c"><%= r.sortCode %></td>
+          <td><%= r.name %><% if (r.name.length > maxText) { %><span class="cut" title="Metro reads the first <%= maxText %> characters"> *</span><% } %></td>
+          <td class="c"><%= r.account %></td>
+          <td><%= r.reference %><% if (r.reference.length > maxText) { %><span class="cut" title="Metro reads the first <%= maxText %> characters"> *</span><% } %></td>
+          <td class="money"><span>£</span><%= (r.pence / 100).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></td>
+        </tr>
+      <% }) %>
+        <tr class="total"><td></td><td></td><td></td><td></td><td class="money"><span>£</span><%= (file.total / 100).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></td></tr>
+      <% if (!file.rows.length) { %><tr><td colspan="5" class="muted">No landlords to pay by bank for <%= file.monthLabel %>. Calculate the rents on the Rent run first.</td></tr><% } %>
+      </tbody>
+    </table></div>
+    <aside class="bulk-help">
+      <p class="bulk-btn">CREATE TXT FILE</p>
+      <p class="ver">Version 7.2606</p>
+      <p><strong>BENEFICIARY SORT CODE:</strong> Enter in the format: 000000 (6 digits)</p>
+      <p><strong>BENEFICIARY NAME:</strong> Enter the beneficiary name. Please note that only the first 18 characters will be uploaded.</p>
+      <p><strong>BENEFICIARY ACCOUNT:</strong> Enter in the format: 00000000 (8 digits)</p>
+      <p><strong>REFERENCE:</strong> Enter the beneficiary reference. Please note that only the first 18 characters will be uploaded</p>
+    </aside>
+  </div>
+  <p class="muted small">* Metro reads only the first <%= maxText %> characters. In the downloaded file, <strong>CREATE TXT FILE</strong> makes the upload file for Metro, as before (allow macros when Excel asks). <%= file.rows.length %> payment<%= file.rows.length === 1 ? '' : 's' %>, total <%= fmt.money(file.total) %> (the same as the Rift report<%= file.cheques.length ? ', less cheques' : '' %>).</p>
+</section>
+<%- include('../partials/footer') %>

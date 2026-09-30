@@ -731,7 +731,7 @@ table.council-db td { white-space: nowrap; font-size: .85rem; }
 @media (max-width: 760px) { .form-grid.three { grid-template-columns: 1fr; } }
 #add-entry details.fold > summary { margin-bottom: 0; }
 #add-entry details.fold[open] > summary { margin-bottom: 12px; }
-.step5 .step-no { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--brand); color: var(--brand-ink); font-size: .9rem; margin-right: 8px; }
+.step5 .step-no { display: inline-grid; place-items: center; min-width: 28px; height: 28px; padding: 0 6px; border-radius: 14px; background: var(--brand); color: var(--brand-ink); font-size: .9rem; margin-right: 8px; }
 .step5-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
 /* Landlord invoice on screen, laid out like the agency's Word invoice. */
@@ -803,3 +803,62 @@ table.council-db tr.new-row .cell-input { border-color: var(--border); backgroun
 /* Rent run step 5: shown in capitals, as they're written on Metro's form */
 .step5-grid input:not([type="date"]) { text-transform: uppercase; }
 .step5-grid input::placeholder { text-transform: none; }
+
+/* Step 5: Metro's bulk payment file, and its preview (looks like the spreadsheet) */
+.bulk-summary { display: flex; flex-wrap: wrap; gap: 8px 20px; margin: 8px 0 4px; }
+.bulk-sheet { display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap; }
+.bulk-sheet .table-wrap { flex: 1 1 560px; }
+table.metro-bulk { border-collapse: collapse; font-family: Calibri, Carlito, Arial, sans-serif; font-size: .92rem; background: #fff; color: #000; width: auto; }
+table.metro-bulk th { background: #0000ff; color: #fff; font-weight: 700; height: 73px; vertical-align: bottom; text-align: left; padding: 2px 6px; border: 1px solid #000; white-space: nowrap; }
+table.metro-bulk td { border: 1px solid #000; padding: 1px 6px; white-space: nowrap; }
+table.metro-bulk th:nth-child(1), table.metro-bulk td:nth-child(1) { min-width: 90px; }
+table.metro-bulk th:nth-child(2), table.metro-bulk td:nth-child(2) { min-width: 200px; }
+table.metro-bulk th:nth-child(3), table.metro-bulk td:nth-child(3) { min-width: 170px; }
+table.metro-bulk th:nth-child(4), table.metro-bulk td:nth-child(4) { min-width: 170px; }
+table.metro-bulk th:nth-child(5), table.metro-bulk td:nth-child(5) { min-width: 110px; }
+table.metro-bulk td.c { text-align: center; }
+table.metro-bulk td.money { text-align: right; }
+table.metro-bulk td.money span { float: left; }
+table.metro-bulk tr.total td { border: 0; }
+table.metro-bulk tr.total td.money { border: 1px solid #000; font-weight: 700; }
+table.metro-bulk .cut { color: #c00; }
+.bulk-help { flex: 0 1 220px; background: linear-gradient(#fbe4d5, #bdd7ee); color: #000; border: 1px solid #7f9fbf; border-radius: 4px; padding: 10px 12px; font-size: .8rem; }
+.bulk-help p { margin: 0 0 10px; }
+.bulk-help .ver { font-weight: 700; }
+ul.tight { margin: 6px 0 0; padding-left: 20px; }
+
+/* A sub-step (e.g. 3.1) in the rent run list: its own label, not counted */
+.monthend > li.sub { counter-increment: none; }
+.monthend > li.sub::before { content: attr(data-step); width: auto; min-width: 30px; padding: 0 6px; border-radius: 15px; }
+.bulk-help .bulk-btn { display: inline-block; font-weight: 700; background: #e1e1e1; border: 1px solid #adadad; padding: 6px 10px; margin-bottom: 12px; }
+
+/* Step 4 preview: the Bank Transfer sheet as it looks in Excel */
+table.transfer-sheet { border-collapse: collapse; font-family: 'Aptos Narrow', Aptos, Calibri, Carlito, Arial, sans-serif; font-size: .92rem; background: #fff; color: #000; width: auto; }
+table.transfer-sheet td, table.transfer-sheet th { border: 1px solid #000; padding: 1px 6px; white-space: nowrap; }
+table.transfer-sheet tr.title td, table.transfer-sheet tr.gap td { border: 0; }
+table.transfer-sheet tr.title td[colspan="3"] { text-align: center; font-weight: 700; }
+table.transfer-sheet tr.gap td { height: 14px; }
+table.transfer-sheet tr.head th { border: 2px solid #000; border-left-width: 1px; text-align: center; font-weight: 700; }
+table.transfer-sheet th:nth-child(1) { min-width: 250px; } table.transfer-sheet th:nth-child(2) { min-width: 60px; }
+table.transfer-sheet th:nth-child(3) { min-width: 260px; } table.transfer-sheet th:nth-child(4) { min-width: 110px; }
+table.transfer-sheet th:nth-child(5) { min-width: 120px; } table.transfer-sheet th:nth-child(6) { min-width: 140px; }
+table.transfer-sheet th:nth-child(7) { min-width: 170px; }
+table.transfer-sheet .note-col { border: 0; min-width: 120px; }
+table.transfer-sheet .c { text-align: center; }
+table.transfer-sheet .money { text-align: right; }
+table.transfer-sheet .money span { float: left; }
+table.transfer-sheet .strong { font-weight: 700; }
+table.transfer-sheet tr.total td { border: 0; }
+table.transfer-sheet tr.total td.c, table.transfer-sheet tr.total td.money { border: 1px solid #000; border-bottom-width: 2px; }
+table.transfer-sheet .yellow-note { background: #ff0; font-weight: 700; padding: 0 2px; }
+/* Both spreadsheet previews: text as typed and left-aligned, like Excel */
+table.metro-bulk th, table.metro-bulk td, table.transfer-sheet th, table.transfer-sheet td { text-transform: none; letter-spacing: normal; text-align: left; font-size: .9rem; color: #000; }
+table.metro-bulk td.c, table.transfer-sheet td.c, table.transfer-sheet tr.head th, table.transfer-sheet tr.title td[colspan="3"] { text-align: center; }
+table.metro-bulk th { color: #fff; }
+table.metro-bulk td.money, table.transfer-sheet td.money { text-align: right; }
+table.metro-bulk tbody tr:hover td, table.transfer-sheet tbody tr:hover td { background: inherit; }
+table.transfer-sheet .note-col { min-width: 240px; }
+table.transfer-sheet th:nth-child(1) { min-width: 200px; } table.transfer-sheet th:nth-child(3) { min-width: 220px; }
+table.transfer-sheet th:nth-child(7) { min-width: 130px; } table.transfer-sheet .note-col { min-width: 110px; }
+.monthend > li.sub::before { font-size: .8rem; padding: 0 4px; }
+.monthend > li.sub { padding-left: 52px; }

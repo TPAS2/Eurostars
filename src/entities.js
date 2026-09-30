@@ -23,6 +23,8 @@ const ENTITIES = {
       { name: 'bank_account_name', label: 'Bank account name', type: 'text', help: 'For the payment instruction in the rent run.', startRow: true },
       { name: 'bank_sort_code', label: 'Sort code', type: 'text', pattern: 'sortcode' },
       { name: 'bank_account_number', label: 'Account number', type: 'text', pattern: 'accountnumber' },
+      { name: 'bank_name', label: 'Bank name', type: 'text', help: 'e.g. Lloyds. Shown on the rent run\'s Bank Transfer sheet.' },
+      { name: 'payment_note', label: 'Bank transfer note', type: 'text', help: 'Shown in yellow beside them on the Bank Transfer sheet, e.g. QUARTERLY.' },
       { name: 'phone', label: 'Phone', type: 'tel' },
       { name: 'address', label: 'Correspondence address', type: 'textarea', inline: true, startRow: true },
       { name: 'notes', label: 'Notes', type: 'textarea', inline: true },

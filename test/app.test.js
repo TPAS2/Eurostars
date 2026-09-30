@@ -1626,7 +1626,8 @@ test('rent run step 5: payment instruction template and a filled-in instruction 
 
   r = await c.get('/app/rent-run?month=2026-08');
   // Step 5 is its own box, after the steps, with the form's details to edit.
-  assert.match(r.text, /<\/ol>\s*<\/section>\s*<details class="card step5 fold" id="payment-instruction">\s*<summary><h2><span class="step-no">5<\/span> Metro Bank Bulk Payment Instruction<\/h2><\/summary>[\s\S]*?class="btn small blank-form"[^>]*>Blank form/);
+  assert.match(r.text, /<\/ol>\s*<\/section>\s*<details class="card step5 fold" id="transfer-sheet">\s*<summary><h2><span class="step-no">4<\/span> Bank transfer sheet<\/h2><\/summary>[\s\S]*?id="bulk-file">\s*<summary><h2><span class="step-no">5<\/span> Metro Bank bulk payment file<\/h2><\/summary>[\s\S]*?id="payment-instruction">\s*<summary><h2><span class="step-no">5\.1<\/span> Metro Bank Bulk Payment Instruction<\/h2><\/summary>[\s\S]*?class="btn small blank-form"[^>]*>Blank form/, 'steps 4, 5 and 5.1 in order');
+  assert.match(r.text, /<li class="sub" data-step="3\.1">\s*<div><strong>Email the report<\/strong>/, 'emailing the report is step 3.1');
   assert.doesNotMatch(r.text, /Check payments/);
   assert.match(r.text, /name="totalFigures" value="£1,000-00"/, 'total worked out from the payments');
   assert.match(r.text, /name="totalWords" value="ONE THOUSAND POUNDS ONLY"/);
@@ -3097,4 +3098,81 @@ test('dark mode switch is saved per person and applied to every page', async () 
   assert.doesNotMatch((await c.get('/app')).text, /data-theme=/, 'anything else resets to the computer setting');
   c.csrf = 'wrong';
   assert.equal((await c.post('/app/theme', { theme: 'dark' })).status, 403);
+});
+
+test('rent run steps 4 and 5: Bank Transfer sheet (.xlsx) and Metro bulk file (.xlsm) from the Rift report', async () => {
+  const c = await registerAndLogin('bank-files@example.com', 'Bank Files Lets');
+  const co = db.prepare("SELECT id FROM users WHERE username = 'bank-files'").get().id;
+  const landlord = (name, code, extra = {}) => Number(db.prepare(
+    `INSERT INTO landlords (account_id, name, code, statement_type, bank_account_name, bank_sort_code, bank_account_number, bank_name, payment_note)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(co, name, code, extra.type || 'Email', extra.accName || null, extra.sort ?? '30-93-84', extra.acc ?? '12345678', extra.bank || 'Lloyds', extra.note || null).lastInsertRowid);
+  const statement = (l, closing, props) => db.prepare(
+    `INSERT INTO monthly_statements (account_id, landlord_id, month, opening_pence, rent_pence, fees_pence, expenses_pence, net_pence,
+      payments_pence, closing_pence, outstanding_pence, detail_json, summary, summary_source, generated_at)
+     VALUES (?, ?, '2026-09', 0, 0, 0, 0, ?, 0, ?, 0, ?, 'x', 'template', datetime('now'))`
+  ).run(co, l, closing, closing, JSON.stringify({ properties: props }));
+  // Two properties that add up exactly: a row each. One property: one row. Nothing held: "No payment".
+  statement(landlord('Mr Two Props', 'L102', { acc: '01234567' }), 150000, [
+    { id: 1, address_line1: '1 First Road', rent: 100000, fees: 10000, expenses: 0 },
+    { id: 2, address_line1: '2 Second Road', rent: 70000, fees: 10000, expenses: 0 }]);
+  statement(landlord('Ms One Prop', 'L101', { accName: 'One Prop Ltd', bank: 'HSBC' }), 90000, [{ id: 3, address_line1: '3 Third Road', rent: 100000, fees: 10000, expenses: 0 }]);
+  statement(landlord('Mr Unpaid', 'L103', { note: 'QUARTERLY' }), 0, [{ id: 4, address_line1: '4 Fourth Road', rent: 0, fees: 0, expenses: 0 }]);
+  statement(landlord('Mrs Cheque', 'L104', { type: 'Cheque' }), 50000, []);
+  statement(landlord('Mr No Bank', 'L105', { sort: '', acc: '' }), 20000, []);
+
+  const bulk = require('../src/bulkPayment');
+  const t = bulk.transferRows(db, co, '2026-09');
+  assert.deepEqual(t.rows.map((r) => [r.code, r.reference, r.pence]), [
+    ['L101', '3 Third Road', 90000], ['L102', '1 First Road', 90000], ['L102', '2 Second Road', 60000],
+    ['L103', '4 Fourth Road', null], ['L105', 'L105 Rent Sept 26', 20000]]);
+  assert.deepEqual(t.cheques.map((x) => x.name), ['Mrs Cheque']);
+  const b = bulk.bulkRows(db, co, '2026-09');
+  assert.equal(b.rows.length, 4, 'no "No payment" rows in the bulk file');
+  assert.equal(b.total, 260000, 'the Rift report total, less cheques');
+  assert.deepEqual(b.problems.map((p) => p.name), ['Mr No Bank']);
+
+  // Rent run: step 4, step 5, step 5.1; previews; downloads.
+  let r = await c.get('/app/rent-run?month=2026-09');
+  assert.match(r.text, /href="\/app\/rent-run\/transfer\.xlsx\?month=2026-09"/);
+  assert.match(r.text, /href="\/app\/rent-run\/bulk\.xlsm\?month=2026-09"/);
+  r = await c.get('/app/rent-run/transfer?month=2026-09');
+  assert.match(r.text, /Bank Files Lets SEPTEMBER 2026 Bank Transfer/);
+  assert.match(r.text, /4 Fourth Road[\s\S]*?No payment[\s\S]*?yellow-note">QUARTERLY/);
+  r = await c.get('/app/rent-run/bulk?month=2026-09');
+  assert.match(r.text, /Mr No Bank<\/a>: no sort code, no account number/);
+  assert.doesNotMatch(r.text, /Mrs Cheque<\/td>/);
+
+  r = await c.get('/app/rent-run/transfer.xlsx?month=2026-09');
+  assert.match(r.headers.get('content-disposition'), /Bank_Files_Lets_SEPT_2026_Online_payments\.xlsx/);
+  const ExcelJS = require('exceljs');
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.load(r.buf);
+  const ws = wb.worksheets[0];
+  assert.equal(ws.getCell('B1').value, 'Bank Files Lets SEPTEMBER 2026 Bank Transfer');
+  assert.deepEqual(ws.getRow(3).values.slice(1, 8), ['Landlord', 'LCODE', 'Property Address / Reference', 'Sort Code', 'Account Number', 'Bank Name', 'Amount']);
+  assert.deepEqual(ws.getRow(4).values.slice(1, 8), ['Ms One Prop', 'L101', '3 Third Road', '30-93-84', 12345678, 'HSBC', 900]);
+  assert.equal(ws.getCell('E5').value, '01234567', 'an account number starting with 0 keeps it');
+  assert.equal(ws.getCell('G7').value, 'No payment');
+  assert.equal(ws.getCell('H7').value, 'QUARTERLY');
+  assert.equal(ws.getCell('F9').value, 'Total');
+  assert.equal(ws.getCell('G9').value.formula, 'SUM(G4:G8)');
+
+  r = await c.get('/app/rent-run/bulk.xlsm?month=2026-09');
+  assert.equal(r.headers.get('content-type'), 'application/vnd.ms-excel.sheet.macroEnabled.12');
+  assert.match(r.headers.get('content-disposition'), /_SEPTEMBER_2026\.xlsm/);
+  const zip = await require('jszip').loadAsync(r.buf);
+  assert.ok(zip.file('xl/vbaProject.bin'), 'Metro\'s macro (the CREATE TXT FILE button) is kept');
+  const sheet = await zip.file('xl/worksheets/sheet1.xml').async('string');
+  assert.match(sheet, /<c r="A2" s="8" t="inlineStr"><is><t xml:space="preserve">30-93-84<\/t><\/is><\/c><c r="B2" s="10" t="inlineStr"><is><t xml:space="preserve">One Prop Ltd<\/t>/);
+  assert.match(sheet, /<c r="E6" s="19"><f>SUM\(E2:E5\)<\/f><v>2600\.00<\/v><\/c>/);
+  // Nothing from the original files (names, bank links) is left in the templates.
+  for (const f of ['metro-bulk-payment-template.xlsm.tpl', 'online-payments-template.xlsx.tpl']) {
+    const z = await require('jszip').loadAsync(require('fs').readFileSync(require('path').join(__dirname, '..', 'assets', f)));
+    for (const name of Object.keys(z.files).filter((n) => /\.(xml|rels)$/.test(n))) {
+      const text = await z.file(name).async('string');
+      assert.doesNotMatch(text, /bankline|sharepoint|TargetMode="External"/i, `${f} ${name}: no links out`);
+      assert.doesNotMatch(text, /<dc:creator>[^<]|<cp:lastModifiedBy>[^<]/, `${f} ${name}: no author names`);
+    }
+  }
 });
