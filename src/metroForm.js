@@ -94,10 +94,11 @@ async function fillMetroForm(data) {
   put('accountName', data.accountName);
   put('contactName', data.contactName);
   put('accountNumber', data.accountNumber);
-  put('totalFigures', data.payees.length ? money(total) : '', { f: bold });
+  // Typed-over figures (from the Rent run's step 5 box) win over the worked-out ones.
+  put('totalFigures', data.totalFigures ?? (data.payees.length ? money(total) : ''), { f: bold });
   put('valueDate', data.valueDate);
-  put('totalWords', data.payees.length ? amountInWords(total) : '', { size: 9.5 });
-  put('count', data.payees.length ? String(data.payees.length) : '');
+  put('totalWords', data.totalWords ?? (data.payees.length ? amountInWords(total) : ''), { size: 9.5 });
+  put('count', data.count ?? (data.payees.length ? String(data.payees.length) : ''));
   // Printed names under each signature, so the bank can read who signed.
   for (const [key, name] of [['signatory1', data.signatory1], ['signatory2', data.signatory2]]) {
     if (!name) continue;
@@ -162,4 +163,4 @@ async function fillMetroForm(data) {
   return doc.save();
 }
 
-module.exports = { fillMetroForm, amountInWords, TEMPLATE };
+module.exports = { fillMetroForm, amountInWords, money, TEMPLATE };

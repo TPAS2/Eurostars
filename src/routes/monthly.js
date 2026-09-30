@@ -79,6 +79,7 @@ module.exports = function monthlyRoutes(db, writer, mailer = { enabled: false })
     res.render('rentrun', {
       title: 'Rent run', section: 'rentrun', month, monthLabel: st.monthLabel(month), rows, template,
       emailEnabled: mailer.enabled, reportTo: (me && me.email) || '', sender: senderFor(a), fmt,
+      step5: require('../paymentInstruction')(db).formFor(req.user, month),
       flash: String(req.query.flash || '').slice(0, 1000), error: String(req.query.error || '').slice(0, 1000),
     });
   };

@@ -699,3 +699,5 @@ table.council-db td { white-space: nowrap; font-size: .85rem; }
 @media (max-width: 760px) { .form-grid.three { grid-template-columns: 1fr; } }
 #add-entry details.fold > summary { margin-bottom: 0; }
 #add-entry details.fold[open] > summary { margin-bottom: 12px; }
+.step5 .step-no { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--brand); color: var(--brand-ink); font-size: .9rem; margin-right: 8px; }
+.step5-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }

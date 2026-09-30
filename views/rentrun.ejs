@@ -73,17 +73,39 @@
         <button class="btn primary" type="submit" <%= emailEnabled && generated ? '' : 'disabled' %>>Email report</button>
       </form>
     </li>
-    <li id="payment-instruction">
-      <div><strong>Metro Bank Bulk Payment Instruction</strong><p class="muted small">
-        Pay the landlords their money. Rift fills in Metro's Bulk Payment Instruction form for <%= monthLabel %>: your account, the total in figures and words, the number of payments and the value date, with the list of payments attached. Check the payments first, then open the form to print, sign and take to Metro.
-      </p></div>
-      <div class="step-actions">
-        <a class="btn" href="/app/rent-run/instruction?month=<%= month %>">Check payments</a>
-        <a class="btn primary" href="/app/rent-run/instruction/metro.pdf?month=<%= month %>" target="_blank" rel="noopener">Fill in Metro form (PDF)</a>
-        <a class="btn small link" href="/app/rent-run/metro-blank.pdf" target="_blank" rel="noopener">Blank form</a>
-      </div>
-    </li>
   </ol>
+</section>
+
+<section class="card step5" id="payment-instruction">
+  <div class="card-head">
+    <h2><span class="step-no">5</span> Metro Bank Bulk Payment Instruction</h2>
+    <div class="step-actions">
+      <a class="btn small" href="/app/rent-run/instruction?month=<%= month %>">Check payments (<%= step5.payees %>)</a>
+      <a class="btn small link" href="/app/rent-run/metro-blank.pdf" target="_blank" rel="noopener">Blank form</a>
+    </div>
+  </div>
+  <p class="muted small">What goes on Metro's form for <%= monthLabel %>. The totals are worked out from the payments; change anything you need, fill in the blanks, then open the form to print, sign and take to Metro.</p>
+  <form method="post" action="/app/rent-run/instruction/form" class="form-grid step5-grid" data-no-keep>
+    <%- include('partials/csrf') %><input type="hidden" name="month" value="<%= month %>">
+    <h3 class="wide form-subhead">1. Customer details</h3>
+    <div class="field wide"><label for="m-store">Store</label><input id="m-store" name="store" value="<%= step5.store %>" placeholder="Metro branch, e.g. Borehamwood"></div>
+    <div class="field"><label for="m-name">Account name</label><input id="m-name" name="from_name" value="<%= step5.from_name %>" placeholder="e.g. <%= step5.agencyName %> Client Account"></div>
+    <div class="field"><label for="m-contact">Contact name</label><input id="m-contact" name="contact_name" value="<%= step5.contact_name %>"></div>
+    <div class="field"><label for="m-acc">Account number</label><input id="m-acc" name="from_account_number" value="<%= step5.from_account_number %>" inputmode="numeric" placeholder="8 digits"></div>
+    <h3 class="wide form-subhead">2. Payment details</h3>
+    <div class="field"><label for="m-total">Total amount in figures</label><input id="m-total" name="totalFigures" value="<%= step5.totalFigures %>"></div>
+    <div class="field"><label for="m-date">Value date</label><input id="m-date" type="date" name="payment_date" value="<%= step5.payment_date %>"></div>
+    <div class="field wide"><label for="m-words">Total amount in words</label><input id="m-words" name="totalWords" value="<%= step5.totalWords %>"></div>
+    <div class="field"><label for="m-count">Total number of transactions</label><input id="m-count" name="count" value="<%= step5.count %>" inputmode="numeric"></div>
+    <h3 class="wide form-subhead">3. Customer signature</h3>
+    <div class="field"><label for="m-sig1">Authorised signatory 1</label><input id="m-sig1" name="signatory_1" value="<%= step5.signatory_1 %>" placeholder="Name printed under the signature"></div>
+    <div class="field"><label for="m-sig2">Authorised signatory 2 (if applicable)</label><input id="m-sig2" name="signatory_2" value="<%= step5.signatory_2 %>"></div>
+    <div class="form-actions wide">
+      <button class="btn" type="submit" name="then" value="save">Save</button>
+      <button class="btn primary" type="submit" name="then" value="metro" formtarget="_blank">Save &amp; open Metro form (PDF)</button>
+      <% if (step5.saved_at) { %><span class="muted small">Last saved <%= fmt.ukDateTime(step5.saved_at) %></span><% } %>
+    </div>
+  </form>
 </section>
 
 <section class="card">

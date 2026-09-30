@@ -80,38 +80,15 @@ module.exports = function paymentRoutes(db) {
 
   // ---------- filling it in ----------
 
-  // Landlords to pay this month: those paid by bank (statement type Email) holding money.
-  function suggestedPayees(accountId, month) {
-    return db.prepare(
-      `SELECT l.id, l.name, l.code, l.bank_account_name, l.bank_sort_code, l.bank_account_number, s.closing_pence
-         FROM landlords l JOIN monthly_statements s ON s.landlord_id = l.id AND s.account_id = l.account_id AND s.month = ?
-        WHERE l.account_id = ? AND l.statement_type != 'Cheque' AND s.closing_pence > 0
-        ORDER BY l.name COLLATE NOCASE`
-    ).all(month, accountId).map((l) => ({
-      include: true, landlord_id: l.id, name: l.bank_account_name || l.name, sort_code: l.bank_sort_code || '',
-      account_number: l.bank_account_number || '', amount: fmt.penceToInput(l.closing_pence),
-      // Banks allow 18 characters: e.g. "RO1 Rent Aug 26".
-      reference: clip(`${l.code ? `${l.code} ` : ''}Rent ${shortMonth(month)}`, 18),
-    }));
-  }
+  const { suggestedPayees, load, total, metroData, saveForm } = require('../paymentInstruction')(db);
 
-  function load(accountId, month) {
-    const row = db.prepare('SELECT data_json, updated_at FROM payment_instructions WHERE account_id = ? AND month = ?').get(accountId, month);
-    if (row) return { ...JSON.parse(row.data_json), saved_at: row.updated_at };
-    // A new month starts from the last instruction's "paying from" details.
-    const last = db.prepare('SELECT data_json FROM payment_instructions WHERE account_id = ? ORDER BY month DESC LIMIT 1').get(accountId);
-    const prev = last ? JSON.parse(last.data_json) : {};
-    return {
-      store: prev.store || '', contact_name: prev.contact_name || '',
-      from_name: prev.from_name || '', from_sort_code: prev.from_sort_code || '', from_account_number: prev.from_account_number || '',
-      payment_date: '', signatory_1: prev.signatory_1 || '', signatory_2: prev.signatory_2 || '', notes: '',
-      payees: suggestedPayees(accountId, month), saved_at: null,
-    };
-  }
-
-  function total(data) {
-    return data.payees.filter((p) => p.include).reduce((t, p) => t + (Number.isNaN(fmt.parseMoney(p.amount)) ? 0 : fmt.parseMoney(p.amount)), 0);
-  }
+  // The Rent run's step 5 box: the details that go on Metro's form.
+  router.post('/instruction/form', (req, res) => {
+    const month = monthOf(req.body.month);
+    saveForm(req.user.id, month, req.body, req.user.name);
+    if (req.body.then === 'metro') return res.redirect(`/app/rent-run/instruction/metro.pdf?month=${month}`);
+    backToRun(res, month, { flash: 'Saved the payment instruction details.' });
+  });
 
   router.get('/instruction', (req, res) => {
     const month = monthOf(req.query.month);
@@ -198,18 +175,7 @@ module.exports = function paymentRoutes(db) {
   router.get('/instruction/metro.pdf', async (req, res, next) => {
     try {
       const month = monthOf(req.query.month);
-      const data = load(req.user.id, month);
-      const agency = db.prepare('SELECT agency_name, name FROM users WHERE id = ?').get(req.user.id);
-      const payees = data.payees.filter((p) => p.include).map((p) => ({
-        name: p.name, sort_code: p.sort_code, account_number: p.account_number, reference: p.reference,
-        pence: Number.isNaN(fmt.parseMoney(p.amount)) ? 0 : fmt.parseMoney(p.amount),
-      }));
-      const pdf = await fillMetroForm({
-        store: data.store, accountName: data.from_name, contactName: data.contact_name || req.user.name || agency.name,
-        accountNumber: data.from_account_number, valueDate: data.payment_date ? fmt.ukDate(data.payment_date) : '',
-        signatory1: data.signatory_1, signatory2: data.signatory_2, payees,
-        monthLabel: st.monthLabel(month), agencyName: agency.agency_name,
-      });
+      const pdf = await fillMetroForm(metroData(req.user, month));
       const name = `Metro bulk payment instruction ${month}.pdf`;
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `${req.query.download === '1' ? 'attachment' : 'inline'}; filename="${name}"`);

@@ -1625,7 +1625,13 @@ test('rent run step 5: payment instruction template and a filled-in instruction 
   await c.post('/app/monthly/calculate', { month: '2026-08' });
 
   r = await c.get('/app/rent-run?month=2026-08');
-  assert.match(r.text, /id="payment-instruction"[\s\S]*?Metro Bank Bulk Payment Instruction[\s\S]*?Check payments[\s\S]*?href="\/app\/rent-run\/instruction\/metro\.pdf\?month=2026-08"[^>]*>Fill in Metro form \(PDF\)/);
+  // Step 5 is its own box, after the steps, with the form's details to edit.
+  assert.match(r.text, /<\/ol>\s*<\/section>\s*<section class="card step5" id="payment-instruction">[\s\S]*?Metro Bank Bulk Payment Instruction[\s\S]*?Check payments \(1\)/);
+  assert.match(r.text, /name="totalFigures" value="£1,000\.00"/, 'total worked out from the payments');
+  assert.match(r.text, /name="totalWords" value="One thousand pounds only"/);
+  assert.match(r.text, /name="count" value="1"/);
+  assert.match(r.text, /name="store" value=""/, 'store left blank');
+  assert.match(r.text, /name="contact_name" value="Test User"/, 'contact name suggested');
   assert.match(r.text, /<table class="centered">/, 'landlords table is centred');
 
   // Save the blank template, then download / print it.
@@ -2714,4 +2720,24 @@ test('council database: add entries, edit, end (moves to Previous tenant), back 
   // Another company can't touch these.
   const other = await registerAndLogin('council-entries-2@example.com', 'Other Entries Lets');
   assert.equal((await other.get(`/app/councils/${council}/database`)).status, 404);
+});
+
+test('rent run step 5 box: edit the Metro form details; typed-over totals are kept, blanks stay blank', async () => {
+  const c = await registerAndLogin('step5-box@example.com', 'Step Five Lets');
+  const co = db.prepare("SELECT id FROM users WHERE username = 'step5-box'").get().id;
+  await c.get('/app/rent-run?month=2026-08');
+  let r = await c.post('/app/rent-run/instruction/form', { month: '2026-08', store: 'Borehamwood', from_name: 'Step Five Client Account', contact_name: 'Theo', from_account_number: '87654321', payment_date: '2026-09-17', totalFigures: '£5,000.00', totalWords: '', count: '', signatory_1: 'Theo', signatory_2: '', then: 'save' });
+  assert.match(decodeURIComponent(r.location.replace(/\+/g, ' ')), /Saved the payment instruction details/);
+  r = await c.get('/app/rent-run?month=2026-08');
+  assert.match(r.text, /name="store" value="Borehamwood"/);
+  assert.match(r.text, /name="totalFigures" value="£5,000\.00"/);
+  assert.match(r.text, /name="payment_date" value="2026-09-17"/);
+  assert.match(r.text, /name="signatory_2" value=""/);
+  const { metroData } = require('../src/paymentInstruction')(db);
+  const d = metroData({ id: co, name: 'Test User' }, '2026-08');
+  assert.equal(d.store, 'Borehamwood');
+  assert.equal(d.totalFigures, '£5,000.00', 'typed-over total goes on the form');
+  assert.equal(d.valueDate, '17/09/2026');
+  r = await c.post('/app/rent-run/instruction/form', { month: '2026-08', store: 'Borehamwood', then: 'metro' });
+  assert.equal(r.location, '/app/rent-run/instruction/metro.pdf?month=2026-08');
 });
