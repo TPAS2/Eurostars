@@ -7,6 +7,8 @@ const totp = require('../totp');
 const activity = require('../activity');
 const { USERNAME_RE, signInNameFrom } = require('../db');
 
+// No password we accept is longer than this (see register and the admin panel).
+const MAX_PASSWORD = 200;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 module.exports = function authRoutes(db, config) {
@@ -50,6 +52,14 @@ module.exports = function authRoutes(db, config) {
     const limited = loginLimited(`${ip}|${who}`) || accountFails.blocked(login.toLowerCase()) || ipFails.blocked(ip);
     if (limited) return fail(429, 'Too many attempts. Please wait 15 minutes and try again.');
     if (!login || !member || !password) return fail(422, 'Enter your agency, your name and your password.');
+    // Longer than any password we accept: refuse without the (deliberately slow) password check,
+    // counting it as a wrong attempt, so a flood of huge passwords can't tie up the server.
+    if (password.length > MAX_PASSWORD || String(req.body.login || '').length > 254 || String(req.body.member || '').length > 60) {
+      accountFails.fail(login.toLowerCase());
+      ipFails.fail(ip);
+      logEvent.run(null, who, 0, ip, ua);
+      return fail(401, 'Incorrect agency, name or password.');
+    }
     const company = findCompany.get(login);
     // The company's own row is its main login (and the admin's login); everyone else is a
     // person inside a company.
@@ -105,12 +115,13 @@ module.exports = function authRoutes(db, config) {
     const ch = pendingChallenge(req);
     if (!ch) return res.redirect('/login');
     const user = db.prepare('SELECT * FROM users WHERE id = ?').get(ch.user_id);
-    const input = String(req.body.code || '').trim();
+    // Codes are 6 digits, recovery codes a little longer: anything over 20 characters is wrong.
+    const input = String(req.body.code || '').trim().slice(0, 21);
     const ip = req.ip;
     const ua = String(req.headers['user-agent'] || '').slice(0, 300);
     const who = `${user.username} (two-step code)`;
     let ok = false;
-    const step = totp.verify(user.totp_secret, input, user.totp_last_step);
+    const step = input.length > 20 ? null : totp.verify(user.totp_secret, input, user.totp_last_step);
     if (step !== null) {
       db.prepare('UPDATE users SET totp_last_step = ? WHERE id = ?').run(step, user.id);
       ok = true;
@@ -118,7 +129,7 @@ module.exports = function authRoutes(db, config) {
       // A recovery code works once.
       const hashes = JSON.parse(user.totp_recovery || '[]');
       const i = hashes.indexOf(totp.hashRecoveryCode(input));
-      if (i >= 0 && input.length >= 8) {
+      if (i >= 0 && input.length >= 8 && input.length <= 20) {
         hashes.splice(i, 1);
         db.prepare('UPDATE users SET totp_recovery = ? WHERE id = ?').run(JSON.stringify(hashes), user.id);
         ok = true;
@@ -181,7 +192,7 @@ module.exports = function authRoutes(db, config) {
       errors.email = 'An account with this email already exists.';
     }
     if (password.length < 10) errors.password = 'Use at least 10 characters.';
-    if (password.length > 200) errors.password = 'Password is too long.';
+    if (password.length > MAX_PASSWORD) errors.password = `Use at most ${MAX_PASSWORD} characters.`;
     if (password !== String(req.body.password_confirm || '')) errors.password_confirm = "Passwords don't match.";
     if (registerLimited(req.ip)) errors.form = 'Too many sign-ups from your network. Please try again later.';
     if (Object.keys(errors).length) return res.status(422).render('register', { title: 'Create account', errors, values });

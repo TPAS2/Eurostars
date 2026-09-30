@@ -33,7 +33,7 @@
     <div class="field">
       <label for="password">Password <span class="req">*</span></label>
       <div class="input-row">
-        <input id="password" name="password" type="text" required minlength="<%= minPassword %>" autocomplete="off">
+        <input id="password" name="password" type="text" required minlength="<%= minPassword %>" maxlength="200" autocomplete="off">
         <button class="btn" type="button" data-generate="#password">Suggest one</button>
       </div>
       <% if (errors.password) { %><div class="field-err"><%= errors.password %></div><% } else { %><div class="help">At least <%= minPassword %> characters. Shown as you type so you can pass it on.</div><% } %>

@@ -3176,3 +3176,24 @@ test('rent run steps 4 and 5: Bank Transfer sheet (.xlsx) and Metro bulk file (.
     }
   }
 });
+
+test('login: over-long input is refused quickly, counted as a wrong attempt, and the boxes have limits', async () => {
+  const page = (await new Client().get('/login')).text;
+  assert.match(page, /name="login"[^>]*maxlength="60"/);
+  assert.match(page, /name="member"[^>]*maxlength="60"/);
+  assert.match(page, /name="password"[^>]*maxlength="200"/);
+  const agent = await registerAndLogin('long-pass@example.com', 'Long Pass Lets');
+  assert.ok(agent);
+  const username = usernameFor('long-pass@example.com');
+  const huge = 'x'.repeat(100000);
+  const started = Date.now();
+  const r = await new Client().post('/login', { login: username, member: 'Test', password: huge });
+  assert.equal(r.status, 401);
+  assert.match(r.text, /Incorrect agency, name or password/);
+  assert.ok(Date.now() - started < 2000, 'answered without hashing the huge password');
+  assert.ok(db.prepare("SELECT 1 FROM login_events WHERE email = ? AND success = 0").get(`${username} / Test`), 'logged as a failed attempt');
+  // A long password can't be set in the first place.
+  const reg = await new Client().post('/register', { username: 'toolong', name: 'T', agency_name: 'T', password: 'y'.repeat(201), password_confirm: 'y'.repeat(201) });
+  assert.equal(reg.status, 422);
+  assert.match(reg.text, /Use at most 200 characters/);
+});

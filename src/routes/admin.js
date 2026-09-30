@@ -128,6 +128,7 @@ module.exports = function adminRoutes(db, config) {
     if (!LOGIN_NAME_RE.test(values.login_name)) errors.login_name = 'Use 1–30 letters, numbers, dashes or underscores (no spaces or dots).';
     if (values.email && !EMAIL_RE.test(values.email)) errors.email = 'Enter a valid email address, or leave it blank.';
     if (password.length < MIN_PASSWORD) errors.password = `Use at least ${MIN_PASSWORD} characters.`;
+    else if (password.length > 200) errors.password = 'Use at most 200 characters.';
     if (password.length > 200) errors.password = 'Password is too long.';
     if (Object.keys(errors).length) {
       return res.status(422).render('admin/new-user', { title: 'Add account', section: 'admin', values, errors, minPassword: MIN_PASSWORD });

@@ -56,7 +56,7 @@
     <div class="field">
       <label for="d-password">Password</label>
       <div class="pw-row">
-        <input id="d-password" name="password" type="text" minlength="<%= minPassword %>" autocomplete="new-password" placeholder="New password">
+        <input id="d-password" name="password" type="text" minlength="<%= minPassword %>" maxlength="200" autocomplete="new-password" placeholder="New password">
         <button class="btn" type="button" data-generate="#d-password">Suggest</button>
         <button class="btn primary" type="submit" formaction="/admin/users/<%= u.id %>/password" formnovalidate>Change password</button>
       </div>
@@ -157,7 +157,7 @@
               </form>
               <form method="post" action="/admin/people/<%= m.id %>/password" class="inline-form">
                 <%- include('../partials/csrf') %>
-                <input id="pw-<%= m.id %>" name="password" type="text" minlength="<%= minPassword %>" placeholder="New password" autocomplete="off" required>
+                <input id="pw-<%= m.id %>" name="password" type="text" minlength="<%= minPassword %>" maxlength="200" placeholder="New password" autocomplete="off" required>
                 <button class="btn small" type="button" data-generate="#pw-<%= m.id %>">Suggest</button>
                 <button class="btn small primary" type="submit">Set password</button>
               </form>
@@ -205,7 +205,7 @@
     <div class="field">
       <label for="p-password">Password <span class="req">*</span></label>
       <div class="input-row">
-        <input id="p-password" name="password" type="text" required minlength="<%= minPassword %>" autocomplete="off">
+        <input id="p-password" name="password" type="text" required minlength="<%= minPassword %>" maxlength="200" autocomplete="off">
         <button class="btn" type="button" data-generate="#p-password">Suggest one</button>
       </div>
     </div>
