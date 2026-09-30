@@ -76,9 +76,9 @@
   </ol>
 </section>
 
-<section class="card step5" id="payment-instruction">
+<details class="card step5 fold" id="payment-instruction">
+  <summary><h2><span class="step-no">5</span> Metro Bank Bulk Payment Instruction</h2></summary>
   <div class="card-head">
-    <h2><span class="step-no">5</span> Metro Bank Bulk Payment Instruction</h2>
     <div class="step-actions">
       <button class="btn small" type="button" data-toggle="#metro-docs" aria-controls="metro-docs" aria-expanded="false">Previous documents (<%= metroDocs.length %>)</button>
       <a class="btn small blank-form" href="/app/rent-run/metro-blank.pdf" target="_blank" rel="noopener">Blank form</a>
@@ -158,7 +158,7 @@
       <% if (step5.saved_at) { %><span class="muted small">Last saved <%= fmt.ukDateTime(step5.saved_at) %></span><% } %>
     </div>
   </form>
-</section>
+</details>
 
 <section class="card">
   <div class="card-head">

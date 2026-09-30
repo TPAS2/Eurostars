@@ -1626,7 +1626,7 @@ test('rent run step 5: payment instruction template and a filled-in instruction 
 
   r = await c.get('/app/rent-run?month=2026-08');
   // Step 5 is its own box, after the steps, with the form's details to edit.
-  assert.match(r.text, /<\/ol>\s*<\/section>\s*<section class="card step5" id="payment-instruction">[\s\S]*?Metro Bank Bulk Payment Instruction[\s\S]*?class="btn small blank-form"[^>]*>Blank form/);
+  assert.match(r.text, /<\/ol>\s*<\/section>\s*<details class="card step5 fold" id="payment-instruction">\s*<summary><h2><span class="step-no">5<\/span> Metro Bank Bulk Payment Instruction<\/h2><\/summary>[\s\S]*?class="btn small blank-form"[^>]*>Blank form/);
   assert.doesNotMatch(r.text, /Check payments/);
   assert.match(r.text, /name="totalFigures" value="£1,000-00"/, 'total worked out from the payments');
   assert.match(r.text, /name="totalWords" value="ONE THOUSAND POUNDS ONLY"/);
@@ -1673,7 +1673,7 @@ test('rent run step 5: payment instruction template and a filled-in instruction 
   const { fillMetroForm, amountInWords } = require('../src/metroForm');
   const bytes = await fillMetroForm({ store: 'Borehamwood', accountName: 'Pay Lets Client Account', contactName: 'Theo', accountNumber: '87654321',
     valueDate: '01/09/2026', payees: [{ name: 'P Paid', sort_code: '12-34-56', account_number: '12345678', reference: 'PP1', pence: 100000 }], monthLabel: 'August 2026' });
-  assert.equal((await PDFDocument.load(bytes)).getPageCount(), 2, 'Metro form page plus the payments page');
+  assert.equal((await PDFDocument.load(bytes)).getPageCount(), 1, 'just the Metro form, no Bulk Payment File pages');
   assert.equal(amountInWords(123456), 'ONE THOUSAND TWO HUNDRED AND THIRTY-FOUR POUNDS AND FIFTY-SIX PENCE');
   assert.equal(amountInWords(100000), 'ONE THOUSAND POUNDS ONLY');
   assert.equal((await c.get('/app/rent-run/metro-blank.pdf')).status, 200);

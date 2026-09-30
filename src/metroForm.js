@@ -1,8 +1,7 @@
 'use strict';
 
 // Rent run step 5: Metro Bank's own "Bulk Payment Instruction" form (assets/), filled in.
-// Page 1 is Metro's form with the details written into its boxes; the pages after it are the
-// "attached Bulk Payment file" the form refers to: every payment, with a total.
+// Just Metro's form, with the details written into its boxes (no Bulk Payment File pages).
 
 const fs = require('node:fs');
 const path = require('node:path');
@@ -114,59 +113,6 @@ async function fillMetroForm(data) {
     page.drawText(t, { x: b.x + 5, y: b.y + 4, size: s, font, color: ink });
   }
 
-  // The attached Bulk Payment file: every payment, 32 to a page.
-  const PER_PAGE = 32;
-  const pages = Math.max(1, Math.ceil(data.payees.length / PER_PAGE));
-  const [W, H] = [595.28, 841.89];
-  const cols = [
-    { label: '#', x: 40, w: 22 }, { label: 'Payee (account name)', x: 62, w: 170 }, { label: 'Sort code', x: 232, w: 64 },
-    { label: 'Account number', x: 296, w: 84 }, { label: 'Reference', x: 380, w: 100 }, { label: 'Amount', x: 480, w: 75, right: true },
-  ];
-  for (let pg = 0; pg < pages; pg++) {
-    const p = doc.addPage([W, H]);
-    let y = H - 50;
-    p.drawText('Bulk Payment File', { x: 40, y, size: 18, font: bold, color: rgb(0.8, 0.07, 0.12) });
-    p.drawText(safe(`Attached to the Metro Bank Bulk Payment Instruction · page ${pg + 1} of ${pages}`), { x: 40, y: y - 18, size: 9, font, color: rgb(0.3, 0.3, 0.35) });
-    y -= 44;
-    const meta = [
-      ['Account name', data.accountName], ['Account number', data.accountNumber], ['Value date', data.valueDate],
-      ['For', `${data.agencyName ? `${data.agencyName} · ` : ''}rent ${data.monthLabel || ''}`],
-    ];
-    meta.forEach(([k, v], i) => {
-      const x = 40 + (i % 2) * 260;
-      const yy = y - Math.floor(i / 2) * 16;
-      p.drawText(safe(k), { x, y: yy, size: 9, font, color: rgb(0.3, 0.3, 0.35) });
-      p.drawText(fit(bold, v || '', 10, 170).t, { x: x + 80, y: yy, size: 10, font: bold });
-    });
-    y -= 46;
-    p.drawRectangle({ x: 36, y: y - 5, width: W - 72, height: 18, color: rgb(0.0, 0.33, 0.66) });
-    for (const c of cols) {
-      const tx = c.right ? c.x + c.w - bold.widthOfTextAtSize(c.label, 9) : c.x;
-      p.drawText(c.label, { x: tx, y, size: 9, font: bold, color: rgb(1, 1, 1) });
-    }
-    y -= 22;
-    const rows = data.payees.slice(pg * PER_PAGE, (pg + 1) * PER_PAGE);
-    rows.forEach((r, i) => {
-      if (i % 2) p.drawRectangle({ x: 36, y: y - 6, width: W - 72, height: 19, color: rgb(0.95, 0.96, 0.98) });
-      const cells = [String(pg * PER_PAGE + i + 1), r.name, r.sort_code, r.account_number, r.reference, money(r.pence)];
-      cols.forEach((c, j) => {
-        const { t, s } = fit(font, cells[j], 9.5, c.w - 6);
-        const tx = c.right ? c.x + c.w - font.widthOfTextAtSize(t, s) : c.x;
-        p.drawText(t, { x: tx, y, size: s, font });
-      });
-      y -= 19;
-    });
-    if (!data.payees.length) { p.drawText('No payments ticked.', { x: 62, y, size: 10, font }); y -= 19; }
-    if (pg === pages - 1) {
-      p.drawLine({ start: { x: 36, y: y + 10 }, end: { x: W - 36, y: y + 10 }, thickness: 1, color: rgb(0.2, 0.2, 0.25) });
-      y -= 8;
-      p.drawText(`Total: ${data.payees.length} payment${data.payees.length === 1 ? '' : 's'}`, { x: 62, y, size: 10.5, font: bold });
-      const tt = money(total);
-      p.drawText(tt, { x: 555 - bold.widthOfTextAtSize(tt, 10.5), y, size: 10.5, font: bold });
-      p.drawText(safe(data.payees.length ? amountInWords(total) : ''), { x: 62, y: y - 16, size: 9, font, color: rgb(0.3, 0.3, 0.35) });
-    }
-  }
-  doc.setTitle(`Metro Bank Bulk Payment Instruction${data.monthLabel ? ` - ${data.monthLabel}` : ''}`);
   return doc.save();
 }
 

@@ -684,3 +684,14 @@ document.addEventListener('DOMContentLoaded', () => {
     if (pence !== null) box.value = figures(pence);
   });
 });
+
+// A fold-down box linked to (e.g. #payment-instruction after saving step 5) opens itself.
+document.addEventListener('DOMContentLoaded', () => {
+  const open = () => {
+    const id = decodeURIComponent(location.hash.slice(1));
+    const el = id && document.getElementById(id);
+    if (el && el.tagName === 'DETAILS' && !el.open) { el.open = true; el.scrollIntoView({ block: 'start' }); }
+  };
+  open();
+  window.addEventListener('hashchange', open);
+});

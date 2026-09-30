@@ -249,7 +249,7 @@ module.exports = function paymentRoutes(db) {
     res.sendFile(require('../metroForm').TEMPLATE);
   });
 
-  // Metro Bank's own Bulk Payment Instruction form, filled in, plus the list of payments.
+  // Metro Bank's own Bulk Payment Instruction form, filled in.
   router.get('/instruction/metro.pdf', async (req, res, next) => {
     try {
       const month = monthOf(req.query.month);
