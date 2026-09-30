@@ -44,17 +44,6 @@
   <a class="tile <%= stats.overdueInvoices > 0 ? 'alert' : stats.unpaidInvoices > 0 ? 'warn' : '' %>" href="/app/invoices?status=unpaid"><span class="label">Unpaid invoices</span><span class="value"><%= fmt.money(stats.unpaidInvoicesTotal) %></span><span class="sub"><%= stats.unpaidInvoices %> contractor invoice<%= stats.unpaidInvoices === 1 ? '' : 's' %></span></a>
 </section>
 
-<section class="card">
-  <form method="post" action="/app/rent/raise" class="inline-form">
-    <%- include('partials/csrf') %>
-    <div>
-      <h2>Raise rent</h2>
-      <p class="muted small">Creates the rent due for every active tenancy in the chosen month. Tenancies already charged for that month are skipped.</p>
-    </div>
-    <input type="month" name="month" value="<%= month %>" required>
-    <button class="btn primary" type="submit">Raise rent charges</button>
-  </form>
-</section>
 
 <div class="grid-2">
   <section class="card">

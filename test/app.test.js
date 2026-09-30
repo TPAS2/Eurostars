@@ -2489,3 +2489,11 @@ test('contractor invoice: price to us, price to landlord, profit, and charge to 
   assert.equal(r.status, 422);
   assert.match(r.text, /Enter the price to the landlord/);
 });
+
+test('dashboard has no Raise rent box and no Tenancies ending list', async () => {
+  const c = await registerAndLogin('dash-trim@example.com', 'Dash Trim Lets');
+  const r = await c.get('/app');
+  assert.doesNotMatch(r.text, /Raise rent|rent\/raise/);
+  assert.doesNotMatch(r.text, /Tenancies ending/);
+  assert.match(r.text, /Coming up in 1–2 months[\s\S]*?Open maintenance/);
+});
