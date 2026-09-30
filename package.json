@@ -14,7 +14,8 @@
     "create-admin": "node scripts/create-admin.js",
     "test": "node --test --disable-warning=ExperimentalWarning test/*.test.js",
     "restore-backup": "node --disable-warning=ExperimentalWarning scripts/restore-backup.js",
-    "backup": "node --disable-warning=ExperimentalWarning scripts/backup-now.js"
+    "backup": "node --disable-warning=ExperimentalWarning scripts/backup-now.js",
+    "build:client": "esbuild client/theme-switch.jsx --bundle --minify --format=iife --jsx=automatic --define:process.env.NODE_ENV=\\\"production\\\" --outfile=public/theme-switch.js --legal-comments=none"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.128.0",
@@ -28,5 +29,11 @@
   },
   "overrides": {
     "uuid": "^11.1.1"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2",
+    "motion": "^13.4.6",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
   }
 }

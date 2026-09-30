@@ -434,6 +434,13 @@ module.exports = function appRoutes(db) {
 
   // ---------- my account: read-only; only the admin edits account details ----------
 
+  // The dashboard's dark mode switch: saved to the person signed in.
+  router.post('/theme', (req, res) => {
+    const theme = ['light', 'dark'].includes(req.body.theme) ? req.body.theme : null;
+    db.prepare('UPDATE users SET theme = ? WHERE id = ?').run(theme, req.user.person_id);
+    res.json({ ok: true, theme });
+  });
+
   router.get('/account', (req, res) => {
     const acct = db.prepare(
       `SELECT m.id, c.id AS company_id, c.username, m.login_name, m.name, c.agency_name, COALESCE(m.email, c.email) AS email,

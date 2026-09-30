@@ -25,8 +25,35 @@
   color-scheme: light;
 }
 
+/* Dark: chosen with the dashboard switch, or following the computer when nothing is chosen. */
+:root[data-theme="dark"] {
+  --bg: #07090d;
+  --surface: #11151d;
+  --surface-2: #1a212d;
+  --border: #3b4659;
+  --text: #f7f8fa;
+  --muted: #c9d0db;
+  --brand: #8fb0ff;
+  --brand-ink: #0b1020;
+  --brand-soft: #1b2a4d;
+  --sidebar: #05070a;
+  --sidebar-text: #e3e8ef;
+  --sidebar-active: #1a2233;
+  --rail-btn: #121a28;
+  --rail-border: #33415a;
+  --brand-rail: #1f5eff;
+  --ok: #6ee7a0;
+  --ok-soft: #12301f;
+  --warn: #fcd34d;
+  --warn-soft: #3a2c0c;
+  --bad: #fca5a5;
+  --bad-soft: #3b1515;
+  --shadow: none;
+  color-scheme: dark;
+}
+
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg: #07090d;
     --surface: #11151d;
     --surface-2: #1a212d;
@@ -751,3 +778,7 @@ table.council-db tr.new-row .cell-input { border-color: var(--border); backgroun
 .presets-bar { flex-wrap: nowrap; }
 .presets-bar label { margin: 0; white-space: nowrap; }
 .presets-bar select { width: auto; flex: 0 1 320px; }
+
+/* Dark mode switch (dashboard) */
+.theme-switch { display: inline-flex; align-items: center; min-height: 38px; color: var(--muted); font-weight: 600; }
+.theme-switch .squish-switch:focus-visible .squish-switch__track { outline: 2px solid var(--brand); outline-offset: 2px; }

@@ -73,7 +73,7 @@ function loadSession(db, { idleMinutes = 60, secure = false } = {}) {
   // req.user.id is the company (every record is scoped to it); req.user.person_id is the
   // person signed in, who may be the company's main login or one of its people.
   const lookup = db.prepare(
-    `SELECT c.id AS id, u.id AS person_id, c.username, u.login_name, u.email, u.name, c.agency_name, u.is_admin, u.hidden_tabs,
+    `SELECT c.id AS id, u.id AS person_id, c.username, u.login_name, u.email, u.name, c.agency_name, u.is_admin, u.hidden_tabs, u.theme,
             CASE WHEN u.status = 'active' AND c.status = 'active' THEN 'active' ELSE 'suspended' END AS status, s.csrf_token,
             (s.last_seen_at IS NOT NULL AND s.last_seen_at <= datetime('now', ?)) AS idle,
             (s.last_seen_at IS NULL OR s.last_seen_at <= datetime('now', '-30 seconds')) AS stale

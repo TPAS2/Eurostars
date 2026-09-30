@@ -419,6 +419,8 @@ function openDatabase(file) {
   addColumnIfMissing(db, 'users', 'statement_from_email', 'TEXT');
   addColumnIfMissing(db, 'users', 'statement_from_name', 'TEXT');
   addColumnIfMissing(db, 'users', 'statement_reply_to', 'TEXT');
+  // 'light' or 'dark' from the dashboard switch; empty follows the computer's setting.
+  addColumnIfMissing(db, 'users', 'theme', 'TEXT');
   addColumnIfMissing(db, 'landlords', 'bank_account_name', 'TEXT');
   addColumnIfMissing(db, 'landlords', 'bank_sort_code', 'TEXT');
   addColumnIfMissing(db, 'landlords', 'bank_account_number', 'TEXT');

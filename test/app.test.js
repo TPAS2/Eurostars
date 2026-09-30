@@ -2997,3 +2997,17 @@ test('repeated wrong passwords for one agency are blocked from any address', asy
   assert.equal(blocked.status, 429, 'even the right password waits once the agency has had 30 wrong guesses');
   assert.ok(agent);
 });
+
+test('dark mode switch is saved per person and applied to every page', async () => {
+  const c = await registerAndLogin('theme@example.com', 'Theme Lets');
+  const dash = await c.get('/app');
+  assert.match(dash.text, /id="theme-switch"/);
+  assert.doesNotMatch(dash.text, /<html lang="en-GB" data-theme/, 'follows the computer until chosen');
+  const r = await c.post('/app/theme', { theme: 'dark' });
+  assert.equal(r.status, 200);
+  assert.match((await c.get('/app/landlords')).text, /<html lang="en-GB" data-theme="dark">/);
+  await c.post('/app/theme', { theme: '"><script>' });
+  assert.doesNotMatch((await c.get('/app')).text, /data-theme=/, 'anything else resets to the computer setting');
+  c.csrf = 'wrong';
+  assert.equal((await c.post('/app/theme', { theme: 'dark' })).status, 403);
+});
