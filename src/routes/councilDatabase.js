@@ -74,10 +74,14 @@ module.exports = function councilDatabaseRoutes(db) {
     const c = council(req, res);
     if (!c) return;
     const { values, errors } = parse(req.body);
+    if (values.cancellation_date && values.booking_date && values.cancellation_date < values.booking_date) errors.cancellation_date = 'The cancellation date can’t be before the booking date.';
     if (Object.keys(errors).length) return back(res, c, 'error', errors.form || Object.values(errors)[0], '#live');
+    // Added with a cancellation date: it goes straight to Previous tenant.
+    if (values.cancellation_date) values.ended = 1;
     const cols = Object.keys(values);
     db.prepare(`INSERT INTO council_db_entries (account_id, council_id, ${cols.join(', ')}) VALUES (?, ?, ${cols.map(() => '?').join(', ')})`)
       .run(req.user.id, c.id, ...cols.map((k) => values[k]));
+    if (values.ended) return back(res, c, 'flash', 'Entry added to Previous tenant (it has a cancellation date).', '#previous');
     back(res, c, 'flash', 'Entry added to Live.', '#live');
   });
 
@@ -96,8 +100,12 @@ module.exports = function councilDatabaseRoutes(db) {
     if (!e) return;
     const { values, errors } = parse(req.body);
     const autosave = req.get('X-Autosave') === '1';
-    // Typed straight into the table: the cancellation date only belongs to ended entries.
-    if (autosave && !e.ended) values.cancellation_date = e.cancellation_date;
+    if (values.cancellation_date && values.booking_date && values.cancellation_date < values.booking_date) errors.cancellation_date = 'The cancellation date can’t be before the booking date.';
+    // A cancellation date ends a Live entry (it moves to Previous tenant); clearing it on an
+    // ended one is left to "Back to Live".
+    const ending = !e.ended && !!values.cancellation_date;
+    if (e.ended && !values.cancellation_date) values.cancellation_date = e.cancellation_date;
+    if (ending) values.ended = 1;
     if (autosave && Object.keys(errors).length) return res.status(422).json({ ok: false, errors });
     if (Object.keys(errors).length) {
       return res.status(422).render('councildb-entry', { title: `Edit entry · ${c.name}`, section: 'councils', council: c, e, headings: HEADINGS, values: req.body, errors });
@@ -105,7 +113,12 @@ module.exports = function councilDatabaseRoutes(db) {
     const cols = Object.keys(values);
     db.prepare(`UPDATE council_db_entries SET ${cols.map((k) => `${k} = ?`).join(', ')} WHERE id = ? AND account_id = ?`)
       .run(...cols.map((k) => values[k]), e.id, req.user.id);
-    if (autosave) return res.json({ ok: true, savedAt: new Date().toISOString() });
+    const endedMsg = `Ended ${values.client_name || values.property_address || 'the entry'} on ${fmt.ukDate(values.cancellation_date)}. It's now under Previous tenant.`;
+    if (autosave) {
+      if (ending) return res.json({ ok: true, reload: `/app/councils/${c.id}/database?flash=${encodeURIComponent(endedMsg)}#previous` });
+      return res.json({ ok: true, savedAt: new Date().toISOString() });
+    }
+    if (ending) return back(res, c, 'flash', endedMsg, '#previous');
     back(res, c, 'flash', 'Entry saved.', e.ended ? '#previous' : '#live');
   });
 

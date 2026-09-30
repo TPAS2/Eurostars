@@ -157,7 +157,7 @@ module.exports = function monthlyRoutes(db, writer, mailer = { enabled: false })
     backTo(res, month, { flash: parts.join(' '), error });
   }));
 
-  // Steps 3 and 4: the CFP report (an Excel workbook), as a page to check, a download and an email.
+  // Steps 3 and 4: the Rift report (an Excel workbook), as a page to check, a download and an email.
   router.get('/report', (req, res) => {
     const month = st.isMonth(req.query.month) ? String(req.query.month) : st.previousMonth();
     const report = monthend.cfpReport(db, req.user.id, month);

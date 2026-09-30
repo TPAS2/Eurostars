@@ -144,9 +144,9 @@ function reportEmail({ agencyName, report }) {
   return { subject, text, html, filename: `statements-${report.month}.csv` };
 }
 
-// ---------- the CFP report (Excel) ----------
+// ---------- the Rift report (Excel) ----------
 // One line per landlord being paid: Date, Name, Debit, LCODE, with a total, laid out like the
-// agency's own "… CFP REPORT" workbook. Debit is what's held for the landlord at the end of
+// agency's own "… CFP REPORT" workbook (now called the Rift report). Debit is what's held for the landlord at the end of
 // the month; Date is the payment date from step 5, or today.
 
 const SHORT_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'June', 'July', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec'];
@@ -162,7 +162,7 @@ function cfpReport(db, accountId, month, today = fmt.today()) {
       ORDER BY l.code IS NULL OR l.code = '', l.code COLLATE NOCASE, l.name COLLATE NOCASE`
   ).all(accountId, month).map((r) => ({ ...r, date: payDate, debit: r.closing_pence }));
   const [y, m] = month.split('-').map(Number);
-  const label = `${agency.agency_name} ${SHORT_MONTHS[m - 1]} ${y} CFP Report`;
+  const label = `${agency.agency_name} ${SHORT_MONTHS[m - 1]} ${y} Rift Report`;
   return {
     month, monthLabel: monthLabel(month), date: payDate, rows, total: rows.reduce((t, r) => t + r.debit, 0),
     label, title: label.toUpperCase(),

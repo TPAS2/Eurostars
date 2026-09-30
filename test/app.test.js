@@ -1240,7 +1240,7 @@ test('signed out after an hour without use, then back to the same page', async (
   assert.equal((await d.get('/app')).location, '/login');
 });
 
-test('month end: calculate rents, email landlords, CFP report (Excel) with preview, email the report', async () => {
+test('month end: calculate rents, email landlords, Rift report (Excel) with preview, email the report', async () => {
   const c = await registerAndLogin('month-end@example.com', 'Month End Lets');
   const accountId = db.prepare("SELECT id FROM users WHERE username = 'month-end'").get().id;
   db.prepare("UPDATE users SET email = 'office@monthend.example' WHERE id = ?").run(accountId);
@@ -1299,23 +1299,23 @@ test('month end: calculate rents, email landlords, CFP report (Excel) with previ
   await c.post('/app/monthly/email', { month: '2026-08', landlord_id: String(ann) });
   assert.equal(sentMail.length, 1);
 
-  // 3. The CFP report: preview and Excel download, laid out like the agency's own workbook.
+  // 3. The Rift report: preview and Excel download, laid out like the agency's own workbook.
   await c.post('/app/rent-run/instruction', { month: '2026-08', payment_date: '2026-09-17', p_include: [], p_landlord: [], p_name: [], p_sort: [], p_account: [], p_amount: [], p_ref: [] });
   r = await c.get('/app/monthly/report?month=2026-08');
-  assert.match(r.text, /Month End Lets Aug 2026 CFP Report/);
-  assert.match(r.text, /MONTH END LETS AUG 2026 CFP REPORT/);
+  assert.match(r.text, /Month End Lets Aug 2026 Rift Report/);
+  assert.match(r.text, /MONTH END LETS AUG 2026 RIFT REPORT/);
   assert.match(r.text, /17\/09\/2026<\/td><td><a[^>]*>Ann Able<\/a><\/td><td class="num">£900\.00<\/td><td>AA1<\/td>/);
   assert.match(r.text, /Download Excel/);
   r = await c.get('/app/monthly/report.xlsx?month=2026-08');
   assert.equal(r.status, 200);
   assert.match(r.headers.get('content-type'), /spreadsheetml/);
-  assert.match(r.headers.get('content-disposition'), /Month_End_Lets_Aug_2026_CFP_Report\.xlsx/);
+  assert.match(r.headers.get('content-disposition'), /Month_End_Lets_Aug_2026_Rift_Report\.xlsx/);
   const ExcelJS = require('exceljs');
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.load(r.buf);
   const ws = wb.worksheets[0];
-  assert.equal(ws.name, 'Month End Lets Aug 2026 CFP Rep');
-  assert.equal(ws.getCell('A1').value, 'MONTH END LETS AUG 2026 CFP REPORT');
+  assert.equal(ws.name, 'Month End Lets Aug 2026 Rift Re');
+  assert.equal(ws.getCell('A1').value, 'MONTH END LETS AUG 2026 RIFT REPORT');
   assert.deepEqual([1, 2, 3, 4].map((i) => ws.getRow(3).getCell(i).value), ['Date', 'Name', 'Debit', 'LCODE']);
   assert.equal(ws.getCell('B4').value, 'Ann Able');
   assert.equal(ws.getCell('C4').value, 900);
@@ -1332,8 +1332,8 @@ test('month end: calculate rents, email landlords, CFP report (Excel) with previ
   assert.match(r.location, /^\/app\/monthly\/report\?month=2026-08&step=4&flash=/);
   assert.equal(sentMail.length, 1);
   assert.equal(sentMail[0].to, 'boss@example.com');
-  assert.equal(sentMail[0].subject, 'Month End Lets Aug 2026 CFP Report');
-  assert.equal(sentMail[0].attachments[0].filename, 'Month_End_Lets_Aug_2026_CFP_Report.xlsx');
+  assert.equal(sentMail[0].subject, 'Month End Lets Aug 2026 Rift Report');
+  assert.equal(sentMail[0].attachments[0].filename, 'Month_End_Lets_Aug_2026_Rift_Report.xlsx');
   const attached = new ExcelJS.Workbook();
   await attached.xlsx.load(sentMail[0].attachments[0].content);
   assert.equal(attached.worksheets[0].getCell('B4').value, 'Ann Able');
@@ -2455,6 +2455,28 @@ test('contractor invoices: choose the landlord to charge and say what is require
   assert.match(form, /Choose a valid landlord/);
 });
 
+test('council database: typing a cancellation date on Live ends the entry', async () => {
+  const c = await registerAndLogin('cdb-cancel@example.com', 'Cancel Lets');
+  const council = idFrom((await c.post('/app/councils', { name: 'Cancel Council' })).location);
+  await c.get(`/app/councils/${council}/database`);
+  await c.post(`/app/councils/${council}/database/entries`, { our_ref: 'CX1', client_name: 'Cara', booking_date: '2026-05-01' });
+  const e = db.prepare("SELECT id FROM council_db_entries WHERE our_ref = 'CX1'").get();
+  const save = (fields) => fetch(`${base}/app/councils/${council}/database/entries/${e.id}`, {
+    method: 'POST', headers: { cookie: c.cookie, 'content-type': 'application/x-www-form-urlencoded', 'X-Autosave': '1' },
+    body: new URLSearchParams({ _csrf: c.csrf, our_ref: 'CX1', client_name: 'Cara', booking_date: '2026-05-01', ...fields }).toString(),
+  });
+  let res = await save({ cancellation_date: '2026-04-01' });
+  assert.equal(res.status, 422, 'not before the booking date');
+  res = await save({ cancellation_date: '2026-09-20' });
+  const json = await res.json();
+  assert.match(json.reload, new RegExp(`^/app/councils/${council}/database\\?flash=.*#previous$`));
+  assert.deepEqual({ ...db.prepare('SELECT ended, cancellation_date FROM council_db_entries WHERE id = ?').get(e.id) }, { ended: 1, cancellation_date: '2026-09-20' });
+  // Added with a cancellation date: straight to Previous tenant.
+  const r = await c.post(`/app/councils/${council}/database/entries`, { our_ref: 'CX2', cancellation_date: '2026-09-01' });
+  assert.match(decodeURIComponent(r.location), /added to Previous tenant/);
+  assert.equal(db.prepare("SELECT ended FROM council_db_entries WHERE our_ref = 'CX2'").get().ended, 1);
+});
+
 test('maintenance: a completed job has a landlord invoice to download and email', async () => {
   const c = await registerAndLogin('job-invoice@example.com', 'Job Invoice Lets');
   const co = db.prepare("SELECT id FROM users WHERE username = 'job-invoice'").get();
@@ -2746,7 +2768,8 @@ test('council database: add entries, edit, end (moves to Previous tenant), back 
   assert.equal(e.price_pence, 5600);
   assert.equal(e.ended, 0);
   r = await c.get(`/app/councils/${council}/database`);
-  assert.match(r.text, /id="live"[\s\S]*?AL1001[\s\S]*?Test Client[\s\S]*?End<\/button>[\s\S]*?id="previous"/);
+  assert.match(r.text, /id="live"[\s\S]*?End<\/button>[\s\S]*?AL1001[\s\S]*?Test Client[\s\S]*?id="previous"/, 'the End button is in the first column');
+  assert.match(r.text, /id="live"[\s\S]*?<input form="entry-\d+" name="cancellation_date" type="date" value=""/, 'the cancellation date can be typed on Live');
 
   // Every cell is a box to type into; changes save by themselves.
   r = await c.get(`/app/councils/${council}/database`);

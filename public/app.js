@@ -180,6 +180,8 @@ const DRAFT_DAYS = 7;
           clearFieldErrors(form);
           // The server can send back figures elsewhere on the page that changed (e.g. totals).
           const data = await res.json().catch(() => null);
+          // The save moved something on the page (e.g. an entry ended): show the new page.
+          if (data && typeof data.reload === 'string' && data.reload.startsWith('/app/')) { window.location.href = data.reload; return; }
           for (const u of (data && data.updates) || []) {
             const el = document.getElementById(u.id);
             if (!el) continue;
