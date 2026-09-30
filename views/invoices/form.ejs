@@ -17,7 +17,7 @@
         <% if (errors.file) { %><div class="field-err"><%= errors.file %></div><% } %>
       </div>
       <div class="field">
-        <label for="f-supplier">Supplier / contractor <span class="req">*</span></label>
+        <label for="f-supplier">Contractor <span class="req">*</span></label>
         <input id="f-supplier" name="supplier" value="<%= values.supplier || '' %>" list="contractor-list" autocomplete="off" placeholder="Start typing to pick a contractor" required>
         <datalist id="contractor-list"><% contractors.forEach(c => { %><option value="<%= c.name %>"><%= c.trade || '' %></option><% }) %></datalist>
         <div class="help">Pick from your contractors, or type a new name to add one.</div>

@@ -23,7 +23,7 @@
   <section class="card">
     <h2>Details</h2>
     <dl class="details">
-      <div><dt>Supplier</dt><dd><%= inv.supplier %></dd></div>
+      <div><dt>Contractor</dt><dd><%= inv.supplier %></dd></div>
       <% const toLandlord = inv.landlord_price_pence ?? inv.amount_pence; const profit = toLandlord - inv.amount_pence; %>
       <div><dt>Charge to landlord</dt><dd><span class="badge plain <%= inv.charge_landlord ? 's-active' : '' %>"><%= inv.charge_landlord ? 'Yes' : 'No' %></span></dd></div>
       <div><dt>Price to us</dt><dd><strong><%= fmt.money(inv.amount_pence) %></strong></dd></div>

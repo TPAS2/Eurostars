@@ -72,7 +72,7 @@ module.exports = function invoiceRoutes(db, config) {
     const errors = {};
     const text = (k, max = 200) => { const s = String(body[k] ?? '').trim(); return s ? s.slice(0, max) : null; };
     v.supplier = text('supplier');
-    if (!v.supplier) errors.supplier = 'Enter the supplier or contractor.';
+    if (!v.supplier) errors.supplier = 'Enter the contractor.';
     // Invoice number and due date aren't on the form; only change them if they're sent.
     if (body.invoice_number !== undefined) v.invoice_number = text('invoice_number', 100);
     v.description = text('description', 5000);

@@ -1,7 +1,7 @@
 <%# locals: invoices, showProperty, today, backTo, statementLink %>
 <div class="table-wrap">
 <table class="clickable centered">
-  <thead><tr><th>Invoice date</th><th>Supplier</th><% if (showProperty) { %><th>Property</th><% } %><th class="num">Amount</th><th>Status</th><th>Deducted</th><th></th></tr></thead>
+  <thead><tr><th>Invoice date</th><th>Contractor</th><% if (showProperty) { %><th>Property</th><% } %><th class="num">Amount</th><th>Status</th><th>Deducted</th><th></th></tr></thead>
   <tbody>
   <% invoices.forEach(i => { const overdue = i.status === 'unpaid' && i.due_date && i.due_date < today; %>
     <tr data-href="/app/invoices/<%= i.id %>">
