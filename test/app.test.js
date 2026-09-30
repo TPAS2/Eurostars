@@ -2502,3 +2502,9 @@ test('dashboard has no Raise rent box and no Tenancies ending list', async () =>
   assert.match(r.text, /class="label">Open maintenance</, 'the Open maintenance box at the top stays');
   assert.doesNotMatch(r.text, /Coming up in 1–2 months/);
 });
+
+test('dashboard: Rent received this month sits to the right of Open maintenance', async () => {
+  const c = await registerAndLogin('dash-order@example.com', 'Dash Order Lets');
+  const r = await c.get('/app');
+  assert.match(r.text, /class="label">Open maintenance<[\s\S]*?class="label">Rent received this month</);
+});

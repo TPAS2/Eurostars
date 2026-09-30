@@ -40,8 +40,8 @@
   <a class="tile" href="/app/properties"><span class="label">Properties</span><span class="value"><%= stats.properties %></span><span class="sub"><%= stats.let %> let · <%= stats.vacant %> vacant</span></a>
   <a class="tile" href="/app/landlords"><span class="label">Landlords</span><span class="value"><%= stats.landlords %></span><span class="sub"><%= stats.tenants %> tenants</span></a>
   <a class="tile" href="/app/tenants"><span class="label">Active tenancies</span><span class="value"><%= stats.activeTenancies %></span><span class="sub">&nbsp;</span></a>
-  <a class="tile" href="/app/transactions"><span class="label">Rent received this month</span><span class="value"><%= fmt.money(stats.rentThisMonth) %></span><span class="sub">Client account <%= fmt.money(stats.clientBalance) %></span></a>
   <a class="tile <%= stats.openJobs > 0 ? 'warn' : '' %>" href="/app/maintenance?month=all"><span class="label">Open maintenance</span><span class="value"><%= stats.openJobs %></span><span class="sub">&nbsp;</span></a>
+  <a class="tile" href="/app/transactions"><span class="label">Rent received this month</span><span class="value"><%= fmt.money(stats.rentThisMonth) %></span><span class="sub">Client account <%= fmt.money(stats.clientBalance) %></span></a>
   <a class="tile <%= stats.overdueInvoices > 0 ? 'alert' : stats.unpaidInvoices > 0 ? 'warn' : '' %>" href="/app/invoices?status=unpaid"><span class="label">Unpaid invoices</span><span class="value"><%= fmt.money(stats.unpaidInvoicesTotal) %></span><span class="sub"><%= stats.unpaidInvoices %> contractor invoice<%= stats.unpaidInvoices === 1 ? '' : 's' %></span></a>
 </section>
 
