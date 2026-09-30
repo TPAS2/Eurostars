@@ -114,7 +114,11 @@ module.exports = function landlordInvoiceRoutes(db, mailer = { enabled: false })
     const a = req.user.id;
     const { v, errors } = parse(req.body, a);
     if (Object.keys(errors).length) return renderForm(req, res, { inv: null, values: { ...req.body, invoice_number: nextNumber(a) }, errors, status: 422 });
-    v.invoice_number = nextNumber(a); // LI- and the next number, set by Rift
+    const wanted = clip(req.body.invoice_number, 30);
+    if (wanted && db.prepare('SELECT 1 FROM landlord_invoices WHERE account_id = ? AND invoice_number = ?').get(a, wanted)) {
+      return renderForm(req, res, { inv: null, values: req.body, errors: { invoice_number: `${wanted} is already used.` }, status: 422 });
+    }
+    v.invoice_number = wanted || nextNumber(a); // LI- and the next number unless changed
     const cols = Object.keys(v);
     const info = db.prepare(`INSERT INTO landlord_invoices (account_id, ${cols.join(', ')}) VALUES (?, ${cols.map(() => '?').join(', ')})`).run(a, ...cols.map((c) => v[c]));
     const id = Number(info.lastInsertRowid);
@@ -150,7 +154,11 @@ module.exports = function landlordInvoiceRoutes(db, mailer = { enabled: false })
     const a = req.user.id;
     const { v, errors } = parse(req.body, a);
     if (Object.keys(errors).length) return renderForm(req, res, { inv, values: { ...req.body, invoice_number: inv.invoice_number }, errors, status: 422 });
-    v.invoice_number = inv.invoice_number;
+    const wanted = clip(req.body.invoice_number, 30);
+    if (wanted && wanted !== inv.invoice_number && db.prepare('SELECT 1 FROM landlord_invoices WHERE account_id = ? AND invoice_number = ? AND id != ?').get(a, wanted, inv.id)) {
+      return renderForm(req, res, { inv, values: req.body, errors: { invoice_number: `${wanted} is already used.` }, status: 422 });
+    }
+    v.invoice_number = wanted || inv.invoice_number;
     const cols = Object.keys(v);
     transaction(db, () => {
       db.prepare(`UPDATE landlord_invoices SET ${cols.map((c) => `${c} = ?`).join(', ')} WHERE id = ? AND account_id = ?`).run(...cols.map((c) => v[c]), inv.id, a);
@@ -214,7 +222,7 @@ module.exports = function landlordInvoiceRoutes(db, mailer = { enabled: false })
     const p = inv.property_id ? db.prepare('SELECT address_line1, town, postcode FROM properties WHERE id = ?').get(inv.property_id) : null;
     const note = inv.status !== 'paid' ? 'Payment will be deducted from the rent payment'
       : inv.paid_how === 'Deducted from rent' ? 'Payment has been deducted from the rent payment'
-      : inv.paid_how === 'Paid by us' ? 'No charge - paid by us' : 'Paid - thank you';
+      : inv.paid_how === 'Paid by us' ? '' : 'Paid - thank you';
     const [y, m] = String(inv.invoice_date || '').split('-').map(Number);
     const name = `${[p && p.address_line1, p && p.postcode].filter(Boolean).join(' ') || inv.invoice_number}${y ? ` - ${MONTHS[m - 1]} ${y}` : ''}`;
     return {

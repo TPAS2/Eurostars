@@ -1818,14 +1818,13 @@ test('landlord invoices: bill a landlord, deduct from rent or mark paid, print a
   assert.match((await c.get('/app/invoices')).text, /<h1>Contractors invoices<\/h1>/);
 
   r = await c.get(`/app/landlord-invoices/new?property_id=${prop}`);
-  assert.match(r.text, /Invoice number<\/label>\s*<div class="static-value"><strong>LI-0001<\/strong> <span class="muted small">set automatically/);
-  assert.doesNotMatch(r.text, /name="invoice_number"/);
+  assert.match(r.text, /name="invoice_number" value="LI-0001"/);
   assert.match(r.text, new RegExp(`<option value="${larry}" selected>Larry Landlord`), 'landlord filled in from the property');
   r = await c.post('/app/landlord-invoices', { landlord_id: String(larry), property_id: String(prop), invoice_number: 'LI-0001', invoice_date: '2026-08-04', due_date: '2026-08-18', description: 'Tenant find fee', amount: '£300', notes: 'Thank you' });
   const inv1 = idFrom(r.location);
   r = await c.post('/app/landlord-invoices', { landlord_id: '', invoice_number: '', invoice_date: 'x', description: '', amount: 'lots' });
   assert.equal(r.status, 422);
-  assert.match((await c.get('/app/landlord-invoices/new')).text, /<strong>LI-0002<\/strong>/, 'numbers count up');
+  assert.match((await c.get('/app/landlord-invoices/new')).text, /name="invoice_number" value="LI-0002"/, 'numbers count up');
 
   // The invoice page is printable, with who it's billed to.
   r = await c.get(`/app/landlord-invoices/${inv1}`);
@@ -2824,4 +2823,24 @@ test('landlords have a Date started, shown in their info box', async () => {
   const id = idFrom((await c.post('/app/landlords', { name: 'Stella Start', date_started: '2019-04-01', statement_type: 'Email' })).location);
   r = await c.get(`/app/landlords/${id}`);
   assert.match(r.text, /<dt>Date started<\/dt>[\s\S]*?01\/04\/2019/);
+});
+
+test('landlord invoice number can be changed; Paid by us drops the deduction note', async () => {
+  const c = await registerAndLogin('li-number@example.com', 'LI Number Lets');
+  const ll = idFrom((await c.post('/app/landlords', { name: 'Nia Number' })).location);
+  const prop = idFrom((await c.post('/app/properties', { address_line1: '3 Count Road', landlord_id: String(ll), status: 'let' })).location);
+  await c.get('/app/landlord-invoices/new');
+  let r = await c.post('/app/landlord-invoices', { landlord_id: String(ll), property_id: String(prop), invoice_number: 'LI-0500', invoice_date: '2026-09-01', description: 'Key cutting', amount: '15' });
+  const id = idFrom(r.location.split('?')[0]);
+  assert.equal(db.prepare('SELECT invoice_number FROM landlord_invoices WHERE id = ?').get(id).invoice_number, 'LI-0500');
+  assert.match((await c.get('/app/landlord-invoices/new')).text, /name="invoice_number" value="LI-0501"/, 'carries on from the highest');
+  r = await c.post('/app/landlord-invoices', { landlord_id: String(ll), property_id: String(prop), invoice_number: 'LI-0500', invoice_date: '2026-09-01', description: 'Dup', amount: '1' });
+  assert.equal(r.status, 422);
+  assert.match(r.text, /LI-0500 is already used/);
+  // Unpaid: the deduction note shows. Paid by us: it doesn't.
+  assert.match((await c.get(`/app/landlord-invoices/${id}`)).text, /Payment will be deducted from the rent payment/);
+  r = await c.post(`/app/landlord-invoices/${id}/settle`, { how: 'us', date: '2026-09-05' });
+  assert.match(decodeURIComponent(r.location || ''), /paid by us/, r.location);
+  r = await c.get(`/app/landlord-invoices/${id}`);
+  assert.doesNotMatch(r.text, /Payment will be deducted|class="lodge-note"/);
 });

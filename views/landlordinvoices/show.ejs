@@ -64,7 +64,7 @@
     <div class="lodge-box lodge-main">
       <div class="lodge-invoice">INVOICE</div>
       <ul><% doc.items.forEach(i => { %><li><%= i %></li><% }) %></ul>
-      <div class="lodge-note"><%= doc.note %></div>
+      <% if (doc.note) { %><div class="lodge-note"><%= doc.note %></div><% } %>
     </div>
     <div class="lodge-box lodge-total"><strong>TOTAL</strong><strong><%= fmt.money(doc.totalPence) %></strong></div>
   </div>
