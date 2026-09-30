@@ -2582,3 +2582,21 @@ test('property page: End tenancy button sets the end date and status; ended tena
   assert.doesNotMatch(r.text, /Staying Sam/);
   assert.match((await c.get('/app/tenants?show=current')).text, /Staying Sam/);
 });
+
+test('tenants: All lists every tenancy including ended ones; Edit buttons for tenancies on the tenant page', async () => {
+  const c = await registerAndLogin('all-tenancies@example.com', 'All Tenancies Lets');
+  const p1 = idFrom((await c.post('/app/properties', { address_line1: '1 Old Flat', status: 'let' })).location);
+  const p2 = idFrom((await c.post('/app/properties', { address_line1: '2 New Flat', status: 'let' })).location);
+  await c.post(`/app/properties/${p1}/add-tenant`, { tenant_mode: 'new', name: 'Moving Mo', booking_date: '2025-01-01', start_date: '2025-02-01', end_date: '2026-01-31', rent_pence: '700', rent_frequency: 'monthly', status: 'ended' });
+  const mo = db.prepare("SELECT id FROM tenants WHERE name = 'Moving Mo'").get().id;
+  await c.post(`/app/properties/${p2}/add-tenant`, { tenant_mode: 'existing', tenant_id: String(mo), booking_date: '2026-01-15', start_date: '2026-02-01', rent_pence: '800', rent_frequency: 'monthly', status: 'active' });
+  let r = await c.get('/app/tenants?show=all');
+  assert.match(r.text, /Moving Mo[\s\S]*?Moving Mo/, 'one line per tenancy');
+  assert.match(r.text, /1 Old Flat/);
+  assert.match(r.text, /2 New Flat/);
+  r = await c.get(`/app/tenants/${mo}`);
+  const active = db.prepare("SELECT id FROM tenancies WHERE tenant_id = ? AND status = 'active'").get(mo).id;
+  assert.match(r.text, new RegExp(`<dt>Status</dt><dd class="status-edit"><span class="badge s-active">active</span> <a class="btn small" href="/app/tenancies/${active}/edit">Edit</a>`));
+  const ended = db.prepare("SELECT id FROM tenancies WHERE tenant_id = ? AND status = 'ended'").get(mo).id;
+  assert.match(r.text, new RegExp(`href="/app/tenancies/${ended}/edit">Edit</a>`), 'ended tenancy editable from the list');
+});

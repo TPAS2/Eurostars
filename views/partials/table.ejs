@@ -1,12 +1,12 @@
 <%# locals: def, rows, maps, display, rowTitle, hideField, endTenancy (show an End tenancy button on tenancy rows) %>
-<% const withEnd = typeof endTenancy !== 'undefined' && endTenancy; %>
+<% const withEnd = typeof endTenancy !== 'undefined' && endTenancy; const withEdit = typeof editRows !== 'undefined' && editRows; %>
 <div class="table-wrap">
 <table class="list-<%= def.key %>">
   <thead><tr>
   <% def.columns.filter(c => c !== hideField).forEach(c => { const f = def.fieldMap[c]; %>
     <th class="<%= ['money','number','integer'].includes(f.type) || f.num ? 'num' : '' %>"><%= f.label.replace(' (£)', '') %></th>
   <% }) %>
-  <% if (withEnd) { %><th></th><% } %>
+  <% if (withEnd || withEdit) { %><th></th><% } %>
   </tr></thead>
   <tbody>
   <% rows.forEach(row => { %>
@@ -21,6 +21,7 @@
         <% } else { %><%= d.text %><% } %>
       </td>
     <% }) %>
+    <% if (withEdit && !withEnd) { %><td class="num"><a class="btn small" href="/app/<%= def.key %>/<%= row.id %>/edit">Edit</a></td><% } %>
     <% if (withEnd) { %>
       <td class="end-cell"><% if (row.status !== 'ended') { %>
         <form method="post" action="/app/tenancies/<%= row.id %>/end" class="end-tenancy" data-confirm="End this tenancy? Its end date will be set and its status changed to ended.">

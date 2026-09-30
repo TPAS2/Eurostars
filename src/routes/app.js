@@ -548,6 +548,7 @@ module.exports = function appRoutes(db) {
       // Each tenant with their current tenancy (or their latest one if none is current).
       const latest = new Map();
       const lastEnded = new Map(); // each tenant's most recent ended tenancy
+      const allOf = new Map(); // every tenancy of each tenant
       for (const t of db.prepare(
         `SELECT ty.id, ty.tenant_id, ty.status, ty.start_date, ty.end_date, ty.rent_pence, ty.rent_frequency,
                 p.id AS property_id, p.address_line1, c.id AS council_id, c.name AS council_name
@@ -556,12 +557,16 @@ module.exports = function appRoutes(db) {
           ORDER BY ty.status = 'active' DESC, ty.status = 'pending' DESC, ty.start_date DESC`
       ).all(a)) {
         if (!latest.has(t.tenant_id)) latest.set(t.tenant_id, t);
+        if (!allOf.has(t.tenant_id)) allOf.set(t.tenant_id, []);
+        allOf.get(t.tenant_id).push(t);
         if (t.status === 'ended' && (!lastEnded.has(t.tenant_id) || t.start_date > lastEnded.get(t.tenant_id).start_date)) lastEnded.set(t.tenant_id, t);
       }
       tenantFilter = ['current', 'past', 'all'].includes(req.query.show) ? req.query.show : 'current';
+      // All: one line per tenancy, ended ones included (tenants with none get one line).
+      if (tenantFilter === 'all') rows = rows.flatMap((r) => (allOf.get(r.id) || [null]).map((t) => ({ ...r, one_tenancy: t })));
       for (const row of rows) {
         // On Past tenants, show the tenancy that ended.
-        const t = tenantFilter === 'past' && lastEnded.has(row.id) ? lastEnded.get(row.id) : latest.get(row.id);
+        const t = tenantFilter === 'all' ? row.one_tenancy : tenantFilter === 'past' && lastEnded.has(row.id) ? lastEnded.get(row.id) : latest.get(row.id);
         row.tenancy_status = t ? t.status : null;
         row.cur_property = t ? { text: t.address_line1, href: `/app/properties/${t.property_id}` } : { text: '' };
         row.cur_council = t && t.council_id ? { text: t.council_name, href: `/app/councils/${t.council_id}` } : { text: '' };
