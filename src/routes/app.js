@@ -289,12 +289,6 @@ module.exports = function appRoutes(db) {
       };
     });
     const comingUp = compliance.filter((c) => c.expiry_date > monthAhead);
-    const endingTenancies = db.prepare(
-      `SELECT ty.id, ty.end_date, p.address_line1, t.name AS tenant_name
-         FROM tenancies ty JOIN properties p ON p.id = ty.property_id JOIN tenants t ON t.id = ty.tenant_id
-        WHERE ty.account_id = ? AND ty.status = 'active' AND ty.end_date IS NOT NULL AND ty.end_date <= ?
-        ORDER BY ty.end_date LIMIT 20`
-    ).all(a, soon);
     const jobs = db.prepare(
       `SELECT m.id, m.title, m.priority, m.status, m.reported_date, p.address_line1
          FROM maintenance_jobs m JOIN properties p ON p.id = m.property_id
@@ -303,7 +297,7 @@ module.exports = function appRoutes(db) {
         LIMIT 10`
     ).all(a);
     res.render('dashboard', {
-      title: 'Dashboard', section: 'dashboard', stats, compliance: comingUp, notifications, endingTenancies, jobs,
+      title: 'Dashboard', section: 'dashboard', stats, compliance: comingUp, notifications, jobs,
       today, month: today.slice(0, 7), fmt, flash: req.query.flash || '',
     });
   });

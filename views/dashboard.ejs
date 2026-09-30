@@ -73,12 +73,5 @@
     </tbody></table><% } %>
   </section>
 
-  <section class="card">
-    <h2>Tenancies ending in 60 days</h2>
-    <% if (!endingTenancies.length) { %><p class="muted">None.</p><% } else { %>
-    <table><thead><tr><th>Property</th><th>Tenant</th><th>Ends</th></tr></thead><tbody>
-    <% endingTenancies.forEach(t => { %><tr><td><a href="/app/tenancies/<%= t.id %>"><%= t.address_line1 %></a></td><td><%= t.tenant_name %></td><td><%= fmt.ukDate(t.end_date) %></td></tr><% }) %>
-    </tbody></table><% } %>
-  </section>
 </div>
 <%- include('partials/footer') %>
