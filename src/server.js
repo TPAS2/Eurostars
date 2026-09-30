@@ -110,7 +110,13 @@ function createApp(config, db, { writer = null, mailer = null } = {}) {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('X-Frame-Options', 'DENY');
     res.setHeader('Referrer-Policy', 'same-origin');
-    res.setHeader('Content-Security-Policy', "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; form-action 'self'; frame-ancestors 'none'");
+    res.setHeader('Content-Security-Policy', "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'");
+    res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=(), usb=()');
+    res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+    // Over HTTPS, browsers must never fall back to plain HTTP for this site.
+    if (config.secureCookies) res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    // Pages show private data: don't keep them in shared or back/forward caches.
+    if (!req.path.startsWith('/static/')) res.setHeader('Cache-Control', 'private, no-store');
     next();
   });
   app.get('/favicon.ico', (req, res) => res.redirect(301, '/static/favicon-32.png'));

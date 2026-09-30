@@ -2966,3 +2966,34 @@ test('rent run step 5: presets to fill in the Metro form, with Edit and Remove',
   await c.post(`/app/rent-run/presets/${p.id}/delete`, { month: '2026-08' });
   assert.equal(db.prepare('SELECT COUNT(*) n FROM metro_presets WHERE id = ?').get(p.id).n, 0);
 });
+
+test('security headers, malformed cookies and sign-out clean-up', async () => {
+  const c = new Client();
+  const page = await c.get('/login');
+  const csp = page.headers.get('content-security-policy');
+  assert.match(csp, /object-src 'none'/);
+  assert.match(csp, /base-uri 'none'/);
+  assert.match(page.headers.get('permissions-policy'), /camera=\(\)/);
+  assert.match(page.headers.get('cache-control'), /no-store/, 'pages with data are never cached');
+  // A broken cookie must not break the site.
+  const bad = await fetch(base + '/login', { headers: { cookie: 'sid=%E0%A4%A' } });
+  assert.equal(bad.status, 200);
+
+  const agent = await registerAndLogin('headers@example.com', 'Header Lets');
+  assert.match((await agent.get('/app')).text, /data-who="\d+"/, 'the page says whose form copies it may keep');
+  const out = await agent.post('/logout', {});
+  assert.match(out.headers.get('clear-site-data'), /"storage"/, 'signing out clears copies of forms left in the browser');
+});
+
+test('repeated wrong passwords for one agency are blocked from any address', async () => {
+  const agent = await registerAndLogin('bruteforce@example.com', 'Brute Lets');
+  const username = usernameFor('bruteforce@example.com');
+  // Different names give each attempt its own per-name counter; the per-agency counter still adds up.
+  for (let i = 0; i < 30; i++) {
+    const r = await new Client().post('/login', { login: username, member: `Guess${i}`, password: 'wrong-password' });
+    assert.equal(r.status, 401);
+  }
+  const blocked = await new Client().post('/login', { login: username, member: 'Test', password: 'password-1234' });
+  assert.equal(blocked.status, 429, 'even the right password waits once the agency has had 30 wrong guesses');
+  assert.ok(agent);
+});

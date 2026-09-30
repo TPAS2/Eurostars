@@ -12,6 +12,10 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 module.exports = function authRoutes(db, config) {
   const router = express.Router();
   const loginLimited = auth.rateLimiter({ windowMs: 15 * 60 * 1000, max: config.loginAttemptsPer15Min || 10 });
+  // Wrong passwords are also counted per agency (guessing from many addresses) and per address
+  // (trying many agencies).
+  const accountFails = auth.failureLimiter({ windowMs: 15 * 60 * 1000, max: config.loginFailuresPerAccount || 30 });
+  const ipFails = auth.failureLimiter({ windowMs: 15 * 60 * 1000, max: config.loginFailuresPerIp || 50 });
   const registerLimited = auth.rateLimiter({ windowMs: 60 * 60 * 1000, max: config.registrationsPerHour || 10 });
 
   const logEvent = db.prepare('INSERT INTO login_events (user_id, email, success, ip, user_agent) VALUES (?, ?, ?, ?, ?)');
@@ -43,7 +47,8 @@ module.exports = function authRoutes(db, config) {
     const ua = String(req.headers['user-agent'] || '').slice(0, 300);
     const who = `${login} / ${member}`;
     const fail = (status, error) => res.status(status).render('login', loginPage(req, { error, login, member }));
-    if (loginLimited(`${ip}|${who}`)) return fail(429, 'Too many attempts. Please wait 15 minutes and try again.');
+    const limited = loginLimited(`${ip}|${who}`) || accountFails.blocked(login.toLowerCase()) || ipFails.blocked(ip);
+    if (limited) return fail(429, 'Too many attempts. Please wait 15 minutes and try again.');
     if (!login || !member || !password) return fail(422, 'Enter your agency, your name and your password.');
     const company = findCompany.get(login);
     // The company's own row is its main login (and the admin's login); everyone else is a
@@ -51,6 +56,8 @@ module.exports = function authRoutes(db, config) {
     const user = !company ? null : company.login_name === member ? company : findPerson.get(company.id, member);
     const ok = auth.verifyPassword(password, user ? user.password_hash : auth.DUMMY_HASH) && !!user;
     if (!ok) {
+      accountFails.fail(login.toLowerCase());
+      ipFails.fail(ip);
       logEvent.run(user ? user.id : null, who, 0, ip, ua);
       return fail(401, 'Incorrect agency, name or password.');
     }
@@ -190,6 +197,8 @@ module.exports = function authRoutes(db, config) {
   router.post('/logout', (req, res) => {
     const isAdmin = !!(req.user && req.user.is_admin);
     auth.destroySession(db, req, res, config.secureCookies);
+    // Signing out on purpose clears anything this site left in the browser (copies of unsent forms).
+    if (req.body.reason !== 'idle') res.setHeader('Clear-Site-Data', '"cache", "storage"');
     // Signed out for inactivity: say so, and return to the same page after signing back in.
     if (req.body.reason === 'idle') {
       const params = new URLSearchParams({ timeout: '1' });

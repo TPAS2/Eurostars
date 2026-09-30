@@ -16,9 +16,9 @@
 <% const cell = (h, e, formId, editable) => {
   const v = e ? e[h.key] : '';
   const val = v == null ? '' : h.money ? fmt.penceToInput(v) : v;
-  if (!editable) return `<td class="muted">${h.date && v ? fmt.ukDate(v) : ''}</td>`;
-  const type = h.date ? 'date' : h.key === 'email' ? 'email' : h.key === 'contact_number' ? 'tel' : 'text';
   const esc = (x) => String(x).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+  if (!editable) return `<td class="muted">${h.date && v ? esc(fmt.ukDate(v)) : ''}</td>`;
+  const type = h.date ? 'date' : h.key === 'email' ? 'email' : h.key === 'contact_number' ? 'tel' : 'text';
   return `<td><input form="${formId}" name="${h.key}" type="${type}" value="${esc(val)}"${h.money ? ' inputmode="decimal" placeholder="0.00"' : ''} aria-label="${esc(h.label)}" class="cell-input${h.date ? ' cell-date' : ''}${h.money ? ' cell-money' : ''}"></td>`;
 }; %>
 <% [['live', 'Live', entries.live, titleRow], ['previous', 'Previous tenant', entries.previous, 'PREVIOUS TENANTS']].forEach(([id, name, list, sheetTitle]) => { %>

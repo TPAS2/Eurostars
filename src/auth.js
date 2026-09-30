@@ -34,7 +34,8 @@ function parseCookies(header) {
     const idx = part.indexOf('=');
     if (idx < 0) continue;
     const key = part.slice(0, idx).trim();
-    if (key) out[key] = decodeURIComponent(part.slice(idx + 1).trim());
+    if (!key) continue;
+    try { out[key] = decodeURIComponent(part.slice(idx + 1).trim()); } catch { /* ignore a malformed cookie */ }
   }
   return out;
 }
@@ -193,6 +194,22 @@ function rateLimiter({ windowMs, max }) {
   };
 }
 
+// Counts only failures: blocked(key) checks without counting, fail(key) records one.
+function failureLimiter({ windowMs, max }) {
+  const hits = new Map();
+  const live = (key, now) => { const e = hits.get(key); return e && now - e.start <= windowMs ? e : null; };
+  return {
+    blocked: (key) => { const e = live(key, Date.now()); return !!e && e.count >= max; },
+    fail(key) {
+      const now = Date.now();
+      const e = live(key, now);
+      if (e) { e.count += 1; return; }
+      hits.set(key, { start: now, count: 1 });
+      if (hits.size > 10000) for (const [k, v] of hits) if (now - v.start > windowMs) hits.delete(k);
+    },
+  };
+}
+
 const INTRO_COOKIE = 'rift_intro';
 function introCookie(on, secure) {
   const attrs = [`${INTRO_COOKIE}=${on ? '1' : ''}`, 'Path=/', 'HttpOnly', 'SameSite=Lax', `Max-Age=${on ? 120 : 0}`];
@@ -213,6 +230,7 @@ module.exports = {
   safeNext,
   verifyCsrf,
   checkCsrfAfterUpload,
+  failureLimiter,
   rejectUncheckedMultipart,
   rateLimiter,
 };

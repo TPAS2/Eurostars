@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="/static/style.css">
   <script src="/static/app.js" defer></script>
 </head>
-<body class="<%= typeof bodyClass !== 'undefined' ? bodyClass : '' %>"<% if (user && typeof idleMinutes !== 'undefined' && idleMinutes > 0) { %> data-idle-minutes="<%= idleMinutes %>"<% } %>>
+<body class="<%= typeof bodyClass !== 'undefined' ? bodyClass : '' %>"<% if (user) { %> data-who="<%= user.person_id || user.id %>"<% } %><% if (user && typeof idleMinutes !== 'undefined' && idleMinutes > 0) { %> data-idle-minutes="<%= idleMinutes %>"<% } %>>
 <% if (user && typeof intro !== 'undefined' && intro) { %>
 <div class="intro" data-intro role="presentation" aria-hidden="true">
   <span class="intro-half intro-l"></span><span class="intro-half intro-r"></span>

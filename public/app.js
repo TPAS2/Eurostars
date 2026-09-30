@@ -1,6 +1,22 @@
 'use strict';
 
 document.addEventListener('DOMContentLoaded', () => {
+  // Copies of unsent forms are kept on this device. They belong to whoever typed them: when
+  // someone else signs in on the same browser, the previous person's copies are wiped first.
+  (() => {
+    const who = document.body && document.body.dataset.who;
+    if (!who) return;
+    try {
+      const store = window.localStorage;
+      if (store.getItem('rift:who') === who) return;
+      for (let i = store.length - 1; i >= 0; i -= 1) {
+        const k = store.key(i);
+        if (/^(draft|keep|unsaved):/.test(k)) store.removeItem(k);
+      }
+      store.setItem('rift:who', who);
+    } catch { /* storage blocked */ }
+  })();
+
   // Confirm destructive actions.
   document.querySelectorAll('form[data-confirm]').forEach((form) => {
     form.addEventListener('submit', (e) => {
