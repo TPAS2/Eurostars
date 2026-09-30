@@ -2828,11 +2828,12 @@ test('rent run step 5 box: edit the Metro form details; typed-over totals are ke
   assert.match(r.text, /name="store" value="Borehamwood"/);
   assert.match(r.text, /name="totalFigures" value="£5,000\.00"/);
   assert.match(r.text, /name="payment_date" value="2026-09-17"/);
-  assert.match(r.text, /name="signatory_2" value=""/);
+  assert.doesNotMatch(r.text, /name="signatory_1"|name="signatory_2"|Customer signature/, 'the signature section is left for signing by hand');
   const { metroData } = require('../src/paymentInstruction')(db);
   const d = metroData({ id: co, name: 'Test User' }, '2026-08');
   assert.equal(d.store, 'Borehamwood');
   assert.equal(d.totalFigures, '£5,000.00', 'typed-over total goes on the form');
+  assert.deepEqual([d.signatory1, d.signatory2], ['', ''], 'no names printed in the signature boxes');
   assert.equal(d.valueDate, '17/09/2026');
   r = await c.post('/app/rent-run/instruction/form', { month: '2026-08', store: 'Borehamwood', then: 'metro' });
   assert.match(r.location, /^\/app\/rent-run\/documents\/\d+$/);
@@ -3032,7 +3033,7 @@ test('rent run step 5: presets to fill in the Metro form, with Edit and Remove',
   r = await c.post('/app/rent-run/presets', { month: '2026-08', preset_name: 'Main client account', store: 'Borehamwood', from_name: 'Preset Lets Client', contact_name: 'Theo', from_account_number: '12345678', signatory_1: 'Theo', signatory_2: 'Sam', totalFigures: '£9' });
   assert.match(decodeURIComponent(r.location.replace(/\+/g, ' ')), /Saved the preset “Main client account”/);
   const p = db.prepare("SELECT * FROM metro_presets WHERE name = 'Main client account'").get();
-  assert.deepEqual(JSON.parse(p.data_json), { store: 'Borehamwood', from_name: 'Preset Lets Client', contact_name: 'Theo', from_account_number: '12345678', signatory_1: 'Theo', signatory_2: 'Sam' });
+  assert.deepEqual(JSON.parse(p.data_json), { store: 'Borehamwood', from_name: 'Preset Lets Client', contact_name: 'Theo', from_account_number: '12345678' });
   r = await c.get('/app/rent-run?month=2026-08');
   assert.match(r.text, new RegExp(`<option value="${p.id}" data-preset="[^"]*Borehamwood[^"]*">Main client account</option>`));
   assert.match(r.text, new RegExp(`href="/app/rent-run/presets/${p.id}/edit\\?month=2026-08">Edit`));

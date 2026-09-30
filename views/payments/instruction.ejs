@@ -48,10 +48,8 @@
     <tfoot><tr class="total"><td colspan="4">Total to pay (ticked rows)</td><td class="num"><%= fmt.money(total) %></td><td></td></tr></tfoot>
   </table></div>
 
-  <h2 class="spaced">Authorisation</h2>
+  <h2 class="spaced">Notes</h2>
   <div class="form-grid three">
-    <div class="field"><label for="sig1">Authorised signatory 1</label><input id="sig1" name="signatory_1" value="<%= data.signatory_1 %>"></div>
-    <div class="field"><label for="sig2">Authorised signatory 2</label><input id="sig2" name="signatory_2" value="<%= data.signatory_2 %>"></div>
     <div class="field wide"><label for="notes">Notes for the bank</label><textarea id="notes" name="notes" rows="2"><%= data.notes %></textarea></div>
   </div>
 

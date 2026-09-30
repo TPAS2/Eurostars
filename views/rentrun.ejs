@@ -119,14 +119,13 @@
   </div>
   <div id="preset-manage" class="metro-docs" hidden>
     <h3>Presets</h3>
-    <p class="muted small">Ready-made details (store, account, contact, signatories) to fill the form in one click. Save what's in the boxes below as a new preset, or edit one.</p>
+    <p class="muted small">Ready-made details (store, account, contact) to fill the form in one click. Save what's in the boxes below as a new preset, or edit one.</p>
     <% if (metroPresets.length) { %>
     <div class="table-wrap"><table>
-      <thead><tr><th>Name</th><th>Store</th><th>Account name</th><th>Account number</th><th>Signatories</th><th></th></tr></thead>
+      <thead><tr><th>Name</th><th>Store</th><th>Account name</th><th>Account number</th><th></th></tr></thead>
       <tbody>
       <% metroPresets.forEach(p => { %><tr>
         <td><strong><%= p.name %></strong></td><td><%= p.data.store %></td><td><%= p.data.from_name %></td><td><%= p.data.from_account_number %></td>
-        <td><%= [p.data.signatory_1, p.data.signatory_2].filter(Boolean).join(', ') %></td>
         <td class="num nowrap">
           <a class="btn small" href="/app/rent-run/presets/<%= p.id %>/edit?month=<%= month %>">Edit</a>
           <form method="post" action="/app/rent-run/presets/<%= p.id %>/delete" class="inline" data-confirm="Remove the preset <%= p.name %>?"><%- include('partials/csrf') %><input type="hidden" name="month" value="<%= month %>"><button class="btn small link" type="submit">Remove</button></form>
@@ -153,9 +152,6 @@
     <div class="field"><label for="m-date">Value date</label><input id="m-date" type="date" name="payment_date" value="<%= step5.payment_date %>"></div>
     <div class="field wide"><label for="m-words">Total amount in words</label><input id="m-words" name="totalWords" value="<%= step5.totalWords %>"></div>
     <div class="field"><label for="m-count">Total number of transactions</label><input id="m-count" name="count" value="<%= step5.count %>" inputmode="numeric"></div>
-    <h3 class="wide form-subhead">3. Customer signature</h3>
-    <div class="field"><label for="m-sig1">Authorised signatory 1</label><input id="m-sig1" name="signatory_1" value="<%= step5.signatory_1 %>" placeholder="Name printed under the signature"></div>
-    <div class="field"><label for="m-sig2">Authorised signatory 2 (if applicable)</label><input id="m-sig2" name="signatory_2" value="<%= step5.signatory_2 %>"></div>
     <div class="form-actions wide">
       <button class="btn" type="submit" formaction="/app/rent-run/instruction/preview" formtarget="_blank">Preview document</button>
       <button class="btn" type="submit" name="then" value="save">Save</button>

@@ -126,7 +126,7 @@ module.exports = function paymentRoutes(db) {
 
   // ---------- presets: ready-made details for the step 5 box ----------
   const PRESET_FIELDS = [['store', 'Store'], ['from_name', 'Account name'], ['contact_name', 'Contact name'],
-    ['from_account_number', 'Account number'], ['signatory_1', 'Authorised signatory 1'], ['signatory_2', 'Authorised signatory 2']];
+    ['from_account_number', 'Account number']];
   const presetValues = (body) => Object.fromEntries(PRESET_FIELDS.map(([k]) => [k, clip(body[k], k === 'from_account_number' ? 12 : 60)]));
   const preset = (req, res) => {
     const p = db.prepare('SELECT * FROM metro_presets WHERE id = ? AND account_id = ?').get(Number(req.params.pid), req.user.id);

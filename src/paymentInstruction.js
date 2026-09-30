@@ -111,7 +111,7 @@ function metroData(user, month, typed = null) {
   return {
     store: data.store, accountName: data.from_name, contactName: data.contact_name || user.name || agency.name,
     accountNumber: data.from_account_number, valueDate: data.payment_date ? fmt.ukDate(data.payment_date) : '',
-    signatory1: data.signatory_1, signatory2: data.signatory_2, payees,
+    signatory1: '', signatory2: '', payees, // signed by hand after printing
     totalFigures: data.totalFigures_override || undefined, totalWords: data.totalWords_override || undefined, count: data.count_override || undefined,
     monthLabel: st.monthLabel(month), agencyName: agency.agency_name,
   };
