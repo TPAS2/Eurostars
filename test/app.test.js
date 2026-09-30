@@ -1940,7 +1940,7 @@ test('"Deduct from landlord" straight from adding a contractor or landlord invoi
   // Without a landlord to charge, it says so and nothing is saved.
   r = await c.post('/app/invoices', await invoiceBody(c, { supplier: 'Quick Fix', amount: '10', property_id: String(lonely), then: 'deduct', file: pdf() }), { multipart: true });
   assert.equal(r.status, 422);
-  assert.match(r.text, /choose a property \(or job\) that has a landlord/);
+  assert.match(r.text, /To deduct from a landlord, choose the landlord/);
   assert.equal(db.prepare('SELECT COUNT(*) n FROM invoices WHERE property_id = ?').get(lonely).n, 0);
   // Plain upload still leaves it unpaid.
   r = await c.post('/app/invoices', await invoiceBody(c, { supplier: 'Quick Fix', amount: '20', property_id: String(prop), then: 'save', file: pdf() }), { multipart: true });
@@ -2418,6 +2418,41 @@ test('council reconciliation: still owed for the month and all months in the top
   // An overpayment later offsets what's owed overall.
   await save('2026-09', { owed: '0', received: '450' });
   assert.match((await c.get('/app/council-reconciliation?month=2026-09')).text, /id="rec-owed-all">£50\.00 over/);
+});
+
+test('contractor invoices: choose the landlord to charge and say what is required', async () => {
+  const c = await registerAndLogin('inv-landlord@example.com', 'Inv Landlord Lets');
+  const owner = idFrom((await c.post('/app/landlords', { name: 'Owner Olive' })).location);
+  const other = idFrom((await c.post('/app/landlords', { name: 'Other Oscar' })).location);
+  const pid = String(idFrom((await c.post('/app/properties', { address_line1: '3 Chosen Road', status: 'vacant', landlord_id: String(owner) })).location));
+  let form = await c.get('/app/invoices/new');
+  assert.match(form.text, /name="landlord_id"[\s\S]*?Other Oscar/);
+  assert.match(form.text, /What(’|'|&#39;)s required/);
+  assert.match(form.text, /data-landlord="\d+"[^>]*>3 Chosen Road/);
+
+  // Left blank: the property's landlord. Deducted from them.
+  let r = await c.post('/app/invoices', { supplier: 'Tap Co', amount: '50', landlord_amount: '60', charge_landlord: 'yes', invoice_date: '2026-09-02', property_id: pid, maintenance_job_id: 'none', work_required: 'Fix the kitchen tap', then: 'deduct' }, { multipart: true });
+  assert.equal(r.status, 302, r.text);
+  let inv = db.prepare("SELECT * FROM invoices WHERE supplier = 'Tap Co'").get();
+  assert.equal(inv.landlord_id, owner);
+  assert.equal(inv.work_required, 'Fix the kitchen tap');
+  assert.equal(db.prepare('SELECT landlord_id FROM transactions WHERE id = ?').get(inv.payment_txn_id).landlord_id, owner);
+  assert.match((await c.get(`/app/invoices/${inv.id}`)).text, /What(’|'|&#39;)s required<\/dt><dd class="pre">Fix the kitchen tap/);
+
+  // Chosen by hand: charged to that landlord instead.
+  r = await c.post('/app/invoices', { supplier: 'Roof Co', amount: '100', landlord_amount: '120', charge_landlord: 'yes', invoice_date: '2026-09-03', property_id: pid, maintenance_job_id: 'none', landlord_id: String(other), then: 'deduct' }, { multipart: true });
+  inv = db.prepare("SELECT * FROM invoices WHERE supplier = 'Roof Co'").get();
+  assert.equal(inv.landlord_id, other);
+  assert.equal(db.prepare('SELECT landlord_id FROM transactions WHERE id = ?').get(inv.payment_txn_id).landlord_id, other);
+  assert.match((await c.get(`/app/invoices/${inv.id}`)).text, /Other Oscar/);
+
+  // Another company's landlord is refused.
+  const stranger = await registerAndLogin('inv-landlord2@example.com', 'Stranger Lets');
+  const spid = String(idFrom((await stranger.post('/app/properties', { address_line1: '9 Elsewhere', status: 'vacant' })).location));
+  r = await stranger.post('/app/invoices', { supplier: 'Sneaky', amount: '10', landlord_amount: '10', charge_landlord: 'yes', invoice_date: '2026-09-03', property_id: spid, maintenance_job_id: 'none', landlord_id: String(owner) }, { multipart: true });
+  assert.equal(r.status, 422);
+  form = r.text;
+  assert.match(form, /Choose a valid landlord/);
 });
 
 test('maintenance: a completed job has a landlord invoice to download and email', async () => {

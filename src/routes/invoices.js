@@ -57,7 +57,7 @@ module.exports = function invoiceRoutes(db, config) {
     fs.rm(path.join(accountDir(accountId), path.basename(fileName)), { force: true }, () => {});
   }
 
-  const PROPERTY_OPTS = "SELECT id, address_line1 || COALESCE(', ' || postcode, '') AS label FROM properties WHERE account_id = ? ORDER BY label COLLATE NOCASE";
+  const PROPERTY_OPTS = "SELECT id, landlord_id, address_line1 || COALESCE(', ' || postcode, '') AS label FROM properties WHERE account_id = ? ORDER BY label COLLATE NOCASE";
   const JOB_OPTS = `SELECT m.id, m.title || ' — ' || p.address_line1 AS label, m.property_id
                       FROM maintenance_jobs m JOIN properties p ON p.id = m.property_id
                      WHERE m.account_id = ? ORDER BY m.status = 'completed', m.reported_date DESC`;
@@ -76,6 +76,7 @@ module.exports = function invoiceRoutes(db, config) {
     // Invoice number and due date aren't on the form; only change them if they're sent.
     if (body.invoice_number !== undefined) v.invoice_number = text('invoice_number', 100);
     v.description = text('description', 5000);
+    v.work_required = text('work_required', 5000);
     for (const k of ['invoice_date', 'due_date']) {
       if (k === 'due_date' && body.due_date === undefined) continue;
       v[k] = text(k, 10);
@@ -113,6 +114,17 @@ module.exports = function invoiceRoutes(db, config) {
       if (!p) errors.property_id = 'Choose a valid property.';
       else v.property_id = p.id;
     }
+    // The landlord to charge: chosen, or else the property's landlord.
+    v.landlord_id = null;
+    if (body.landlord_id) {
+      const l = owned('landlords', body.landlord_id, accountId);
+      if (!l) errors.landlord_id = 'Choose a valid landlord.';
+      else v.landlord_id = l.id;
+    }
+    if (!v.landlord_id && v.property_id) {
+      const p = db.prepare('SELECT landlord_id FROM properties WHERE id = ? AND account_id = ?').get(v.property_id, accountId);
+      if (p && p.landlord_id) v.landlord_id = p.landlord_id;
+    }
     // Required: supplier, amount, invoice date and property. The job, notes and file are optional.
     if (!v.invoice_date && !errors.invoice_date) errors.invoice_date = 'Enter the invoice date.';
     if (!v.property_id && !errors.property_id) errors.property_id = 'Choose the property.';
@@ -127,6 +139,7 @@ module.exports = function invoiceRoutes(db, config) {
       title: invoice ? 'Edit contractor invoice' : 'Upload contractor invoice', section: 'invoices', invoice, values, errors, people,
       contractors: db.prepare('SELECT name, trade FROM contractors WHERE account_id = ? ORDER BY name COLLATE NOCASE').all(a),
       jobs: db.prepare(JOB_OPTS).all(a), properties: db.prepare(PROPERTY_OPTS).all(a), fmt,
+      landlords: db.prepare('SELECT id, name FROM landlords WHERE account_id = ? ORDER BY name COLLATE NOCASE').all(a),
     });
   }
 
@@ -205,8 +218,8 @@ module.exports = function invoiceRoutes(db, config) {
     if (deduct) v.charge_landlord = 1;
     let landlord = null;
     if (deduct) {
-      landlord = v.property_id && db.prepare('SELECT l.id, l.name FROM properties p JOIN landlords l ON l.id = p.landlord_id WHERE p.id = ? AND p.account_id = ?').get(v.property_id, a);
-      if (!landlord) errors.property_id = 'To deduct from a landlord, choose a property (or job) that has a landlord.';
+      landlord = v.landlord_id && db.prepare('SELECT id, name FROM landlords WHERE id = ? AND account_id = ?').get(v.landlord_id, a);
+      if (!landlord && !errors.landlord_id) errors.landlord_id = 'To deduct from a landlord, choose the landlord.';
     }
     if (Object.keys(errors).length) {
       if (stored) removeFile(a, stored.file_name);
@@ -231,7 +244,8 @@ module.exports = function invoiceRoutes(db, config) {
     if (!inv) return;
     const a = req.user.id;
     const property = inv.property_id ? owned('properties', inv.property_id, a) : null;
-    const landlord = property && property.landlord_id ? owned('landlords', property.landlord_id, a) : null;
+    const landlordId = inv.landlord_id || (property && property.landlord_id);
+    const landlord = landlordId ? owned('landlords', landlordId, a) : null;
     const job = inv.maintenance_job_id ? owned('maintenance_jobs', inv.maintenance_job_id, a) : null;
     const deduction = db.prepare(`${INVOICE_LIST_SQL} WHERE i.id = ? AND i.account_id = ?`).get(inv.id, a);
     res.render('invoices/show', {
@@ -326,7 +340,7 @@ module.exports = function invoiceRoutes(db, config) {
     transaction(db, () => {
       let txnId = null;
       if (chargeLandlord) {
-        const t = ledger.resolveLinks(db, a, { property_id: inv.property_id, landlord_id: null });
+        const t = ledger.resolveLinks(db, a, { property_id: inv.property_id, landlord_id: inv.landlord_id || null });
         const desc = `Invoice ${inv.invoice_number || '#' + inv.id} — ${inv.supplier}`;
         const info = db.prepare(
           `INSERT INTO transactions (account_id, txn_date, txn_type, landlord_id, property_id, description, amount_pence)

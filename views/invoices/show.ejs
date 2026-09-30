@@ -35,6 +35,7 @@
       <div><dt>Maintenance job</dt><dd><% if (job) { %><a href="/app/maintenance/<%= job.id %>"><%= job.title %></a><% } else { %>—<% } %></dd></div>
       <div><dt>Added by</dt><dd><%= addedBy ? addedBy.name : '—' %></dd></div>
       <div><dt>Landlord</dt><dd><% if (landlord) { %><a href="/app/landlords/<%= landlord.id %>"><%= landlord.name %></a><% } else { %>—<% } %></dd></div>
+      <% if (inv.work_required) { %><div class="wide"><dt>What's required</dt><dd class="pre"><%= inv.work_required %></dd></div><% } %>
       <% if (inv.description) { %><div class="wide"><dt>Notes</dt><dd class="pre"><%= inv.description %></dd></div><% } %>
     </dl>
     <% if (inv.file_name) { %>

@@ -578,6 +578,19 @@ document.addEventListener('click', (e) => {
   });
 })();
 
+// Contractor invoice form: choosing a property fills in its landlord (unless one was picked by hand).
+document.addEventListener('DOMContentLoaded', () => {
+  const pick = document.querySelector('[data-landlord-pick]');
+  const property = pick && pick.form && pick.form.querySelector('select[name="property_id"]');
+  if (!property) return;
+  const ownerOf = () => (property.selectedOptions[0] && property.selectedOptions[0].dataset.landlord) || '';
+  let auto = !pick.value || pick.value === ownerOf();
+  pick.addEventListener('change', () => { auto = !pick.value || pick.value === ownerOf(); });
+  const fill = () => { if (auto && [...pick.options].some((o) => o.value === ownerOf())) pick.value = ownerOf(); };
+  property.addEventListener('change', fill);
+  fill();
+});
+
 // Landlord invoice form: "£x a month" hint when paying over several months.
 (function () {
   document.addEventListener('DOMContentLoaded', () => {

@@ -70,15 +70,29 @@
       <label for="f-property">Property <span class="req">*</span></label>
       <select id="f-property" name="property_id" required>
         <option value="">Choose…</option>
-        <% properties.forEach(p => { %><option value="<%= p.id %>" <%= Number(values.property_id) === p.id ? 'selected' : '' %>><%= p.label %></option><% }) %>
+        <% properties.forEach(p => { %><option value="<%= p.id %>" data-landlord="<%= p.landlord_id || '' %>" <%= Number(values.property_id) === p.id ? 'selected' : '' %>><%= p.label %></option><% }) %>
       </select>
       <% if (errors.property_id) { %><div class="field-err"><%= errors.property_id %></div><% } %>
+    </div>
+    <div class="field">
+      <label for="f-landlord">Landlord</label>
+      <select id="f-landlord" name="landlord_id" data-landlord-pick>
+        <option value="">Property's landlord</option>
+        <% landlords.forEach(l => { %><option value="<%= l.id %>" <%= Number(values.landlord_id) === l.id ? 'selected' : '' %>><%= l.name %></option><% }) %>
+      </select>
+      <div class="help">Who it's charged to. Filled in from the property; change it if needed.</div>
+      <% if (errors.landlord_id) { %><div class="field-err"><%= errors.landlord_id %></div><% } %>
     </div>
     <div class="field">
       <label for="f-added_by">Added by <span class="req">*</span></label>
       <select id="f-added_by" name="added_by" required>
         <% people.forEach(m => { %><option value="<%= m.id %>" <%= Number(values.added_by) === m.id ? 'selected' : '' %>><%= m.name %></option><% }) %>
       </select>
+    </div>
+    <div class="field wide">
+      <label for="f-work_required">What's required</label>
+      <textarea id="f-work_required" name="work_required" rows="3" maxlength="5000" placeholder="e.g. Replace leaking kitchen tap and reseal sink"><%= values.work_required || '' %></textarea>
+      <% if (errors.work_required) { %><div class="field-err"><%= errors.work_required %></div><% } %>
     </div>
     <div class="field wide">
       <label for="f-description">Notes</label>
