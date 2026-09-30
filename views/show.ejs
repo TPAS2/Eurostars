@@ -80,8 +80,6 @@
         <% if (t.council_id) { %>
           <p class="with-thumb-line"><% if (t.council_photo_v) { %><img class="thumb" src="/app/councils/<%= t.council_id %>/photo?v=<%= t.council_photo_v %>" alt=""><% } %><a href="/app/councils/<%= t.council_id %>"><strong><%= t.council_name %></strong></a></p>
           <dl class="mini">
-            <% if (t.council_tax_account) { %><dt>Council tax account</dt><dd><%= t.council_tax_account %></dd><% } %>
-            <% if (t.council_tax_payer) { %><dt>Council tax paid by</dt><dd><%= t.council_tax_payer %></dd><% } %>
             <% if (t.council_tax_phone) { %><dt>Phone</dt><dd class="pre"><%= t.council_tax_phone %></dd><% } %>
             <% if (t.council_tax_email) { %><dt>Email</dt><dd class="pre"><%= t.council_tax_email %></dd><% } %>
           </dl>

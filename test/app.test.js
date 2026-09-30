@@ -2622,3 +2622,9 @@ test('tenant Edit form: a Council dropdown that changes the council of the prope
   assert.equal(r.status, 422);
   assert.equal(db.prepare('SELECT council_id FROM properties WHERE id = ?').get(prop).council_id, york);
 });
+
+test('adding a property: no council tax account number or council tax paid by', async () => {
+  const c = await registerAndLogin('no-ct@example.com', 'No CT Lets');
+  const r = await c.get('/app/properties/new');
+  assert.doesNotMatch(r.text, /Council tax account|Council tax paid by|name="council_tax_account"|name="council_tax_payer"/);
+});

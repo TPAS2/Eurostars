@@ -49,8 +49,6 @@ const ENTITIES = {
       { name: 'property_type', label: 'Type', type: 'select', options: ['House', 'Flat', 'HMO', 'Bungalow', 'Studio', 'Commercial', 'Other'] },
       { name: 'bedrooms', label: 'Bedrooms', type: 'integer' },
       { name: 'management_fee_pct', label: 'Management fee %', type: 'number', help: 'Deducted automatically from rent received.' },
-      { name: 'council_tax_account', label: 'Council tax account no.', type: 'text' },
-      { name: 'council_tax_payer', label: 'Council tax paid by', type: 'select', options: ['Tenant', 'Landlord', 'Agent'] },
       { name: 'status', label: 'Status', type: 'select', options: ['vacant', 'let', 'under offer', 'unavailable'], required: true, default: 'vacant' },
       { name: 'notes', label: 'Notes', type: 'textarea' },
     ],
