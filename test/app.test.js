@@ -2628,3 +2628,27 @@ test('adding a property: no council tax account number or council tax paid by', 
   const r = await c.get('/app/properties/new');
   assert.doesNotMatch(r.text, /Council tax account|Council tax paid by|name="council_tax_account"|name="council_tax_payer"/);
 });
+
+test('a tenancy with an end date that has come is ended automatically', async () => {
+  const fmt = require('../src/format');
+  const c = await registerAndLogin('auto-end@example.com', 'Auto End Lets');
+  const prop = idFrom((await c.post('/app/properties', { address_line1: '9 Auto Road', status: 'let' })).location);
+  let r = await c.post(`/app/properties/${prop}/add-tenant`, { tenant_mode: 'new', name: 'Past Pat', booking_date: '2025-01-01', start_date: '2025-02-01', end_date: fmt.addDays(fmt.today(), -1), rent_pence: '900', rent_frequency: 'monthly', status: 'active' });
+  assert.equal(r.status, 302);
+  assert.equal(db.prepare("SELECT ty.status FROM tenancies ty JOIN tenants t ON t.id = ty.tenant_id WHERE t.name = 'Past Pat'").get().status, 'ended');
+  // Editing an active tenancy to add an end date of today ends it.
+  await c.post(`/app/properties/${prop}/add-tenant`, { tenant_mode: 'new', name: 'Now Nell', booking_date: '2025-01-01', start_date: '2025-02-01', rent_pence: '900', rent_frequency: 'monthly', status: 'active' });
+  const nell = db.prepare("SELECT ty.* FROM tenancies ty JOIN tenants t ON t.id = ty.tenant_id WHERE t.name = 'Now Nell'").get();
+  assert.equal(nell.status, 'active');
+  await c.get(`/app/tenancies/${nell.id}/edit`);
+  r = await c.post(`/app/tenancies/${nell.id}`, { property_id: String(prop), tenant_id: String(nell.tenant_id), booking_date: '2025-01-01', start_date: '2025-02-01', end_date: fmt.today(), rent_pence: '900', rent_frequency: 'monthly', status: 'active' });
+  assert.equal(r.status, 302);
+  assert.equal(db.prepare('SELECT status FROM tenancies WHERE id = ?').get(nell.id).status, 'ended');
+  // A future end date keeps it active until that day comes.
+  await c.post(`/app/properties/${prop}/add-tenant`, { tenant_mode: 'new', name: 'Future Fay', booking_date: '2025-01-01', start_date: '2025-02-01', end_date: fmt.addDays(fmt.today(), 30), rent_pence: '900', rent_frequency: 'monthly', status: 'active' });
+  const fay = db.prepare("SELECT ty.id FROM tenancies ty JOIN tenants t ON t.id = ty.tenant_id WHERE t.name = 'Future Fay'").get().id;
+  assert.equal(db.prepare('SELECT status FROM tenancies WHERE id = ?').get(fay).status, 'active');
+  db.prepare('UPDATE tenancies SET end_date = ? WHERE id = ?').run(fmt.addDays(fmt.today(), -2), fay); // time passes
+  await c.get('/app');
+  assert.equal(db.prepare('SELECT status FROM tenancies WHERE id = ?').get(fay).status, 'ended');
+});

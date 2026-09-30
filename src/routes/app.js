@@ -15,6 +15,15 @@ const LIST_LIMIT = 500;
 module.exports = function appRoutes(db) {
   const router = express.Router();
 
+  // Tenancies whose end date has come are marked ended (a future end date takes effect on the day).
+  router.use((req, res, next) => {
+    if (req.user && !req.user.is_admin) {
+      db.prepare("UPDATE tenancies SET status = 'ended' WHERE account_id = ? AND status != 'ended' AND end_date IS NOT NULL AND end_date <= ?")
+        .run(req.user.id, fmt.today());
+    }
+    next();
+  });
+
   // ---------- helpers ----------
 
   function refOptions(refKey, accountId) {
@@ -136,6 +145,8 @@ module.exports = function appRoutes(db) {
     if (def.key === 'tenancies' && values.end_date) {
       if (values.start_date && values.start_date > values.end_date) errors.start_date = 'The start date can’t be after the end date.';
       if (values.booking_date && values.booking_date > values.end_date) errors.booking_date = 'The booking date can’t be after the end date.';
+      // Once its end date has come, a tenancy is ended.
+      if (values.end_date <= fmt.today()) values.status = 'ended';
     }
     if (def.key === 'transactions' && ['rent_charge', 'rent_received'].includes(values.txn_type) && !values.tenancy_id) {
       errors.tenancy_id = 'Rent charges and receipts must be linked to a tenancy.';
