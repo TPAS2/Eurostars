@@ -139,6 +139,20 @@ CREATE TABLE IF NOT EXISTS app_settings (
   value TEXT
 );
 
+-- Each Metro payment instruction created in the rent run (step 5), kept to look back at.
+CREATE TABLE IF NOT EXISTS metro_documents (
+  id          INTEGER PRIMARY KEY,
+  account_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  month       TEXT NOT NULL,
+  filename    TEXT NOT NULL,
+  total_pence INTEGER,
+  payments    INTEGER,
+  created_by  INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+  data        BLOB NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_metro_documents ON metro_documents(account_id, created_at);
+
 -- Entries on a council's database (Councils → Database): Live until ended, then Previous tenant.
 CREATE TABLE IF NOT EXISTS council_db_entries (
   id                  INTEGER PRIMARY KEY,

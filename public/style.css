@@ -741,3 +741,6 @@ table.council-db tr.new-row .cell-input { border-color: var(--border); backgroun
 .table-wrap td { vertical-align: middle; }
 .table-wrap td .btn.small { margin: -2px 0; }
 .rec-actions { display: flex; gap: 8px; justify-content: flex-end; margin: -6px 0 12px; }
+.metro-docs { margin: 4px 0 16px; padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-2); }
+.metro-docs h3 { margin: 0 0 8px; }
+.btn.blank-form { border-color: var(--brand); color: var(--brand); font-weight: 700; }

@@ -80,9 +80,33 @@
   <div class="card-head">
     <h2><span class="step-no">5</span> Metro Bank Bulk Payment Instruction</h2>
     <div class="step-actions">
-      <a class="btn small" href="/app/rent-run/instruction?month=<%= month %>">Check payments (<%= step5.payees %>)</a>
-      <a class="btn small link" href="/app/rent-run/metro-blank.pdf" target="_blank" rel="noopener">Blank form</a>
+      <button class="btn small" type="button" data-toggle="#metro-docs" aria-controls="metro-docs" aria-expanded="false">Previous documents (<%= metroDocs.length %>)</button>
+      <a class="btn small blank-form" href="/app/rent-run/metro-blank.pdf" target="_blank" rel="noopener">Blank form</a>
     </div>
+  </div>
+  <div id="metro-docs" class="metro-docs" hidden>
+    <h3>Previous documents</h3>
+    <% if (!metroDocs.length) { %><p class="muted small">None yet. Each time you click "Save &amp; open Metro form", a copy is kept here.</p><% } else { %>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Created</th><th>For</th><th class="num">Total</th><th class="num">Payments</th><th>By</th><th></th></tr></thead>
+      <tbody>
+      <% metroDocs.forEach(d => { %>
+        <tr>
+          <td class="nowrap"><%= fmt.ukDateTime(d.created_at) %></td>
+          <td><%= d.monthLabel %></td>
+          <td class="num"><%= fmt.money(d.total_pence || 0) %></td>
+          <td class="num"><%= d.payments %></td>
+          <td><%= d.created_by_name || '' %></td>
+          <td class="num nowrap">
+            <a class="btn small" href="/app/rent-run/documents/<%= d.id %>" target="_blank" rel="noopener">Open</a>
+            <a class="btn small" href="/app/rent-run/documents/<%= d.id %>?download=1">Download</a>
+            <form method="post" action="/app/rent-run/documents/<%= d.id %>/delete" class="inline" data-confirm="Remove this document?"><%- include('partials/csrf') %><input type="hidden" name="month" value="<%= month %>"><button class="btn small link" type="submit">Remove</button></form>
+          </td>
+        </tr>
+      <% }) %>
+      </tbody>
+    </table></div>
+    <% } %>
   </div>
   <p class="muted small">What goes on Metro's form for <%= monthLabel %>. The totals are worked out from the payments; change anything you need, fill in the blanks, then open the form to print, sign and take to Metro.</p>
   <form method="post" action="/app/rent-run/instruction/form" class="form-grid step5-grid" data-no-keep>

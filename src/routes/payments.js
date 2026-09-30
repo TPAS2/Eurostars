@@ -96,10 +96,38 @@ module.exports = function paymentRoutes(db) {
   });
 
   // The Rent run's step 5 box: the details that go on Metro's form.
-  router.post('/instruction/form', (req, res) => {
+  // Make the Metro form from what's saved, keep a copy (Previous documents), and open it.
+  async function createDocument(req, res, next, month) {
+    try {
+      const data = metroData(req.user, month);
+      const pdf = Buffer.from(await fillMetroForm(data));
+      const stamp = new Date().toISOString().slice(0, 16).replace('T', ' ').replace(':', '.');
+      const filename = `Metro bulk payment instruction ${month} (${stamp}).pdf`;
+      const info = db.prepare('INSERT INTO metro_documents (account_id, month, filename, total_pence, payments, created_by, data) VALUES (?, ?, ?, ?, ?, ?, ?)')
+        .run(req.user.id, month, filename, data.payees.reduce((t, p) => t + p.pence, 0), data.payees.length, req.user.person_id || req.user.id, pdf);
+      res.redirect(`/app/rent-run/documents/${Number(info.lastInsertRowid)}`);
+    } catch (err) { next(err); }
+  }
+
+  router.get('/documents/:docId(\\d+)', (req, res) => {
+    const doc = db.prepare('SELECT filename, data FROM metro_documents WHERE id = ? AND account_id = ?').get(Number(req.params.docId), req.user.id);
+    if (!doc) return res.status(404).render('error', { title: 'Not found', message: 'That document was not found.' });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `${req.query.download === '1' ? 'attachment' : 'inline'}; filename="${doc.filename.replace(/"/g, '')}"`);
+    res.setHeader('Content-Security-Policy', "sandbox; default-src 'none'; object-src 'self'");
+    res.setHeader('Cache-Control', 'private, no-store');
+    res.end(Buffer.from(doc.data));
+  });
+
+  router.post('/documents/:docId(\\d+)/delete', (req, res) => {
+    db.prepare('DELETE FROM metro_documents WHERE id = ? AND account_id = ?').run(Number(req.params.docId), req.user.id);
+    backToRun(res, monthOf(req.body.month), { flash: 'Document removed.' });
+  });
+
+  router.post('/instruction/form', (req, res, next) => {
     const month = monthOf(req.body.month);
     saveForm(req.user.id, month, req.body, req.user.name);
-    if (req.body.then === 'metro') return res.redirect(`/app/rent-run/instruction/metro.pdf?month=${month}`);
+    if (req.body.then === 'metro') return createDocument(req, res, next, month);
     backToRun(res, month, { flash: 'Saved the payment instruction details.' });
   });
 

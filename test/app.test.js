@@ -1626,7 +1626,8 @@ test('rent run step 5: payment instruction template and a filled-in instruction 
 
   r = await c.get('/app/rent-run?month=2026-08');
   // Step 5 is its own box, after the steps, with the form's details to edit.
-  assert.match(r.text, /<\/ol>\s*<\/section>\s*<section class="card step5" id="payment-instruction">[\s\S]*?Metro Bank Bulk Payment Instruction[\s\S]*?Check payments \(1\)/);
+  assert.match(r.text, /<\/ol>\s*<\/section>\s*<section class="card step5" id="payment-instruction">[\s\S]*?Metro Bank Bulk Payment Instruction[\s\S]*?class="btn small blank-form"[^>]*>Blank form/);
+  assert.doesNotMatch(r.text, /Check payments/);
   assert.match(r.text, /name="totalFigures" value="£1,000\.00"/, 'total worked out from the payments');
   assert.match(r.text, /name="totalWords" value="One thousand pounds only"/);
   assert.match(r.text, /name="count" value="1"/);
@@ -2751,7 +2752,21 @@ test('rent run step 5 box: edit the Metro form details; typed-over totals are ke
   assert.equal(d.totalFigures, '£5,000.00', 'typed-over total goes on the form');
   assert.equal(d.valueDate, '17/09/2026');
   r = await c.post('/app/rent-run/instruction/form', { month: '2026-08', store: 'Borehamwood', then: 'metro' });
-  assert.equal(r.location, '/app/rent-run/instruction/metro.pdf?month=2026-08');
+  assert.match(r.location, /^\/app\/rent-run\/documents\/\d+$/);
+  const first = await c.get(r.location);
+  assert.equal(first.headers.get('content-type'), 'application/pdf');
+  // A second one; Previous documents lists both, newest first, with the date created.
+  db.prepare("UPDATE metro_documents SET created_at = '2026-09-01 09:00:00' WHERE account_id = ?").run(co);
+  await c.get('/app/rent-run?month=2026-08');
+  r = await c.post('/app/rent-run/instruction/form', { month: '2026-08', store: 'Borehamwood', then: 'metro' });
+  const newest = idFrom(r.location);
+  r = await c.get('/app/rent-run?month=2026-08');
+  assert.match(r.text, /Previous documents \(2\)/);
+  const rows = [...r.text.matchAll(/href="\/app\/rent-run\/documents\/(\d+)" target="_blank"/g)].map((m) => Number(m[1]));
+  assert.equal(rows[0], newest, 'newest at the top');
+  assert.match(r.text, /01\/09\/2026 09:00[\s\S]*?August 2026/);
+  const other = await registerAndLogin('step5-box-2@example.com', 'Other Step Five');
+  assert.equal((await other.get(`/app/rent-run/documents/${newest}`)).status, 404);
 });
 
 test('landlord invoice: Download invoice gives a PDF', async () => {

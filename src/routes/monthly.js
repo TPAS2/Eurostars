@@ -80,6 +80,10 @@ module.exports = function monthlyRoutes(db, writer, mailer = { enabled: false })
       title: 'Rent run', section: 'rentrun', month, monthLabel: st.monthLabel(month), rows, template,
       emailEnabled: mailer.enabled, reportTo: (me && me.email) || '', sender: senderFor(a), fmt,
       step5: require('../paymentInstruction')(db).formFor(req.user, month),
+      metroDocs: db.prepare(
+        `SELECT d.id, d.month, d.filename, d.total_pence, d.payments, d.created_at, u.name AS created_by_name
+           FROM metro_documents d LEFT JOIN users u ON u.id = d.created_by WHERE d.account_id = ? ORDER BY d.created_at DESC, d.id DESC`
+      ).all(a).map((d) => ({ ...d, monthLabel: st.monthLabel(d.month) })),
       flash: String(req.query.flash || '').slice(0, 1000), error: String(req.query.error || '').slice(0, 1000),
     });
   };
