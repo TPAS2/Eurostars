@@ -2816,3 +2816,12 @@ test('contractor page: boxes for paid in a chosen month, paid all time, unpaid a
   r = await c.get(`/app/contractors/${contractor}?month=2026-08`);
   assert.match(r.text, /<option value="2026-08" selected>August 2026[\s\S]*?class="value">£100\.00/);
 });
+
+test('landlords have a Date started, shown in their info box', async () => {
+  const c = await registerAndLogin('ll-started@example.com', 'LL Started Lets');
+  let r = await c.get('/app/landlords/new');
+  assert.match(r.text, /Date started[\s\S]*?name="date_started"[^>]*value="\d{4}-\d{2}-\d{2}"/, 'defaults to today');
+  const id = idFrom((await c.post('/app/landlords', { name: 'Stella Start', date_started: '2019-04-01', statement_type: 'Email' })).location);
+  r = await c.get(`/app/landlords/${id}`);
+  assert.match(r.text, /<dt>Date started<\/dt>[\s\S]*?01\/04\/2019/);
+});

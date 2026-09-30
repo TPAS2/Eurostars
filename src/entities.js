@@ -17,6 +17,7 @@ const ENTITIES = {
     fields: [
       { name: 'name', label: 'Name', type: 'text', required: true },
       { name: 'code', label: 'Landlord code', type: 'text', help: 'Your own reference for this landlord, e.g. LL001.' },
+      { name: 'date_started', label: 'Date started', type: 'date', default: 'today', help: 'The first day they did business with you.' },
       { name: 'statement_type', label: 'Statement type', type: 'select', options: ['Email', 'Cheque'], required: true, default: 'Email', help: 'Email: their statement is emailed in the rent run. Cheque: their statement is printed and sent with a cheque.' },
       { name: 'email', label: 'Email', type: 'email' },
       { name: 'bank_account_name', label: 'Bank account name', type: 'text', help: 'For the payment instruction in the rent run.', startRow: true },
