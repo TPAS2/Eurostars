@@ -23,6 +23,9 @@ const BOX = {
   count: { x: 162.4, y: 513.7, w: 166.0 },
   signatory1: { x: 62.9, y: 391.2, w: 237.3 },
   signatory2: { x: 315.7, y: 391.8, w: 237.3 },
+  // The Date box under each signature.
+  signatureDate1: { x: 111.0, y: 370.0, w: 188.3 },
+  signatureDate2: { x: 364.0, y: 370.7, w: 188.3 },
 };
 const BOX_HEIGHT = 18.2;
 
@@ -98,6 +101,9 @@ async function fillMetroForm(data) {
   // Typed-over figures (from the Rent run's step 5 box) win over the worked-out ones.
   put('totalFigures', data.totalFigures ?? (data.payees.length ? money(total) : ''), { f: bold });
   put('valueDate', data.valueDate);
+  // The same date under both signatures.
+  put('signatureDate1', data.valueDate);
+  put('signatureDate2', data.valueDate);
   put('totalWords', data.totalWords ?? (data.payees.length ? amountInWords(total) : ''), { size: 9.5 });
   put('count', data.count ?? (data.payees.length ? String(data.payees.length) : ''));
   // Printed names under each signature, so the bank can read who signed.
