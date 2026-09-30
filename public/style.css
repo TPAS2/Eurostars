@@ -737,3 +737,6 @@ table.council-db tr.new-row td { background: var(--surface-2); }
 table.council-db tr.new-row .cell-input { border-color: var(--border); background: var(--surface); }
 .tile-month { display: inline; }
 .tile-month select { font-size: .8rem; padding: 2px 6px; border-radius: 6px; margin-left: 4px; }
+/* Line up every cell in a row with its buttons. */
+.table-wrap td { vertical-align: middle; }
+.table-wrap td .btn.small { margin: -2px 0; }
