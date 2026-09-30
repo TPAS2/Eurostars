@@ -41,19 +41,14 @@
       <input id="f-date" type="date" name="invoice_date" value="<%= values.invoice_date || '' %>" required>
       <% if (errors.invoice_date) { %><div class="field-err"><%= errors.invoice_date %></div><% } %>
     </div>
-    <div class="field">
-      <label for="f-due">Due date <span class="req">*</span></label>
-      <input id="f-due" type="date" name="due_date" value="<%= values.due_date || '' %>" required>
-      <% if (errors.due_date) { %><div class="field-err"><%= errors.due_date %></div><% } %>
-    </div>
     <div class="field wide">
       <label for="f-desc">What it's for <span class="req">*</span></label>
       <input id="f-desc" name="description" value="<%= values.description || '' %>" placeholder="e.g. Tenant find fee, inventory check, annual inspection" required>
       <% if (errors.description) { %><div class="field-err"><%= errors.description %></div><% } %>
     </div>
     <div class="field wide">
-      <label for="f-notes">Notes (shown on the invoice) <span class="req">*</span></label>
-      <textarea id="f-notes" name="notes" rows="3" required><%= values.notes || '' %></textarea>
+      <label for="f-notes">Notes (shown on the invoice)</label>
+      <textarea id="f-notes" name="notes" rows="3"><%= values.notes || '' %></textarea>
       <% if (errors.notes) { %><div class="field-err"><%= errors.notes %></div><% } %>
     </div>
     <div class="form-actions wide">

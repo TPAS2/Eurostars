@@ -1985,13 +1985,15 @@ test('every section must be filled in when adding a contractor or landlord invoi
   assert.equal((await c.get(`/app/invoices/${idFrom(r.location)}`)).status, 200);
 
   r = await c.get('/app/landlord-invoices/new');
-  for (const name of ['landlord_id', 'property_id', 'invoice_number', 'amount', 'invoice_date', 'due_date', 'description', 'notes']) {
+  for (const name of ['landlord_id', 'property_id', 'invoice_number', 'amount', 'invoice_date', 'description']) {
     assert.match(r.text, new RegExp(`name="${name}"[^>]*required|required[^>]*name="${name}"`), `${name} is required on the landlord invoice form`);
   }
   const ll = idFrom((await c.post('/app/landlords', { name: 'Req Landlord' })).location);
   r = await c.post('/app/landlord-invoices', { landlord_id: String(ll), invoice_number: 'LI-0001', invoice_date: '2026-08-01', description: 'Fee', amount: '5' });
   assert.equal(r.status, 422);
-  assert.match(r.text, /Choose the property[\s\S]*?Enter the due date[\s\S]*?Add notes for the invoice/);
+  assert.match(r.text, /Choose the property/);
+  assert.doesNotMatch(r.text, /Enter the due date|Add notes for the invoice|name="due_date"/);
+  assert.doesNotMatch(r.text, /name="notes"[^>]*required/, 'notes are optional');
 });
 
 test('contractor invoice job can be None; councils take several phone numbers and emails', async () => {
