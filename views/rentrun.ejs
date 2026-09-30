@@ -108,8 +108,40 @@
     </table></div>
     <% } %>
   </div>
+  <div class="presets-bar">
+    <label for="preset-pick" class="strong">Preset</label>
+    <select id="preset-pick" data-preset-pick>
+      <option value="">Choose a preset…</option>
+      <% metroPresets.forEach(p => { %><option value="<%= p.id %>" data-preset="<%= JSON.stringify(p.data) %>"><%= p.name %></option><% }) %>
+    </select>
+    <button class="btn small primary" type="button" data-preset-fill>Fill in</button>
+    <button class="btn small" type="button" data-toggle="#preset-manage" aria-controls="preset-manage" aria-expanded="false">Presets (<%= metroPresets.length %>)</button>
+  </div>
+  <div id="preset-manage" class="metro-docs" hidden>
+    <h3>Presets</h3>
+    <p class="muted small">Ready-made details (store, account, contact, signatories) to fill the form in one click. Save what's in the boxes below as a new preset, or edit one.</p>
+    <% if (metroPresets.length) { %>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Name</th><th>Store</th><th>Account name</th><th>Account number</th><th>Signatories</th><th></th></tr></thead>
+      <tbody>
+      <% metroPresets.forEach(p => { %><tr>
+        <td><strong><%= p.name %></strong></td><td><%= p.data.store %></td><td><%= p.data.from_name %></td><td><%= p.data.from_account_number %></td>
+        <td><%= [p.data.signatory_1, p.data.signatory_2].filter(Boolean).join(', ') %></td>
+        <td class="num nowrap">
+          <a class="btn small" href="/app/rent-run/presets/<%= p.id %>/edit?month=<%= month %>">Edit</a>
+          <form method="post" action="/app/rent-run/presets/<%= p.id %>/delete" class="inline" data-confirm="Remove the preset <%= p.name %>?"><%- include('partials/csrf') %><input type="hidden" name="month" value="<%= month %>"><button class="btn small link" type="submit">Remove</button></form>
+        </td>
+      </tr><% }) %>
+      </tbody>
+    </table></div>
+    <% } %>
+    <div class="inline-form preset-save">
+      <input form="step5-form" name="preset_name" placeholder="New preset name, e.g. Main client account" maxlength="60" aria-label="Preset name">
+      <button form="step5-form" class="btn small" type="submit" formaction="/app/rent-run/presets">Save boxes as preset</button>
+    </div>
+  </div>
   <p class="muted small">What goes on Metro's form for <%= monthLabel %>. The totals are worked out from the payments; change anything you need, fill in the blanks, then open the form to print, sign and take to Metro.</p>
-  <form method="post" action="/app/rent-run/instruction/form" class="form-grid step5-grid" data-no-keep>
+  <form method="post" action="/app/rent-run/instruction/form" class="form-grid step5-grid" id="step5-form" data-no-keep>
     <%- include('partials/csrf') %><input type="hidden" name="month" value="<%= month %>">
     <h3 class="wide form-subhead">1. Customer details</h3>
     <div class="field wide"><label for="m-store">Store</label><input id="m-store" name="store" value="<%= step5.store %>" placeholder="Metro branch, e.g. Borehamwood"></div>

@@ -2941,3 +2941,28 @@ test('rent run step 5: Preview document shows the Metro form with what is typed,
   const co = db.prepare("SELECT id FROM users WHERE username = 'step5-preview'").get().id;
   assert.equal(db.prepare('SELECT COUNT(*) n FROM payment_instructions WHERE account_id = ?').get(co).n, 0, 'nothing saved');
 });
+
+test('rent run step 5: presets to fill in the Metro form, with Edit and Remove', async () => {
+  const c = await registerAndLogin('presets@example.com', 'Preset Lets');
+  let r = await c.get('/app/rent-run?month=2026-08');
+  assert.match(r.text, /data-preset-pick[\s\S]*?Fill in[\s\S]*?Presets \(0\)/);
+  r = await c.post('/app/rent-run/presets', { month: '2026-08', preset_name: 'Main client account', store: 'Borehamwood', from_name: 'Preset Lets Client', contact_name: 'Theo', from_account_number: '12345678', signatory_1: 'Theo', signatory_2: 'Sam', totalFigures: '£9' });
+  assert.match(decodeURIComponent(r.location.replace(/\+/g, ' ')), /Saved the preset “Main client account”/);
+  const p = db.prepare("SELECT * FROM metro_presets WHERE name = 'Main client account'").get();
+  assert.deepEqual(JSON.parse(p.data_json), { store: 'Borehamwood', from_name: 'Preset Lets Client', contact_name: 'Theo', from_account_number: '12345678', signatory_1: 'Theo', signatory_2: 'Sam' });
+  r = await c.get('/app/rent-run?month=2026-08');
+  assert.match(r.text, new RegExp(`<option value="${p.id}" data-preset="[^"]*Borehamwood[^"]*">Main client account</option>`));
+  assert.match(r.text, new RegExp(`href="/app/rent-run/presets/${p.id}/edit\\?month=2026-08">Edit`));
+  // Edit it.
+  r = await c.get(`/app/rent-run/presets/${p.id}/edit?month=2026-08`);
+  assert.match(r.text, /name="store" value="Borehamwood"/);
+  r = await c.post(`/app/rent-run/presets/${p.id}`, { month: '2026-08', name: 'Main account', store: 'Enfield', from_name: 'Preset Lets Client', contact_name: 'Theo', from_account_number: '12345678', signatory_1: 'Theo', signatory_2: '' });
+  assert.equal(db.prepare('SELECT name FROM metro_presets WHERE id = ?').get(p.id).name, 'Main account');
+  assert.equal(JSON.parse(db.prepare('SELECT data_json FROM metro_presets WHERE id = ?').get(p.id).data_json).store, 'Enfield');
+  // Another company can't see or change it; remove it.
+  const other = await registerAndLogin('presets-2@example.com', 'Other Preset Lets');
+  assert.equal((await other.get(`/app/rent-run/presets/${p.id}/edit`)).status, 404);
+  await c.get('/app/rent-run?month=2026-08');
+  await c.post(`/app/rent-run/presets/${p.id}/delete`, { month: '2026-08' });
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM metro_presets WHERE id = ?').get(p.id).n, 0);
+});

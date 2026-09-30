@@ -139,6 +139,15 @@ CREATE TABLE IF NOT EXISTS app_settings (
   value TEXT
 );
 
+-- Ready-made details for the Metro form (rent run step 5): fill the boxes in one click.
+CREATE TABLE IF NOT EXISTS metro_presets (
+  id          INTEGER PRIMARY KEY,
+  account_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name        TEXT NOT NULL,
+  data_json   TEXT NOT NULL,
+  created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 -- Each Metro payment instruction created in the rent run (step 5), kept to look back at.
 CREATE TABLE IF NOT EXISTS metro_documents (
   id          INTEGER PRIMARY KEY,

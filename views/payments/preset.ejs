@@ -1,0 +1,23 @@
+<%- include('../partials/header') %>
+<header class="page-head">
+  <div>
+    <a class="crumb" href="/app/rent-run?month=<%= month %>#payment-instruction">← Rent run</a>
+    <h1>Edit preset</h1>
+    <p class="muted">Ready-made details for the Metro form in step 5.</p>
+  </div>
+</header>
+<% if (error) { %><div class="notice err"><%= error %></div><% } %>
+<section class="card">
+  <form method="post" action="/app/rent-run/presets/<%= p.id %>" class="form-grid" data-no-keep>
+    <%- include('../partials/csrf') %><input type="hidden" name="month" value="<%= month %>">
+    <div class="field wide"><label for="pr-name">Preset name <span class="req">*</span></label><input id="pr-name" name="name" value="<%= values.name || '' %>" required maxlength="60"></div>
+    <% fields.forEach(([k, label]) => { %>
+    <div class="field"><label for="pr-<%= k %>"><%= label %></label><input id="pr-<%= k %>" name="<%= k %>" value="<%= values[k] || '' %>"<%- k === 'from_account_number' ? ' inputmode="numeric" maxlength="12"' : ' maxlength="60"' %>></div>
+    <% }) %>
+    <div class="form-actions wide">
+      <button class="btn primary" type="submit">Save preset</button>
+      <a class="btn" href="/app/rent-run?month=<%= month %>#payment-instruction">Cancel</a>
+    </div>
+  </form>
+</section>
+<%- include('../partials/footer') %>

@@ -124,6 +124,43 @@ module.exports = function paymentRoutes(db) {
     backToRun(res, monthOf(req.body.month), { flash: 'Document removed.' });
   });
 
+  // ---------- presets: ready-made details for the step 5 box ----------
+  const PRESET_FIELDS = [['store', 'Store'], ['from_name', 'Account name'], ['contact_name', 'Contact name'],
+    ['from_account_number', 'Account number'], ['signatory_1', 'Authorised signatory 1'], ['signatory_2', 'Authorised signatory 2']];
+  const presetValues = (body) => Object.fromEntries(PRESET_FIELDS.map(([k]) => [k, clip(body[k], k === 'from_account_number' ? 12 : 60)]));
+  const preset = (req, res) => {
+    const p = db.prepare('SELECT * FROM metro_presets WHERE id = ? AND account_id = ?').get(Number(req.params.pid), req.user.id);
+    if (!p) res.status(404).render('error', { title: 'Not found', message: 'That preset was not found.' });
+    return p;
+  };
+  router.post('/presets', (req, res) => {
+    const month = monthOf(req.body.month);
+    const name = clip(req.body.preset_name, 60);
+    if (!name) return backToRun(res, month, { error: 'Give the preset a name.' });
+    db.prepare('INSERT INTO metro_presets (account_id, name, data_json) VALUES (?, ?, ?)').run(req.user.id, name, JSON.stringify(presetValues(req.body)));
+    backToRun(res, month, { flash: `Saved the preset “${name}”.` });
+  });
+  router.get('/presets/:pid(\\d+)/edit', (req, res) => {
+    const p = preset(req, res);
+    if (!p) return;
+    res.render('payments/preset', { title: `Edit preset · ${p.name}`, section: 'rentrun', p, values: { name: p.name, ...JSON.parse(p.data_json) }, fields: PRESET_FIELDS, month: monthOf(req.query.month), error: '' });
+  });
+  router.post('/presets/:pid(\\d+)', (req, res) => {
+    const p = preset(req, res);
+    if (!p) return;
+    const month = monthOf(req.body.month);
+    const name = clip(req.body.name, 60);
+    if (!name) return res.status(422).render('payments/preset', { title: `Edit preset · ${p.name}`, section: 'rentrun', p, values: req.body, fields: PRESET_FIELDS, month, error: 'Give the preset a name.' });
+    db.prepare('UPDATE metro_presets SET name = ?, data_json = ? WHERE id = ? AND account_id = ?').run(name, JSON.stringify(presetValues(req.body)), p.id, req.user.id);
+    backToRun(res, month, { flash: `Saved the preset “${name}”.` });
+  });
+  router.post('/presets/:pid(\\d+)/delete', (req, res) => {
+    const p = preset(req, res);
+    if (!p) return;
+    db.prepare('DELETE FROM metro_presets WHERE id = ? AND account_id = ?').run(p.id, req.user.id);
+    backToRun(res, monthOf(req.body.month), { flash: `Removed the preset “${p.name}”.` });
+  });
+
   router.post('/instruction/form', (req, res, next) => {
     const month = monthOf(req.body.month);
     saveForm(req.user.id, month, req.body, req.user.name);

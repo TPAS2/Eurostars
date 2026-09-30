@@ -582,3 +582,20 @@ document.addEventListener('click', (e) => {
     update();
   });
 })();
+
+// Rent run step 5: "Fill in" copies the chosen preset into the boxes.
+(function () {
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-preset-fill]');
+    if (!btn) return;
+    const pick = document.querySelector('[data-preset-pick]');
+    const opt = pick && pick.selectedOptions[0];
+    if (!opt || !opt.dataset.preset) { if (pick) pick.focus(); return; }
+    const data = JSON.parse(opt.dataset.preset);
+    const form = document.getElementById('step5-form');
+    for (const [k, v] of Object.entries(data)) {
+      const el = form && form.elements[k];
+      if (el && v) el.value = v;
+    }
+  });
+})();

@@ -744,3 +744,10 @@ table.council-db tr.new-row .cell-input { border-color: var(--border); backgroun
 .metro-docs { margin: 4px 0 16px; padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-2); }
 .metro-docs h3 { margin: 0 0 8px; }
 .btn.blank-form { border-color: var(--brand); color: var(--brand); font-weight: 700; }
+.presets-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 4px 0 12px; }
+.presets-bar select { min-width: 220px; }
+.preset-save { display: flex; gap: 8px; margin-top: 10px; }
+.preset-save input { flex: 1; max-width: 360px; }
+.presets-bar { flex-wrap: nowrap; }
+.presets-bar label { margin: 0; white-space: nowrap; }
+.presets-bar select { width: auto; flex: 0 1 320px; }
