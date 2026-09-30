@@ -7,6 +7,12 @@ const fmt = require('./format');
 const st = require('./statements');
 const { amountInWords, money } = require('./metroForm');
 
+// A typed total in figures ("5000", "£5,000.00", "5000-5") written the bank's way: £5,000-00.
+function tidyFigures(v) {
+  const m = String(v || '').replace(/[£,\s]/g, '').match(/^(\d+)(?:[.\-](\d{0,2}))?$/);
+  return m ? money(Number(m[1]) * 100 + Number((m[2] || '').padEnd(2, '0'))) : String(v || '');
+}
+
 const clip = (v, n) => String(v ?? '').trim().slice(0, n);
 const shortMonth = (month) => {
   const [y, m] = month.split('-').map(Number);
@@ -67,7 +73,7 @@ function saveForm(accountId, month, body, userName) {
     signatory_1: f('signatory_1'), signatory_2: f('signatory_2'),
   });
   for (const k of ['totalFigures', 'totalWords', 'count']) {
-    const v = f(k, 200);
+    const v = k === 'totalFigures' ? tidyFigures(f(k, 200)) : f(k, 200);
     data[`${k}_override`] = v && v !== auto[k] ? v : '';
   }
   db.prepare(
@@ -85,7 +91,7 @@ function formFor(user, month) {
   return {
     store: data.store || '', from_name: data.from_name || '', contact_name: data.contact_name || user.name || '',
     from_account_number: data.from_account_number || '', payment_date: data.payment_date || '',
-    totalFigures: data.totalFigures_override || auto.totalFigures, totalWords: data.totalWords_override || auto.totalWords,
+    totalFigures: tidyFigures(data.totalFigures_override) || auto.totalFigures, totalWords: data.totalWords_override || auto.totalWords,
     count: data.count_override || auto.count, signatory_1: data.signatory_1 || '', signatory_2: data.signatory_2 || '',
     payees: data.payees.filter((p) => p.include).length, saved_at: data.saved_at, agencyName: agency.agency_name,
   };
@@ -109,10 +115,10 @@ function metroData(user, month, typed = null) {
     pence: Number.isNaN(fmt.parseMoney(p.amount)) ? 0 : fmt.parseMoney(p.amount),
   }));
   return {
-    store: data.store, accountName: data.from_name, contactName: data.contact_name || user.name || agency.name,
+    store: '', accountName: data.from_name, // Store: left blank on the form for now contactName: data.contact_name || user.name || agency.name,
     accountNumber: data.from_account_number, valueDate: data.payment_date ? fmt.ukDate(data.payment_date) : '',
     signatory1: '', signatory2: '', payees, // signed by hand after printing
-    totalFigures: data.totalFigures_override || undefined, totalWords: data.totalWords_override || undefined, count: data.count_override || undefined,
+    totalFigures: tidyFigures(data.totalFigures_override) || undefined, totalWords: data.totalWords_override || undefined, count: data.count_override || undefined,
     monthLabel: st.monthLabel(month), agencyName: agency.agency_name,
   };
 }

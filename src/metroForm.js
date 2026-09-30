@@ -59,7 +59,8 @@ function amountInWords(pence) {
   return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
-const money = (pence) => `£${(pence / 100).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+// Cheque style for the bank form: £5,000-00 (a dash before the pence).
+const money = (pence) => `£${Math.floor(pence / 100).toLocaleString('en-GB')}-${String(pence % 100).padStart(2, '0')}`;
 
 // The standard PDF fonts only cover Western European characters.
 const safe = (s) => String(s ?? '').replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/[–—]/g, '-')

@@ -630,3 +630,57 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 })();
+
+// Rent run step 5: the total in figures always reads like £5,000-00, and typing it fills in
+// the total in words.
+document.addEventListener('DOMContentLoaded', () => {
+  const box = document.querySelector('[data-money-figures]');
+  const wordsBox = box && document.querySelector(box.dataset.moneyFigures);
+  if (!box || !wordsBox) return;
+  const ONES = ['', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve',
+    'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen'];
+  const TENS = ['', '', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety'];
+  const under1000 = (n) => {
+    const parts = [];
+    if (n >= 100) { parts.push(`${ONES[Math.floor(n / 100)]} hundred`); n %= 100; if (n) parts.push('and'); }
+    if (n >= 20) parts.push(TENS[Math.floor(n / 10)] + (n % 10 ? `-${ONES[n % 10]}` : ''));
+    else if (n) parts.push(ONES[n]);
+    return parts.join(' ');
+  };
+  const whole = (n) => {
+    if (n === 0) return 'zero';
+    const parts = [];
+    for (const [size, name] of [[1e9, 'billion'], [1e6, 'million'], [1e3, 'thousand']]) {
+      if (n >= size) { parts.push(`${under1000(Math.floor(n / size))} ${name}`); n %= size; }
+    }
+    if (n) parts.push((parts.length && n < 100 ? 'and ' : '') + under1000(n));
+    return parts.join(' ');
+  };
+  const inWords = (pence) => {
+    const pounds = Math.floor(pence / 100);
+    const p = pence % 100;
+    let w = `${whole(pounds)} pound${pounds === 1 ? '' : 's'}`;
+    w += p ? ` and ${whole(p)} ${p === 1 ? 'penny' : 'pence'}` : ' only';
+    return w.charAt(0).toUpperCase() + w.slice(1);
+  };
+  // "5000", "£5,000.5", "5000-50" → pence; anything else → null.
+  const toPence = (v) => {
+    const m = String(v).replace(/[£,\s]/g, '').match(/^(\d+)(?:[.\-](\d{0,2}))?$/);
+    if (!m) return null;
+    return Number(m[1]) * 100 + Number((m[2] || '').padEnd(2, '0'));
+  };
+  const figures = (pence) => `£${Math.floor(pence / 100).toLocaleString('en-GB')}-${String(pence % 100).padStart(2, '0')}`;
+  box.addEventListener('input', () => {
+    // Always starts with £ …
+    const raw = box.value.replace(/£/g, '');
+    if (raw && box.value !== `£${raw}`) box.value = `£${raw}`;
+    // … and the words follow what's typed.
+    const pence = toPence(box.value);
+    wordsBox.value = pence === null || !raw ? '' : inWords(pence);
+  });
+  // Tidied up when you leave the box: commas and a dash before the pence.
+  box.addEventListener('change', () => {
+    const pence = toPence(box.value);
+    if (pence !== null) box.value = figures(pence);
+  });
+});

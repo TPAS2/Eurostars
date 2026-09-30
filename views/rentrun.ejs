@@ -119,13 +119,13 @@
   </div>
   <div id="preset-manage" class="metro-docs" hidden>
     <h3>Presets</h3>
-    <p class="muted small">Ready-made details (store, account, contact) to fill the form in one click. Save what's in the boxes below as a new preset, or edit one.</p>
+    <p class="muted small">Ready-made details (account, contact) to fill the form in one click. Save what's in the boxes below as a new preset, or edit one.</p>
     <% if (metroPresets.length) { %>
     <div class="table-wrap"><table>
-      <thead><tr><th>Name</th><th>Store</th><th>Account name</th><th>Account number</th><th></th></tr></thead>
+      <thead><tr><th>Name</th><th>Account name</th><th>Account number</th><th></th></tr></thead>
       <tbody>
       <% metroPresets.forEach(p => { %><tr>
-        <td><strong><%= p.name %></strong></td><td><%= p.data.store %></td><td><%= p.data.from_name %></td><td><%= p.data.from_account_number %></td>
+        <td><strong><%= p.name %></strong></td><td><%= p.data.from_name %></td><td><%= p.data.from_account_number %></td>
         <td class="num nowrap">
           <a class="btn small" href="/app/rent-run/presets/<%= p.id %>/edit?month=<%= month %>">Edit</a>
           <form method="post" action="/app/rent-run/presets/<%= p.id %>/delete" class="inline" data-confirm="Remove the preset <%= p.name %>?"><%- include('partials/csrf') %><input type="hidden" name="month" value="<%= month %>"><button class="btn small link" type="submit">Remove</button></form>
@@ -143,12 +143,11 @@
   <form method="post" action="/app/rent-run/instruction/form" class="form-grid step5-grid" id="step5-form" data-no-keep>
     <%- include('partials/csrf') %><input type="hidden" name="month" value="<%= month %>">
     <h3 class="wide form-subhead">1. Customer details</h3>
-    <div class="field wide"><label for="m-store">Store</label><input id="m-store" name="store" value="<%= step5.store %>" placeholder="Metro branch, e.g. Borehamwood"></div>
     <div class="field"><label for="m-name">Account name</label><input id="m-name" name="from_name" value="<%= step5.from_name %>" placeholder="e.g. <%= step5.agencyName %> Client Account"></div>
     <div class="field"><label for="m-contact">Contact name</label><input id="m-contact" name="contact_name" value="<%= step5.contact_name %>"></div>
     <div class="field"><label for="m-acc">Account number</label><input id="m-acc" name="from_account_number" value="<%= step5.from_account_number %>" inputmode="numeric" placeholder="8 digits"></div>
     <h3 class="wide form-subhead">2. Payment details</h3>
-    <div class="field"><label for="m-total">Total amount in figures</label><input id="m-total" name="totalFigures" value="<%= step5.totalFigures %>"></div>
+    <div class="field"><label for="m-total">Total amount in figures</label><input id="m-total" name="totalFigures" value="<%= step5.totalFigures %>" inputmode="decimal" placeholder="£0-00" data-money-figures="#m-words"></div>
     <div class="field"><label for="m-date">Value date</label><input id="m-date" type="date" name="payment_date" value="<%= step5.payment_date %>"></div>
     <div class="field wide"><label for="m-words">Total amount in words</label><input id="m-words" name="totalWords" value="<%= step5.totalWords %>"></div>
     <div class="field"><label for="m-count">Total number of transactions</label><input id="m-count" name="count" value="<%= step5.count %>" inputmode="numeric"></div>

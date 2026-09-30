@@ -1628,10 +1628,10 @@ test('rent run step 5: payment instruction template and a filled-in instruction 
   // Step 5 is its own box, after the steps, with the form's details to edit.
   assert.match(r.text, /<\/ol>\s*<\/section>\s*<section class="card step5" id="payment-instruction">[\s\S]*?Metro Bank Bulk Payment Instruction[\s\S]*?class="btn small blank-form"[^>]*>Blank form/);
   assert.doesNotMatch(r.text, /Check payments/);
-  assert.match(r.text, /name="totalFigures" value="£1,000\.00"/, 'total worked out from the payments');
+  assert.match(r.text, /name="totalFigures" value="£1,000-00"/, 'total worked out from the payments');
   assert.match(r.text, /name="totalWords" value="One thousand pounds only"/);
   assert.match(r.text, /name="count" value="1"/);
-  assert.match(r.text, /name="store" value=""/, 'store left blank');
+  assert.doesNotMatch(r.text, /name="store"/, 'no Store box');
   assert.match(r.text, /name="contact_name" value="Test User"/, 'contact name suggested');
   assert.match(r.text, /<table class="centered">/, 'landlords table is centred');
 
@@ -2825,14 +2825,14 @@ test('rent run step 5 box: edit the Metro form details; typed-over totals are ke
   let r = await c.post('/app/rent-run/instruction/form', { month: '2026-08', store: 'Borehamwood', from_name: 'Step Five Client Account', contact_name: 'Theo', from_account_number: '87654321', payment_date: '2026-09-17', totalFigures: '£5,000.00', totalWords: '', count: '', signatory_1: 'Theo', signatory_2: '', then: 'save' });
   assert.match(decodeURIComponent(r.location.replace(/\+/g, ' ')), /Saved the payment instruction details/);
   r = await c.get('/app/rent-run?month=2026-08');
-  assert.match(r.text, /name="store" value="Borehamwood"/);
-  assert.match(r.text, /name="totalFigures" value="£5,000\.00"/);
+  assert.doesNotMatch(r.text, /name="store"/, 'no Store box for now');
+  assert.match(r.text, /name="totalFigures" value="£5,000-00"/);
   assert.match(r.text, /name="payment_date" value="2026-09-17"/);
   assert.doesNotMatch(r.text, /name="signatory_1"|name="signatory_2"|Customer signature/, 'the signature section is left for signing by hand');
   const { metroData } = require('../src/paymentInstruction')(db);
   const d = metroData({ id: co, name: 'Test User' }, '2026-08');
-  assert.equal(d.store, 'Borehamwood');
-  assert.equal(d.totalFigures, '£5,000.00', 'typed-over total goes on the form');
+  assert.equal(d.store, '', 'store left blank on the form');
+  assert.equal(d.totalFigures, '£5,000-00', 'typed-over total goes on the form');
   assert.deepEqual([d.signatory1, d.signatory2], ['', ''], 'no names printed in the signature boxes');
   assert.equal(d.valueDate, '17/09/2026');
   r = await c.post('/app/rent-run/instruction/form', { month: '2026-08', store: 'Borehamwood', then: 'metro' });
@@ -3033,16 +3033,16 @@ test('rent run step 5: presets to fill in the Metro form, with Edit and Remove',
   r = await c.post('/app/rent-run/presets', { month: '2026-08', preset_name: 'Main client account', store: 'Borehamwood', from_name: 'Preset Lets Client', contact_name: 'Theo', from_account_number: '12345678', signatory_1: 'Theo', signatory_2: 'Sam', totalFigures: '£9' });
   assert.match(decodeURIComponent(r.location.replace(/\+/g, ' ')), /Saved the preset “Main client account”/);
   const p = db.prepare("SELECT * FROM metro_presets WHERE name = 'Main client account'").get();
-  assert.deepEqual(JSON.parse(p.data_json), { store: 'Borehamwood', from_name: 'Preset Lets Client', contact_name: 'Theo', from_account_number: '12345678' });
+  assert.deepEqual(JSON.parse(p.data_json), { from_name: 'Preset Lets Client', contact_name: 'Theo', from_account_number: '12345678' });
   r = await c.get('/app/rent-run?month=2026-08');
-  assert.match(r.text, new RegExp(`<option value="${p.id}" data-preset="[^"]*Borehamwood[^"]*">Main client account</option>`));
+  assert.match(r.text, new RegExp(`<option value="${p.id}" data-preset="[^"]*Preset Lets Client[^"]*">Main client account</option>`));
   assert.match(r.text, new RegExp(`href="/app/rent-run/presets/${p.id}/edit\\?month=2026-08">Edit`));
   // Edit it.
   r = await c.get(`/app/rent-run/presets/${p.id}/edit?month=2026-08`);
-  assert.match(r.text, /name="store" value="Borehamwood"/);
-  r = await c.post(`/app/rent-run/presets/${p.id}`, { month: '2026-08', name: 'Main account', store: 'Enfield', from_name: 'Preset Lets Client', contact_name: 'Theo', from_account_number: '12345678', signatory_1: 'Theo', signatory_2: '' });
+  assert.match(r.text, /name="from_name" value="Preset Lets Client"/);
+  r = await c.post(`/app/rent-run/presets/${p.id}`, { month: '2026-08', name: 'Main account', from_name: 'Preset Lets Client 2', contact_name: 'Theo', from_account_number: '12345678', signatory_1: 'Theo', signatory_2: '' });
   assert.equal(db.prepare('SELECT name FROM metro_presets WHERE id = ?').get(p.id).name, 'Main account');
-  assert.equal(JSON.parse(db.prepare('SELECT data_json FROM metro_presets WHERE id = ?').get(p.id).data_json).store, 'Enfield');
+  assert.equal(JSON.parse(db.prepare('SELECT data_json FROM metro_presets WHERE id = ?').get(p.id).data_json).from_name, 'Preset Lets Client 2');
   // Another company can't see or change it; remove it.
   const other = await registerAndLogin('presets-2@example.com', 'Other Preset Lets');
   assert.equal((await other.get(`/app/rent-run/presets/${p.id}/edit`)).status, 404);
