@@ -48,6 +48,10 @@ function paymentRows(db, accountId, month) {
   const rows = [];
   const cheques = [];
   const problems = [];
+  // Landlords whose bank details changed and haven't been checked with them yet.
+  const pending = new Set(db.prepare('SELECT DISTINCT landlord_id FROM landlord_bank_changes WHERE account_id = ? AND checked_at IS NULL')
+    .all(accountId).map((c) => c.landlord_id));
+  const bankAlerts = [];
   for (const l of all) {
     if (l.statement_type === 'Cheque') { if (l.closing_pence > 0) cheques.push({ name: l.name, pence: l.closing_pence }); continue; }
     const paid = l.closing_pence > 0;
@@ -57,10 +61,11 @@ function paymentRows(db, accountId, month) {
     if (sort.length !== 6) issues.push(sort ? 'sort code isn’t 6 digits' : 'no sort code');
     if (account.length !== 8) issues.push(account ? 'account number isn’t 8 digits' : 'no account number');
     if (paid && issues.length) problems.push({ landlord_id: l.landlord_id, name: l.name, issues });
+    if (pending.has(l.landlord_id)) bankAlerts.push({ landlord_id: l.landlord_id, name: l.name, paid });
     const base = {
       landlord_id: l.landlord_id, landlordName: l.name, code: l.code || '', name: l.bank_account_name || l.name, account,
       sortCode: sort.length === 6 ? `${sort.slice(0, 2)}-${sort.slice(2, 4)}-${sort.slice(4)}` : sort, sortDigits: sort,
-      bankName: l.bank_name || '', note: l.payment_note || '',
+      bankName: l.bank_name || '', note: l.payment_note || '', bankUnchecked: pending.has(l.landlord_id),
     };
     const split = byProperty(l.detail_json, l.closing_pence);
     if (paid && split.exact) {
@@ -70,7 +75,7 @@ function paymentRows(db, accountId, month) {
       rows.push({ ...base, reference, pence: paid ? l.closing_pence : null });
     }
   }
-  return { month, monthLabel: monthLabel(month), rows, cheques, problems };
+  return { month, monthLabel: monthLabel(month), rows, cheques, problems, bankAlerts };
 }
 
 // Step 5 (Metro's bulk file): the payments only, adding up to the Rift report (less cheques).

@@ -210,6 +210,28 @@ function failureLimiter({ windowMs, max }) {
   };
 }
 
+// Passwords that are too easy to guess: the most common ones, simple runs and repeats, and any
+// that contain the person's own username, name or agency. Returns why, or '' if it's fine.
+const COMMON_PASSWORDS = new Set(['password', 'password1', 'password12', 'password123', 'password1234', 'passw0rd', 'p@ssw0rd', 'p@ssword',
+  'qwerty', 'qwerty123', 'qwertyuiop', 'qwerty1234', 'letmein', 'letmein1', 'welcome', 'welcome1', 'welcome123', 'admin', 'admin123',
+  'admin1234', 'administrator', 'iloveyou', 'monkey', 'dragon', 'football', 'baseball', 'sunshine', 'princess', 'trustno1',
+  'abc123', 'abcd1234', 'changeme', 'default', 'secret', 'master', 'superman', 'batman', 'starwars', 'liverpool', 'chelsea',
+  'arsenal', 'manchester', 'london', 'london123', 'summer', 'summer2026', 'winter', 'autumn', 'spring', 'lettings', 'property',
+  'landlord', 'tenant', 'rentals', 'rift', 'rift1234', 'test', 'test1234', 'testing', 'guest', 'login', 'computer', 'internet']);
+function weakPassword(password, words = []) {
+  const p = String(password || '').toLowerCase();
+  const bare = p.replace(/[^a-z0-9]/g, '');
+  if (COMMON_PASSWORDS.has(p) || COMMON_PASSWORDS.has(bare) || COMMON_PASSWORDS.has(bare.replace(/\d+$/, ''))) return 'That password is too common. Choose something harder to guess.';
+  if (/^(.)\1+$/.test(p) || /^(?:0123456789|1234567890|123456789|12345678|987654321|abcdefgh|qwertyui)/.test(bare) && bare.length < 14) {
+    return 'That password is too simple. Avoid repeated or consecutive characters.';
+  }
+  for (const w of words) {
+    const word = String(w || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (word.length >= 4 && bare.includes(word)) return 'Don’t use the username, name or agency in the password.';
+  }
+  return '';
+}
+
 const INTRO_COOKIE = 'rift_intro';
 function introCookie(on, secure) {
   const attrs = [`${INTRO_COOKIE}=${on ? '1' : ''}`, 'Path=/', 'HttpOnly', 'SameSite=Lax', `Max-Age=${on ? 120 : 0}`];
@@ -218,6 +240,7 @@ function introCookie(on, secure) {
 }
 
 module.exports = {
+  weakPassword,
   introCookie,
   hashPassword,
   verifyPassword,

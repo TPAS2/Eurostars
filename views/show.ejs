@@ -20,6 +20,19 @@
 
 <% if (error) { %><div class="notice err"><%= error %></div><% } %>
 <% if (flash) { %><div class="notice ok"><%= flash %></div><% } %>
+<% if (typeof bankChanges !== 'undefined' && bankChanges.length) { %>
+<div class="notice err bank-alert" id="bank-changes">
+  <strong>Bank details changed — check with the landlord before paying them.</strong>
+  <ul class="tight">
+    <% bankChanges.forEach(c => { %><li><%= fmt.ukDateTime(c.changed_at) %> by <%= c.changed_by_name || 'someone' %>: account <%= c.oldAccount %> → <%= c.newAccount %>, sort code <%= c.oldSort %> → <%= c.newSort %><% if ((c.old_name || '') !== (c.new_name || '')) { %>, account name “<%= c.old_name || '' %>” → “<%= c.new_name || '' %>”<% } %></li><% }) %>
+  </ul>
+  <p class="small">Fraudsters change bank details to redirect rent. Phone the landlord on a number you already have (not one from the email or letter asking for the change) and confirm the new details.</p>
+  <form method="post" action="/app/landlords/<%= row.id %>/bank-checked" class="inline" data-confirm="Have you confirmed the new bank details with the landlord directly?">
+    <%- include('partials/csrf') %>
+    <button class="btn small" type="submit">I've checked them with the landlord</button>
+  </form>
+</div>
+<% } %>
 <% if (typeof contractorStats !== 'undefined' && contractorStats) { const cs = contractorStats; const plural = (n) => `${n} invoice${n === 1 ? '' : 's'}`; %>
 <section class="tiles centered-tiles contractor-tiles">
   <div class="tile">

@@ -9,6 +9,13 @@
     <a class="btn primary" href="/app/rent-run/bulk.xlsm?month=<%= month %>">Download Excel (.xlsm)</a>
   </div>
 </header>
+<% if (file.bankAlerts.length) { %>
+<div class="notice err bank-alert">
+  <strong>Bank details changed and not yet checked:</strong>
+  <ul class="tight"><% file.bankAlerts.forEach(b => { %><li><a href="/app/landlords/<%= b.landlord_id %>#bank-changes"><%= b.name %></a></li><% }) %></ul>
+  <p class="small">Check the new details with each landlord by phone before paying them. Their rows are marked ⚠ below.</p>
+</div>
+<% } %>
 <% if (file.problems.length) { %>
 <div class="notice warn">
   <strong>Check these landlords' bank details before uploading:</strong>
@@ -25,7 +32,7 @@
       <tbody>
       <% file.rows.forEach(r => { %>
         <tr>
-          <td class="c"><%= r.sortCode %></td>
+          <td class="c"><% if (r.bankUnchecked) { %><span class="bank-flag" title="Bank details changed, not yet checked">⚠ </span><% } %><%= r.sortCode %></td>
           <td><%= r.name %><% if (r.name.length > maxText) { %><span class="cut" title="Metro reads the first <%= maxText %> characters"> *</span><% } %></td>
           <td class="c"><%= r.account %></td>
           <td><%= r.reference %><% if (r.reference.length > maxText) { %><span class="cut" title="Metro reads the first <%= maxText %> characters"> *</span><% } %></td>

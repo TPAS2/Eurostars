@@ -188,6 +188,24 @@ module.exports = function appRoutes(db) {
   }
 
   // Keep derived data consistent after a record is saved.
+  // Did the sort code, account number or account name change (ignoring spaces and dashes)?
+  const bankKey = (v) => String(v || '').replace(/[\s-]/g, '').toLowerCase();
+  function bankDetailsChanged(row, values) {
+    return ['bank_account_name', 'bank_sort_code', 'bank_account_number'].some((k) => k in values && bankKey(values[k]) !== bankKey(row[k]))
+      // Only when complete details were there already: filling them in for the first time isn't a change.
+      && (String(row.bank_sort_code || '').replace(/\D/g, '').length === 6 || String(row.bank_account_number || '').replace(/\D/g, '').length === 8);
+  }
+
+  // Confirm a bank details change (after checking it with the landlord, e.g. by phone).
+  router.post('/landlords/:id/bank-checked', (req, res) => {
+    const id = Number(req.params.id);
+    const l = Number.isInteger(id) && db.prepare('SELECT id FROM landlords WHERE id = ? AND account_id = ?').get(id, req.user.id);
+    if (!l) return res.status(404).render('error', { title: 'Not found', message: 'That landlord was not found.' });
+    db.prepare("UPDATE landlord_bank_changes SET checked_at = datetime('now'), checked_by = ? WHERE landlord_id = ? AND account_id = ? AND checked_at IS NULL")
+      .run(req.user.person_id || req.user.id, l.id, req.user.id);
+    res.redirect(`/app/landlords/${l.id}?flash=${encodeURIComponent('Bank details marked as checked.')}`);
+  });
+
   function afterSave(def, accountId, id, values) {
     if (def.key === 'transactions') ledger.bookManagementFee(db, accountId, id);
     if (def.key === 'tenancies' && values.status === 'active') {
@@ -782,7 +800,8 @@ module.exports = function appRoutes(db) {
     const photo = def.key === 'councils'
       ? db.prepare("SELECT strftime('%s', updated_at) AS v FROM council_photos WHERE council_id = ? AND account_id = ?").get(row.id, a) || { v: null }
       : null;
-    res.render('show', { title: rowTitle(def, row, maps), section: sectionOf(def), def, row, maps, display, rowTitle, children, extra, invoices, related: relatedLists(def, row, a), certs, photo, tenantBoxes, statementLink, jobFiles, jobInvoice, contractorStats, error: req.query.error ? String(req.query.error).slice(0, 200) : null, flash: req.query.flash ? String(req.query.flash).slice(0, 200) : null, fmt, today: fmt.today() });
+    const bankChanges = def.key === 'landlords' ? require('../bankChanges').unchecked(db, a, row.id) : [];
+    res.render('show', { title: rowTitle(def, row, maps), section: sectionOf(def), def, row, maps, display, rowTitle, children, extra, invoices, related: relatedLists(def, row, a), certs, photo, tenantBoxes, statementLink, jobFiles, jobInvoice, contractorStats, bankChanges, error: req.query.error ? String(req.query.error).slice(0, 200) : null, flash: req.query.flash ? String(req.query.flash).slice(0, 200) : null, fmt, today: fmt.today() });
   });
 
   router.get('/:entity/:id/edit', (req, res) => {
@@ -817,7 +836,24 @@ module.exports = function appRoutes(db) {
     if (councilChange) db.prepare('UPDATE properties SET council_id = ? WHERE id = ? AND account_id = ?').run(councilChange.council_id, councilChange.property_id, a);
     prepareValues(def, a, values);
     const cols = Object.keys(values);
+    // A landlord's bank details changing is recorded, and flagged until it's been checked.
+    const bankChange = def.key === 'landlords' && bankDetailsChanged(row, values);
     transaction(db, () => {
+      // Typing saves as you go, so edits within half an hour by the same person are one change.
+      const recent = bankChange && db.prepare(
+        `SELECT id FROM landlord_bank_changes WHERE account_id = ? AND landlord_id = ? AND changed_by IS ? AND checked_at IS NULL
+           AND changed_at > datetime('now', '-30 minutes') ORDER BY id DESC LIMIT 1`
+      ).get(a, row.id, req.user.person_id || a);
+      if (recent) {
+        db.prepare("UPDATE landlord_bank_changes SET new_name = ?, new_sort_code = ?, new_account = ?, changed_at = datetime('now') WHERE id = ?")
+          .run(values.bank_account_name, values.bank_sort_code, values.bank_account_number, recent.id);
+      } else if (bankChange) {
+        db.prepare(
+          `INSERT INTO landlord_bank_changes (account_id, landlord_id, changed_by, old_name, old_sort_code, old_account, new_name, new_sort_code, new_account)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ).run(a, row.id, req.user.person_id || a, row.bank_account_name, row.bank_sort_code, row.bank_account_number,
+          values.bank_account_name, values.bank_sort_code, values.bank_account_number);
+      }
       db.prepare(`UPDATE ${def.table} SET ${cols.map((c) => `${c} = ?`).join(', ')} WHERE id = ? AND account_id = ?`)
         .run(...cols.map((c) => values[c]), row.id, a);
       afterSave(def, a, row.id, values);

@@ -148,6 +148,21 @@ CREATE TABLE IF NOT EXISTS metro_presets (
   created_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Every change to a landlord's bank details (a common fraud: redirecting their rent). Shown as a
+-- warning until someone confirms the new details with the landlord.
+CREATE TABLE IF NOT EXISTS landlord_bank_changes (
+  id            INTEGER PRIMARY KEY,
+  account_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  landlord_id   INTEGER NOT NULL REFERENCES landlords(id) ON DELETE CASCADE,
+  changed_at    TEXT NOT NULL DEFAULT (datetime('now')),
+  changed_by    INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  old_name      TEXT, old_sort_code TEXT, old_account TEXT,
+  new_name      TEXT, new_sort_code TEXT, new_account TEXT,
+  checked_at    TEXT,
+  checked_by    INTEGER REFERENCES users(id) ON DELETE SET NULL
+);
+CREATE INDEX IF NOT EXISTS idx_bank_changes ON landlord_bank_changes(account_id, landlord_id, checked_at);
+
 -- Each Metro payment instruction created in the rent run (step 5), kept to look back at.
 CREATE TABLE IF NOT EXISTS metro_documents (
   id          INTEGER PRIMARY KEY,

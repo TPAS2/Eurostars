@@ -83,6 +83,7 @@
     <span><strong><%= transferFile.rows.length %></strong> row<%= transferFile.rows.length === 1 ? '' : 's' %></span>
     <span>Total <strong><%= fmt.money(transferFile.total) %></strong></span>
     <% const noPay = transferFile.rows.filter(r => !r.pence).length; if (noPay) { %><span class="muted"><%= noPay %> no payment</span><% } %>
+    <% if (transferFile.bankAlerts.length) { %><span class="bad-text strong">⚠ <%= transferFile.bankAlerts.length %> landlord<%= transferFile.bankAlerts.length === 1 ? '' : 's' %> with changed bank details to check</span><% } %>
   </div>
   <div class="form-actions">
     <a class="btn" href="/app/rent-run/transfer?month=<%= month %>">Preview</a>
@@ -98,6 +99,7 @@
     <span>Total <strong><%= fmt.money(bulkFile.total) %></strong></span>
     <% if (bulkFile.problems.length) { %><span class="bad-text"><%= bulkFile.problems.length %> landlord<%= bulkFile.problems.length === 1 ? '' : 's' %> missing bank details</span><% } %>
     <% if (bulkFile.cheques.length) { %><span class="muted"><%= bulkFile.cheques.length %> paid by cheque (not included)</span><% } %>
+    <% if (bulkFile.bankAlerts.length) { %><span class="bad-text strong">⚠ <%= bulkFile.bankAlerts.length %> landlord<%= bulkFile.bankAlerts.length === 1 ? '' : 's' %> with changed bank details to check</span><% } %>
   </div>
   <div class="form-actions">
     <a class="btn" href="/app/rent-run/bulk?month=<%= month %>">Preview</a>

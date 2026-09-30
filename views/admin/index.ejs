@@ -10,6 +10,7 @@
   </div>
 </header>
 <% if (flash) { %><div class="notice ok"><%= flash %></div><% } %>
+<% if (noTwoStep) { %><div class="notice warn">Two-step login is off for your admin account. This account can see every company's data, so if its password were guessed or leaked, everything would be exposed. <a href="/admin/security">Switch on two-step login</a> — it takes a minute with an authenticator app.</div><% } %>
 
 <section class="tiles">
   <div class="tile"><span class="label">Total users</span><span class="value"><%= totals.users %></span><span class="sub"><%= totals.new30 %> joined in 30 days</span></div>

@@ -10,6 +10,13 @@
     <a class="btn primary" href="/app/rent-run/transfer.xlsx?month=<%= month %>">Download Excel</a>
   </div>
 </header>
+<% if (file.bankAlerts.length) { %>
+<div class="notice err bank-alert">
+  <strong>Bank details changed and not yet checked:</strong>
+  <ul class="tight"><% file.bankAlerts.forEach(b => { %><li><a href="/app/landlords/<%= b.landlord_id %>#bank-changes"><%= b.name %></a></li><% }) %></ul>
+  <p class="small">Check the new details with each landlord by phone before paying them. Their rows are marked ⚠ below.</p>
+</div>
+<% } %>
 <% if (file.problems.length) { %>
 <div class="notice warn">
   <strong>Missing or wrong bank details:</strong>
@@ -30,7 +37,7 @@
       <% file.rows.forEach(r => { %>
         <tr>
           <td><%= r.landlordName %></td><td><%= r.code %></td><td><%= r.reference %></td>
-          <td class="c"><%= r.sortCode %></td><td class="c"><%= r.account %></td><td class="c"><%= r.bankName %></td>
+          <td class="c"><% if (r.bankUnchecked) { %><span class="bank-flag" title="Bank details changed, not yet checked">⚠ </span><% } %><%= r.sortCode %></td><td class="c"><%= r.account %></td><td class="c"><%= r.bankName %></td>
           <% if (r.pence) { %><td class="money"><span>£</span><%= pounds(r.pence) %></td><% } else { %><td class="c">No payment</td><% } %>
           <td class="note-col"><% if (r.note) { %><span class="yellow-note"><%= r.note %></span><% } %></td>
         </tr>

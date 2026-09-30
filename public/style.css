@@ -862,3 +862,8 @@ table.transfer-sheet th:nth-child(1) { min-width: 200px; } table.transfer-sheet 
 table.transfer-sheet th:nth-child(7) { min-width: 130px; } table.transfer-sheet .note-col { min-width: 110px; }
 .monthend > li.sub::before { font-size: .8rem; padding: 0 4px; }
 .monthend > li.sub { padding-left: 52px; }
+
+/* Bank details changed and not yet checked */
+.bank-alert ul { margin: 6px 0; }
+.bank-alert .small { margin: 6px 0; }
+.bank-flag { color: #c00; font-weight: 700; }

@@ -193,6 +193,8 @@ module.exports = function authRoutes(db, config) {
     }
     if (password.length < 10) errors.password = 'Use at least 10 characters.';
     if (password.length > MAX_PASSWORD) errors.password = `Use at most ${MAX_PASSWORD} characters.`;
+    if (!errors.password) errors.password = auth.weakPassword(password, [values.username, values.name, values.agency_name]) || undefined;
+    if (!errors.password) delete errors.password;
     if (password !== String(req.body.password_confirm || '')) errors.password_confirm = "Passwords don't match.";
     if (registerLimited(req.ip)) errors.form = 'Too many sign-ups from your network. Please try again later.';
     if (Object.keys(errors).length) return res.status(422).render('register', { title: 'Create account', errors, values });

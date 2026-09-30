@@ -74,7 +74,9 @@ module.exports = function adminRoutes(db, config) {
          FROM activity_log a JOIN users u ON u.id = a.user_id JOIN users c ON c.id = COALESCE(u.company_id, u.id)
         WHERE a.user_id != ? ORDER BY a.id DESC LIMIT 25`
     ).all(req.user.id);
-    res.render('admin/index', { title: 'Admin', section: 'admin', users, totals, recentLogins, recentActivity, q, status, fmt, flash: req.query.flash || '' });
+    // The admin sees every company's data, so nudge them to protect it with two-step login.
+    const me = db.prepare('SELECT totp_enabled FROM users WHERE id = ?').get(req.user.person_id || req.user.id);
+    res.render('admin/index', { title: 'Admin', section: 'admin', users, totals, recentLogins, recentActivity, q, status, fmt, flash: req.query.flash || '', noTwoStep: !(me && me.totp_enabled) });
   });
 
   // ---------- account details: every login at every agency ----------
@@ -128,7 +130,7 @@ module.exports = function adminRoutes(db, config) {
     if (!LOGIN_NAME_RE.test(values.login_name)) errors.login_name = 'Use 1–30 letters, numbers, dashes or underscores (no spaces or dots).';
     if (values.email && !EMAIL_RE.test(values.email)) errors.email = 'Enter a valid email address, or leave it blank.';
     if (password.length < MIN_PASSWORD) errors.password = `Use at least ${MIN_PASSWORD} characters.`;
-    else if (password.length > 200) errors.password = 'Use at most 200 characters.';
+    else if (auth.weakPassword(password, [values.username, values.agency_name, values.name, values.login_name])) errors.password = auth.weakPassword(password, [values.username, values.agency_name, values.name, values.login_name]);
     if (password.length > 200) errors.password = 'Password is too long.';
     if (Object.keys(errors).length) {
       return res.status(422).render('admin/new-user', { title: 'Add account', section: 'admin', values, errors, minPassword: MIN_PASSWORD });
@@ -168,6 +170,7 @@ module.exports = function adminRoutes(db, config) {
     // A new password, if one was typed (blank keeps the current one).
     const password = String(req.body.password || '');
     if (!error && password && (password.length < MIN_PASSWORD || password.length > 200)) error = `The new password must be at least ${MIN_PASSWORD} characters.`;
+    if (!error && password) error = auth.weakPassword(password, [values.username, values.agency_name, values.name, values.login_name]) || null;
     if (error) return res.redirect(`/admin/users/${u.id}?error=${encodeURIComponent(error)}#details`);
     db.prepare('UPDATE users SET name = ?, agency_name = ?, email = ?, phone = ?, address = ?, login_name = ?, username = ? WHERE id = ?')
       .run(values.name, values.agency_name, values.email || null, values.phone || null, values.address || null, values.login_name, values.username, u.id);
@@ -187,6 +190,8 @@ module.exports = function adminRoutes(db, config) {
     if (password.length < MIN_PASSWORD || password.length > 200) {
       return res.redirect(`/admin/users/${u.id}?error=` + encodeURIComponent(password ? `The new password must be at least ${MIN_PASSWORD} characters.` : 'Type a new password first, or click Suggest.') + '#details');
     }
+    const weak = auth.weakPassword(password, [u.username, u.agency_name, u.name, u.login_name]);
+    if (weak) return res.redirect(`/admin/users/${u.id}?error=${encodeURIComponent(weak)}#details`);
     db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(auth.hashPassword(password), u.id);
     if (u.id !== req.user.id) db.prepare('DELETE FROM sessions WHERE user_id = ?').run(u.id);
     res.redirect(`/admin/users/${u.id}?flash=` + encodeURIComponent(`Password changed for @${u.username}.` + (u.id !== req.user.id ? ' They have been signed out and must use the new password.' : '')) + '#details');
@@ -217,6 +222,8 @@ module.exports = function adminRoutes(db, config) {
     if (!LOGIN_NAME_RE.test(loginName)) return back('Their sign-in name must be 1–30 letters, numbers, dashes or underscores (no spaces or dots).');
     if (db.prepare('SELECT 1 FROM users WHERE (company_id = ? OR id = ?) AND login_name = ? COLLATE NOCASE').get(u.id, u.id, loginName)) return back(`${u.agency_name} already has someone called "${loginName}".`);
     if (password.length < MIN_PASSWORD || password.length > 200) return back(`Their password must be at least ${MIN_PASSWORD} characters.`);
+    const weak = auth.weakPassword(password, [u.username, u.agency_name, name, loginName]);
+    if (weak) return back(weak);
     db.prepare('INSERT INTO users (username, company_id, login_name, name, agency_name, password_hash) VALUES (?, ?, ?, ?, ?, ?)')
       .run(`${u.username}.${loginName}`, u.id, loginName, name, u.agency_name, auth.hashPassword(password));
     back(`Added ${name} to ${u.agency_name}. They sign in with username "${u.username}", name "${loginName}" and the password you chose.`, true);
@@ -235,6 +242,8 @@ module.exports = function adminRoutes(db, config) {
     const password = String(req.body.password || '');
     const back = (msg, ok) => res.redirect(`/admin/users/${m.company_id}?${ok ? 'flash' : 'error'}=${encodeURIComponent(msg)}#people`);
     if (password.length < MIN_PASSWORD || password.length > 200) return back(`The new password must be at least ${MIN_PASSWORD} characters.`);
+    const weak = auth.weakPassword(password, [m.username, m.agency_name, m.name, m.login_name]);
+    if (weak) return back(weak);
     db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(auth.hashPassword(password), m.id);
     db.prepare('DELETE FROM sessions WHERE user_id = ?').run(m.id);
     back(`Password changed for ${m.name}. They have been signed out and must use the new password.`, true);
