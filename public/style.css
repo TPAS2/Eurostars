@@ -144,7 +144,7 @@ nav.rail { flex: 1; }
 }
 .rail-tip.below::before { left: 50%; top: -5px; transform: translateX(-50%); border: 5px solid transparent; border-top: 0; border-bottom-color: #0b1220; }
 .link-btn { background: none; border: 0; padding: 0; color: var(--brand); cursor: pointer; font: inherit; text-decoration: underline; }
-.content { padding: 28px 32px 60px; max-width: 1300px; width: 100%; min-width: 0; }
+.content { padding: 28px 32px 60px; width: 100%; min-width: 0; }
 
 .brand { display: inline-flex; align-items: center; gap: 10px; font-weight: 700; font-size: 1.1rem; color: var(--text); padding: 0 8px 4px; }
 .brand:hover { text-decoration: none; }
