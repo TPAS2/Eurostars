@@ -3160,7 +3160,7 @@ test('rent run steps 4 and 5: Bank Transfer sheet (.xlsx) and Metro bulk file (.
 
   r = await c.get('/app/rent-run/bulk.xlsm?month=2026-09');
   assert.equal(r.headers.get('content-type'), 'application/vnd.ms-excel.sheet.macroEnabled.12');
-  assert.match(r.headers.get('content-disposition'), /_SEPTEMBER_2026\.xlsm/);
+  assert.match(r.headers.get('content-disposition'), /filename="\d{1,2}(st|nd|rd|th)_[A-Z]+_\d{4}\.xlsm"/, 'named after the payment date (today until one is set)');
   const zip = await require('jszip').loadAsync(r.buf);
   assert.ok(zip.file('xl/vbaProject.bin'), 'Metro\'s macro (the CREATE TXT FILE button) is kept');
   const sheet = await zip.file('xl/worksheets/sheet1.xml').async('string');
