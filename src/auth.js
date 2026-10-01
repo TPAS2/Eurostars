@@ -86,7 +86,8 @@ function loadSession(db, { idleMinutes = 60, secure = false } = {}) {
     const token = parseCookies(req.headers.cookie)[SESSION_COOKIE];
     if (token) {
       const hash = sha256(token);
-      const row = lookup.get(idleMinutes > 0 ? idleLimit : '+1 day', hash);
+      // With the idle sign-out off (0), no session ever counts as idle.
+      const row = lookup.get(idleMinutes > 0 ? idleLimit : '-100 years', hash);
       if (row && row.idle) {
         end.run(hash);
         res.append('Set-Cookie', sessionCookie('', 0, secure));

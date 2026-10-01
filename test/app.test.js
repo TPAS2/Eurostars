@@ -3268,3 +3268,26 @@ test('council page: Council Database and Council Invoices boxes under Properties
   const other = await registerAndLogin('council-boxes-2@example.com', 'Other Boxes Lets');
   assert.equal((await other.get(`/app/councils/${council}`)).status, 404);
 });
+
+test('with the idle sign-out turned off (0), people stay signed in', async () => {
+  const s = createApp({ ...config, idleTimeoutMinutes: 0 }, db, { mailer: fakeMailer }).listen(0);
+  await new Promise((r) => s.once('listening', r));
+  const url = `http://127.0.0.1:${s.address().port}`;
+  try {
+    const c = await registerAndLogin('no-idle@example.com', 'No Idle Lets');
+    // Pretend they were last seen a week ago.
+    db.prepare("UPDATE sessions SET last_seen_at = datetime('now', '-7 days')").run();
+    const r = await fetch(`${url}/app`, { headers: { cookie: c.cookie }, redirect: 'manual' });
+    assert.equal(r.status, 200, 'not signed out');
+  } finally { s.close(); }
+});
+
+test('phones: the page fits the screen (viewport tag, shrinking forms, scrolling tables, 16px boxes)', async () => {
+  const c = await registerAndLogin('phone-fit@example.com', 'Phone Fit Lets');
+  assert.match((await c.get('/app')).text, /<meta name="viewport" content="width=device-width, initial-scale=1">/);
+  const css = await (await fetch(`${base}/static/style.css`)).text();
+  assert.match(css, /grid-template-columns: minmax\(0, 1fr\)/, 'one-column forms that can shrink');
+  assert.match(css, /\.table-wrap > table \{ table-layout: auto; width: max-content; min-width: 100%; \}/, 'tables scroll sideways instead of squashing');
+  assert.match(css, /input, select, textarea, table\.council-db \.cell-input \{ font-size: 16px; \}/, 'no iPhone zoom when tapping a box');
+  assert.match(css, /\.form-actions \{ flex-wrap: wrap; \}/);
+});

@@ -875,3 +875,41 @@ table.transfer-sheet th:nth-child(7) { min-width: 130px; } table.transfer-sheet 
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .dashboard-bg { opacity: .5; } }
 @media (max-width: 900px) { .dashboard-bg { left: 0; } }
 @media print { .dashboard-bg { display: none; } }
+
+/* ---------- phones: nothing wider than the screen ---------- */
+.form-actions { flex-wrap: wrap; }
+.field { min-width: 0; }
+input, select, textarea { max-width: 100%; }
+@media (max-width: 900px) {
+  /* One column that can shrink below its widest content (plain 1fr can't). */
+  .grid-2, .form-grid, .form-grid.three, .price-trio, .top-trio, .sender-settings.form-grid { grid-template-columns: minmax(0, 1fr); }
+  .form-grid > *, .price-trio > *, .top-trio > * { min-width: 0; }
+  select { width: 100%; min-width: 0; text-overflow: ellipsis; }
+  input[type="file"] { width: 100%; min-width: 0; }
+  .page-head { flex-wrap: wrap; }
+  .page-head .actions, .actions, .step-actions { flex-wrap: wrap; }
+}
+@media (max-width: 900px) {
+  .presets-bar { flex-wrap: wrap; }
+  .presets-bar select { flex: 1 1 100%; }
+}
+@media (max-width: 900px) {
+  /* Tables keep their words whole and scroll sideways instead of squashing columns. */
+  .table-wrap { -webkit-overflow-scrolling: touch; }
+  .table-wrap > table { table-layout: auto; width: max-content; min-width: 100%; }
+  .table-wrap > table th, .table-wrap > table td { white-space: nowrap; overflow-wrap: normal; word-break: normal; }
+  .table-wrap > table td textarea { min-width: 200px; }
+}
+@media (max-width: 600px) {
+  /* Month switcher: the month on top, Previous and Next side by side below it. */
+  .month-nav { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .month-nav .month-pick { grid-column: 1 / -1; order: -1; }
+  .month-nav .month-pick input { width: 100%; }
+  .month-nav > .btn { justify-content: center; text-align: center; }
+}
+@media (max-width: 900px) {
+  /* iPhones zoom the page into any box with text under 16px; keep them at 16px. */
+  input, select, textarea, table.council-db .cell-input { font-size: 16px; }
+  /* The menu bar swipes sideways: fade its right edge so it's clear there's more. */
+  .sidebar { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); }
+}
