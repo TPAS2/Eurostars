@@ -308,4 +308,29 @@
   <% } %>
 </section>
 <% }) %>
+<% if (typeof councilBoxes !== 'undefined' && councilBoxes) { const cb = councilBoxes; %>
+<section class="card" id="council-database">
+  <div class="card-head">
+    <h2>Council Database <span class="count"><%= cb.live.length %></span></h2>
+    <div class="actions">
+      <a class="btn small" href="/app/councils/<%= row.id %>/database">Open database</a>
+      <a class="btn small" href="/app/councils/<%= row.id %>/database.xlsx">Download Excel</a>
+    </div>
+  </div>
+  <% if (!cb.live.length) { %><p class="muted">No live entries yet.<% if (cb.previous) { %> <%= cb.previous %> previous tenant<%= cb.previous === 1 ? '' : 's' %>.<% } %> Add entries in the <a href="/app/councils/<%= row.id %>/database">database</a>.</p><% } else { %>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Our ref</th><th>Property address</th><th>Client's name</th><th>Date of booking</th><th class="num">Price per night</th><th>Contact number</th></tr></thead>
+    <tbody>
+    <% cb.live.forEach(e => { %><tr><td><%= e.our_ref || '' %></td><td><%= e.property_address || '' %></td><td><%= e.client_name || '' %></td><td><%= e.booking_date ? fmt.ukDate(e.booking_date) : '' %></td><td class="num"><%= e.price_pence != null ? fmt.money(e.price_pence) : '' %></td><td><%= e.contact_number || '' %></td></tr><% }) %>
+    </tbody>
+  </table></div>
+  <% if (cb.previous) { %><p class="muted small"><%= cb.previous %> previous tenant<%= cb.previous === 1 ? '' : 's' %> in the <a href="/app/councils/<%= row.id %>/database#previous">database</a>.</p><% } %>
+  <% } %>
+</section>
+
+<section class="card" id="council-invoices">
+  <div class="card-head"><h2>Council Invoices <span class="count"><%= cb.invoices.length %></span></h2></div>
+  <p class="muted">No council invoices yet.</p>
+</section>
+<% } %>
 <%- include('partials/footer') %>

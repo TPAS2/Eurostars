@@ -3252,3 +3252,19 @@ test('weak passwords are refused wherever a password is set; the admin is nudged
   assert.equal(created.status, 422);
   assert.match(created.text, /username, name or agency/);
 });
+
+test('council page: Council Database and Council Invoices boxes under Properties in this council', async () => {
+  const c = await registerAndLogin('council-boxes@example.com', 'Council Boxes Lets');
+  const council = idFrom((await c.post('/app/councils', { name: 'Boxes Council' })).location);
+  let page = (await c.get(`/app/councils/${council}`)).text;
+  assert.match(page, /Properties in this council[\s\S]*?id="council-database"[\s\S]*?Council Database[\s\S]*?id="council-invoices"[\s\S]*?Council Invoices/);
+  assert.match(page, /No live entries yet/);
+  await c.get(`/app/councils/${council}/database`);
+  await c.post(`/app/councils/${council}/database/entries`, { our_ref: 'BX1', property_address: '5 Box Lane', client_name: 'Made Up Client', booking_date: '2026-09-01', price_pence: '45' });
+  page = (await c.get(`/app/councils/${council}`)).text;
+  assert.match(page, /<td>BX1<\/td><td>5 Box Lane<\/td><td>Made Up Client<\/td><td>01\/09\/2026<\/td><td class="num">£45\.00<\/td>/);
+  assert.match(page, new RegExp(`href="/app/councils/${council}/database\\.xlsx">Download Excel`));
+  // Another company's council isn't shown.
+  const other = await registerAndLogin('council-boxes-2@example.com', 'Other Boxes Lets');
+  assert.equal((await other.get(`/app/councils/${council}`)).status, 404);
+});
