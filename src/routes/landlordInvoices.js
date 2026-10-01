@@ -107,7 +107,18 @@ module.exports = function landlordInvoiceRoutes(db, mailer = { enabled: false })
          FROM landlord_invoices WHERE account_id = ? AND substr(invoice_date, 1, 7) = ?`
     ).get(a, month);
     const shift = (by) => { const [y, m] = (month === 'all' ? thisMonth : month).split('-').map(Number); return new Date(Date.UTC(y, m - 1 + by, 1)).toISOString().slice(0, 7); };
+    // Profit from contractor invoices: what the landlord was charged minus what the contractor
+    // charged us, on paid invoices that were charged to a landlord (by the date they were paid).
+    const profitMonth = month === 'all' ? thisMonth : month;
+    const profitSql = `SELECT COALESCE(SUM(COALESCE(landlord_price_pence, amount_pence) - amount_pence), 0) AS profit, COUNT(*) AS n
+                         FROM invoices WHERE account_id = ? AND status = 'paid' AND charge_landlord = 1`;
+    const profit = {
+      month: db.prepare(`${profitSql} AND substr(paid_date, 1, 7) = ?`).get(a, profitMonth),
+      all: db.prepare(profitSql).get(a),
+      monthLabel: st.monthLabel(profitMonth),
+    };
     res.render('landlordinvoices/list', {
+      profit,
       title: 'Landlord invoices', section: 'landlordinvoices', invoices, totals, monthTotals, status, month, prev: shift(-1), next: shift(1), thisMonth,
       monthLabel: month === 'all' ? 'All months' : st.monthLabel(month), statementLink, today, fmt, flash: clip(req.query.flash, 300),
     });

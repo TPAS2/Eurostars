@@ -3291,3 +3291,18 @@ test('phones: the page fits the screen (viewport tag, shrinking forms, scrolling
   assert.match(css, /input, select, textarea, table\.council-db \.cell-input \{ font-size: 16px; \}/, 'no iPhone zoom when tapping a box');
   assert.match(css, /\.form-actions \{ flex-wrap: wrap; \}/);
 });
+
+test('landlord invoices tab: profit from contractor invoices this month and all time (paid, charged to a landlord)', async () => {
+  const c = await registerAndLogin('profit-tiles@example.com', 'Profit Tiles Lets');
+  const ll = String(idFrom((await c.post('/app/landlords', { name: 'Profit Owner', statement_type: 'Email' })).location));
+  const prop = String(idFrom((await c.post('/app/properties', { address_line1: '7 Margin Road', status: 'let', landlord_id: ll })).location));
+  const add = async (fields) => { await c.get('/app/invoices/new'); return c.post('/app/invoices', { maintenance_job_id: 'none', property_id: prop, charge_landlord: 'yes', ...fields }, { multipart: true }); };
+  await add({ supplier: 'Sept Co', amount: '100', landlord_amount: '150', invoice_date: '2026-09-05', then: 'deduct' }); // +50 in September
+  await add({ supplier: 'Aug Co', amount: '80', landlord_amount: '100', invoice_date: '2026-08-10', then: 'deduct' }); // +20 in August
+  await add({ supplier: 'Unpaid Co', amount: '10', landlord_amount: '500', invoice_date: '2026-09-06' }); // not paid: not counted
+  await add({ supplier: 'Ours Co', amount: '40', charge_landlord: 'no', invoice_date: '2026-09-07' }); // not charged: not counted
+  const r = (await c.get('/app/landlord-invoices?month=2026-09')).text;
+  assert.match(r, /Profit from invoices · September 2026<\/span><span class="value ok-text" id="profit-month">£50\.00/);
+  assert.match(r, /Profit from invoices · all time<\/span><span class="value ok-text" id="profit-all">£70\.00/);
+  assert.match((await c.get('/app/landlord-invoices?month=2026-08')).text, /id="profit-month">£20\.00/);
+});

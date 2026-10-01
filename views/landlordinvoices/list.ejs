@@ -1,10 +1,14 @@
 <%- include('../partials/header') %>
-<header class="page-head">
-  <div>
+<header class="page-head with-head-tiles">
+  <div class="head-text">
     <h1>Landlord invoices</h1>
     <p class="muted">Invoices you raise to landlords. Deduct them from their rent or mark them paid.</p>
+    <div class="actions head-actions"><a class="btn primary" href="/app/landlord-invoices/new">+ New landlord invoice</a></div>
   </div>
-  <div class="actions"><a class="btn primary" href="/app/landlord-invoices/new">+ New landlord invoice</a></div>
+  <div class="head-tiles" title="Price to landlord minus price paid to the contractor, on paid contractor invoices charged to a landlord">
+    <div class="mini-tile"><span class="label">Profit from invoices · <%= profit.monthLabel %></span><span class="value <%= profit.month.profit > 0 ? 'ok-text' : profit.month.profit < 0 ? 'bad-text' : '' %>" id="profit-month"><%= fmt.money(profit.month.profit) %></span></div>
+    <div class="mini-tile"><span class="label">Profit from invoices · all time</span><span class="value <%= profit.all.profit > 0 ? 'ok-text' : profit.all.profit < 0 ? 'bad-text' : '' %>" id="profit-all"><%= fmt.money(profit.all.profit) %></span></div>
+  </div>
 </header>
 <% if (flash) { %><div class="notice ok"><%= flash %></div><% } %>
 <%- include('../partials/month-nav', { base: '/app/landlord-invoices', keep: status === 'all' ? {} : { status }, allowAll: true }) %>
