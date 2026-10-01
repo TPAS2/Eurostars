@@ -695,3 +695,45 @@ document.addEventListener('DOMContentLoaded', () => {
   open();
   window.addEventListener('hashchange', open);
 });
+
+// Keep your place when moving around: the sidebar stays scrolled where it was on every page, and
+// tabs that only filter the same page (All/Unpaid/Paid, months, Current/Past) keep the page's
+// scroll position too. Kept for this browser tab only.
+(() => {
+  const KEY = 'rift:scroll';
+  const store = (() => { try { return window.sessionStorage; } catch { return null; } })();
+  if (!store) return;
+  const sidebar = document.querySelector('.sidebar');
+  const read = () => { try { return JSON.parse(store.getItem(KEY) || '{}'); } catch { return {}; } };
+  const save = (extra = {}) => {
+    try { store.setItem(KEY, JSON.stringify({ ...read(), rail: sidebar ? sidebar.scrollTop : 0, ...extra })); } catch { /* full or blocked */ }
+  };
+  // Restore as early as possible.
+  const saved = read();
+  if (sidebar && saved.rail) sidebar.scrollTop = saved.rail;
+  if (saved.page && saved.page.path === location.pathname && Date.now() - saved.page.at < 15000 && !location.hash) {
+    const y = saved.page.y;
+    const restore = () => window.scrollTo(0, y);
+    restore();
+    window.addEventListener('load', restore, { once: true });
+  }
+  if (saved.page) save({ page: null });
+  // Remember the sidebar whenever the page is left.
+  window.addEventListener('pagehide', () => save());
+  if (sidebar) sidebar.addEventListener('scroll', () => save(), { passive: true });
+  // A tab or month switch on the same page: remember where the page was.
+  const samePageNav = '.tabs a, .month-nav a, .month-back a, .page-tabs a';
+  document.addEventListener('click', (e) => {
+    const a = e.target.closest && e.target.closest(samePageNav);
+    if (!a || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey) return;
+    let url;
+    try { url = new URL(a.href, location.href); } catch { return; }
+    if (url.origin === location.origin && url.pathname === location.pathname) save({ page: { path: url.pathname, y: window.scrollY, at: Date.now() } });
+  });
+  // The month box sends itself when changed, so remember the position as it changes.
+  const monthPicked = (e) => {
+    if (e.target.closest && e.target.closest('.month-nav form, form[data-autogo]')) save({ page: { path: location.pathname, y: window.scrollY, at: Date.now() } });
+  };
+  document.addEventListener('change', monthPicked, true);
+  document.addEventListener('submit', monthPicked, true);
+})();
