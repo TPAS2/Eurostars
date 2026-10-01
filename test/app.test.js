@@ -3257,7 +3257,7 @@ test('council page: Council Database and Council Invoices boxes under Properties
   const c = await registerAndLogin('council-boxes@example.com', 'Council Boxes Lets');
   const council = idFrom((await c.post('/app/councils', { name: 'Boxes Council' })).location);
   let page = (await c.get(`/app/councils/${council}`)).text;
-  assert.match(page, /Properties in this council[\s\S]*?id="council-database"[\s\S]*?Council Database[\s\S]*?id="council-invoices"[\s\S]*?Council Invoices/);
+  assert.match(page, /<details class="card fold" id="council-properties"><summary><h2>Properties in this council[\s\S]*?<details class="card fold" id="council-database">\s*<summary><h2>Council Database[\s\S]*?<details class="card fold" id="council-invoices">\s*<summary><h2>Council Invoices/, 'three drop-down boxes');
   assert.match(page, /No live entries yet/);
   await c.get(`/app/councils/${council}/database`);
   await c.post(`/app/councils/${council}/database/entries`, { our_ref: 'BX1', property_address: '5 Box Lane', client_name: 'Made Up Client', booking_date: '2026-09-01', price_pence: '45' });

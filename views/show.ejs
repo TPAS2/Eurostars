@@ -293,10 +293,10 @@
 </section>
 <% }) %>
 
-<% children.forEach(c => { %>
-<section class="card">
+<% children.forEach(c => { const fold = def.key === 'councils'; const heading = `${c.title ? c.title : def.key === 'landlords' && c.def.key === 'properties' ? 'Properties owned' : def.key === 'councils' && c.def.key === 'properties' ? 'Properties in this council' : c.def.plural}`; %>
+<% if (fold) { %><details class="card fold" id="council-properties"><summary><h2><%= heading %> <span class="count"><%= c.rows.length %></span></h2></summary><% } else { %><section class="card"><% } %>
   <div class="card-head">
-    <h2><%= c.title ? c.title : def.key === 'landlords' && c.def.key === 'properties' ? 'Properties owned' : def.key === 'councils' && c.def.key === 'properties' ? 'Properties in this council' : c.def.plural %> <span class="count"><%= c.rows.length %></span></h2>
+    <% if (!fold) { %><h2><%= heading %> <span class="count"><%= c.rows.length %></span></h2><% } else { %><span></span><% } %>
     <% if (def.key === 'properties' && c.def.key === 'tenancies') { %>
       <a class="btn small" href="/app/properties/<%= row.id %>/add-tenant">+ Add tenant</a>
     <% } else { %>
@@ -306,12 +306,13 @@
   <% if (!c.rows.length) { %><p class="muted">None yet.</p><% } else { %>
     <%- include('partials/table', { def: c.def, rows: c.rows, maps: c.maps, hideField: c.fk, endTenancy: def.key === 'properties' && c.def.key === 'tenancies', editRows: def.key === 'tenants' && c.def.key === 'tenancies' }) %>
   <% } %>
-</section>
+<% if (fold) { %></details><% } else { %></section><% } %>
 <% }) %>
 <% if (typeof councilBoxes !== 'undefined' && councilBoxes) { const cb = councilBoxes; %>
-<section class="card" id="council-database">
+<details class="card fold" id="council-database">
+  <summary><h2>Council Database <span class="count"><%= cb.live.length %></span></h2></summary>
   <div class="card-head">
-    <h2>Council Database <span class="count"><%= cb.live.length %></span></h2>
+    <span></span>
     <div class="actions">
       <a class="btn small" href="/app/councils/<%= row.id %>/database">Open database</a>
       <a class="btn small" href="/app/councils/<%= row.id %>/database.xlsx">Download Excel</a>
@@ -326,11 +327,11 @@
   </table></div>
   <% if (cb.previous) { %><p class="muted small"><%= cb.previous %> previous tenant<%= cb.previous === 1 ? '' : 's' %> in the <a href="/app/councils/<%= row.id %>/database#previous">database</a>.</p><% } %>
   <% } %>
-</section>
+</details>
 
-<section class="card" id="council-invoices">
-  <div class="card-head"><h2>Council Invoices <span class="count"><%= cb.invoices.length %></span></h2></div>
+<details class="card fold" id="council-invoices">
+  <summary><h2>Council Invoices <span class="count"><%= cb.invoices.length %></span></h2></summary>
   <p class="muted">No council invoices yet.</p>
-</section>
+</details>
 <% } %>
 <%- include('partials/footer') %>
