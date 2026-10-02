@@ -441,6 +441,7 @@ function openDatabase(file) {
   addColumnIfMissing(db, 'landlords', 'bank_account_number', 'TEXT');
   addColumnIfMissing(db, 'landlords', 'bank_name', 'TEXT');
   addColumnIfMissing(db, 'landlords', 'payment_note', 'TEXT');
+  addColumnIfMissing(db, 'landlords', 'overseas', 'TEXT');
   // When a landlord started with the agency. Existing landlords start from when they were added.
   const hadDateStarted = db.prepare("SELECT 1 FROM pragma_table_info('landlords') WHERE name = 'date_started'").get();
   addColumnIfMissing(db, 'landlords', 'date_started', 'TEXT');

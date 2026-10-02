@@ -12,6 +12,10 @@ const fmt = require('../format');
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const LIST_LIMIT = 500;
 
+const UK_BANKS = ['Allied Irish Bank', 'Bank of Scotland', 'Barclays', 'Chase', 'Co-operative Bank', 'Coutts', 'Cynergy Bank', 'First Direct',
+  'Halifax', 'HSBC', 'Lloyds', 'Metro Bank', 'Monzo', 'Nationwide', 'NatWest', 'Revolut', 'Royal Bank of Scotland', 'Santander', 'Starling',
+  'Tide', 'TSB', 'Virgin Money'];
+
 module.exports = function appRoutes(db) {
   const router = express.Router();
 
@@ -173,6 +177,11 @@ module.exports = function appRoutes(db) {
   function renderForm(res, def, { row, values, errors, accountId, status = 200 }) {
     const options = {};
     for (const f of def.fields) if (f.type === 'ref') options[f.name] = refOptions(f.ref, accountId);
+    // Bank names to pick from: the usual UK banks plus any already typed in.
+    if (def.key === 'landlords') {
+      const used = db.prepare("SELECT DISTINCT bank_name FROM landlords WHERE account_id = ? AND bank_name IS NOT NULL AND bank_name != ''").all(accountId).map((r) => r.bank_name.trim());
+      options.bank_name = [...new Set([...UK_BANKS, ...used])].sort((x, y) => x.localeCompare(y));
+    }
     const tenantCouncil = def.key === 'tenants' && row ? tenantProperty(accountId, row.id) : null;
     if (tenantCouncil) tenantCouncil.options = refOptions('councils', accountId);
     res.status(status).render('form', { title: row ? `Edit ${def.singular.toLowerCase()}` : `New ${def.singular.toLowerCase()}`, def, row, values, errors, options, tenantCouncil, fmt, section: sectionOf(def) });
@@ -267,7 +276,7 @@ module.exports = function appRoutes(db) {
   function relatedLists(def, row, a) {
     const link = (entity, id, text) => ({ text, href: `/app/${entity}/${id}` });
     // A council's page lists just its properties (as a child list), nothing else.
-    if (def.key === 'councils') return [];
+    if (def.key === 'councils' || def.key === 'landlords') return [];
     const councilsVia = (sql, ...params) => db.prepare(sql).all(...params);
     if (def.key === 'landlords') {
       const rows = councilsVia(
@@ -732,13 +741,35 @@ module.exports = function appRoutes(db) {
   router.get('/:entity/new', (req, res) => {
     const def = getEntity(req, res);
     if (!def) return;
-    renderForm(res, def, { row: null, values: formDefaults(def, req.query), errors: {}, accountId: req.user.id });
+    const values = formDefaults(def, req.query);
+    if (def.key === 'landlords' && !values.code) values.code = nextLandlordCode(req.user.id);
+    renderForm(res, def, { row: null, values, errors: {}, accountId: req.user.id });
   });
+
+  // The next landlord code: one more than the highest so far, keeping its letters and zero
+  // padding (L101 → L102, LL009 → LL010); L001 for the first.
+  function nextLandlordCode(accountId) {
+    let best = null;
+    for (const { code } of db.prepare("SELECT code FROM landlords WHERE account_id = ? AND code IS NOT NULL AND code != ''").all(accountId)) {
+      const m = /^(.*?)(\d+)$/.exec(String(code).trim());
+      if (m && (!best || Number(m[2]) > best.n)) best = { prefix: m[1], n: Number(m[2]), width: m[2].length };
+    }
+    if (!best) return 'L001';
+    let next = `${best.prefix}${String(best.n + 1).padStart(best.width, '0')}`;
+    // Never hand out a code that's already in use.
+    while (db.prepare('SELECT 1 FROM landlords WHERE account_id = ? AND code = ?').get(accountId, next)) {
+      best.n += 1;
+      next = `${best.prefix}${String(best.n + 1).padStart(best.width, '0')}`;
+    }
+    return next;
+  }
 
   router.post('/:entity', (req, res) => {
     const def = getEntity(req, res);
     if (!def) return;
     const a = req.user.id;
+    // A landlord left without a code gets the next one.
+    if (def.key === 'landlords' && !String(req.body.code || '').trim()) req.body.code = nextLandlordCode(a);
     const { values, errors } = parseForm(def, req.body, a);
     if (Object.keys(errors).length) return renderForm(res, def, { row: null, values, errors, accountId: a, status: 422 });
     prepareValues(def, a, values);
@@ -862,6 +893,7 @@ module.exports = function appRoutes(db) {
     if (!row) return;
     const a = req.user.id;
     const autosave = req.get('X-Autosave') === '1';
+    if (def.key === 'landlords' && !String(req.body.code || '').trim()) req.body.code = row.code || nextLandlordCode(a);
     const { values, errors } = parseForm(def, req.body, a);
     // A tenant's Edit form can change the council of the property they rent.
     let councilChange = null;

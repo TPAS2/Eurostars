@@ -104,6 +104,10 @@ async function registerAndLogin(email, agency) {
   return c;
 }
 
+// Every box on the landlord form is required; tests fill the ones they don't care about.
+const LANDLORD = { address: '1 Made Up Street, London', phone: '020 0000 0000', email: 'landlord@example.com', code: '', date_started: '2026-01-01',
+  statement_type: 'Email', overseas: 'No', bank_name: 'Lloyds', bank_account_name: 'Made Up Account', bank_account_number: '12345678', bank_sort_code: '30-93-84', payment_note: 'Monthly' };
+
 const idFrom = (location) => Number(location.split('/').pop());
 
 // Contractor invoices need every field; tests fill in what they don't care about
@@ -157,7 +161,7 @@ test('wrong password is rejected and logged', async () => {
 test('POST without CSRF token is refused', async () => {
   const c = await registerAndLogin('csrf@example.com', 'CSRF Lets');
   c.csrf = 'wrong';
-  const r = await c.post('/app/landlords', { name: 'Should not save' });
+  const r = await c.post('/app/landlords', { ...LANDLORD, name: 'Should not save' });
   assert.equal(r.status, 403);
   assert.equal(db.prepare("SELECT COUNT(*) n FROM landlords WHERE name = 'Should not save'").get().n, 0);
 });
@@ -165,7 +169,7 @@ test('POST without CSRF token is refused', async () => {
 test('full lettings workflow: landlord → property → tenant → rent → fee → statement', async () => {
   const c = await registerAndLogin('agent1@example.com', 'Agent One Lettings');
 
-  let r = await c.post('/app/landlords', { name: 'Jane Landlord', email: 'jane@example.com', phone: '07700 900000' });
+  let r = await c.post('/app/landlords', { ...LANDLORD, name: 'Jane Landlord', email: 'jane@example.com', phone: '07700 900000' });
   assert.equal(r.status, 302, r.text);
   const landlordId = idFrom(r.location);
 
@@ -235,7 +239,7 @@ test('full lettings workflow: landlord → property → tenant → rent → fee 
 
 test('maintenance invoices: upload, list unpaid, pay, undo', async () => {
   const c = await registerAndLogin('agent-inv@example.com', 'Invoice Lets');
-  let r = await c.post('/app/landlords', { name: 'Bob Owner' });
+  let r = await c.post('/app/landlords', { ...LANDLORD, name: 'Bob Owner' });
   const landlordId = idFrom(r.location);
   r = await c.post('/app/properties', { address_line1: '9 Mill Lane', landlord_id: landlordId, status: 'let' });
   const propertyId = idFrom(r.location);
@@ -297,7 +301,7 @@ test('maintenance invoices: upload, list unpaid, pay, undo', async () => {
 test('agencies cannot see or touch each other\'s data', async () => {
   const a = await registerAndLogin('iso-a@example.com', 'Agency A');
   const b = await registerAndLogin('iso-b@example.com', 'Agency B');
-  let r = await a.post('/app/landlords', { name: 'Secret Landlord' });
+  let r = await a.post('/app/landlords', { ...LANDLORD, name: 'Secret Landlord' });
   const landlordId = idFrom(r.location);
   r = await a.post('/app/properties', { address_line1: 'A Street', status: 'vacant' });
   const propertyId = idFrom(r.location);
@@ -371,27 +375,29 @@ test('only ADMIN_EMAIL keeps admin rights on restart', () => {
 
 test('edits autosave: background save returns JSON, invalid values are reported', async () => {
   const c = await registerAndLogin('autosave@example.com', 'Autosave Lets');
-  let r = await c.post('/app/landlords', { name: 'Before' });
+  let r = await c.post('/app/landlords', { ...LANDLORD, name: 'Before' });
   const id = idFrom(r.location);
   await c.get(`/app/landlords/${id}/edit`);
   const post = (body) => fetch(`${base}/app/landlords/${id}`, {
     method: 'POST',
     headers: { cookie: c.cookie, 'content-type': 'application/x-www-form-urlencoded', 'x-autosave': '1' },
-    body: new URLSearchParams({ _csrf: c.csrf, ...body }).toString(),
+    body: new URLSearchParams({ _csrf: c.csrf, ...LANDLORD, code: 'L001', ...body }).toString(),
   });
-  r = await post({ name: 'After', email: '' });
+  r = await post({ name: 'After', email: 'after@example.com' });
   assert.equal(r.status, 200);
   assert.equal((await r.json()).ok, true);
   assert.equal(db.prepare('SELECT name FROM landlords WHERE id = ?').get(id).name, 'After');
   r = await post({ name: 'After', email: 'not-an-email' });
   assert.equal(r.status, 422);
   assert.ok((await r.json()).errors.email);
-  assert.equal(db.prepare('SELECT email FROM landlords WHERE id = ?').get(id).email, null);
+  assert.equal(db.prepare('SELECT email FROM landlords WHERE id = ?').get(id).email, 'after@example.com', 'the bad email is not saved');
+  r = await post({ name: 'After', email: '' });
+  assert.equal(r.status, 422, 'every landlord box is required');
 });
 
 async function monthlySetup(email) {
   const c = await registerAndLogin(email, 'Monthly Lets');
-  let r = await c.post('/app/landlords', { name: 'Mary Owner' });
+  let r = await c.post('/app/landlords', { ...LANDLORD, name: 'Mary Owner' });
   const landlordId = idFrom(r.location);
   r = await c.post('/app/properties', { address_line1: '5 Oak Road', landlord_id: landlordId, status: 'vacant', management_fee_pct: '12' });
   const propertyId = idFrom(r.location);
@@ -450,7 +456,7 @@ test('monthly job fills in last month only where missing', async () => {
 
 test('agency data export: only the admin can download it', async () => {
   const c = await registerAndLogin('export@example.com', 'Export Lets');
-  await c.post('/app/landlords', { name: 'Exported Landlord' });
+  await c.post('/app/landlords', { ...LANDLORD, name: 'Exported Landlord' });
   assert.equal((await c.get('/app/export')).status, 404, 'companies have no export');
   assert.doesNotMatch((await c.get('/app')).text, /Download my data/);
   const id = db.prepare("SELECT id FROM users WHERE username = 'export'").get().id;
@@ -636,7 +642,7 @@ test('councils link to properties, and through them to landlords and tenants', a
   let r = await c.post('/app/councils', { name: 'Bristol City Council', council_tax_phone: '0117 922 2900', licensing_email: 'private.housing@bristol.gov.uk' });
   assert.equal(r.status, 302, r.text);
   const councilId = idFrom(r.location);
-  r = await c.post('/app/landlords', { name: 'Olive Grant' });
+  r = await c.post('/app/landlords', { ...LANDLORD, name: 'Olive Grant' });
   const landlordId = idFrom(r.location);
 
   // "+ Add property in this council" pre-selects the council.
@@ -670,7 +676,7 @@ test('councils link to properties, and through them to landlords and tenants', a
   const rail = (await c.get('/app')).text.match(/<nav class="rail"[\s\S]*?<\/nav>/)[0];
   // [0] is the menu's own label ("Main"); the first button follows it.
   assert.equal(rail.match(/aria-label="([^"]+)"/g)[1], 'aria-label="Councils"', 'Councils is the first menu button');
-  assert.ok(rail.indexOf('aria-label="Properties"') < rail.indexOf('aria-label="Landlords"'), 'Properties is above Landlords');
+  assert.ok(rail.indexOf('aria-label="Landlords"') < rail.indexOf('aria-label="Properties"'), 'Landlords is above Properties');
 
   // Another company can't see or link to this council.
   const other = await registerAndLogin('councils-other@example.com', 'Other Lets');
@@ -791,17 +797,17 @@ test('activity log: the admin sees each user\'s sign-ins, page views and changes
   const uid = db.prepare("SELECT id FROM users WHERE username = 'tracked'").get().id;
   await c.login('tracked', 'kettle-harbour-58');
   await c.get('/app/landlords');
-  let r = await c.post('/app/landlords', { name: 'Martha Quinn' });
+  let r = await c.post('/app/landlords', { ...LANDLORD, name: 'Martha Quinn' });
   const lid = idFrom(r.location);
   await c.get(`/app/landlords/${lid}`);
   // Autosave while typing: several saves, one "Edited" entry.
   await c.get(`/app/landlords/${lid}/edit`);
   for (const phone of ['0', '01', '011']) {
     await fetch(`${base}/app/landlords/${lid}`, { method: 'POST', headers: { cookie: c.cookie, 'content-type': 'application/x-www-form-urlencoded', 'x-autosave': '1' },
-      body: new URLSearchParams({ _csrf: c.csrf, name: 'Martha Quinn', phone }).toString() });
+      body: new URLSearchParams({ _csrf: c.csrf, ...LANDLORD, name: 'Martha Quinn', phone }).toString() });
   }
   await c.post(`/app/landlords/${lid}/delete`, {});
-  await c.post('/app/landlords', { name: '' }); // failed attempt: not logged
+  await c.post('/app/landlords', { ...LANDLORD, name: '' }); // failed attempt: not logged
 
   const rows = db.prepare('SELECT action, summary FROM activity_log WHERE user_id = ? ORDER BY id').all(uid).map((x) => `${x.action}: ${x.summary}`);
   for (const expected of ['signed in: Signed in', 'viewed: Viewed landlords', 'created: Added landlord: Martha Quinn',
@@ -862,7 +868,7 @@ test('several people at one company share its username, each with their own name
   assert.equal((await main.login('eurostars', 'harbour-gate-19', 'main')).location, '/app');
 
   // They all work on the same company's data.
-  r = await john.post('/app/landlords', { name: 'Shared Landlord' });
+  r = await john.post('/app/landlords', { ...LANDLORD, name: 'Shared Landlord' });
   const lid = idFrom(r.location);
   assert.match((await amy.get(`/app/landlords/${lid}`)).text, /Shared Landlord/);
   assert.match((await main.get('/app/landlords')).text, /Shared Landlord/);
@@ -1042,9 +1048,9 @@ test('councils, landlords and properties have a search bar that also matches lin
   let r = await c.post('/app/councils', { name: 'Leeds City Council' });
   const leeds = String(idFrom(r.location));
   await c.post('/app/councils', { name: 'York Council' });
-  r = await c.post('/app/landlords', { name: 'Olive Grant' });
+  r = await c.post('/app/landlords', { ...LANDLORD, name: 'Olive Grant' });
   const olive = String(idFrom(r.location));
-  await c.post('/app/landlords', { name: 'Ben Hart' });
+  await c.post('/app/landlords', { ...LANDLORD, name: 'Ben Hart' });
   await c.post('/app/properties', { address_line1: 'Rose Cottage', council_id: leeds, landlord_id: olive, status: 'let' });
   await c.post('/app/properties', { address_line1: 'Mill House', status: 'vacant' });
 
@@ -1115,7 +1121,7 @@ test('councils can have a picture, shown left of the council details and in the 
 
 test('landlords have a code, shown right of the name in the list and on their page', async () => {
   const c = await registerAndLogin('landlord-code@example.com', 'Code Lets');
-  let r = await c.post('/app/landlords', { name: 'Olive Grant', code: 'LL001', email: 'olive@example.com' });
+  let r = await c.post('/app/landlords', { ...LANDLORD, name: 'Olive Grant', code: 'LL001', email: 'olive@example.com' });
   const id = idFrom(r.location);
   r = await c.get('/app/landlords');
   assert.match(r.text, /<th[^>]*>Name<\/th>\s*<th[^>]*>Landlord code<\/th>/, 'code column sits right of Name');
@@ -1128,7 +1134,7 @@ test('landlords have a code, shown right of the name in the list and on their pa
 
 test('any invoice can be deleted, from its page or from a list', async () => {
   const c = await registerAndLogin('invoice-delete@example.com', 'Delete Lets');
-  let r = await c.post('/app/landlords', { name: 'Dee Owner' });
+  let r = await c.post('/app/landlords', { ...LANDLORD, name: 'Dee Owner' });
   const landlordId = idFrom(r.location);
   r = await c.post('/app/properties', { address_line1: '3 Quay Street', landlord_id: landlordId, status: 'let' });
   const propertyId = idFrom(r.location);
@@ -1181,7 +1187,7 @@ test('signed out after an hour without use, then back to the same page', async (
   const c = await registerAndLogin('idle@example.com', 'Idle Lets');
   const person = db.prepare("SELECT id FROM users WHERE username = 'idle'").get().id;
   const ageSession = (mins) => db.prepare("UPDATE sessions SET last_seen_at = datetime('now', ?) WHERE user_id = ?").run(`-${mins} minutes`, person);
-  let r = await c.post('/app/landlords', { name: 'Ivy Idle' });
+  let r = await c.post('/app/landlords', { ...LANDLORD, name: 'Ivy Idle' });
   const landlordId = idFrom(r.location);
 
   // Pages carry the time limit for the browser's timer.
@@ -1244,10 +1250,12 @@ test('month end: calculate rents, email landlords, Rift report (Excel) with prev
   const c = await registerAndLogin('month-end@example.com', 'Month End Lets');
   const accountId = db.prepare("SELECT id FROM users WHERE username = 'month-end'").get().id;
   db.prepare("UPDATE users SET email = 'office@monthend.example' WHERE id = ?").run(accountId);
-  let r = await c.post('/app/landlords', { name: 'Ann Able', code: 'AA1', email: 'ann@example.com' });
+  let r = await c.post('/app/landlords', { ...LANDLORD, name: 'Ann Able', code: 'AA1', email: 'ann@example.com' });
   const ann = idFrom(r.location);
-  r = await c.post('/app/landlords', { name: '=Bad Formula', email: 'bounce@example.com' });
-  r = await c.post('/app/landlords', { name: 'Cy NoEmail' });
+  r = await c.post('/app/landlords', { ...LANDLORD, name: '=Bad Formula', email: 'bounce@example.com' });
+  r = await c.post('/app/landlords', { ...LANDLORD, name: 'Cy NoEmail' });
+  // Landlords added before email was required may have none.
+  db.prepare("UPDATE landlords SET email = NULL WHERE name = 'Cy NoEmail'").run();
   r = await c.post('/app/properties', { address_line1: '1 First Street', landlord_id: ann, status: 'vacant', management_fee_pct: '10' });
   const prop = idFrom(r.location);
   r = await c.post(`/app/properties/${prop}/add-tenant`, { tenant_mode: 'new', name: 'Tess', booking_date: '2026-07-01', start_date: '2026-08-01', rent_pence: '1000', rent_frequency: 'monthly', status: 'active' });
@@ -1372,13 +1380,12 @@ test('landlords have a statement type (Email or Cheque); cheque landlords are le
   const c = await registerAndLogin('statement-type@example.com', 'Type Lets');
   let r = await c.get('/app/landlords/new');
   assert.match(r.text, /<label for="f-statement_type">Statement type[\s\S]*?<option value="Email" selected>Email<\/option><option value="Cheque" >Cheque<\/option>/);
-  assert.match(r.text, /class="field  row-start">\s*<label for="f-address">Correspondence address[\s\S]*?class="field  ">\s*<label for="f-notes">Notes/, 'Notes sits beside the address');
-  r = await c.post('/app/landlords', { name: 'Eve Email', email: 'eve@example.com' });
+  r = await c.post('/app/landlords', { ...LANDLORD, name: 'Eve Email', email: 'eve@example.com' });
   const eve = idFrom(r.location);
   assert.equal(db.prepare('SELECT statement_type FROM landlords WHERE id = ?').get(eve).statement_type, 'Email', 'Email by default');
-  r = await c.post('/app/landlords', { name: 'Chad Cheque', email: 'chad@example.com', statement_type: 'Cheque' });
+  r = await c.post('/app/landlords', { ...LANDLORD, name: 'Chad Cheque', email: 'chad@example.com', statement_type: 'Cheque' });
   const chad = idFrom(r.location);
-  r = await c.post('/app/landlords', { name: 'X', statement_type: 'Carrier pigeon' });
+  r = await c.post('/app/landlords', { ...LANDLORD, name: 'X', statement_type: 'Carrier pigeon' });
   assert.equal(r.status, 422);
   assert.match(r.text, /Choose a valid statement type/);
 
@@ -1430,7 +1437,7 @@ test('the admin chooses which tabs each person sees; hidden tabs are blocked', a
     assert.equal(r.status, 403, blocked);
   }
   assert.match((await c.get('/app/invoices')).text, /isn’t available on your login/);
-  r = await c.post('/app/landlords', { name: 'Sneaky' });
+  r = await c.post('/app/landlords', { ...LANDLORD, name: 'Sneaky' });
   assert.equal(r.status, 403, 'changes are blocked too');
   assert.equal(db.prepare("SELECT COUNT(*) n FROM landlords WHERE name = 'Sneaky'").get().n, 0);
 
@@ -1559,7 +1566,7 @@ test('tenant page: a second box with the council, property and tenancy agreement
   const c = await registerAndLogin('tenant-box@example.com', 'Box Lets');
   let r = await c.post('/app/councils', { name: 'Leeds City Council', council_tax_phone: '0113 222 4404' });
   const leeds = idFrom(r.location);
-  r = await c.post('/app/landlords', { name: 'Lou Landlord' });
+  r = await c.post('/app/landlords', { ...LANDLORD, name: 'Lou Landlord' });
   const lou = idFrom(r.location);
   r = await c.post('/app/properties', { address_line1: '7 Canal Street', town: 'Leeds', postcode: 'LS1 4AB', landlord_id: String(lou), council_id: String(leeds), council_tax_account: 'CT-777', council_tax_payer: 'Tenant', status: 'vacant' });
   const prop = idFrom(r.location);
@@ -1607,14 +1614,14 @@ test('tenant page: a second box with the council, property and tenancy agreement
 
 test('rent run step 5: payment instruction template and a filled-in instruction to print', async () => {
   const c = await registerAndLogin('pay-instr@example.com', 'Pay Lets');
-  let r = await c.post('/app/landlords', { name: 'Paula Paid', code: 'PP1', bank_account_name: 'P Paid', bank_sort_code: '12 34 56', bank_account_number: '12345678' });
+  let r = await c.post('/app/landlords', { ...LANDLORD, name: 'Paula Paid', code: 'PP1', bank_account_name: 'P Paid', bank_sort_code: '12 34 56', bank_account_number: '12345678' });
   const paula = idFrom(r.location);
   assert.deepEqual({ ...db.prepare('SELECT bank_sort_code, bank_account_number FROM landlords WHERE id = ?').get(paula) }, { bank_sort_code: '12-34-56', bank_account_number: '12345678' });
-  r = await c.post('/app/landlords', { name: 'Bad Bank', bank_sort_code: '12', bank_account_number: 'abc' });
+  r = await c.post('/app/landlords', { ...LANDLORD, name: 'Bad Bank', bank_sort_code: '12', bank_account_number: 'abc' });
   assert.equal(r.status, 422);
   assert.match(r.text, /6-digit sort code/);
   assert.match(r.text, /8-digit account number/);
-  r = await c.post('/app/landlords', { name: 'Cheque Charlie', statement_type: 'Cheque' });
+  r = await c.post('/app/landlords', { ...LANDLORD, name: 'Cheque Charlie', statement_type: 'Cheque' });
   const charlie = idFrom(r.location);
   for (const [ll, addr] of [[paula, '1 Pay Street'], [charlie, '2 Pay Street']]) {
     const p = idFrom((await c.post('/app/properties', { address_line1: addr, landlord_id: String(ll), status: 'vacant' })).location);
@@ -1719,7 +1726,7 @@ test('invoices have a month switcher', async () => {
 
 test('invoices link to their property and show whether they were deducted, with the statement', async () => {
   const c = await registerAndLogin('inv-deduct@example.com', 'Deduct Lets');
-  let r = await c.post('/app/landlords', { name: 'Dora Deduct' });
+  let r = await c.post('/app/landlords', { ...LANDLORD, name: 'Dora Deduct' });
   const dora = idFrom(r.location);
   r = await c.post('/app/properties', { address_line1: '4 Drain Lane', landlord_id: String(dora), status: 'let' });
   const prop = idFrom(r.location);
@@ -1809,7 +1816,7 @@ test('contractors: every supplier listed with how much has been paid to them in 
 
 test('landlord invoices: bill a landlord, deduct from rent or mark paid, print and email', async () => {
   const c = await registerAndLogin('ll-invoices@example.com', 'Bill Lets');
-  let r = await c.post('/app/landlords', { name: 'Larry Landlord', code: 'LL9', email: 'larry@example.com', address: '1 Home Road' });
+  let r = await c.post('/app/landlords', { ...LANDLORD, name: 'Larry Landlord', code: 'LL9', email: 'larry@example.com', address: '1 Home Road' });
   const larry = idFrom(r.location);
   r = await c.post('/app/properties', { address_line1: '8 Bill Street', landlord_id: String(larry), status: 'let' });
   const prop = idFrom(r.location);
@@ -1919,7 +1926,7 @@ test('contractor invoice form offers the saved contractors as a type-to-narrow l
 
 test('"Deduct from landlord" straight from adding a contractor or landlord invoice', async () => {
   const c = await registerAndLogin('deduct-now@example.com', 'Deduct Now Lets');
-  let r = await c.post('/app/landlords', { name: 'Nora Now' });
+  let r = await c.post('/app/landlords', { ...LANDLORD, name: 'Nora Now' });
   const nora = idFrom(r.location);
   r = await c.post('/app/properties', { address_line1: '3 Quick Street', landlord_id: String(nora), status: 'let' });
   const prop = idFrom(r.location);
@@ -1990,7 +1997,7 @@ test('every section must be filled in when adding a contractor or landlord invoi
   for (const name of ['landlord_id', 'property_id', 'amount', 'invoice_date', 'description']) {
     assert.match(r.text, new RegExp(`name="${name}"[^>]*required|required[^>]*name="${name}"`), `${name} is required on the landlord invoice form`);
   }
-  const ll = idFrom((await c.post('/app/landlords', { name: 'Req Landlord' })).location);
+  const ll = idFrom((await c.post('/app/landlords', { ...LANDLORD, name: 'Req Landlord' })).location);
   r = await c.post('/app/landlord-invoices', { landlord_id: String(ll), invoice_number: 'LI-0001', invoice_date: '2026-08-01', description: 'Fee', amount: '5' });
   assert.equal(r.status, 422);
   assert.match(r.text, /Choose the property/);
@@ -2134,18 +2141,18 @@ test('landlords list shows their councils to the right of phone', async () => {
   const c = await registerAndLogin('ll-councils@example.com', 'LL Councils Lets');
   const leeds = idFrom((await c.post('/app/councils', { name: 'Leeds City Council' })).location);
   const york = idFrom((await c.post('/app/councils', { name: 'York Council' })).location);
-  const ll = idFrom((await c.post('/app/landlords', { name: 'Two Council Tom', phone: '07700 900001' })).location);
+  const ll = idFrom((await c.post('/app/landlords', { ...LANDLORD, name: 'Two Council Tom', phone: '07700 900001' })).location);
   await c.post('/app/properties', { address_line1: 'A1', landlord_id: String(ll), council_id: String(leeds), status: 'let' });
   await c.post('/app/properties', { address_line1: 'A2', landlord_id: String(ll), council_id: String(york), status: 'let' });
   await c.post('/app/properties', { address_line1: 'A3', landlord_id: String(ll), council_id: String(leeds), status: 'let' });
   const r = await c.get('/app/landlords');
-  assert.match(r.text, /<th[^>]*>Phone<\/th>\s*<th[^>]*>Councils<\/th>/);
+  assert.match(r.text, /<th[^>]*>Telephone number<\/th>\s*<th[^>]*>Councils<\/th>/);
   assert.match(r.text, /07700 900001[\s\S]*?<span class="cell-text">Leeds City Council\nYork Council<\/span>/);
 });
 
 test('a landlord page has no Transactions list', async () => {
   const c = await registerAndLogin('ll-no-txn@example.com', 'No Txn LL Lets');
-  const ll = idFrom((await c.post('/app/landlords', { name: 'Quiet Landlord' })).location);
+  const ll = idFrom((await c.post('/app/landlords', { ...LANDLORD, name: 'Quiet Landlord' })).location);
   const r = await c.get(`/app/landlords/${ll}`);
   assert.match(r.text, /Properties owned/);
   assert.doesNotMatch(r.text, /<h2>Transactions/);
@@ -2337,7 +2344,7 @@ test('properties list columns: Property name, Council, Landlord, Tenant, Status'
   const c = await registerAndLogin('prop-cols@example.com', 'Prop Cols Lets');
   let r = await c.post('/app/councils', { name: 'Col Council' });
   const council = idFrom(r.location);
-  r = await c.post('/app/landlords', { name: 'Col Landlord' });
+  r = await c.post('/app/landlords', { ...LANDLORD, name: 'Col Landlord' });
   const landlord = idFrom(r.location);
   r = await c.post('/app/properties', { address_line1: '3 Column Close', council_id: String(council), landlord_id: String(landlord), status: 'vacant' });
   const prop = idFrom(r.location);
@@ -2427,8 +2434,8 @@ test('council reconciliation: still owed for the month and all months in the top
 
 test('contractor invoices: choose the landlord to charge and say what is required', async () => {
   const c = await registerAndLogin('inv-landlord@example.com', 'Inv Landlord Lets');
-  const owner = idFrom((await c.post('/app/landlords', { name: 'Owner Olive' })).location);
-  const other = idFrom((await c.post('/app/landlords', { name: 'Other Oscar' })).location);
+  const owner = idFrom((await c.post('/app/landlords', { ...LANDLORD, name: 'Owner Olive' })).location);
+  const other = idFrom((await c.post('/app/landlords', { ...LANDLORD, name: 'Other Oscar' })).location);
   const pid = String(idFrom((await c.post('/app/properties', { address_line1: '3 Chosen Road', status: 'vacant', landlord_id: String(owner) })).location));
   let form = await c.get('/app/invoices/new');
   assert.match(form.text, /name="landlord_id"[\s\S]*?Other Oscar/);
@@ -2486,7 +2493,7 @@ test('maintenance: a completed job has a landlord invoice to download and email'
   const c = await registerAndLogin('job-invoice@example.com', 'Job Invoice Lets');
   const co = db.prepare("SELECT id FROM users WHERE username = 'job-invoice'").get();
   db.prepare("UPDATE users SET address = 'Unit 9 Netherhouse Farm', phone = '020 8882 5500', email = 'info@jobinvoice.example' WHERE id = ?").run(co.id);
-  let r = await c.post('/app/landlords', { name: 'Mrs Karen Wright', email: 'karen@example.com' });
+  let r = await c.post('/app/landlords', { ...LANDLORD, name: 'Mrs Karen Wright', email: 'karen@example.com' });
   const ll = idFrom(r.location);
   r = await c.post('/app/properties', { address_line1: '2 Review Lodge', town: 'Review Road', postcode: 'RM10 9DB', landlord_id: String(ll), status: 'let' });
   const prop = idFrom(r.location);
@@ -2542,7 +2549,7 @@ test('maintenance: a completed job has a landlord invoice to download and email'
 
 test('contractor invoice: price to us, price to landlord, profit, and charge to landlord Yes/No', async () => {
   const c = await registerAndLogin('profit@example.com', 'Profit Lets');
-  const ll = idFrom((await c.post('/app/landlords', { name: 'Pat Profit' })).location);
+  const ll = idFrom((await c.post('/app/landlords', { ...LANDLORD, name: 'Pat Profit' })).location);
   const prop = idFrom((await c.post('/app/properties', { address_line1: '5 Margin Row', landlord_id: String(ll), status: 'let' })).location);
   let r = await c.get('/app/invoices/new');
   assert.match(r.text, /Charge to landlord <span class="req">\*<\/span>[\s\S]*?<option value="" selected>Choose…[\s\S]*?Price to us \(£\)[\s\S]*?Price to landlord \(£\)[\s\S]*?Profit \(£\)/);
@@ -2864,7 +2871,7 @@ test('rent run step 5 box: edit the Metro form details; typed-over totals are ke
 
 test('landlord invoice: Download invoice gives a PDF', async () => {
   const c = await registerAndLogin('li-download@example.com', 'LI Download Lets');
-  const ll = idFrom((await c.post('/app/landlords', { name: 'Dan Download' })).location);
+  const ll = idFrom((await c.post('/app/landlords', { ...LANDLORD, name: 'Dan Download' })).location);
   const prop = idFrom((await c.post('/app/properties', { address_line1: '2 Paper Lane', postcode: 'N1 1AA', landlord_id: String(ll), status: 'let' })).location);
   await c.get('/app/landlord-invoices/new');
   let r = await c.post('/app/landlord-invoices', { landlord_id: String(ll), property_id: String(prop), invoice_number: 'LI-7001', invoice_date: '2026-09-01', description: 'Inventory check', notes: 'Room by room', amount: '85' });
@@ -2911,15 +2918,15 @@ test('contractor page: boxes for paid in a chosen month, paid all time, unpaid a
 test('landlords have a Date started, shown in their info box', async () => {
   const c = await registerAndLogin('ll-started@example.com', 'LL Started Lets');
   let r = await c.get('/app/landlords/new');
-  assert.match(r.text, /Date started[\s\S]*?name="date_started"[^>]*value="\d{4}-\d{2}-\d{2}"/, 'defaults to today');
-  const id = idFrom((await c.post('/app/landlords', { name: 'Stella Start', date_started: '2019-04-01', statement_type: 'Email' })).location);
+  assert.match(r.text, /Lease commencement date[\s\S]*?name="date_started"[^>]*value="\d{4}-\d{2}-\d{2}"/, 'defaults to today');
+  const id = idFrom((await c.post('/app/landlords', { ...LANDLORD, name: 'Stella Start', date_started: '2019-04-01', statement_type: 'Email' })).location);
   r = await c.get(`/app/landlords/${id}`);
-  assert.match(r.text, /<dt>Date started<\/dt>[\s\S]*?01\/04\/2019/);
+  assert.match(r.text, /<dt>Lease commencement date<\/dt>[\s\S]*?01\/04\/2019/);
 });
 
 test('landlord invoice number can be changed; no Paid by us option', async () => {
   const c = await registerAndLogin('li-number@example.com', 'LI Number Lets');
-  const ll = idFrom((await c.post('/app/landlords', { name: 'Nia Number' })).location);
+  const ll = idFrom((await c.post('/app/landlords', { ...LANDLORD, name: 'Nia Number' })).location);
   const prop = idFrom((await c.post('/app/properties', { address_line1: '3 Count Road', landlord_id: String(ll), status: 'let' })).location);
   await c.get('/app/landlord-invoices/new');
   let r = await c.post('/app/landlord-invoices', { landlord_id: String(ll), property_id: String(prop), invoice_number: 'LI-0500', invoice_date: '2026-09-01', description: 'Key cutting', amount: '15' });
@@ -2935,7 +2942,7 @@ test('landlord invoice number can be changed; no Paid by us option', async () =>
 
 test('landlord invoice paid over several months: deducted a month at a time, undone and re-split on edit', async () => {
   const c = await registerAndLogin('li-months@example.com', 'LI Months Lets');
-  const ll = idFrom((await c.post('/app/landlords', { name: 'Ivy Instalment' })).location);
+  const ll = idFrom((await c.post('/app/landlords', { ...LANDLORD, name: 'Ivy Instalment' })).location);
   const prop = idFrom((await c.post('/app/properties', { address_line1: '4 Split Street', landlord_id: String(ll), status: 'let' })).location);
   let r = await c.get('/app/landlord-invoices/new');
   assert.match(r.text, /name="months"[\s\S]*?<option value="3" >3 months/);
@@ -2964,7 +2971,7 @@ test('landlord invoice paid over several months: deducted a month at a time, und
 
 test('landlord invoice instalments: an Edit button beside each deducted payment changes its amount or date', async () => {
   const c = await registerAndLogin('li-inst-edit@example.com', 'LI Inst Edit Lets');
-  const ll = idFrom((await c.post('/app/landlords', { name: 'Ed Instalment' })).location);
+  const ll = idFrom((await c.post('/app/landlords', { ...LANDLORD, name: 'Ed Instalment' })).location);
   const prop = idFrom((await c.post('/app/properties', { address_line1: '5 Edit Road', landlord_id: String(ll), status: 'let' })).location);
   await c.get('/app/landlord-invoices/new');
   let r = await c.post('/app/landlord-invoices', { landlord_id: String(ll), property_id: String(prop), invoice_date: '2026-01-10', description: 'Roof', amount: '90', months: '3', then: 'deduct' });
@@ -2985,7 +2992,7 @@ test('landlord invoice instalments: an Edit button beside each deducted payment 
 
 test('Landlord invoices list: an Edit button to the right of Deducted', async () => {
   const c = await registerAndLogin('li-list-edit@example.com', 'LI List Edit Lets');
-  const ll = idFrom((await c.post('/app/landlords', { name: 'Lea List' })).location);
+  const ll = idFrom((await c.post('/app/landlords', { ...LANDLORD, name: 'Lea List' })).location);
   const prop = idFrom((await c.post('/app/properties', { address_line1: '6 List Lane', landlord_id: String(ll), status: 'let' })).location);
   await c.get('/app/landlord-invoices/new');
   const r = await c.post('/app/landlord-invoices', { landlord_id: String(ll), property_id: String(prop), invoice_date: '2026-09-01', description: 'Keys', amount: '10' });
@@ -3205,8 +3212,8 @@ test('login: over-long input is refused quickly, counted as a wrong attempt, and
 
 test('landlord bank details changes are recorded and flagged until checked with the landlord', async () => {
   const c = await registerAndLogin('bank-change@example.com', 'Bank Change Lets');
-  const id = idFrom((await c.post('/app/landlords', { name: 'Mr Careful', statement_type: 'Email' })).location);
-  const save = (fields) => c.post(`/app/landlords/${id}`, { name: 'Mr Careful', statement_type: 'Email', ...fields });
+  const id = idFrom((await c.post('/app/landlords', { ...LANDLORD, name: 'Mr Careful', statement_type: 'Email', bank_account_name: 'Mr Careful' })).location);
+  const save = (fields) => c.post(`/app/landlords/${id}`, { ...LANDLORD, name: 'Mr Careful', statement_type: 'Email', ...fields });
   // Filling them in for the first time isn't a change.
   await save({ bank_account_name: 'Mr Careful', bank_sort_code: '30-93-84', bank_account_number: '12345678' });
   assert.equal(db.prepare('SELECT COUNT(*) n FROM landlord_bank_changes WHERE landlord_id = ?').get(id).n, 0);
@@ -3299,7 +3306,7 @@ test('phones: the page fits the screen (viewport tag, shrinking forms, scrolling
 
 test('landlord invoices tab: profit from contractor invoices this month and all time (paid, charged to a landlord)', async () => {
   const c = await registerAndLogin('profit-tiles@example.com', 'Profit Tiles Lets');
-  const ll = String(idFrom((await c.post('/app/landlords', { name: 'Profit Owner', statement_type: 'Email' })).location));
+  const ll = String(idFrom((await c.post('/app/landlords', { ...LANDLORD, name: 'Profit Owner', statement_type: 'Email' })).location));
   const prop = String(idFrom((await c.post('/app/properties', { address_line1: '7 Margin Road', status: 'let', landlord_id: ll })).location));
   const add = async (fields) => { await c.get('/app/invoices/new'); return c.post('/app/invoices', { maintenance_job_id: 'none', property_id: prop, charge_landlord: 'yes', ...fields }, { multipart: true }); };
   await add({ supplier: 'Sept Co', amount: '100', landlord_amount: '150', invoice_date: '2026-09-05', then: 'deduct' }); // +50 in September
@@ -3334,4 +3341,21 @@ test('dashboard: properties box (empty needing maintenance or ready, booked, acq
   assert.equal(n('Handed back'), 1);
   assert.match(page, /1 Fixer Road<\/a> <span class="muted small">· 1 open job/);
   assert.ok(month);
+});
+
+test('landlords: codes fill in automatically, one more each time; all boxes required; bank name list', async () => {
+  const c = await registerAndLogin('ll-codes@example.com', 'Codes Lets');
+  let page = (await c.get('/app/landlords/new')).text;
+  assert.match(page, /name="code" value="L001"/, 'the first code');
+  assert.match(page, /list="list-bank_name"[\s\S]*?<option value="Lloyds">/);
+  for (const name of ['Overseas landlord', 'Payment terms', 'Lease commencement date', 'Telephone number', 'Correspondence address']) assert.match(page, new RegExp(name));
+  assert.match(page, /<label for="f-name">[\s\S]*?<label for="f-address">Correspondence address[\s\S]*?<label for="f-phone">Telephone number[\s\S]*?<label for="f-bank_name">Bank name[\s\S]*?<label for="f-bank_account_name">Account name[\s\S]*?<label for="f-bank_account_number">Account number[\s\S]*?<label for="f-bank_sort_code">Sort code/);
+  await c.post('/app/landlords', { ...LANDLORD, name: 'First', code: 'L101' });
+  assert.match((await c.get('/app/landlords/new')).text, /name="code" value="L102"/);
+  await c.post('/app/landlords', { ...LANDLORD, name: 'Second' }); // left blank: given the next code
+  assert.equal(db.prepare("SELECT code FROM landlords WHERE name = 'Second' AND account_id = (SELECT id FROM users WHERE username = 'll-codes')").get().code, 'L102');
+  const r = await c.post('/app/landlords', { name: 'Missing Bits' });
+  assert.equal(r.status, 422);
+  assert.match(r.text, /Telephone number is required/);
+  assert.doesNotMatch((await c.get('/app/landlords')).text, /aria-label="Properties"[\s\S]*?aria-label="Landlords"/, 'Landlords above Properties');
 });
