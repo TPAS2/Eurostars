@@ -2055,11 +2055,11 @@ test('contractor invoices: unpaid and paid boxes for the chosen month either sid
 test('the app is called Rift everywhere people see it', async () => {
   const login = (await new Client().get('/login')).text;
   assert.match(login, /<title>Sign in · Rift<\/title>/);
-  assert.match(login, /<span class="logo">R<\/span>Rift/);
+  assert.match(login, /<span>Rift<\/span>/, 'the name beside the logo');
   assert.doesNotMatch(login, /Nexus/);
   const c = await registerAndLogin('rift-name@example.com', 'Rift Name Lets');
   const home = (await c.get('/app')).text;
-  assert.match(home, /<span class="logo">R<\/span>/);
+  assert.match(home, /<img class="logo logo-img" src="\/static\/icon-192\.png"/, 'the rail logo is the galaxy icon');
   assert.doesNotMatch(home, /Nexus/);
   assert.match(fs.readFileSync(path.join(__dirname, '..', 'README.md'), 'utf8'), /^# Rift/);
 });
@@ -2264,8 +2264,9 @@ test('signing in plays the welcome animation once, on the first page', async () 
   r = await c.post('/login', { login: 'admin', member: 'Theo', password: 'owner-password-123' });
   r = await c.get(r.location);
   assert.match(r.text, /data-intro/);
-  assert.match(r.text, /class="intro-portal"/, 'travels through the rift');
-  for (const f of ['rift-portal.webp', 'login-galaxy.webp', 'icon-192.png']) {
+  assert.match(r.text, /class="intro-seam"/, 'the rift opens');
+  assert.doesNotMatch(r.text, /<span class="logo">R<\/span>/, 'the rail logo is the galaxy icon');
+  for (const f of ['intro-sky.jpg', 'login-art.jpg', 'icon-192.png']) {
     const img = await fetch(`${base}/static/${f}`);
     assert.equal(img.status, 200, `${f} is served`);
     assert.ok(Number(img.headers.get('content-length')) > 1000);

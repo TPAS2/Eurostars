@@ -18,7 +18,9 @@
 <body class="<%= typeof bodyClass !== 'undefined' ? bodyClass : '' %>"<% if (user) { %> data-who="<%= user.person_id || user.id %>"<% } %><% if (user && typeof idleMinutes !== 'undefined' && idleMinutes > 0) { %> data-idle-minutes="<%= idleMinutes %>"<% } %>>
 <% if (user && typeof intro !== 'undefined' && intro) { %>
 <div class="intro" data-intro role="presentation" aria-hidden="true">
-  <span class="intro-portal"></span><span class="intro-flash"></span>
+  <span class="intro-half intro-l"><img src="/static/intro-sky.jpg" alt=""></span>
+  <span class="intro-half intro-r"><img src="/static/intro-sky.jpg" alt=""></span>
+  <span class="intro-seam"></span>
   <div class="intro-center"><img class="intro-logo" src="/static/icon-192.png" alt="" width="84" height="84"></div>
 </div>
 <% } %>
@@ -39,7 +41,7 @@
 <div class="shell">
   <aside class="sidebar">
     <% const home = user.is_admin ? { href: '/admin', label: 'Admin panel', tip: 'Admin panel', on: s === 'admin' } : { href: '/app', label: 'Dashboard', tip: `Dashboard · ${user.agency_name}`, on: s === 'dashboard' }; %>
-    <a class="rail-btn brand-btn <%= home.on ? 'active' : '' %>" href="<%= home.href %>" data-tip="<%= home.tip %>" aria-label="<%= home.label %>" <%- home.on ? 'aria-current="page"' : '' %>><span class="logo"><%= appName.charAt(0).toUpperCase() %></span></a>
+    <a class="rail-btn brand-btn <%= home.on ? 'active' : '' %>" href="<%= home.href %>" data-tip="<%= home.tip %>" aria-label="<%= home.label %>" <%- home.on ? 'aria-current="page"' : '' %>><img class="logo logo-img" src="/static/icon-192.png" alt="" width="30" height="30"></a>
     <nav class="rail" aria-label="Main">
       <% groups.filter(g => g.some(([key]) => !(user.hidden_tabs || []).includes(key))).forEach((g, gi) => { %>
         <% if (gi) { %><span class="rail-sep" aria-hidden="true"></span><% } %>
