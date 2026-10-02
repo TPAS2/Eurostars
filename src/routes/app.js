@@ -344,7 +344,7 @@ module.exports = function appRoutes(db) {
     stats.landlordsPaid = rift.rows.length;
     stats.statementsReady = !!db.prepare('SELECT 1 FROM monthly_statements WHERE account_id = ? AND month = ? LIMIT 1').get(a, thisMonth);
     stats.grossProfit = stats.councilInvoiced - stats.paidToLandlords;
-    // Properties at a glance: empty ones (needing maintenance or ready to rent), bookings, new and
+    // Properties at a glance: any needing maintenance, empty ones ready to rent, reservations, new and
     // handed-back properties this month.
     const openJob = "EXISTS (SELECT 1 FROM maintenance_jobs m WHERE m.property_id = p.id AND m.account_id = p.account_id AND m.status != 'completed')";
     const empty = db.prepare(
@@ -352,11 +352,16 @@ module.exports = function appRoutes(db) {
               (SELECT COUNT(*) FROM maintenance_jobs m WHERE m.property_id = p.id AND m.account_id = p.account_id AND m.status != 'completed') AS jobs
          FROM properties p WHERE p.account_id = ? AND p.status = 'vacant' ORDER BY p.address_line1 COLLATE NOCASE`
     ).all(a);
+    const needsWork = db.prepare(
+      `SELECT p.id, p.address_line1,
+              (SELECT COUNT(*) FROM maintenance_jobs m WHERE m.property_id = p.id AND m.account_id = p.account_id AND m.status != 'completed') AS jobs
+         FROM properties p WHERE p.account_id = ? AND p.status != 'handed back' AND ${openJob} ORDER BY p.address_line1 COLLATE NOCASE`
+    ).all(a);
     const monthFrom = `${thisMonth}-01`;
     const monthTo = `${thisMonth}-31`;
     const propertyBox = {
       empty,
-      needsWork: empty.filter((p) => p.needs_work),
+      needsWork,
       ready: empty.filter((p) => !p.needs_work),
       booked: db.prepare(
         `SELECT ty.id, p.id AS property_id, p.address_line1, t.name AS tenant, COALESCE(ty.booking_date, ty.start_date) AS date

@@ -41,7 +41,7 @@
 </section>
 
 <% const pb = propertyBox; const groups = [
-  ['Empty – needs maintenance', pb.needsWork, 'bad', (x) => `${x.jobs} open job${x.jobs === 1 ? '' : 's'}`, (x) => `/app/properties/${x.id}`],
+  ['Properties that need maintenance', pb.needsWork, 'bad', (x) => `${x.jobs} open job${x.jobs === 1 ? '' : 's'}`, (x) => `/app/properties/${x.id}`],
   ['Empty – ready to rent', pb.ready, 'ok', () => '', (x) => `/app/properties/${x.id}`],
   [`Reserved · ${stats.monthLabel}`, pb.booked, 'info', (x) => `${x.tenant} · ${fmt.ukDate(x.date)}`, (x) => `/app/tenancies/${x.id}`],
   [`New acquisitions · ${stats.monthLabel}`, pb.acquired, 'info', (x) => fmt.ukDate(x.date), (x) => `/app/properties/${x.id}`],
@@ -50,7 +50,7 @@
 <section class="card property-overview" id="property-overview">
   <div class="card-head">
     <h2>Properties <span class="count"><%= pb.empty.length %> empty</span></h2>
-    <span class="muted small">Empty properties, bookings, new and handed back this month</span>
+    <span class="muted small">Maintenance, empty properties, reservations, new and handed back this month</span>
   </div>
   <div class="po-tiles">
     <% groups.forEach(([label, list, tone]) => { %><div class="po-tile po-<%= tone %>"><span class="po-n"><%= list.length %></span><span class="po-label"><%= label %></span></div><% }) %>

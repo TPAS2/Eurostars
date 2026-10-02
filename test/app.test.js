@@ -3324,7 +3324,7 @@ test('landlord invoices tab: profit from contractor invoices this month and all 
   assert.match((await c.get('/app/landlord-invoices?month=2026-08')).text, /id="profit-month">£20\.00/);
 });
 
-test('dashboard: properties box (empty needing maintenance or ready, booked, acquired and handed back this month)', async () => {
+test('dashboard: properties box (needing maintenance, empty and ready, booked, acquired and handed back this month)', async () => {
   const c = await registerAndLogin('prop-box@example.com', 'Prop Box Lets');
   const month = new Date().toISOString().slice(0, 7);
   const today = new Date().toISOString().slice(0, 10);
@@ -3332,6 +3332,8 @@ test('dashboard: properties box (empty needing maintenance or ready, booked, acq
   await c.post('/app/properties', { address_line1: '2 Ready Road', status: 'vacant' });
   await c.post('/app/maintenance', { property_id: fixer, title: 'Repaint', priority: 'normal', status: 'open' });
   const let1 = String(idFrom((await c.post('/app/properties', { address_line1: '3 Booked Road', status: 'let' })).location));
+  // A let property with an open job needs maintenance too.
+  await c.post('/app/maintenance', { property_id: let1, title: 'Fix gutter', priority: 'normal', status: 'open' });
   const ten = String(idFrom((await c.post('/app/tenants', { name: 'Made Up Tenant' })).location));
   await c.post('/app/tenancies', { property_id: let1, tenant_id: ten, booking_date: today, start_date: today, rent_pence: '900', rent_frequency: 'monthly', status: 'active' });
   const back = String(idFrom((await c.post('/app/properties', { address_line1: '4 Returned Road', status: 'let', acquired_date: '2025-01-01' })).location));
@@ -3339,7 +3341,7 @@ test('dashboard: properties box (empty needing maintenance or ready, booked, acq
   assert.equal(db.prepare('SELECT status FROM properties WHERE id = ?').get(Number(back)).status, 'handed back');
   const page = (await c.get('/app')).text;
   const n = (label) => Number(page.match(new RegExp(`<span class="po-n">(\\d+)</span><span class="po-label">${label}`))[1]);
-  assert.equal(n('Empty – needs maintenance'), 1);
+  assert.equal(n('Properties that need maintenance'), 2, 'empty or let');
   assert.equal(n('Empty – ready to rent'), 1);
   assert.equal(n('Reserved'), 1);
   assert.equal(n('New acquisitions'), 3, 'the three added today (not the one acquired in 2025)');
