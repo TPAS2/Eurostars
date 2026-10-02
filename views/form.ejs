@@ -7,7 +7,7 @@
 </header>
 <section class="card">
   <% if (Object.keys(errors).length) { %><div class="notice err">Please fix the highlighted fields.</div><% } %>
-  <form method="post" action="/app/<%= def.key %><%= row ? '/' + row.id : '' %>" class="form-grid"
+  <form method="post" action="/app/<%= def.key %><%= row ? '/' + row.id : '' %>" class="form-grid"<%- def.files && !row ? ' enctype="multipart/form-data"' : '' %>
         <%- row ? 'data-autosave' : `data-draft="new-${def.key}"` %>>
     <%- include('partials/csrf') %>
     <% def.fields.forEach(f => { %>
@@ -24,6 +24,13 @@
       </div>
       <% } %>
     <% }) %>
+    <% if (def.files && !row) { %>
+    <div class="field wide">
+      <label for="f-files">Photos and files</label>
+      <input id="f-files" type="file" name="files" multiple>
+      <div class="help">Optional. Photos, PDFs, iPhone photos, or Word, Excel and PowerPoint files, up to 25 MB each. You can add more later on the job's page.</div>
+    </div>
+    <% } %>
     <div class="form-actions wide">
       <% if (row) { %>
         <a class="btn primary" href="/app/<%= def.key %>/<%= row.id %>">Done</a>

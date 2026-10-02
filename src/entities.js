@@ -151,17 +151,20 @@ const ENTITIES = {
     titleField: 'title',
     order: "CASE status WHEN 'completed' THEN 1 ELSE 0 END, reported_date DESC",
     fields: [
-      { name: 'property_id', label: 'Property', type: 'ref', ref: 'properties', required: true },
+      { name: 'property_id', label: 'Property address', type: 'ref', ref: 'properties', required: true },
       { name: 'title', label: 'Issue', type: 'text', required: true },
-      // Details then cost sit beside the issue.
-      { name: 'description', label: 'Details', type: 'textarea', inline: true },
+      // Description then cost sit beside the issue.
+      { name: 'description', label: 'Description of work', type: 'textarea', inline: true },
       { name: 'cost_pence', label: 'Cost (£)', type: 'money' },
-      { name: 'contractor', label: 'Contractor', type: 'text' },
+      { name: 'contractor', label: 'Contractor', type: 'text', suggest: 'contractors', help: 'Pick from your contractors, or type a new name.' },
       { name: 'priority', label: 'Priority', type: 'select', options: ['low', 'normal', 'high', 'emergency'], required: true, default: 'normal' },
       { name: 'status', label: 'Status', type: 'select', options: ['open', 'in progress', 'completed'], required: true, default: 'open' },
       { name: 'reported_date', label: 'Reported', type: 'date', default: 'today' },
+      { name: 'completed_date', label: 'Date completed', type: 'date', help: 'Filled in with today\'s date when the job is saved as completed.' },
+      { name: 'added_by', label: 'Added by', type: 'person', required: true },
     ],
-    columns: ['title', 'property_id', 'priority', 'status', 'reported_date', 'cost_pence'],
+    files: true,
+    columns: ['title', 'property_id', 'priority', 'status', 'reported_date', 'cost_pence', 'added_by'],
   },
 
   compliance: {

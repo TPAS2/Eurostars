@@ -20,7 +20,12 @@ const TYPES = [
   // iPhone photos: kept and downloadable (most browsers can't show them inline).
   { mime: 'image/heic', image: false, test: (b) => ['ftypheic', 'ftypheix', 'ftypmif1', 'ftyphevc'].includes(b.subarray(4, 12).toString('latin1')) },
   { mime: 'application/pdf', image: false, test: (b) => b.subarray(0, 5).toString('latin1') === '%PDF-' },
+  // Word, Excel and PowerPoint (new and old formats): always downloaded, never opened in the page.
+  { mime: 'application/vnd.openxmlformats-officedocument', image: false, ext: /\.(docx|xlsx|pptx)$/i, test: (b) => b.subarray(0, 4).equals(Buffer.from([0x50, 0x4b, 0x03, 0x04])) },
+  { mime: 'application/vnd.ms-office', image: false, ext: /\.(doc|xls|ppt)$/i, test: (b) => b.subarray(0, 8).equals(Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1])) },
 ];
+const typeOf = (buffer, name) => TYPES.find((t) => t.test(buffer) && (!t.ext || t.ext.test(name)));
+const REFUSED = 'Not uploaded (use photos, PDFs, iPhone HEIC files, or Word, Excel or PowerPoint files):';
 const SHOWABLE = new Set(TYPES.filter((t) => t.image).map((t) => t.mime));
 
 module.exports = function jobFileRoutes(db) {
@@ -29,6 +34,8 @@ module.exports = function jobFileRoutes(db) {
   // photos never has to sit in memory all at once.
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'rift-job-files-'));
   const upload = multer({ dest: tmpDir, limits: { fileSize: MAX_BYTES, files: MAX_FILES, fields: 5 } }).array('files', MAX_FILES);
+  // The new-job form has the job's own fields too.
+  const uploadWithJob = multer({ dest: tmpDir, limits: { fileSize: MAX_BYTES, files: MAX_FILES, fields: 60 } }).array('files', MAX_FILES);
   const cleanUp = (files) => { for (const f of files || []) fs.rm(f.path, { force: true }, () => {}); };
 
   function ownedJob(req, res) {
@@ -37,6 +44,36 @@ module.exports = function jobFileRoutes(db) {
     if (!job) res.status(404).render('error', { title: 'Not found', message: 'That maintenance job was not found.' });
     return job;
   }
+  function saveFiles(accountId, jobId, files, personId) {
+    const insert = db.prepare('INSERT INTO maintenance_files (account_id, job_id, filename, mime, size, data, uploaded_by) VALUES (?, ?, ?, ?, ?, ?, ?)');
+    const refused = [];
+    let saved = 0;
+    for (const f of files) {
+      const buffer = fs.readFileSync(f.path);
+      const name = path.basename(String(f.originalname || 'file')).replace(/[^\w.\- ()]/g, '_').slice(0, 150) || 'file';
+      const type = typeOf(buffer, name);
+      if (!type) { refused.push(name); continue; }
+      insert.run(accountId, jobId, name, type.mime, f.size, buffer, personId);
+      saved += 1;
+    }
+    return { saved, refused };
+  }
+
+  // Adding a job with files: the files are kept aside, the job is saved as usual, then the files.
+  router.post('/', (req, res, next) => {
+    if (!req.is('multipart/form-data')) return next();
+    uploadWithJob(req, res, (err) => {
+      if (err) req.uploadError = err.code === 'LIMIT_FILE_SIZE' ? 'A file is larger than 25 MB.' : 'The upload failed. Please try again.';
+      req.body = req.body || {};
+      auth.checkCsrfAfterUpload(req, res, () => {
+        const files = (req.files || []).filter((f) => f.size);
+        res.on('finish', () => cleanUp(req.files));
+        req.saveJobFiles = (jobId) => saveFiles(req.user.id, jobId, files, req.user.person_id);
+        next();
+      });
+    });
+  });
+
   const back = (res, id, key, msg) => res.redirect(`/app/maintenance/${id}?${key}=${encodeURIComponent(msg)}#files`);
 
   router.post('/:id(\\d+)/files', (req, res, next) => {
@@ -53,19 +90,9 @@ module.exports = function jobFileRoutes(db) {
     if (req.uploadError) return back(res, job.id, 'error', req.uploadError);
     const files = all.filter((f) => f.size);
     if (!files.length) return back(res, job.id, 'error', 'Choose one or more photos or files to upload.');
-    const insert = db.prepare('INSERT INTO maintenance_files (account_id, job_id, filename, mime, size, data, uploaded_by) VALUES (?, ?, ?, ?, ?, ?, ?)');
-    const refused = [];
-    let saved = 0;
-    for (const f of files) {
-      const buffer = fs.readFileSync(f.path);
-      const type = TYPES.find((t) => t.test(buffer));
-      const name = path.basename(String(f.originalname || 'file')).replace(/[^\w.\- ()]/g, '_').slice(0, 150) || 'file';
-      if (!type) { refused.push(name); continue; }
-      insert.run(req.user.id, job.id, name, type.mime, f.size, buffer, req.user.person_id);
-      saved += 1;
-    }
+    const { saved, refused } = saveFiles(req.user.id, job.id, files, req.user.person_id);
     const msg = `Uploaded ${saved} file${saved === 1 ? '' : 's'}.`;
-    if (refused.length) return back(res, job.id, 'error', `${saved ? msg + ' ' : ''}Not uploaded (use photos, PDFs or iPhone HEIC files): ${refused.join(', ')}.`);
+    if (refused.length) return back(res, job.id, 'error', `${saved ? msg + ' ' : ''}${REFUSED} ${refused.join(', ')}.`);
     back(res, job.id, 'flash', msg);
   });
 

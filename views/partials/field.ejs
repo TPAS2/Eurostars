@@ -9,6 +9,10 @@
       <% if (!f.required) { %><option value="">—</option><% } %>
       <% f.options.forEach(o => { %><option value="<%= o %>" <%= String(v) === o ? 'selected' : '' %>><%= (f.optionLabels && f.optionLabels[o]) || fmt.humanize(o) %></option><% }) %>
     </select>
+  <% } else if (f.type === 'person') { %>
+    <select id="f-<%= f.name %>" name="<%= f.name %>" <%= f.required ? 'required' : '' %>>
+      <% (opts || []).forEach(o => { %><option value="<%= o.id %>" <%= Number(v) === o.id ? 'selected' : '' %>><%= o.label %></option><% }) %>
+    </select>
   <% } else if (f.type === 'ref') { %>
     <select id="f-<%= f.name %>" name="<%= f.name %>" <%= f.required ? 'required' : '' %>>
       <option value="">— Select —</option>

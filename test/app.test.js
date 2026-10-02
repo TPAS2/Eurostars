@@ -3359,3 +3359,40 @@ test('landlords: codes fill in automatically, one more each time; all boxes requ
   assert.match(r.text, /Telephone number is required/);
   assert.doesNotMatch((await c.get('/app/landlords')).text, /aria-label="Properties"[\s\S]*?aria-label="Landlords"/, 'Landlords above Properties');
 });
+
+test('maintenance: files when adding, contractor list, who added it, date completed, new labels', async () => {
+  const c = await registerAndLogin('maint-new@example.com', 'Maint New Lets');
+  const prop = String(idFrom((await c.post('/app/properties', { address_line1: '9 Job Road', status: 'vacant' })).location));
+  await c.post('/app/contractors', { name: 'Made Up Plumbing' });
+  const co = db.prepare("SELECT id FROM users WHERE username = 'maint-new'").get().id;
+  db.prepare("INSERT INTO users (username, company_id, login_name, name, agency_name, password_hash) VALUES ('maint-new.sam', ?, 'Sam', 'Sam Helper', 'Maint New Lets', 'x')").run(co);
+  const sam = db.prepare("SELECT id FROM users WHERE login_name = 'Sam' AND company_id = ?").get(co).id;
+  const form = (await c.get('/app/maintenance/new')).text;
+  assert.match(form, /enctype="multipart\/form-data"/);
+  assert.match(form, /Property address/);
+  assert.match(form, /Description of work/);
+  assert.match(form, /<option value="Made Up Plumbing">/, 'contractors to pick from');
+  assert.match(form, new RegExp(`<option value="${co}" selected>`), 'Added by starts as the person signed in');
+  assert.match(form, /Sam Helper/);
+  // Added by someone else, with a photo and a Word file.
+  const png = new Blob([Buffer.from('89504e470d0a1a0a0000000d49484452', 'hex')]);
+  const docx = new Blob([Buffer.from('504b0304140000000800', 'hex')]);
+  const body = new FormData();
+  for (const [k, v] of Object.entries({ _csrf: c.csrf, property_id: prop, title: 'Leaking tap', priority: 'normal', status: 'open', reported_date: '2026-10-01', added_by: String(sam), contractor: 'Made Up Plumbing' })) body.append(k, v);
+  body.append('files', png, 'photo.png');
+  body.append('files', docx, 'quote.docx');
+  const r = await fetch(`${base}/app/maintenance`, { method: 'POST', headers: { cookie: c.cookie }, body, redirect: 'manual' });
+  assert.equal(r.status, 302);
+  assert.match(decodeURIComponent(r.headers.get('location')), /Added with 2 files/);
+  const job = db.prepare("SELECT * FROM maintenance_jobs WHERE title = 'Leaking tap'").get();
+  assert.equal(job.added_by, sam);
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM maintenance_files WHERE job_id = ?').get(job.id).n, 2);
+  assert.match((await c.get(`/app/maintenance/${job.id}`)).text, /Sam Helper/);
+  // Saved as completed: dated today.
+  await c.get(`/app/maintenance/${job.id}/edit`);
+  await c.post(`/app/maintenance/${job.id}`, { property_id: prop, title: 'Leaking tap', priority: 'normal', status: 'completed', reported_date: '2026-10-01', added_by: String(sam) });
+  assert.equal(db.prepare('SELECT completed_date FROM maintenance_jobs WHERE id = ?').get(job.id).completed_date, new Date().toISOString().slice(0, 10));
+  // Someone from another company can't be named as having added it.
+  const bad = await c.post('/app/maintenance', { property_id: prop, title: 'X', priority: 'normal', status: 'open', added_by: '1' });
+  assert.equal(bad.status, 422);
+});

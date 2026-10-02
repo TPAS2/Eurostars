@@ -35,12 +35,18 @@ module.exports = function appRoutes(db) {
     return db.prepare(`SELECT ${r.alias}.id AS id, ${r.label} AS label FROM ${r.from} WHERE ${r.alias}.account_id = ? ORDER BY label COLLATE NOCASE`).all(accountId);
   }
 
+  // Everyone at the company (its main login and its people), for "Added by" boxes.
+  function peopleOptions(accountId) {
+    return db.prepare("SELECT id, name AS label FROM users WHERE (id = ? OR company_id = ?) AND status = 'active' ORDER BY company_id IS NOT NULL, name COLLATE NOCASE").all(accountId, accountId);
+  }
+
   function refLabelMaps(def, accountId) {
     const maps = {};
     for (const f of def.fields) {
       if (f.type === 'ref' && !maps[f.ref]) {
         maps[f.ref] = new Map(refOptions(f.ref, accountId).map((o) => [o.id, o.label]));
       }
+      if (f.type === 'person' && !maps.people) maps.people = new Map(peopleOptions(accountId).map((o) => [o.id, o.label]));
     }
     return maps;
   }
@@ -56,6 +62,7 @@ module.exports = function appRoutes(db) {
       case 'number': return { text: String(v), num: true };
       case 'integer': return { text: String(v), num: true };
       case 'ref': return { text: maps[f.ref].get(v) || '(deleted)', href: `/app/${f.ref}/${v}` };
+      case 'person': return { text: (maps.people && maps.people.get(v)) || 'Someone who has left' };
       case 'select': return { text: (f.optionLabels && f.optionLabels[v]) || fmt.humanize(v), badge: true };
       default: return { text: String(v) };
     }
@@ -123,6 +130,13 @@ module.exports = function appRoutes(db) {
           if (!f.options.includes(raw)) errors[f.name] = `Choose a valid ${f.label.toLowerCase()}.`;
           values[f.name] = raw;
           break;
+        case 'person': {
+          const id = Number(raw);
+          const ok = Number.isInteger(id) && db.prepare('SELECT 1 FROM users WHERE id = ? AND (id = ? OR company_id = ?)').get(id, accountId, accountId);
+          if (!ok) errors[f.name] = `Choose who ${f.label.toLowerCase()}.`;
+          values[f.name] = id;
+          break;
+        }
         case 'ref': {
           const id = Number(raw);
           const owned = Number.isInteger(id) &&
@@ -177,6 +191,8 @@ module.exports = function appRoutes(db) {
   function renderForm(res, def, { row, values, errors, accountId, status = 200 }) {
     const options = {};
     for (const f of def.fields) if (f.type === 'ref') options[f.name] = refOptions(f.ref, accountId);
+    for (const f of def.fields) if (f.type === 'person') options[f.name] = peopleOptions(accountId);
+    if (def.key === 'maintenance') options.contractor = db.prepare('SELECT name FROM contractors WHERE account_id = ? ORDER BY name COLLATE NOCASE').all(accountId).map((c) => c.name);
     // Bank names to pick from: the usual UK banks plus any already typed in.
     if (def.key === 'landlords') {
       const used = db.prepare("SELECT DISTINCT bank_name FROM landlords WHERE account_id = ? AND bank_name IS NOT NULL AND bank_name != ''").all(accountId).map((r) => r.bank_name.trim());
@@ -228,6 +244,9 @@ module.exports = function appRoutes(db) {
 
   function prepareValues(def, accountId, values) {
     if (def.key === 'transactions') ledger.resolveLinks(db, accountId, values);
+    // A job saved as completed is dated today, unless a date was given.
+    if (def.key === 'maintenance' && values.status === 'completed' && !values.completed_date) values.completed_date = fmt.today();
+    if (def.key === 'maintenance' && values.status && values.status !== 'completed') values.completed_date = null;
     // A handed-back date means the property has gone back to the landlord.
     if (def.key === 'properties' && values.handed_back_date) values.status = 'handed back';
     return values;
@@ -743,6 +762,7 @@ module.exports = function appRoutes(db) {
     if (!def) return;
     const values = formDefaults(def, req.query);
     if (def.key === 'landlords' && !values.code) values.code = nextLandlordCode(req.user.id);
+    for (const f of def.fields) if (f.type === 'person' && !values[f.name]) values[f.name] = req.user.person_id || req.user.id;
     renderForm(res, def, { row: null, values, errors: {}, accountId: req.user.id });
   });
 
@@ -770,6 +790,8 @@ module.exports = function appRoutes(db) {
     const a = req.user.id;
     // A landlord left without a code gets the next one.
     if (def.key === 'landlords' && !String(req.body.code || '').trim()) req.body.code = nextLandlordCode(a);
+    // "Added by" left out: the person signed in.
+    for (const f of def.fields) if (f.type === 'person' && !String(req.body[f.name] || '').trim()) req.body[f.name] = String(req.user.person_id || a);
     const { values, errors } = parseForm(def, req.body, a);
     if (Object.keys(errors).length) return renderForm(res, def, { row: null, values, errors, accountId: a, status: 422 });
     prepareValues(def, a, values);
@@ -783,6 +805,14 @@ module.exports = function appRoutes(db) {
       afterSave(def, a, newId, values);
       return newId;
     });
+    // Files chosen while adding a maintenance job.
+    if (def.key === 'maintenance' && req.saveJobFiles) {
+      const { saved, refused } = req.saveJobFiles(id);
+      if (saved || refused.length || req.uploadError) {
+        const msg = req.uploadError || (refused.length ? `Not uploaded (use photos, PDFs, iPhone HEIC files, or Word, Excel or PowerPoint files): ${refused.join(', ')}.` : `Added with ${saved} file${saved === 1 ? '' : 's'}.`);
+        return res.redirect(`/app/maintenance/${id}?${req.uploadError || refused.length ? 'error' : 'flash'}=${encodeURIComponent(msg)}#files`);
+      }
+    }
     // A new certificate goes back to its property's certificate panel.
     if (def.key === 'compliance') return res.redirect(`/app/properties/${values.property_id}#certificates`);
     res.redirect(`/app/${def.key}/${id}`);
