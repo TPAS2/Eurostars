@@ -970,3 +970,13 @@ input, select, textarea { max-width: 100%; }
 @media (max-width: 999px) {
   .rift-bg { background: linear-gradient(180deg, rgba(3, 4, 16, .55), rgba(3, 4, 16, .3)), url(/static/login-galaxy.webp) 70% center / cover no-repeat; }
 }
+
+/* Privacy notice and terms */
+.auth-legal { margin: 18px 0 0; text-align: center; font-size: .82rem; color: #8d95c2; }
+.auth-legal a { color: #a9b4ee; }
+.legal-page { max-width: 780px; margin: 0 auto; padding: 24px 16px 60px; }
+.legal-page h1 { margin: 6px 0 4px; }
+.legal-page h2 { margin: 28px 0 8px; font-size: 1.15rem; }
+.legal-page p, .legal-page li { line-height: 1.6; }
+.legal-page ul { padding-left: 22px; }
+.legal-page .legal-back { display: inline-block; margin-bottom: 6px; }

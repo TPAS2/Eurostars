@@ -29,6 +29,9 @@ and holds real people's personal and bank details. It's deployed on Render from 
   (the bundle is committed; rebuild after changing `client/`).
 - Installable app (PWA): `public/manifest.webmanifest` and the worker `public/sw.js` (served at `/sw.js`).
   The worker must never cache pages or data (they hold personal details); it only shows an offline page.
+- Legal: proprietary `LICENSE`; public `/privacy` and `/terms` (details come from LEGAL_NAME, LEGAL_ADDRESS,
+  PRIVACY_EMAIL, ICO_NUMBER in Render). After changing dependencies run `npm run notices` to refresh
+  `public/third-party-notices.txt`. If a new feature sends personal data to another service, update the privacy notice.
 - Libraries: `pdf-lib` (Metro form, invoices), `exceljs` (reports), `jszip` (filling the
   spreadsheet templates in `assets/`), `nodemailer`/Resend for email.
 

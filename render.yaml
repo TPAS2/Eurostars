@@ -41,6 +41,15 @@ services:
       # Encrypts every backup. Keep it safe: it's needed to restore a backup.
       - key: BACKUP_PASSWORD
         sync: false
+      # Shown on the public privacy notice and terms pages.
+      - key: LEGAL_NAME
+        sync: false
+      - key: LEGAL_ADDRESS
+        sync: false
+      - key: PRIVACY_EMAIL
+        sync: false
+      - key: ICO_NUMBER
+        sync: false
       - key: ANTHROPIC_API_KEY
         sync: false
       # Email for the Rent run (statements to landlords, the CSV report).

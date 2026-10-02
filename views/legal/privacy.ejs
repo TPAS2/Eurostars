@@ -1,0 +1,55 @@
+<%- include('../partials/header') %>
+<article class="legal-page">
+  <a class="crumb legal-back" href="<%= user ? '/app/account' : '/login' %>">← <%= user ? 'My account' : 'Sign in' %></a>
+  <h1>Privacy notice</h1>
+  <p class="muted">Last updated <%= legal.updated %></p>
+  <% if (missing) { %><div class="notice warn">Only you can see this note: to finish this page, set LEGAL_NAME, PRIVACY_EMAIL and ICO_NUMBER in Render's environment settings. Ask a solicitor to read it before you rely on it.</div><% } %>
+
+  <h2>Who we are</h2>
+  <p><strong><%= legal.legalName %></strong><%= legal.legalAddress ? ', ' + legal.legalAddress : '' %> is a letting agent. We use <%= appName %> to manage lettings, and we are the “data controller” for the personal information in it: we decide why and how it is used.</p>
+  <p>Questions about your information: <% if (legal.privacyEmail) { %><a href="mailto:<%= legal.privacyEmail %>"><%= legal.privacyEmail %></a><% } else { %>contact us using the details on your tenancy or management paperwork<% } %>.<% if (legal.icoNumber) { %> We are registered with the Information Commissioner’s Office (ICO), registration number <strong><%= legal.icoNumber %></strong>.<% } %></p>
+
+  <h2>What we hold</h2>
+  <ul>
+    <li><strong>Landlords:</strong> name, address, phone, email, bank details (account name, number and sort code), lease and payment terms, statements and invoices.</li>
+    <li><strong>Tenants:</strong> name, phone, email, council reference number, tenancy dates and agreement, rent and payment records, and notes of calls about the property.</li>
+    <li><strong>Properties:</strong> addresses, safety certificates and insurance, maintenance jobs, photos and files.</li>
+    <li><strong>Contractors and councils:</strong> business contact details, invoices and payment records.</li>
+    <li><strong>Our staff:</strong> name, work email, a sign-in name and a password (stored only as a one-way scrambled value, so nobody can read it) and a record of what was viewed or changed.</li>
+  </ul>
+
+  <h2>Why we use it, and our legal reasons</h2>
+  <ul>
+    <li>To manage tenancies and properties, collect and pass on rent and pay landlords and contractors. <em>Legal reason: it is needed for our contract with you.</em></li>
+    <li>To keep accounts and records the law requires, and to meet our duties as a letting agent. <em>Legal reason: legal obligation.</em></li>
+    <li>To keep our systems safe, prevent fraud and keep backups. <em>Legal reason: our legitimate interests.</em></li>
+  </ul>
+
+  <h2>Who we share it with</h2>
+  <ul>
+    <li><strong>Landlords</strong> receive statements about their own properties and rent.</li>
+    <li><strong>Local councils</strong>, where a tenancy or placement involves them, receive the details needed for invoices and records.</li>
+    <li><strong>Contractors</strong> receive the details needed to do a job at a property.</li>
+    <li><strong>Our bank</strong> receives payment details when we make payments to landlords.</li>
+    <li><strong>Our service providers</strong> who run the system for us and may only use the information on our instructions: our hosting provider (Render) and our email provider (Resend, or our own email service).<% if (legal.aiEnabled) { %> We also use an AI service (Anthropic) to help write the short summary on a landlord’s statement. It is sent the statement’s figures and the landlord’s name, and is not used to make decisions about anyone.<% } %></li>
+    <li>Anyone the law requires us to tell, such as the police, HMRC or a court.</li>
+  </ul>
+  <p>We do not sell your information or use it for advertising. Some of our providers may handle information outside the UK; where they do, we rely on the safeguards the law requires, such as approved contract terms.</p>
+
+  <h2>How long we keep it</h2>
+  <p>Tenancy and financial records are normally kept for six years after the tenancy or arrangement ends, in line with accounting and legal time limits. After that we delete or anonymise them. Backups are encrypted and replaced on a regular cycle.</p>
+
+  <h2>How we keep it safe</h2>
+  <p>The site only works over a secure connection. Each person has their own sign-in, people only see their own agency’s information, and staff are signed out after a period of inactivity. Backups are encrypted. Nothing from the site is stored on your device when you use it as an installed app.</p>
+
+  <h2>Your rights</h2>
+  <p>You can ask us to: show you the information we hold about you; correct anything wrong; delete it where we no longer need it; limit or object to how we use it; or give you a copy in a usable format. We will reply within one month. If you are unhappy with our answer you can complain to the Information Commissioner’s Office at <a href="https://ico.org.uk/make-a-complaint/" rel="noopener">ico.org.uk</a> or on 0303 123 1113.</p>
+
+  <h2>Cookies</h2>
+  <p>We use one small cookie, which keeps you signed in. It is strictly necessary for the site to work, so there is no cookie banner. We do not use tracking or advertising cookies.</p>
+
+  <h2>Changes</h2>
+  <p>If we change this notice we will update the date at the top.</p>
+  <p class="muted small">The open-source software <%= appName %> is built with is listed in the <a href="/static/third-party-notices.txt">open-source notices</a>.</p>
+</article>
+<%- include('../partials/footer') %>

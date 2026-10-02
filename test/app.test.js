@@ -3567,3 +3567,37 @@ test('installable app: manifest, icons, service worker that stores nothing, inst
   assert.match(page, /data-install-button/);
   assert.match(page, /Add to Home Screen/);
 });
+
+test('privacy notice and terms: public, show the agency details, mention the AI helper only when it is on', async () => {
+  const text = async (u, p) => (await fetch(`${u}${p}`)).text();
+  // Main test app: has a statement writer (AI) switched on, no agency details set.
+  let r = await fetch(`${base}/privacy`);
+  assert.equal(r.status, 200, 'readable without signing in');
+  let page = await r.text();
+  assert.match(page, /<h1>Privacy notice<\/h1>/);
+  assert.match(page, /Anthropic/, 'AI helper is declared when switched on');
+  assert.match(page, /contact us using the details on your tenancy/, 'no contact email set yet');
+  assert.doesNotMatch(page, /Only you can see this note/, 'the setup reminder is for the admin only');
+  assert.match(await text(base, '/terms'), /<h1>Terms of use<\/h1>/);
+  assert.match(await text(base, '/login'), /href="\/privacy">Privacy<\/a> · <a href="\/terms">Terms<\/a>/);
+  // With details set and no AI.
+  const db2 = openDatabase(':memory:');
+  const app2 = createApp({ ...config, legalName: 'Made Up Lettings Ltd', privacyEmail: 'privacy@madeup.example', icoNumber: 'ZA000000' }, db2).listen(0);
+  await new Promise((res) => app2.once('listening', res));
+  const url2 = `http://127.0.0.1:${app2.address().port}`;
+  try {
+    page = await text(url2, '/privacy');
+    assert.match(page, /Made Up Lettings Ltd/);
+    assert.match(page, /href="mailto:privacy@madeup\.example"/);
+    assert.match(page, /registration number <strong>ZA000000<\/strong>/);
+    assert.doesNotMatch(page, /Anthropic/, 'no AI mention when it is off');
+    assert.match(await text(url2, '/terms'), /Made Up Lettings Ltd/);
+  } finally { app2.close(); db2.close(); }
+  // Open-source notices are served.
+  r = await fetch(`${base}/static/third-party-notices.txt`);
+  assert.equal(r.status, 200);
+  assert.match(await r.text(), /express [\d.]+\s+\(MIT\)/);
+  // Signed-in people find them on My account.
+  const c = await registerAndLogin('legal-links@example.com', 'Legal Links Lets');
+  assert.match((await c.get('/app/account')).text, /href="\/privacy">Privacy notice<\/a>/);
+});

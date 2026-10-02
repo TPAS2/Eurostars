@@ -27,6 +27,11 @@ function loadConfig(env = process.env) {
     backupIntervalHours: Math.max(1, Number(env.BACKUP_INTERVAL_HOURS) || 24),
     autoBackups: env.AUTO_BACKUPS !== 'false',
     appName: env.APP_NAME || 'Rift',
+    // Shown on the privacy notice and terms. Set these in Render's environment settings.
+    legalName: (env.LEGAL_NAME || '').trim(),
+    legalAddress: (env.LEGAL_ADDRESS || '').trim(),
+    privacyEmail: (env.PRIVACY_EMAIL || env.ADMIN_EMAIL || '').trim().toLowerCase(),
+    icoNumber: (env.ICO_NUMBER || '').trim(),
     adminEmail: (env.ADMIN_EMAIL || '').trim().toLowerCase(),
     adminPassword: env.ADMIN_PASSWORD || '',
     adminPasswordReset: env.ADMIN_PASSWORD_RESET === 'true',
@@ -153,6 +158,7 @@ function createApp(config, db, { writer = null, mailer = null } = {}) {
     if (req.user) return res.redirect(req.user.is_admin ? '/admin' : '/app');
     res.redirect('/login');
   });
+  app.use('/', require('./routes/legal')(config, { aiEnabled: !!writer }));
   app.use('/', require('./routes/auth')(db, config));
   app.use('/app/invoices', auth.requireLogin, require('./routes/invoices')(db, config));
   app.use('/app/councils', auth.requireLogin, require('./routes/councilPhotos')(db));

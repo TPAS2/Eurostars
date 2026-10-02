@@ -1,0 +1,40 @@
+<%- include('../partials/header') %>
+<article class="legal-page">
+  <a class="crumb legal-back" href="<%= user ? '/app/account' : '/login' %>">← <%= user ? 'My account' : 'Sign in' %></a>
+  <h1>Terms of use</h1>
+  <p class="muted">Last updated <%= legal.updated %></p>
+  <% if (missing) { %><div class="notice warn">Only you can see this note: to finish this page, set LEGAL_NAME, PRIVACY_EMAIL and ICO_NUMBER in Render's environment settings. Ask a solicitor to read it before you rely on it.</div><% } %>
+
+  <h2>Who these terms are for</h2>
+  <p><%= appName %> is lettings software provided by <strong><%= legal.legalName %></strong> to its staff and to the agencies it gives accounts to. By signing in you agree to these terms.</p>
+
+  <h2>Your account</h2>
+  <ul>
+    <li>Accounts are created by the administrator. Keep your sign-in details private and do not share them. Everything done under your sign-in is treated as done by you.</li>
+    <li>Tell the administrator straight away if you think someone else knows your password.</li>
+  </ul>
+
+  <h2>Using <%= appName %></h2>
+  <ul>
+    <li>Use it only for lettings work. Do not try to see another agency’s information, break the security, or load anything harmful.</li>
+    <li>You are responsible for the information you enter and for having a right to use it. Treat everything in <%= appName %> as confidential, because it holds real people’s personal and bank details.</li>
+    <li>Look after personal information as set out in our <a href="/privacy">privacy notice</a> and data protection law.</li>
+  </ul>
+
+  <h2>Your information</h2>
+  <p>The information you put into <%= appName %> belongs to you or your agency. We keep it only to run the service. If an account ends, you can ask for a copy of your information and for it to be deleted, subject to records the law requires us to keep.</p>
+
+  <h2>Availability and accuracy</h2>
+  <p>We work to keep <%= appName %> running and backed up, but we cannot promise it will always be available or free of errors. Statements, reports and payment files are produced from the information entered, so check them before you send them or make a payment. Summaries written with the help of AI are drafts: please read them before sending.</p>
+
+  <h2>Liability</h2>
+  <p>Nothing in these terms limits liability that cannot be limited by law, such as for death or personal injury caused by negligence, or for fraud. Otherwise, we are not responsible for losses caused by information being entered or checked incorrectly, or by services we rely on (such as internet, email or banking providers) being unavailable.</p>
+
+  <h2>Ownership</h2>
+  <p><%= appName %> is proprietary software. All rights in it are reserved. It uses open-source packages listed in the <a href="/static/third-party-notices.txt">open-source notices</a>.</p>
+
+  <h2>Changes and law</h2>
+  <p>We may update these terms and will change the date above when we do. They are governed by the law of England and Wales.</p>
+  <p>Questions: <% if (legal.privacyEmail) { %><a href="mailto:<%= legal.privacyEmail %>"><%= legal.privacyEmail %></a><% } else { %>contact your administrator<% } %>.</p>
+</article>
+<%- include('../partials/footer') %>
