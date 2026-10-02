@@ -40,12 +40,37 @@
   <% } %>
 </section>
 
+<% const pb = propertyBox; const groups = [
+  ['Empty – needs maintenance', pb.needsWork, 'bad', (x) => `${x.jobs} open job${x.jobs === 1 ? '' : 's'}`, (x) => `/app/properties/${x.id}`],
+  ['Empty – ready to rent', pb.ready, 'ok', () => '', (x) => `/app/properties/${x.id}`],
+  [`Booked · ${stats.monthLabel}`, pb.booked, 'info', (x) => `${x.tenant} · ${fmt.ukDate(x.date)}`, (x) => `/app/tenancies/${x.id}`],
+  [`New acquisitions · ${stats.monthLabel}`, pb.acquired, 'info', (x) => fmt.ukDate(x.date), (x) => `/app/properties/${x.id}`],
+  [`Handed back · ${stats.monthLabel}`, pb.handedBack, 'warn', (x) => fmt.ukDate(x.date), (x) => `/app/properties/${x.id}`],
+]; %>
+<section class="card property-overview" id="property-overview">
+  <div class="card-head">
+    <h2>Properties <span class="count"><%= pb.empty.length %> empty</span></h2>
+    <span class="muted small">Empty properties, bookings, new and handed back this month</span>
+  </div>
+  <div class="po-tiles">
+    <% groups.forEach(([label, list, tone]) => { %><div class="po-tile po-<%= tone %>"><span class="po-n"><%= list.length %></span><span class="po-label"><%= label %></span></div><% }) %>
+  </div>
+  <% groups.forEach(([label, list, tone, detail, href]) => { if (!list.length) return; %>
+  <details class="po-group">
+    <summary><%= label %> <span class="count"><%= list.length %></span></summary>
+    <ul class="po-list"><% list.forEach(x => { %><li><a href="<%= href(x) %>"><%= x.address_line1 %></a><% const d = detail(x); if (d) { %> <span class="muted small">· <%= d %></span><% } %></li><% }) %></ul>
+  </details>
+  <% }) %>
+</section>
+
 <section class="tiles">
   <a class="tile" href="/app/properties"><span class="label">Properties</span><span class="value"><%= stats.properties %></span><span class="sub"><%= stats.let %> let · <%= stats.vacant %> vacant</span></a>
   <a class="tile" href="/app/landlords"><span class="label">Landlords</span><span class="value"><%= stats.landlords %></span><span class="sub"><%= stats.tenants %> tenants</span></a>
   <a class="tile" href="/app/tenants"><span class="label">Active tenancies</span><span class="value"><%= stats.activeTenancies %></span><span class="sub">&nbsp;</span></a>
   <a class="tile <%= stats.openJobs > 0 ? 'warn' : '' %>" href="/app/maintenance?month=all"><span class="label">Open maintenance</span><span class="value"><%= stats.openJobs %></span><span class="sub">&nbsp;</span></a>
-  <a class="tile" href="/app/transactions"><span class="label">Rent received this month</span><span class="value"><%= fmt.money(stats.rentThisMonth) %></span><span class="sub">Client account <%= fmt.money(stats.clientBalance) %></span></a>
+  <a class="tile" href="/app/council-reconciliation"><span class="label">Total invoiced to councils</span><span class="value"><%= fmt.money(stats.councilInvoiced) %></span><span class="sub"><%= stats.monthLabel %></span></a>
+  <a class="tile" href="/app/rent-run"><span class="label">Total paid to landlords</span><span class="value"><%= fmt.money(stats.paidToLandlords) %></span><span class="sub"><%= stats.statementsReady ? `${stats.landlordsPaid} landlord${stats.landlordsPaid === 1 ? '' : 's'} · ${stats.monthLabel}` : `Rents not calculated yet · ${stats.monthLabel}` %></span></a>
+  <a class="tile <%= stats.grossProfit > 0 ? 'ok' : stats.grossProfit < 0 ? 'alert' : '' %>" href="/app/council-reconciliation"><span class="label">Gross profit</span><span class="value"><%= fmt.money(stats.grossProfit) %></span><span class="sub">Invoiced to councils − paid to landlords</span></a>
   <a class="tile <%= stats.overdueInvoices > 0 ? 'alert' : stats.unpaidInvoices > 0 ? 'warn' : '' %>" href="/app/invoices?status=unpaid"><span class="label">Unpaid invoices</span><span class="value"><%= fmt.money(stats.unpaidInvoicesTotal) %></span><span class="sub"><%= stats.unpaidInvoices %> contractor invoice<%= stats.unpaidInvoices === 1 ? '' : 's' %></span></a>
 </section>
 

@@ -444,6 +444,11 @@ function openDatabase(file) {
   // When a landlord started with the agency. Existing landlords start from when they were added.
   const hadDateStarted = db.prepare("SELECT 1 FROM pragma_table_info('landlords') WHERE name = 'date_started'").get();
   addColumnIfMissing(db, 'landlords', 'date_started', 'TEXT');
+  // When a property was taken on, and when it was handed back to the landlord (for the dashboard).
+  const hadAcquired = db.prepare("SELECT 1 FROM pragma_table_info('properties') WHERE name = 'acquired_date'").get();
+  addColumnIfMissing(db, 'properties', 'acquired_date', 'TEXT');
+  addColumnIfMissing(db, 'properties', 'handed_back_date', 'TEXT');
+  if (!hadAcquired) db.exec('UPDATE properties SET acquired_date = date(created_at) WHERE acquired_date IS NULL');
   if (!hadDateStarted) db.exec('UPDATE landlords SET date_started = date(created_at) WHERE date_started IS NULL');
   addColumnIfMissing(db, 'council_rec_notes', 'owed_pence', 'INTEGER');
   addColumnIfMissing(db, 'council_rec_notes', 'received_pence', 'INTEGER');

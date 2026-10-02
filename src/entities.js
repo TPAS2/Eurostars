@@ -52,7 +52,9 @@ const ENTITIES = {
       { name: 'property_type', label: 'Type', type: 'select', options: ['House', 'Flat', 'HMO', 'Bungalow', 'Studio', 'Commercial', 'Other'] },
       { name: 'bedrooms', label: 'Bedrooms', type: 'integer' },
       { name: 'management_fee_pct', label: 'Management fee %', type: 'number', help: 'Deducted automatically from rent received.' },
-      { name: 'status', label: 'Status', type: 'select', options: ['vacant', 'let', 'under offer', 'unavailable'], required: true, default: 'vacant' },
+      { name: 'status', label: 'Status', type: 'select', options: ['vacant', 'let', 'under offer', 'unavailable', 'handed back'], required: true, default: 'vacant' },
+      { name: 'acquired_date', label: 'Date acquired', type: 'date', default: 'today', help: 'When you took the property on.', startRow: true },
+      { name: 'handed_back_date', label: 'Date handed back', type: 'date', help: 'When it went back to the landlord. Filling this in sets the status to handed back.' },
       { name: 'notes', label: 'Notes', type: 'textarea' },
     ],
     columns: ['address_line1', 'council_id', 'landlord_id', 'cur_tenant', 'status'],
@@ -80,7 +82,7 @@ const ENTITIES = {
     ],
     columns: ['name', 'properties', 'council_tax_email', 'council_tax_phone', 'database'],
     // Columns worked out when listing rather than stored on the record.
-    computed: { properties: { label: 'Properties' }, database: { label: 'Database' } },
+    computed: { properties: { label: 'Properties With This Council' }, database: { label: 'Database' } },
     children: [{ entity: 'properties', fk: 'council_id' }],
   },
 

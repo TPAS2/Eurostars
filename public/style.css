@@ -918,3 +918,15 @@ input, select, textarea { max-width: 100%; }
   .head-tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; }
   .mini-tile { min-width: 0; }
 }
+
+/* Dashboard: properties overview box */
+.po-tiles { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; margin-bottom: 8px; }
+.po-tile { border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; gap: 2px; background: var(--surface-2); }
+.po-n { font-size: 1.5rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.po-label { font-size: .8rem; color: var(--muted); }
+.po-bad .po-n { color: var(--bad); } .po-ok .po-n { color: var(--ok); } .po-warn .po-n { color: var(--warn); } .po-info .po-n { color: var(--brand); }
+.po-group { border-top: 1px solid var(--border); padding: 8px 0; }
+.po-group summary { cursor: pointer; font-weight: 600; }
+.po-list { margin: 6px 0 0; padding-left: 20px; }
+.po-list li { margin: 3px 0; }
+@media (max-width: 900px) { .po-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

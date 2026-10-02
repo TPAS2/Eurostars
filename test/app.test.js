@@ -1029,8 +1029,8 @@ test('councils list shows how many properties each has, and which', async () => 
   await c.post('/app/councils', { name: 'Empty Council' });
   for (const a of ['1 A Street', '2 B Street', '3 C Street', '4 D Street']) await c.post('/app/properties', { address_line1: a, council_id: leeds, status: 'let' });
   r = await c.get('/app/councils');
-  assert.match(r.text, /<th[^>]*>Properties<\/th>/);
-  assert.match(r.text, /<th[^>]*>Council<\/th>\s*<th[^>]*>Properties<\/th>\s*<th[^>]*>Email<\/th>\s*<th[^>]*>Phone number<\/th>/, 'name, property amount, email, phone');
+  assert.match(r.text, /<th[^>]*>Properties With This Council<\/th>/);
+  assert.match(r.text, /<th[^>]*>Council<\/th>\s*<th[^>]*>Properties With This Council<\/th>\s*<th[^>]*>Email<\/th>\s*<th[^>]*>Phone number<\/th>/, 'name, property amount, email, phone');
   const page = (await c.get(`/app/councils/${leeds}`)).text + (await c.get(`/app/councils/${leeds}/edit`)).text;
   assert.doesNotMatch(page, /Licensing email|Environmental health phone/, 'those two fields are gone');
   assert.match(r.text, /Leeds City Council<\/a>\s*<\/td>\s*<td class="">\s*4\s*<\/td>[\s\S]*?0113 222 4404/);
@@ -2598,10 +2598,11 @@ test('dashboard has no Raise rent box and no Tenancies ending list', async () =>
   assert.doesNotMatch(r.text, /Coming up in 1–2 months/);
 });
 
-test('dashboard: Rent received this month sits to the right of Open maintenance', async () => {
+test('dashboard: Total invoiced to councils, Total paid to landlords and Gross profit after Open maintenance', async () => {
   const c = await registerAndLogin('dash-order@example.com', 'Dash Order Lets');
   const r = await c.get('/app');
-  assert.match(r.text, /class="label">Open maintenance<[\s\S]*?class="label">Rent received this month</);
+  assert.match(r.text, /class="label">Open maintenance<[\s\S]*?class="label">Total invoiced to councils<[\s\S]*?class="label">Total paid to landlords<[\s\S]*?class="label">Gross profit</);
+  assert.doesNotMatch(r.text, /Rent received this month/);
 });
 
 test('councils: a Database button per council, with the Live and Previous tenant headings to download as Excel', async () => {
@@ -3305,4 +3306,28 @@ test('landlord invoices tab: profit from contractor invoices this month and all 
   assert.match(r, /Profit from invoices · September 2026<\/span><span class="value ok-text" id="profit-month">£50\.00/);
   assert.match(r, /Profit from invoices · all time<\/span><span class="value ok-text" id="profit-all">£70\.00/);
   assert.match((await c.get('/app/landlord-invoices?month=2026-08')).text, /id="profit-month">£20\.00/);
+});
+
+test('dashboard: properties box (empty needing maintenance or ready, booked, acquired and handed back this month)', async () => {
+  const c = await registerAndLogin('prop-box@example.com', 'Prop Box Lets');
+  const month = new Date().toISOString().slice(0, 7);
+  const today = new Date().toISOString().slice(0, 10);
+  const fixer = String(idFrom((await c.post('/app/properties', { address_line1: '1 Fixer Road', status: 'vacant' })).location));
+  await c.post('/app/properties', { address_line1: '2 Ready Road', status: 'vacant' });
+  await c.post('/app/maintenance', { property_id: fixer, title: 'Repaint', priority: 'normal', status: 'open' });
+  const let1 = String(idFrom((await c.post('/app/properties', { address_line1: '3 Booked Road', status: 'let' })).location));
+  const ten = String(idFrom((await c.post('/app/tenants', { name: 'Made Up Tenant' })).location));
+  await c.post('/app/tenancies', { property_id: let1, tenant_id: ten, booking_date: today, start_date: today, rent_pence: '900', rent_frequency: 'monthly', status: 'active' });
+  const back = String(idFrom((await c.post('/app/properties', { address_line1: '4 Returned Road', status: 'let', acquired_date: '2025-01-01' })).location));
+  await c.post(`/app/properties/${back}`, { address_line1: '4 Returned Road', status: 'let', acquired_date: '2025-01-01', handed_back_date: today });
+  assert.equal(db.prepare('SELECT status FROM properties WHERE id = ?').get(Number(back)).status, 'handed back');
+  const page = (await c.get('/app')).text;
+  const n = (label) => Number(page.match(new RegExp(`<span class="po-n">(\\d+)</span><span class="po-label">${label}`))[1]);
+  assert.equal(n('Empty – needs maintenance'), 1);
+  assert.equal(n('Empty – ready to rent'), 1);
+  assert.equal(n('Booked'), 1);
+  assert.equal(n('New acquisitions'), 3, 'the three added today (not the one acquired in 2025)');
+  assert.equal(n('Handed back'), 1);
+  assert.match(page, /1 Fixer Road<\/a> <span class="muted small">· 1 open job/);
+  assert.ok(month);
 });

@@ -219,6 +219,8 @@ module.exports = function appRoutes(db) {
 
   function prepareValues(def, accountId, values) {
     if (def.key === 'transactions') ledger.resolveLinks(db, accountId, values);
+    // A handed-back date means the property has gone back to the landlord.
+    if (def.key === 'properties' && values.handed_back_date) values.status = 'handed back';
     return values;
   }
 
@@ -299,9 +301,38 @@ module.exports = function appRoutes(db) {
       unpaidInvoicesTotal: count("SELECT COALESCE(SUM(amount_pence), 0) n FROM invoices WHERE account_id = ? AND status = 'unpaid'"),
       overdueInvoices: count("SELECT COUNT(*) n FROM invoices WHERE account_id = ? AND status = 'unpaid' AND due_date < ?", today),
       clientBalance: ledger.clientAccountBalance(db, a),
-      rentThisMonth: db.prepare(
-        "SELECT COALESCE(SUM(amount_pence),0) n FROM transactions WHERE account_id = ? AND txn_type = 'rent_received' AND substr(txn_date,1,7) = ?"
-      ).get(a, today.slice(0, 7)).n,
+    };
+    // This month's money: what the councils are invoiced (council reconciliation), what's paid to
+    // landlords (the Rift report: what each is held at the month end), and the difference.
+    const thisMonth = today.slice(0, 7);
+    stats.monthLabel = statements.monthLabel(thisMonth);
+    stats.councilInvoiced = reconcile.reconciliation(db, a, thisMonth).totals.owed;
+    const rift = require('../monthend').cfpReport(db, a, thisMonth);
+    stats.paidToLandlords = rift.total;
+    stats.landlordsPaid = rift.rows.length;
+    stats.statementsReady = !!db.prepare('SELECT 1 FROM monthly_statements WHERE account_id = ? AND month = ? LIMIT 1').get(a, thisMonth);
+    stats.grossProfit = stats.councilInvoiced - stats.paidToLandlords;
+    // Properties at a glance: empty ones (needing maintenance or ready to rent), bookings, new and
+    // handed-back properties this month.
+    const openJob = "EXISTS (SELECT 1 FROM maintenance_jobs m WHERE m.property_id = p.id AND m.account_id = p.account_id AND m.status != 'completed')";
+    const empty = db.prepare(
+      `SELECT p.id, p.address_line1, ${openJob} AS needs_work,
+              (SELECT COUNT(*) FROM maintenance_jobs m WHERE m.property_id = p.id AND m.account_id = p.account_id AND m.status != 'completed') AS jobs
+         FROM properties p WHERE p.account_id = ? AND p.status = 'vacant' ORDER BY p.address_line1 COLLATE NOCASE`
+    ).all(a);
+    const monthFrom = `${thisMonth}-01`;
+    const monthTo = `${thisMonth}-31`;
+    const propertyBox = {
+      empty,
+      needsWork: empty.filter((p) => p.needs_work),
+      ready: empty.filter((p) => !p.needs_work),
+      booked: db.prepare(
+        `SELECT ty.id, p.id AS property_id, p.address_line1, t.name AS tenant, COALESCE(ty.booking_date, ty.start_date) AS date
+           FROM tenancies ty JOIN properties p ON p.id = ty.property_id JOIN tenants t ON t.id = ty.tenant_id
+          WHERE ty.account_id = ? AND COALESCE(ty.booking_date, ty.start_date) BETWEEN ? AND ? ORDER BY date`
+      ).all(a, monthFrom, monthTo),
+      acquired: db.prepare('SELECT id, address_line1, acquired_date AS date FROM properties WHERE account_id = ? AND acquired_date BETWEEN ? AND ? ORDER BY acquired_date').all(a, monthFrom, monthTo),
+      handedBack: db.prepare('SELECT id, address_line1, handed_back_date AS date FROM properties WHERE account_id = ? AND handed_back_date BETWEEN ? AND ? ORDER BY handed_back_date').all(a, monthFrom, monthTo),
     };
     const compliance = db.prepare(
       `SELECT c.id, c.item_type, c.expiry_date, p.address_line1, p.id AS property_id
@@ -323,7 +354,7 @@ module.exports = function appRoutes(db) {
         when: days < 0 ? `expired ${-days} day${days === -1 ? '' : 's'} ago` : days === 0 ? 'expires today' : `expires in ${days} day${days === 1 ? '' : 's'}`,
       };
     });
-    res.render('dashboard', {
+    res.render('dashboard', { propertyBox,
       title: 'Dashboard', section: 'dashboard', stats, notifications,
       today, month: today.slice(0, 7), fmt, flash: req.query.flash || '',
     });
@@ -707,6 +738,8 @@ module.exports = function appRoutes(db) {
     const { values, errors } = parseForm(def, req.body, a);
     if (Object.keys(errors).length) return renderForm(res, def, { row: null, values, errors, accountId: a, status: 422 });
     prepareValues(def, a, values);
+    // A new property counts as acquired today unless another date is given.
+    if (def.key === 'properties' && !values.acquired_date) values.acquired_date = fmt.today();
     const cols = Object.keys(values);
     const id = transaction(db, () => {
       const info = db.prepare(`INSERT INTO ${def.table} (account_id, ${cols.join(', ')}) VALUES (?, ${cols.map(() => '?').join(', ')})`)
