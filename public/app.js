@@ -1,6 +1,35 @@
 'use strict';
 
+// Rift can be installed as an app. The worker stores nothing; it only shows an offline page.
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => { navigator.serviceWorker.register('/sw.js').catch(() => {}); });
+}
+let installPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  installPrompt = e;
+  document.querySelectorAll('[data-install]').forEach((el) => { el.hidden = false; });
+  document.querySelectorAll('[data-install-help]').forEach((el) => { el.hidden = true; });
+});
+window.addEventListener('appinstalled', () => {
+  installPrompt = null;
+  document.querySelectorAll('[data-install]').forEach((el) => { el.hidden = true; });
+  document.querySelectorAll('[data-installed]').forEach((el) => { el.hidden = false; });
+});
+
 document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('[data-install-button]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      if (!installPrompt) return;
+      installPrompt.prompt();
+      await installPrompt.userChoice.catch(() => {});
+      installPrompt = null;
+    });
+  });
+  if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone) {
+    document.querySelectorAll('[data-install], [data-install-help]').forEach((el) => { el.hidden = true; });
+    document.querySelectorAll('[data-installed]').forEach((el) => { el.hidden = false; });
+  }
   // Copies of unsent forms are kept on this device. They belong to whoever typed them: when
   // someone else signs in on the same browser, the previous person's copies are wiped first.
   (() => {

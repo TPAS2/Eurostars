@@ -949,3 +949,8 @@ input, select, textarea { max-width: 100%; }
 .cert-file-list { list-style: none; padding: 0; margin: 0; }
 .cert-file-list li { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; padding: 8px 0; border-top: 1px solid var(--border); overflow-wrap: anywhere; }
 .cert-file-list li:first-child { border-top: 0; }
+
+/* Install as an app */
+.install-steps { margin: 8px 0 12px; padding-left: 20px; }
+.install-steps li { margin: 6px 0; }
+[data-install][hidden], [data-install-help][hidden], [data-installed][hidden] { display: none; }

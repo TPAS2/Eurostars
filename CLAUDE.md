@@ -27,6 +27,8 @@ and holds real people's personal and bank details. It's deployed on Render from 
 - No front-end build except the dashboard's React pieces (dark mode switch, MicroSlats animated
   background): source in `client/`, bundled to `public/dashboard.js` with `npm run build:client`
   (the bundle is committed; rebuild after changing `client/`).
+- Installable app (PWA): `public/manifest.webmanifest` and the worker `public/sw.js` (served at `/sw.js`).
+  The worker must never cache pages or data (they hold personal details); it only shows an offline page.
 - Libraries: `pdf-lib` (Metro form, invoices), `exceljs` (reports), `jszip` (filling the
   spreadsheet templates in `assets/`), `nodemailer`/Resend for email.
 

@@ -3533,3 +3533,31 @@ test('properties: upload a file for each certificate when adding, view it, add m
   await c.post(`/app/compliance/${gas}/files/${file.id}/delete`, {});
   assert.equal(db.prepare('SELECT COUNT(*) n FROM compliance_files WHERE id = ?').get(file.id).n, 0);
 });
+
+test('installable app: manifest, icons, service worker that stores nothing, install help on My account', async () => {
+  const get = (p) => fetch(`${base}${p}`);
+  // Public, so the browser can read them before sign-in.
+  let r = await get('/static/manifest.webmanifest');
+  assert.equal(r.status, 200);
+  assert.match(r.headers.get('content-type'), /application\/manifest\+json/);
+  const m = await r.json();
+  assert.equal(m.display, 'standalone');
+  assert.equal(m.start_url, '/app');
+  for (const icon of m.icons) assert.equal((await get(icon.src)).status, 200, `${icon.src} exists`);
+  assert.ok(m.icons.some((i) => i.sizes === '192x192') && m.icons.some((i) => i.sizes === '512x512'));
+  assert.ok(m.icons.some((i) => i.purpose === 'maskable'));
+  r = await get('/sw.js');
+  assert.equal(r.status, 200);
+  assert.match(r.headers.get('content-type'), /javascript/);
+  const sw = await r.text();
+  assert.doesNotMatch(sw, /cache\.put|cache\.add|caches\.open/, 'the worker keeps no copies of pages');
+  assert.match(sw, /You're offline/);
+  // Linked from every page, including sign-in.
+  assert.match((await get('/login')).headers.get('content-type'), /html/);
+  assert.match(await (await get('/login')).text(), /<link rel="manifest" href="\/static\/manifest\.webmanifest">/);
+  const c = await registerAndLogin('install-app@example.com', 'Install Lets');
+  const page = (await c.get('/app/account')).text;
+  assert.match(page, /id="install"/);
+  assert.match(page, /data-install-button/);
+  assert.match(page, /Add to Home Screen/);
+});

@@ -119,8 +119,16 @@ function createApp(config, db, { writer = null, mailer = null } = {}) {
     if (!req.path.startsWith('/static/')) res.setHeader('Cache-Control', 'private, no-store');
     next();
   });
+  // The service worker must sit at the top so it can cover the whole site (it stores nothing).
+  app.get('/sw.js', (req, res) => {
+    res.type('application/javascript').setHeader('Cache-Control', 'no-cache');
+    res.sendFile(path.join(__dirname, '..', 'public', 'sw.js'));
+  });
   app.get('/favicon.ico', (req, res) => res.redirect(301, '/static/favicon-32.png'));
-  app.use('/static', express.static(path.join(__dirname, '..', 'public'), { maxAge: '1h' }));
+  app.use('/static', express.static(path.join(__dirname, '..', 'public'), {
+    maxAge: '1h',
+    setHeaders: (res, file) => { if (file.endsWith('.webmanifest')) res.type('application/manifest+json'); },
+  }));
   app.use(express.urlencoded({ extended: false, limit: '100kb' }));
 
   // Reject cross-site form posts (covers login/register, which happen before a session exists).

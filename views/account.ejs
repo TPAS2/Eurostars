@@ -22,4 +22,21 @@
     <div><dt>Phone</dt><dd><%= acct.phone || '—' %></dd></div>
   </dl>
 </section>
+<section class="card" id="install">
+  <h2>Use <%= appName %> as an app</h2>
+  <p class="muted" data-installed hidden>You're using <%= appName %> as an app on this device.</p>
+  <div data-install hidden>
+    <p>Add <%= appName %> to this device so it opens in its own window, like any other app. It always loads the latest version.</p>
+    <button class="btn primary" type="button" data-install-button>Install <%= appName %></button>
+  </div>
+  <div data-install-help>
+    <p>Your browser will offer to add <%= appName %> as an app:</p>
+    <ul class="install-steps">
+      <li><strong>iPhone or iPad (Safari):</strong> tap the Share button, then <em>Add to Home Screen</em>.</li>
+      <li><strong>Android (Chrome):</strong> open the menu (⋮), then <em>Install app</em>.</li>
+      <li><strong>Windows or Mac (Chrome or Edge):</strong> click the install icon at the right of the address bar, or open the menu and choose <em>Install <%= appName %></em>.</li>
+    </ul>
+  </div>
+  <p class="muted small">Nothing is stored on the device: your details stay safely on the server, and you need an internet connection to use it.</p>
+</section>
 <%- include('partials/footer') %>
