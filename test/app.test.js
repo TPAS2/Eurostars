@@ -3579,7 +3579,7 @@ test('privacy notice and terms: public, show the agency details, mention the AI 
   assert.match(page, /contact us using the details on your tenancy/, 'no contact email set yet');
   assert.doesNotMatch(page, /Only you can see this note/, 'the setup reminder is for the admin only');
   assert.match(await text(base, '/terms'), /<h1>Terms of use<\/h1>/);
-  assert.match(await text(base, '/login'), /href="\/privacy">Privacy<\/a> · <a href="\/terms">Terms<\/a>/);
+  assert.match(await text(base, '/login'), /href="\/privacy">Privacy<\/a><a href="\/terms">Terms<\/a>/);
   // With details set and no AI.
   const db2 = openDatabase(':memory:');
   const app2 = createApp({ ...config, legalName: 'Made Up Lettings Ltd', privacyEmail: 'privacy@madeup.example', icoNumber: 'ZA000000' }, db2).listen(0);
