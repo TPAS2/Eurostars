@@ -740,7 +740,7 @@ test('property certificates: gas, electrical and insurance with current, previou
   r = await c.get(`/app/properties/${propertyId}`);
   assert.match(r.text, /Certificates &amp; insurance/);
   for (const title of ['Gas certificate', 'Electrical certificate \\(EICR\\)', 'Insurance']) assert.match(r.text, new RegExp(title));
-  assert.equal((r.text.match(/cert-badge-missing/g) || []).length, 3, 'all three missing to start');
+  assert.equal((r.text.match(/cert-badge-missing/g) || []).length, 4, 'all four missing to start');
 
   // "+ Add" pre-fills the property and type, and returns to the panel.
   r = await c.get(`/app/compliance/new?property_id=${propertyId}&item_type=${encodeURIComponent('Gas Safety (CP12)')}`);
@@ -3471,4 +3471,65 @@ test('tenants: council reference number; tenancies: reservation date, term as bo
   await c.post('/app/rent/raise', { month: '2026-10' });
   assert.equal(db.prepare("SELECT COUNT(*) n FROM transactions WHERE tenancy_id = ? AND txn_type = 'rent_charge'").get(t.id).n, 0);
   assert.match((await c.get('/app/tenants')).text, /HB-12345/);
+});
+
+test('properties: upload a file for each certificate when adding, view it, add more on the certificate page', async () => {
+  const c = await registerAndLogin('cert-files@example.com', 'Cert Files Lets');
+  const form = (await c.get('/app/properties/new')).text;
+  assert.match(form, /action="\/app\/properties" class="form-grid" enctype="multipart\/form-data"/);
+  assert.match(form, /name="cert_0_file"/);
+  assert.match(form, /name="cert_3_file"/);
+  const pdf = new Blob([Buffer.from('%PDF-1.4 made up certificate')]);
+  const post = async (fields, files) => {
+    const body = new FormData();
+    for (const [k, v] of Object.entries({ _csrf: c.csrf, ...fields })) body.append(k, v);
+    for (const [k, blob, name] of files) body.append(k, blob, name);
+    const r = await fetch(`${base}/app/properties`, { method: 'POST', headers: { cookie: c.cookie }, body, redirect: 'manual' });
+    return { status: r.status, location: r.headers.get('location'), text: await r.text() };
+  };
+  // A file without an expiry date: asked for the date, and to choose the file again.
+  let r = await post({ address_line1: '7 Upload Lane', status: 'vacant' }, [['cert_0_file', pdf, 'gas.pdf']]);
+  assert.equal(r.status, 422);
+  assert.match(r.text, /Enter when the Gas Safety \(CP12\) expires/);
+  assert.match(r.text, /choose the certificate files again/);
+  assert.equal(db.prepare("SELECT COUNT(*) n FROM properties WHERE address_line1 = '7 Upload Lane'").get().n, 0);
+  // Without the form's security token: refused.
+  const noToken = new FormData();
+  noToken.append('address_line1', 'Sneaky');
+  noToken.append('cert_0_file', pdf, 'gas.pdf');
+  assert.equal((await fetch(`${base}/app/properties`, { method: 'POST', headers: { cookie: c.cookie }, body: noToken, redirect: 'manual' })).status, 403);
+  // Gas and EICR with files (the EICR one isn't an allowed type).
+  r = await post({ address_line1: '7 Upload Lane', status: 'vacant', cert_0_expiry: '2027-03-01', cert_1_expiry: '2030-01-01' },
+    [['cert_0_file', pdf, 'gas.pdf'], ['cert_1_file', new Blob(['just text']), 'eicr.txt']]);
+  assert.equal(r.status, 302);
+  assert.match(decodeURIComponent(r.location), /these certificate files weren’t uploaded.*eicr\.txt/);
+  const pid = Number(r.location.match(/^\/app\/properties\/(\d+)\?/)[1]);
+  const gas = db.prepare("SELECT id FROM compliance_items WHERE property_id = ? AND item_type = 'Gas Safety (CP12)'").get(pid).id;
+  const file = db.prepare('SELECT id, filename, mime FROM compliance_files WHERE item_id = ?').get(gas);
+  assert.deepEqual({ ...file, id: undefined }, { id: undefined, filename: 'gas.pdf', mime: 'application/pdf' });
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM compliance_files f JOIN compliance_items i ON i.id = f.item_id WHERE i.property_id = ?').get(pid).n, 1);
+  // Shown on the property's certificate panel, and opens (sandboxed).
+  const page = (await c.get(`/app/properties/${pid}`)).text;
+  assert.match(page, new RegExp(`href="/app/compliance/${gas}/files/${file.id}"[^>]*>📄 gas\\.pdf`));
+  assert.match(page, /Energy certificate \(EPC\)/, 'EPC has its own card');
+  const got = await fetch(`${base}/app/compliance/${gas}/files/${file.id}`, { headers: { cookie: c.cookie } });
+  assert.equal(got.status, 200);
+  assert.equal(got.headers.get('content-type'), 'application/pdf');
+  assert.match(got.headers.get('content-security-policy'), /sandbox/);
+  // Another company can't see or remove it.
+  const other = await registerAndLogin('cert-files2@example.com', 'Other Cert Lets');
+  assert.equal((await fetch(`${base}/app/compliance/${gas}/files/${file.id}`, { headers: { cookie: other.cookie } })).status, 404);
+  await other.post(`/app/compliance/${gas}/files/${file.id}/delete`, {});
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM compliance_files WHERE id = ?').get(file.id).n, 1);
+  // The certificate page: list, upload another, remove.
+  const eicr = db.prepare("SELECT id FROM compliance_items WHERE property_id = ? AND item_type = 'EICR'").get(pid).id;
+  assert.match((await c.get(`/app/compliance/${eicr}`)).text, /Certificate files[\s\S]*No file yet/);
+  const up = new FormData();
+  up.append('_csrf', c.csrf);
+  up.append('files', pdf, 'eicr.pdf');
+  r = await fetch(`${base}/app/compliance/${eicr}/files`, { method: 'POST', headers: { cookie: c.cookie }, body: up, redirect: 'manual' });
+  assert.match(decodeURIComponent(r.headers.get('location')), /Uploaded 1 file/);
+  assert.match((await c.get(`/app/compliance/${eicr}`)).text, /eicr\.pdf/);
+  await c.post(`/app/compliance/${gas}/files/${file.id}/delete`, {});
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM compliance_files WHERE id = ?').get(file.id).n, 0);
 });

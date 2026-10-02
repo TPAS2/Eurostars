@@ -273,6 +273,7 @@ module.exports = function appRoutes(db) {
   const KEY_CERTS = [
     { type: 'Gas Safety (CP12)', title: 'Gas certificate', icon: 'gas' },
     { type: 'EICR', title: 'Electrical certificate (EICR)', icon: 'electric' },
+    { type: 'EPC', title: 'Energy certificate (EPC)', icon: 'energy' },
     { type: 'Insurance', title: 'Insurance', icon: 'insurance' },
   ];
 
@@ -291,6 +292,7 @@ module.exports = function appRoutes(db) {
     return KEY_CERTS.map((k) => {
       const list = rows.filter((r) => r.item_type === k.type);
       const [current, ...previous] = list;
+      if (current) current.files = db.prepare('SELECT id, filename FROM compliance_files WHERE account_id = ? AND item_id = ? ORDER BY id').all(a, current.id);
       return { ...k, current: current || null, previous, status: current ? certStatus(current.expiry_date, today) : { key: 'missing', label: 'Missing' } };
     });
   }
@@ -805,8 +807,9 @@ module.exports = function appRoutes(db) {
       NEW_PROPERTY_CERTS.forEach((type, i) => {
         const issued = String(req.body[`cert_${i}_issued`] || '').trim();
         const expiry = String(req.body[`cert_${i}_expiry`] || '').trim();
-        if (!issued && !expiry) return;
-        newCerts.push({ type, issued, expiry, i });
+        const file = req.certFile ? req.certFile(i) : null;
+        if (!issued && !expiry && !file) return;
+        newCerts.push({ type, issued, expiry, i, file });
       });
     }
     // "Added by" left out: the person signed in.
@@ -816,23 +819,34 @@ module.exports = function appRoutes(db) {
       if (!fmt.isIsoDate(cert.expiry)) errors[`cert_${cert.i}_expiry`] = `Enter when the ${cert.type} expires.`;
       if (cert.issued && !fmt.isIsoDate(cert.issued)) errors[`cert_${cert.i}_issued`] = 'Enter a valid date.';
     }
+    if (req.uploadError && def.key === 'properties') errors.cert_upload = req.uploadError;
+    // Files can't be kept when the form comes back with a mistake, so ask for them again.
+    if (Object.keys(errors).length && newCerts.some((x) => x.file)) errors.cert_upload = errors.cert_upload || 'Please choose the certificate files again.';
     if (Object.keys(errors).length) return renderForm(res, def, { row: null, values: { ...values, ...certValues(req.body) }, errors, accountId: a, status: 422 });
     prepareValues(def, a, values);
     // A new property counts as acquired today unless another date is given.
     if (def.key === 'properties' && !values.acquired_date) values.acquired_date = fmt.today();
     if (def.key === 'tenancies' && !('rent_pence' in values)) values.rent_pence = 0; // rent isn't entered any more
     const cols = Object.keys(values);
+    const refusedCerts = [];
     const id = transaction(db, () => {
       const info = db.prepare(`INSERT INTO ${def.table} (account_id, ${cols.join(', ')}) VALUES (?, ${cols.map(() => '?').join(', ')})`)
         .run(a, ...cols.map((c) => values[c]));
       const newId = Number(info.lastInsertRowid);
       afterSave(def, a, newId, values);
       for (const cert of newCerts) {
-        db.prepare('INSERT INTO compliance_items (account_id, property_id, item_type, issued_date, expiry_date) VALUES (?, ?, ?, ?, ?)')
+        const item = db.prepare('INSERT INTO compliance_items (account_id, property_id, item_type, issued_date, expiry_date) VALUES (?, ?, ?, ?, ?)')
           .run(a, newId, cert.type, cert.issued || null, cert.expiry);
+        if (cert.file) {
+          const saved = req.saveCertFile(Number(item.lastInsertRowid), cert.file);
+          if (!saved.ok) refusedCerts.push(saved.name);
+        }
       }
       return newId;
     });
+    if (refusedCerts.length) {
+      return res.redirect(`/app/properties/${id}?error=${encodeURIComponent(`Property added, but these certificate files weren’t uploaded (use PDFs or photos): ${refusedCerts.join(', ')}.`)}#certificates`);
+    }
     // Files chosen while adding a maintenance job.
     if (def.key === 'maintenance' && req.saveJobFiles) {
       const { saved, refused } = req.saveJobFiles(id);
@@ -893,6 +907,12 @@ module.exports = function appRoutes(db) {
         invoicesN: invoices.length, last: paid.map((i) => i.paid_date).filter(Boolean).sort().pop() || null,
       };
     }
+    // On a certificate: its scans and PDFs.
+    const certFiles = def.key === 'compliance'
+      ? db.prepare(`SELECT f.id, f.filename, f.mime, f.size, f.uploaded_at, u.name AS uploaded_by_name
+                      FROM compliance_files f LEFT JOIN users u ON u.id = f.uploaded_by
+                     WHERE f.account_id = ? AND f.item_id = ? ORDER BY f.id DESC`).all(a, row.id)
+      : null;
     // On a maintenance job: its photos and files (without the file contents).
     const jobFiles = def.key === 'maintenance'
       ? db.prepare(`SELECT f.id, f.filename, f.mime, f.size, f.uploaded_at, u.name AS uploaded_by_name
@@ -946,7 +966,7 @@ module.exports = function appRoutes(db) {
       previous: db.prepare('SELECT COUNT(*) AS n FROM council_db_entries WHERE account_id = ? AND council_id = ? AND ended = 1').get(a, row.id).n,
       invoices: [],
     } : null;
-    res.render('show', { title: rowTitle(def, row, maps), section: sectionOf(def), def, row, maps, display, rowTitle, children, extra, invoices, related: relatedLists(def, row, a), certs, photo, tenantBoxes, statementLink, jobFiles, jobInvoice, contractorStats, bankChanges, councilBoxes, landlordStatements, callNotes, error: req.query.error ? String(req.query.error).slice(0, 200) : null, flash: req.query.flash ? String(req.query.flash).slice(0, 200) : null, fmt, today: fmt.today() });
+    res.render('show', { title: rowTitle(def, row, maps), section: sectionOf(def), def, row, maps, display, rowTitle, children, extra, invoices, related: relatedLists(def, row, a), certs, photo, tenantBoxes, statementLink, jobFiles, jobInvoice, contractorStats, bankChanges, councilBoxes, landlordStatements, callNotes, certFiles, error: req.query.error ? String(req.query.error).slice(0, 200) : null, flash: req.query.flash ? String(req.query.flash).slice(0, 200) : null, fmt, today: fmt.today() });
   });
 
   router.get('/:entity/:id/edit', (req, res) => {

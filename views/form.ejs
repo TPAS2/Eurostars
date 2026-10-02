@@ -7,7 +7,7 @@
 </header>
 <section class="card">
   <% if (Object.keys(errors).length) { %><div class="notice err">Please fix the highlighted fields.</div><% } %>
-  <form method="post" action="/app/<%= def.key %><%= row ? '/' + row.id : '' %>" class="form-grid"<%- def.files && !row ? ' enctype="multipart/form-data"' : '' %>
+  <form method="post" action="/app/<%= def.key %><%= row ? '/' + row.id : '' %>" class="form-grid"<%- (def.files || def.key === 'properties') && !row ? ' enctype="multipart/form-data"' : '' %>
         <%- row ? 'data-autosave' : `data-draft="new-${def.key}"` %>>
     <%- include('partials/csrf') %>
     <% def.fields.forEach(f => { %>
@@ -27,12 +27,14 @@
     <% if (def.key === 'properties' && !row) { %>
     <div class="wide new-certs">
       <h3 class="form-subhead">Certificates</h3>
-      <p class="muted small">Optional. Fill in any you have; more can be added on the property's page.</p>
+      <p class="muted small">Optional. Fill in any you have and upload the certificate (PDF or photo, up to 25 MB); more can be added on the property's page.</p>
+      <% if (errors.cert_upload) { %><div class="field-err"><%= errors.cert_upload %></div><% } %>
       <% ['Gas Safety (CP12)', 'EICR', 'EPC', 'Insurance'].forEach((type, i) => { %>
       <div class="cert-row">
         <strong><%= type %></strong>
         <div class="field"><label for="c-<%= i %>-i">Issued</label><input id="c-<%= i %>-i" type="date" name="cert_<%= i %>_issued" value="<%= values[`cert_${i}_issued`] || '' %>"><% if (errors[`cert_${i}_issued`]) { %><div class="field-err"><%= errors[`cert_${i}_issued`] %></div><% } %></div>
         <div class="field"><label for="c-<%= i %>-e">Expires</label><input id="c-<%= i %>-e" type="date" name="cert_<%= i %>_expiry" value="<%= values[`cert_${i}_expiry`] || '' %>"><% if (errors[`cert_${i}_expiry`]) { %><div class="field-err"><%= errors[`cert_${i}_expiry`] %></div><% } %></div>
+        <div class="field"><label for="c-<%= i %>-f">Certificate file</label><input id="c-<%= i %>-f" type="file" name="cert_<%= i %>_file" accept="application/pdf,image/*,.heic,.heif,.doc,.docx"></div>
       </div>
       <% }) %>
     </div>

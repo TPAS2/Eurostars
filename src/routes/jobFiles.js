@@ -118,3 +118,6 @@ module.exports = function jobFileRoutes(db) {
 };
 
 module.exports.SHOWABLE = SHOWABLE;
+module.exports.typeOf = typeOf;
+module.exports.REFUSED = REFUSED;
+module.exports.MAX_BYTES = MAX_BYTES;

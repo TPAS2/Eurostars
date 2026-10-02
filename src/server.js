@@ -152,6 +152,9 @@ function createApp(config, db, { writer = null, mailer = null } = {}) {
   app.use('/app/tenancies', auth.requireLogin, require('./routes/agreements')(db));
   app.use('/app/rent-run', auth.requireLogin, require('./routes/payments')(db));
   app.use('/app/maintenance', auth.requireLogin, require('./routes/jobFiles')(db));
+  const certFiles = require('./routes/certFiles')(db);
+  app.use('/app/compliance', auth.requireLogin, certFiles);
+  app.use('/app/properties', auth.requireLogin, certFiles.newProperty);
   app.use('/app/maintenance', auth.requireLogin, require('./routes/jobInvoice')(db, mailer));
   app.use('/app/landlord-invoices', auth.requireLogin, require('./routes/landlordInvoices')(db, mailer));
   app.use(auth.rejectUncheckedMultipart);

@@ -339,6 +339,20 @@ CREATE TABLE IF NOT EXISTS maintenance_files (
 );
 CREATE INDEX IF NOT EXISTS idx_maintenance_files ON maintenance_files(account_id, job_id);
 
+-- Scans or PDFs of a certificate (gas, EICR, EPC, insurance...), kept in the database for backups.
+CREATE TABLE IF NOT EXISTS compliance_files (
+  id           INTEGER PRIMARY KEY,
+  account_id   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  item_id      INTEGER NOT NULL REFERENCES compliance_items(id) ON DELETE CASCADE,
+  filename     TEXT NOT NULL,
+  mime         TEXT NOT NULL,
+  size         INTEGER NOT NULL,
+  data         BLOB NOT NULL,
+  uploaded_by  INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  uploaded_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_compliance_files ON compliance_files(account_id, item_id);
+
 -- Supplier/contractor invoices, usually for a maintenance job, with the uploaded document.
 CREATE TABLE IF NOT EXISTS invoices (
   id                  INTEGER PRIMARY KEY,
