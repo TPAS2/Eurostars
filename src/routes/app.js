@@ -12,6 +12,10 @@ const fmt = require('../format');
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const LIST_LIMIT = 500;
 
+// The certificates offered when adding a property (more can be added on its page).
+const NEW_PROPERTY_CERTS = ['Gas Safety (CP12)', 'EICR', 'EPC', 'Insurance'];
+const certValues = (body) => Object.fromEntries(Object.entries(body).filter(([k]) => /^cert_\d+_(issued|expiry)$/.test(k)));
+
 const UK_BANKS = ['Allied Irish Bank', 'Bank of Scotland', 'Barclays', 'Chase', 'Co-operative Bank', 'Coutts', 'Cynergy Bank', 'First Direct',
   'Halifax', 'HSBC', 'Lloyds', 'Metro Bank', 'Monzo', 'Nationwide', 'NatWest', 'Revolut', 'Royal Bank of Scotland', 'Santander', 'Starling',
   'Tide', 'TSB', 'Virgin Money'];
@@ -790,10 +794,24 @@ module.exports = function appRoutes(db) {
     const a = req.user.id;
     // A landlord left without a code gets the next one.
     if (def.key === 'landlords' && !String(req.body.code || '').trim()) req.body.code = nextLandlordCode(a);
+    // Certificates typed in while adding a property (any left blank are skipped).
+    const newCerts = [];
+    if (def.key === 'properties') {
+      NEW_PROPERTY_CERTS.forEach((type, i) => {
+        const issued = String(req.body[`cert_${i}_issued`] || '').trim();
+        const expiry = String(req.body[`cert_${i}_expiry`] || '').trim();
+        if (!issued && !expiry) return;
+        newCerts.push({ type, issued, expiry, i });
+      });
+    }
     // "Added by" left out: the person signed in.
     for (const f of def.fields) if (f.type === 'person' && !String(req.body[f.name] || '').trim()) req.body[f.name] = String(req.user.person_id || a);
     const { values, errors } = parseForm(def, req.body, a);
-    if (Object.keys(errors).length) return renderForm(res, def, { row: null, values, errors, accountId: a, status: 422 });
+    for (const cert of newCerts) {
+      if (!fmt.isIsoDate(cert.expiry)) errors[`cert_${cert.i}_expiry`] = `Enter when the ${cert.type} expires.`;
+      if (cert.issued && !fmt.isIsoDate(cert.issued)) errors[`cert_${cert.i}_issued`] = 'Enter a valid date.';
+    }
+    if (Object.keys(errors).length) return renderForm(res, def, { row: null, values: { ...values, ...certValues(req.body) }, errors, accountId: a, status: 422 });
     prepareValues(def, a, values);
     // A new property counts as acquired today unless another date is given.
     if (def.key === 'properties' && !values.acquired_date) values.acquired_date = fmt.today();
@@ -803,6 +821,10 @@ module.exports = function appRoutes(db) {
         .run(a, ...cols.map((c) => values[c]));
       const newId = Number(info.lastInsertRowid);
       afterSave(def, a, newId, values);
+      for (const cert of newCerts) {
+        db.prepare('INSERT INTO compliance_items (account_id, property_id, item_type, issued_date, expiry_date) VALUES (?, ?, ?, ?, ?)')
+          .run(a, newId, cert.type, cert.issued || null, cert.expiry);
+      }
       return newId;
     });
     // Files chosen while adding a maintenance job.
@@ -900,6 +922,14 @@ module.exports = function appRoutes(db) {
       : null;
     const bankChanges = def.key === 'landlords' ? require('../bankChanges').unchecked(db, a, row.id) : [];
     // A council's page also shows its database and its invoices.
+    // A property's page has notes of tenants' calls, newest first.
+    const callNotes = def.key === 'properties' ? {
+      notes: db.prepare(
+        `SELECT n.id, n.note_date, n.body, n.created_at, u.name AS added_by_name FROM property_notes n LEFT JOIN users u ON u.id = n.added_by
+          WHERE n.account_id = ? AND n.property_id = ? ORDER BY n.note_date DESC, n.id DESC`
+      ).all(a, row.id),
+      people: peopleOptions(a), me: req.user.person_id || a,
+    } : null;
     // A landlord's page lists their statements, newest first.
     const landlordStatements = def.key === 'landlords' ? db.prepare(
       `SELECT id, month, rent_pence, fees_pence, expenses_pence, closing_pence, emailed_at FROM monthly_statements
@@ -910,7 +940,7 @@ module.exports = function appRoutes(db) {
       previous: db.prepare('SELECT COUNT(*) AS n FROM council_db_entries WHERE account_id = ? AND council_id = ? AND ended = 1').get(a, row.id).n,
       invoices: [],
     } : null;
-    res.render('show', { title: rowTitle(def, row, maps), section: sectionOf(def), def, row, maps, display, rowTitle, children, extra, invoices, related: relatedLists(def, row, a), certs, photo, tenantBoxes, statementLink, jobFiles, jobInvoice, contractorStats, bankChanges, councilBoxes, landlordStatements, error: req.query.error ? String(req.query.error).slice(0, 200) : null, flash: req.query.flash ? String(req.query.flash).slice(0, 200) : null, fmt, today: fmt.today() });
+    res.render('show', { title: rowTitle(def, row, maps), section: sectionOf(def), def, row, maps, display, rowTitle, children, extra, invoices, related: relatedLists(def, row, a), certs, photo, tenantBoxes, statementLink, jobFiles, jobInvoice, contractorStats, bankChanges, councilBoxes, landlordStatements, callNotes, error: req.query.error ? String(req.query.error).slice(0, 200) : null, flash: req.query.flash ? String(req.query.flash).slice(0, 200) : null, fmt, today: fmt.today() });
   });
 
   router.get('/:entity/:id/edit', (req, res) => {
@@ -919,6 +949,34 @@ module.exports = function appRoutes(db) {
     const row = getOwnedRow(def, req, res);
     if (!row) return;
     renderForm(res, def, { row, values: row, errors: {}, accountId: req.user.id });
+  });
+
+  // ---------- notes of tenants' calls about a property ----------
+  function ownedProperty(req, res) {
+    const id = Number(req.params.id);
+    const p = Number.isInteger(id) && db.prepare('SELECT id FROM properties WHERE id = ? AND account_id = ?').get(id, req.user.id);
+    if (!p) res.status(404).render('error', { title: 'Not found', message: 'That property was not found.' });
+    return p;
+  }
+  router.post('/properties/:id(\\d+)/notes', (req, res) => {
+    const p = ownedProperty(req, res);
+    if (!p) return;
+    const a = req.user.id;
+    const back = (key, msg) => res.redirect(`/app/properties/${p.id}?${key}=${encodeURIComponent(msg)}#call-notes`);
+    const date = String(req.body.note_date || '').trim() || fmt.today();
+    const body = String(req.body.body || '').trim().slice(0, 5000);
+    const who = Number(req.body.added_by) || req.user.person_id || a;
+    if (!fmt.isIsoDate(date)) return back('error', 'Enter a valid date for the note.');
+    if (!body) return back('error', 'Write the note first.');
+    if (!db.prepare('SELECT 1 FROM users WHERE id = ? AND (id = ? OR company_id = ?)').get(who, a, a)) return back('error', 'Choose who added the note.');
+    db.prepare('INSERT INTO property_notes (account_id, property_id, note_date, added_by, body) VALUES (?, ?, ?, ?, ?)').run(a, p.id, date, who, body);
+    back('flash', 'Note added.');
+  });
+  router.post('/properties/:id(\\d+)/notes/:nid(\\d+)/delete', (req, res) => {
+    const p = ownedProperty(req, res);
+    if (!p) return;
+    db.prepare('DELETE FROM property_notes WHERE id = ? AND property_id = ? AND account_id = ?').run(Number(req.params.nid), p.id, req.user.id);
+    res.redirect(`/app/properties/${p.id}?flash=${encodeURIComponent('Note removed.')}#call-notes`);
   });
 
   router.post('/:entity/:id', (req, res) => {

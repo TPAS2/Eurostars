@@ -930,3 +930,15 @@ input, select, textarea { max-width: 100%; }
 .po-list { margin: 6px 0 0; padding-left: 20px; }
 .po-list li { margin: 3px 0; }
 @media (max-width: 900px) { .po-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* New property: certificates */
+.new-certs { border-top: 1px solid var(--border); padding-top: 12px; }
+.cert-row { display: grid; grid-template-columns: 180px minmax(0, 1fr) minmax(0, 1fr); gap: 10px 16px; align-items: end; margin: 8px 0; }
+@media (max-width: 900px) { .cert-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .cert-row > strong { grid-column: 1 / -1; } }
+/* Property: tenant call notes, each in its own box */
+.call-note-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 16px; margin-bottom: 14px; }
+.call-note-form .wide { grid-column: 1 / -1; }
+.call-note { border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; margin: 10px 0; background: var(--surface-2); }
+.call-note-head { display: flex; gap: 12px; align-items: center; margin-bottom: 4px; }
+.call-note-head form { margin-left: auto; }
+@media (max-width: 900px) { .call-note-form { grid-template-columns: minmax(0, 1fr); } }

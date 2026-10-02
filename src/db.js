@@ -451,6 +451,17 @@ function openDatabase(file) {
   const hadAcquired = db.prepare("SELECT 1 FROM pragma_table_info('properties') WHERE name = 'acquired_date'").get();
   addColumnIfMissing(db, 'properties', 'acquired_date', 'TEXT');
   addColumnIfMissing(db, 'properties', 'handed_back_date', 'TEXT');
+  addColumnIfMissing(db, 'properties', 'lease_start_date', 'TEXT');
+  db.exec(`CREATE TABLE IF NOT EXISTS property_notes (
+    id          INTEGER PRIMARY KEY,
+    account_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    property_id INTEGER NOT NULL REFERENCES properties(id) ON DELETE CASCADE,
+    note_date   TEXT NOT NULL,
+    added_by    INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    body        TEXT NOT NULL,
+    created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+  )`);
+  db.exec('CREATE INDEX IF NOT EXISTS idx_property_notes ON property_notes(account_id, property_id, note_date)');
   if (!hadAcquired) db.exec('UPDATE properties SET acquired_date = date(created_at) WHERE acquired_date IS NULL');
   if (!hadDateStarted) db.exec('UPDATE landlords SET date_started = date(created_at) WHERE date_started IS NULL');
   addColumnIfMissing(db, 'council_rec_notes', 'owed_pence', 'INTEGER');

@@ -308,6 +308,27 @@
   <% } %>
 <% if (fold) { %></details><% } else { %></section><% } %>
 <% }) %>
+<% if (typeof callNotes !== 'undefined' && callNotes) { %>
+<details class="card fold" id="call-notes" open>
+  <summary><h2>Tenant calls <span class="count"><%= callNotes.notes.length %></span></h2></summary>
+  <form method="post" action="/app/properties/<%= row.id %>/notes" class="call-note-form" data-no-keep>
+    <%- include('partials/csrf') %>
+    <div class="field"><label for="cn-date">Date</label><input id="cn-date" type="date" name="note_date" value="<%= today %>" required></div>
+    <div class="field"><label for="cn-by">Added by</label><select id="cn-by" name="added_by"><% callNotes.people.forEach(o => { %><option value="<%= o.id %>" <%= o.id === callNotes.me ? 'selected' : '' %>><%= o.label %></option><% }) %></select></div>
+    <div class="field wide"><label for="cn-body">Note</label><textarea id="cn-body" name="body" rows="3" maxlength="5000" required placeholder="Who called, what about, what was agreed…"></textarea></div>
+    <div class="form-actions wide"><button class="btn primary" type="submit">Add note</button></div>
+  </form>
+  <% if (!callNotes.notes.length) { %><p class="muted">No calls noted yet.</p><% } %>
+  <% callNotes.notes.forEach(n => { %>
+  <div class="call-note">
+    <div class="call-note-head"><strong><%= fmt.ukDate(n.note_date) %></strong><span class="muted small"><%= n.added_by_name ? `Added by ${n.added_by_name}` : '' %></span>
+      <form method="post" action="/app/properties/<%= row.id %>/notes/<%= n.id %>/delete" class="inline" data-confirm="Remove this note?"><%- include('partials/csrf') %><button class="btn small link" type="submit">Remove</button></form>
+    </div>
+    <div class="call-note-body pre"><%= n.body %></div>
+  </div>
+  <% }) %>
+</details>
+<% } %>
 <% if (typeof landlordStatements !== 'undefined' && landlordStatements) { %>
 <details class="card fold" id="landlord-statements">
   <summary><h2>Statements <span class="count"><%= landlordStatements.length %></span></h2></summary>

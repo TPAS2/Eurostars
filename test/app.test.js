@@ -670,7 +670,7 @@ test('councils link to properties, and through them to landlords and tenants', a
   const list = (await c.get('/app/properties')).text;
   assert.match(list, /<th[^>]*>Council<\/th>\s*<th[^>]*>Landlord<\/th>/, 'Council sits left of Landlord');
   assert.doesNotMatch(list, /<th[^>]*>Postcode<\/th>/, 'Council replaces Postcode in the list');
-  assert.match(list, /<th[^>]*>Property name<\/th>/);
+  assert.match(list, /<th[^>]*>Property address<\/th>/);
   assert.doesNotMatch(list, /<th[^>]*>Address<\/th>/, 'Property name replaces Address');
   assert.match(list, /Bristol City Council/);
   const rail = (await c.get('/app')).text.match(/<nav class="rail"[\s\S]*?<\/nav>/)[0];
@@ -2351,7 +2351,7 @@ test('properties list columns: Property name, Council, Landlord, Tenant, Status'
   await c.post(`/app/properties/${prop}/add-tenant`, { tenant_mode: 'new', name: 'Cora Tenant', booking_date: '2026-07-10', start_date: '2026-08-01', rent_pence: '850', rent_frequency: 'monthly', status: 'active' });
   r = await c.get('/app/properties');
   const heads = [...r.text.slice(r.text.indexOf('<thead'), r.text.indexOf('</thead>')).matchAll(/<th[^>]*>([^<]+)</g)].map((m) => m[1].trim()).filter(Boolean);
-  assert.deepEqual(heads.slice(0, 5), ['Property name', 'Council', 'Landlord', 'Tenant', 'Status']);
+  assert.deepEqual(heads.slice(0, 5), ['Property address', 'Council', 'Landlord', 'Tenant', 'Status']);
   assert.match(r.text, /3 Column Close[\s\S]*Col Council[\s\S]*Col Landlord[\s\S]*Cora Tenant/);
 });
 
@@ -3395,4 +3395,48 @@ test('maintenance: files when adding, contractor list, who added it, date comple
   // Someone from another company can't be named as having added it.
   const bad = await c.post('/app/maintenance', { property_id: prop, title: 'X', priority: 'normal', status: 'open', added_by: '1' });
   assert.equal(bad.status, 422);
+});
+
+test('properties: address label, lease start with landlord, certificates when adding, notes of tenant calls', async () => {
+  const c = await registerAndLogin('prop-notes@example.com', 'Prop Notes Lets');
+  const co = db.prepare("SELECT id FROM users WHERE username = 'prop-notes'").get().id;
+  db.prepare("INSERT INTO users (username, company_id, login_name, name, agency_name, password_hash) VALUES ('prop-notes.kim', ?, 'Kim', 'Kim Helper', 'Prop Notes Lets', 'x')").run(co);
+  const kim = db.prepare("SELECT id FROM users WHERE login_name = 'Kim' AND company_id = ?").get(co).id;
+  const form = (await c.get('/app/properties/new')).text;
+  assert.match(form, /Property address/);
+  assert.match(form, /Lease start date with landlord/);
+  assert.match(form, /Gas Safety \(CP12\)/);
+  assert.match(form, /name="cert_1_expiry"/);
+  // A certificate with an issued date but no expiry is refused.
+  let r = await c.post('/app/properties', { address_line1: '3 Cert Close', status: 'vacant', cert_0_issued: '2026-01-01' });
+  assert.equal(r.status, 422);
+  assert.match(r.text, /Enter when the Gas Safety \(CP12\) expires/);
+  r = await c.post('/app/properties', { address_line1: '3 Cert Close', status: 'vacant', lease_start_date: '2026-02-01',
+    cert_0_issued: '2026-01-01', cert_0_expiry: '2027-01-01', cert_2_expiry: '2035-05-05' });
+  assert.equal(r.status, 302);
+  const pid = idFrom(r.location);
+  assert.equal(db.prepare('SELECT lease_start_date FROM properties WHERE id = ?').get(pid).lease_start_date, '2026-02-01');
+  const certs = db.prepare('SELECT item_type, issued_date, expiry_date FROM compliance_items WHERE property_id = ? ORDER BY item_type').all(pid);
+  assert.deepEqual(certs.map((x) => [x.item_type, x.issued_date, x.expiry_date]), [['EPC', null, '2035-05-05'], ['Gas Safety (CP12)', '2026-01-01', '2027-01-01']]);
+  // Notes: separate boxes, newest date first, added by someone else.
+  await c.post(`/app/properties/${pid}/notes`, { note_date: '2026-09-01', body: 'Tenant rang about the boiler' });
+  await c.post(`/app/properties/${pid}/notes`, { note_date: '2026-09-20', body: 'Tenant rang about the bins', added_by: String(kim) });
+  const page = (await c.get(`/app/properties/${pid}`)).text;
+  assert.match(page, /Tenant calls/);
+  assert.ok(page.indexOf('about the bins') < page.indexOf('about the boiler'), 'newest first');
+  assert.match(page, /Added by Kim Helper/);
+  assert.equal(page.match(/class="call-note"/g).length, 2);
+  // Empty notes, and other companies' people or properties, are refused.
+  r = await c.post(`/app/properties/${pid}/notes`, { note_date: '2026-09-21', body: '  ' });
+  assert.match(decodeURIComponent(r.location), /Write the note first/);
+  r = await c.post(`/app/properties/${pid}/notes`, { body: 'x', added_by: '1' });
+  assert.match(decodeURIComponent(r.location), /Choose who added the note/);
+  const other = await registerAndLogin('prop-notes2@example.com', 'Other Lets');
+  r = await other.post(`/app/properties/${pid}/notes`, { body: 'sneaky' });
+  assert.equal(r.status, 404);
+  const nid = db.prepare("SELECT id FROM property_notes WHERE body LIKE '%boiler%'").get().id;
+  await other.post(`/app/properties/${pid}/notes/${nid}/delete`, {});
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM property_notes WHERE property_id = ?').get(pid).n, 2);
+  await c.post(`/app/properties/${pid}/notes/${nid}/delete`, {});
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM property_notes WHERE property_id = ?').get(pid).n, 1);
 });

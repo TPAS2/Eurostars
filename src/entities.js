@@ -46,7 +46,7 @@ const ENTITIES = {
     searchBar: true,
     fields: [
       { name: 'council_id', label: 'Council', type: 'ref', ref: 'councils', help: 'The local authority for this address.' },
-      { name: 'address_line1', label: 'Property name', type: 'text', required: true },
+      { name: 'address_line1', label: 'Property address', type: 'text', required: true },
       { name: 'town', label: 'Town / city', type: 'text' },
       { name: 'postcode', label: 'Postcode', type: 'text' },
       { name: 'landlord_id', label: 'Landlord', type: 'ref', ref: 'landlords' },
@@ -54,7 +54,8 @@ const ENTITIES = {
       { name: 'bedrooms', label: 'Bedrooms', type: 'integer' },
       { name: 'management_fee_pct', label: 'Management fee %', type: 'number', help: 'Deducted automatically from rent received.' },
       { name: 'status', label: 'Status', type: 'select', options: ['vacant', 'let', 'under offer', 'unavailable', 'handed back'], required: true, default: 'vacant' },
-      { name: 'acquired_date', label: 'Date acquired', type: 'date', default: 'today', help: 'When you took the property on.', startRow: true },
+      { name: 'lease_start_date', label: 'Lease start date with landlord', type: 'date', help: 'When your lease with the landlord for this property began.', startRow: true },
+      { name: 'acquired_date', label: 'Date acquired', type: 'date', default: 'today', help: 'When you took the property on.' },
       { name: 'handed_back_date', label: 'Date handed back', type: 'date', help: 'When it went back to the landlord. Filling this in sets the status to handed back.' },
       { name: 'notes', label: 'Notes', type: 'textarea' },
     ],
