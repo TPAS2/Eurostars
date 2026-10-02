@@ -43,7 +43,7 @@
 <% const pb = propertyBox; const groups = [
   ['Empty – needs maintenance', pb.needsWork, 'bad', (x) => `${x.jobs} open job${x.jobs === 1 ? '' : 's'}`, (x) => `/app/properties/${x.id}`],
   ['Empty – ready to rent', pb.ready, 'ok', () => '', (x) => `/app/properties/${x.id}`],
-  [`Booked · ${stats.monthLabel}`, pb.booked, 'info', (x) => `${x.tenant} · ${fmt.ukDate(x.date)}`, (x) => `/app/tenancies/${x.id}`],
+  [`Reserved · ${stats.monthLabel}`, pb.booked, 'info', (x) => `${x.tenant} · ${fmt.ukDate(x.date)}`, (x) => `/app/tenancies/${x.id}`],
   [`New acquisitions · ${stats.monthLabel}`, pb.acquired, 'info', (x) => fmt.ukDate(x.date), (x) => `/app/properties/${x.id}`],
   [`Handed back · ${stats.monthLabel}`, pb.handedBack, 'warn', (x) => fmt.ukDate(x.date), (x) => `/app/properties/${x.id}`],
 ]; %>

@@ -49,7 +49,7 @@ function raiseMonthlyRent(db, accountId, month) {
   const monthEnd = `${month}-${String(daysInMonth).padStart(2, '0')}`;
   const tenancies = db.prepare(
     `SELECT ty.*, p.landlord_id FROM tenancies ty JOIN properties p ON p.id = ty.property_id
-      WHERE ty.account_id = ? AND ty.status = 'active'
+      WHERE ty.account_id = ? AND ty.status = 'active' AND ty.rent_pence > 0
         AND ty.start_date <= ? AND (ty.end_date IS NULL OR ty.end_date >= ?)`
   ).all(accountId, monthEnd, monthStart);
   const alreadyCharged = db.prepare(

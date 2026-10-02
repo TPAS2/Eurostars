@@ -166,7 +166,7 @@ module.exports = function appRoutes(db) {
     // A tenancy can't be booked or start after it ends.
     if (def.key === 'tenancies' && values.end_date) {
       if (values.start_date && values.start_date > values.end_date) errors.start_date = 'The start date can’t be after the end date.';
-      if (values.booking_date && values.booking_date > values.end_date) errors.booking_date = 'The booking date can’t be after the end date.';
+      if (values.booking_date && values.booking_date > values.end_date) errors.booking_date = 'The reservation date can’t be after the end date.';
       // Once its end date has come, a tenancy is ended.
       if (values.end_date <= fmt.today()) values.status = 'ended';
     }
@@ -567,7 +567,7 @@ module.exports = function appRoutes(db) {
     const end = String(req.body.end_date || '').trim() || fmt.today();
     if (!fmt.isIsoDate(end)) return back('error', 'Enter a valid end date.');
     if (t.start_date && end < t.start_date) return back('error', `The end date can’t be before the start date (${fmt.ukDate(t.start_date)}).`);
-    if (t.booking_date && end < t.booking_date) return back('error', `The end date can’t be before the booking date (${fmt.ukDate(t.booking_date)}).`);
+    if (t.booking_date && end < t.booking_date) return back('error', `The end date can’t be before the reservation date (${fmt.ukDate(t.booking_date)}).`);
     db.prepare("UPDATE tenancies SET end_date = ?, status = 'ended' WHERE id = ? AND account_id = ?").run(end, t.id, a);
     back('flash', `Tenancy ended on ${fmt.ukDate(end)}.`);
   });
@@ -597,10 +597,11 @@ module.exports = function appRoutes(db) {
       const tv = letParsed.values;
       if (mode === 'new') {
         const t = tenantParsed.values;
-        const info = db.prepare('INSERT INTO tenants (account_id, name, email, phone, notes) VALUES (?, ?, ?, ?, ?)')
-          .run(a, t.name, t.email, t.phone, t.notes);
+        const info = db.prepare('INSERT INTO tenants (account_id, name, email, phone, council_ref, notes) VALUES (?, ?, ?, ?, ?, ?)')
+          .run(a, t.name, t.email, t.phone, t.council_ref ?? null, t.notes);
         tv.tenant_id = Number(info.lastInsertRowid);
       }
+      if (!('rent_pence' in tv)) tv.rent_pence = 0; // rent isn't entered any more
       const cols = Object.keys(tv);
       const info = db.prepare(`INSERT INTO tenancies (account_id, ${cols.join(', ')}) VALUES (?, ${cols.map(() => '?').join(', ')})`)
         .run(a, ...cols.map((c) => tv[c]));
@@ -715,7 +716,6 @@ module.exports = function appRoutes(db) {
         row.tenancy_status = t ? t.status : null;
         row.cur_property = t ? { text: t.address_line1, href: `/app/properties/${t.property_id}` } : { text: '' };
         row.cur_council = t && t.council_id ? { text: t.council_name, href: `/app/councils/${t.council_id}` } : { text: '' };
-        row.cur_rent = t ? { text: `${fmt.money(t.rent_pence)}${t.rent_frequency === 'weekly' ? ' pw' : ' pcm'}` } : { text: '' };
         row.cur_term = t ? { text: `${fmt.ukDate(t.start_date)} – ${t.end_date ? fmt.ukDate(t.end_date) : 'ongoing'}`, href: `/app/tenancies/${t.id}` } : { text: 'No tenancy yet' };
         row.cur_status = t ? { text: fmt.humanize(t.status), cls: `badge s-${t.status}` } : { text: '' };
       }
@@ -815,6 +815,7 @@ module.exports = function appRoutes(db) {
     prepareValues(def, a, values);
     // A new property counts as acquired today unless another date is given.
     if (def.key === 'properties' && !values.acquired_date) values.acquired_date = fmt.today();
+    if (def.key === 'tenancies' && !('rent_pence' in values)) values.rent_pence = 0; // rent isn't entered any more
     const cols = Object.keys(values);
     const id = transaction(db, () => {
       const info = db.prepare(`INSERT INTO ${def.table} (account_id, ${cols.join(', ')}) VALUES (?, ${cols.map(() => '?').join(', ')})`)
@@ -952,14 +953,14 @@ module.exports = function appRoutes(db) {
   });
 
   // ---------- notes of tenants' calls about a property ----------
-  function ownedProperty(req, res) {
+  function noteProperty(req, res) {
     const id = Number(req.params.id);
     const p = Number.isInteger(id) && db.prepare('SELECT id FROM properties WHERE id = ? AND account_id = ?').get(id, req.user.id);
     if (!p) res.status(404).render('error', { title: 'Not found', message: 'That property was not found.' });
     return p;
   }
   router.post('/properties/:id(\\d+)/notes', (req, res) => {
-    const p = ownedProperty(req, res);
+    const p = noteProperty(req, res);
     if (!p) return;
     const a = req.user.id;
     const back = (key, msg) => res.redirect(`/app/properties/${p.id}?${key}=${encodeURIComponent(msg)}#call-notes`);
@@ -973,7 +974,7 @@ module.exports = function appRoutes(db) {
     back('flash', 'Note added.');
   });
   router.post('/properties/:id(\\d+)/notes/:nid(\\d+)/delete', (req, res) => {
-    const p = ownedProperty(req, res);
+    const p = noteProperty(req, res);
     if (!p) return;
     db.prepare('DELETE FROM property_notes WHERE id = ? AND property_id = ? AND account_id = ?').run(Number(req.params.nid), p.id, req.user.id);
     res.redirect(`/app/properties/${p.id}?flash=${encodeURIComponent('Note removed.')}#call-notes`);

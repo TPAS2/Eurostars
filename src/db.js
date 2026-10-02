@@ -452,6 +452,9 @@ function openDatabase(file) {
   addColumnIfMissing(db, 'properties', 'acquired_date', 'TEXT');
   addColumnIfMissing(db, 'properties', 'handed_back_date', 'TEXT');
   addColumnIfMissing(db, 'properties', 'lease_start_date', 'TEXT');
+  // Tenants: the council's reference. Tenancies: the term as booked (rent is no longer entered).
+  addColumnIfMissing(db, 'tenants', 'council_ref', 'TEXT');
+  addColumnIfMissing(db, 'tenancies', 'term_booked', 'TEXT');
   db.exec(`CREATE TABLE IF NOT EXISTS property_notes (
     id          INTEGER PRIMARY KEY,
     account_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,

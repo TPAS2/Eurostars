@@ -196,7 +196,9 @@ test('full lettings workflow: landlord → property → tenant → rent → fee 
   const tenancyId = idFrom(r.location);
   const tenancy = db.prepare('SELECT * FROM tenancies WHERE id = ?').get(tenancyId);
   assert.equal(tenancy.booking_date, '2026-08-20');
-  assert.equal(tenancy.rent_pence, 100000);
+  assert.equal(tenancy.rent_pence, 0, 'rent is no longer entered');
+  // Tenancies from before rent was taken off the form still have one, and still get charged.
+  db.prepare('UPDATE tenancies SET rent_pence = 100000 WHERE id = ?').run(tenancyId);
   assert.equal(db.prepare('SELECT status FROM properties WHERE id = ?').get(propertyId).status, 'let');
 
   // Missing booking date is rejected.
@@ -1260,6 +1262,7 @@ test('month end: calculate rents, email landlords, Rift report (Excel) with prev
   const prop = idFrom(r.location);
   r = await c.post(`/app/properties/${prop}/add-tenant`, { tenant_mode: 'new', name: 'Tess', booking_date: '2026-07-01', start_date: '2026-08-01', rent_pence: '1000', rent_frequency: 'monthly', status: 'active' });
   const tenancy = idFrom(r.location);
+  db.prepare('UPDATE tenancies SET rent_pence = 100000 WHERE id = ?').run(tenancy); // an older tenancy with a rent
 
   assert.match((await c.get('/app')).text, /aria-label="Rent run"/, 'Rent run is in the menu');
   r = await c.get('/app/rent-run?month=2026-08');
@@ -1465,7 +1468,9 @@ test('council reconciliation: every council, money owed and in, notes, totals, m
   const quiet = idFrom(r.location);
   const addLet = async (addr, rent) => {
     const p = idFrom((await c.post('/app/properties', { address_line1: addr, council_id: String(bristol), status: 'vacant' })).location);
-    return idFrom((await c.post(`/app/properties/${p}/add-tenant`, { tenant_mode: 'new', name: `T ${addr}`, booking_date: '2026-07-01', start_date: '2026-08-01', rent_pence: rent, rent_frequency: 'monthly', status: 'active' })).location);
+    const id = idFrom((await c.post(`/app/properties/${p}/add-tenant`, { tenant_mode: 'new', name: `T ${addr}`, booking_date: '2026-07-01', start_date: '2026-08-01', status: 'active' })).location);
+    db.prepare('UPDATE tenancies SET rent_pence = ? WHERE id = ?').run(Number(rent) * 100, id); // older tenancies have a rent
+    return id;
   };
   const t1 = await addLet('1 Park Row', '500');
   await addLet('2 Park Row', '400');
@@ -1583,7 +1588,7 @@ test('tenant page: a second box with the council, property and tenancy agreement
   assert.match(r.text, /<h3>Property<\/h3>[\s\S]*?7 Canal Street[\s\S]*?Leeds, LS1 4AB[\s\S]*?Lou Landlord/);
   assert.doesNotMatch(r.text, /Deposit/);
   assert.doesNotMatch((await c.get(`/app/properties/${prop}/add-tenant`)).text, /Deposit/);
-  assert.match(r.text, /<h3>Tenancy agreement<\/h3>[\s\S]*?10\/07\/2026[\s\S]*?01\/08\/2026 – ongoing[\s\S]*?£850\.00 a month[\s\S]*?No signed agreement uploaded yet/);
+  assert.match(r.text, /<h3>Tenancy agreement<\/h3>[\s\S]*?10\/07\/2026[\s\S]*?01\/08\/2026 – ongoing[\s\S]*?No signed agreement uploaded yet/);
 
   // Upload the signed agreement from the tenant page; it's shown and can be opened.
   const pdf = new File([Buffer.from('%PDF-1.4\n%signed\n')], 'Nina agreement.pdf');
@@ -2074,8 +2079,8 @@ test('Tenants and Tenancies are one tab', async () => {
   assert.equal((await c.get('/app/tenancies')).location, '/app/tenants');
 
   r = await c.get('/app/tenants');
-  assert.match(r.text, /<th[^>]*>Property<\/th>\s*<th[^>]*>Rent<\/th>\s*<th[^>]*>Tenancy<\/th>\s*<th[^>]*>Status<\/th>\s*<th[^>]*>Phone<\/th>\s*<th[^>]*>Council<\/th>/);
-  assert.match(r.text, new RegExp(`Current Carol[\\s\\S]*?5 Joined Road[\\s\\S]*?£950\\.00 pcm[\\s\\S]*?href="/app/tenancies/${tenancy}">01/08/2026 – ongoing[\\s\\S]*?badge s-active">active[\\s\\S]*?Merge Council`));
+  assert.match(r.text, /<th[^>]*>Property<\/th>\s*<th[^>]*>Tenancy<\/th>\s*<th[^>]*>Status<\/th>\s*<th[^>]*>Phone<\/th>\s*<th[^>]*>Council<\/th>/);
+  assert.match(r.text, new RegExp(`Current Carol[\\s\\S]*?5 Joined Road[\\s\\S]*?href="/app/tenancies/${tenancy}">01/08/2026 – ongoing[\\s\\S]*?badge s-active">active[\\s\\S]*?Merge Council`));
   assert.match(r.text, /Waiting Wendy[\s\S]*?No tenancy yet/);
   assert.doesNotMatch(r.text, /Past Pete/, 'current tenants by default');
   r = await c.get('/app/tenants?show=past');
@@ -2648,7 +2653,7 @@ test('tenancies: booking and start dates cannot be after the end date', async ()
   const prop = idFrom((await c.post('/app/properties', { address_line1: '8 Date Row', status: 'vacant' })).location);
   let r = await c.post(`/app/properties/${prop}/add-tenant`, { tenant_mode: 'new', name: 'Early Ender', booking_date: '2026-09-01', start_date: '2026-10-01', end_date: '2026-08-31', rent_pence: '900', rent_frequency: 'monthly', status: 'active' });
   assert.equal(r.status, 422);
-  assert.match(r.text, /The booking date can’t be after the end date/);
+  assert.match(r.text, /The reservation date can’t be after the end date/);
   assert.match(r.text, /The start date can’t be after the end date/);
   r = await c.post(`/app/properties/${prop}/add-tenant`, { tenant_mode: 'new', name: 'Fine Tenant', booking_date: '2026-09-01', start_date: '2026-10-01', end_date: '2027-09-30', rent_pence: '900', rent_frequency: 'monthly', status: 'active' });
   assert.equal(r.status, 302);
@@ -3336,7 +3341,7 @@ test('dashboard: properties box (empty needing maintenance or ready, booked, acq
   const n = (label) => Number(page.match(new RegExp(`<span class="po-n">(\\d+)</span><span class="po-label">${label}`))[1]);
   assert.equal(n('Empty – needs maintenance'), 1);
   assert.equal(n('Empty – ready to rent'), 1);
-  assert.equal(n('Booked'), 1);
+  assert.equal(n('Reserved'), 1);
   assert.equal(n('New acquisitions'), 3, 'the three added today (not the one acquired in 2025)');
   assert.equal(n('Handed back'), 1);
   assert.match(page, /1 Fixer Road<\/a> <span class="muted small">· 1 open job/);
@@ -3439,4 +3444,29 @@ test('properties: address label, lease start with landlord, certificates when ad
   assert.equal(db.prepare('SELECT COUNT(*) n FROM property_notes WHERE property_id = ?').get(pid).n, 2);
   await c.post(`/app/properties/${pid}/notes/${nid}/delete`, {});
   assert.equal(db.prepare('SELECT COUNT(*) n FROM property_notes WHERE property_id = ?').get(pid).n, 1);
+});
+
+test('tenants: council reference number; tenancies: reservation date, term as booked, no rent boxes', async () => {
+  const c = await registerAndLogin('reserve@example.com', 'Reserve Lets');
+  const prop = idFrom((await c.post('/app/properties', { address_line1: '6 Reserve Row', status: 'vacant' })).location);
+  const form = (await c.get(`/app/properties/${prop}/add-tenant`)).text;
+  assert.match(form, /Council reference number/);
+  assert.match(form, /Reservation date/);
+  assert.match(form, /Term as booked/);
+  assert.doesNotMatch(form, /name="rent_pence"|name="rent_frequency"/, 'no rent boxes');
+  const r = await c.post(`/app/properties/${prop}/add-tenant`, { tenant_mode: 'new', name: 'Rita Reserve', council_ref: 'HB-12345', booking_date: '2026-09-10', term_booked: '6 months', start_date: '2026-10-01', status: 'active' });
+  assert.equal(r.status, 302);
+  const t = db.prepare('SELECT * FROM tenancies WHERE id = ?').get(idFrom(r.location));
+  assert.equal(t.term_booked, '6 months');
+  assert.equal(t.rent_pence, 0);
+  assert.equal(db.prepare('SELECT council_ref FROM tenants WHERE id = ?').get(t.tenant_id).council_ref, 'HB-12345');
+  const page = (await c.get(`/app/tenants/${t.tenant_id}`)).text;
+  assert.match(page, /HB-12345/);
+  assert.match(page, /<dt>Reserved<\/dt><dd>10\/09\/2026/);
+  assert.match(page, /<dt>Term as booked<\/dt><dd>6 months/);
+  assert.doesNotMatch(page, /<dt>Rent<\/dt>/);
+  // No rent: no automatic rent charge for it.
+  await c.post('/app/rent/raise', { month: '2026-10' });
+  assert.equal(db.prepare("SELECT COUNT(*) n FROM transactions WHERE tenancy_id = ? AND txn_type = 'rent_charge'").get(t.id).n, 0);
+  assert.match((await c.get('/app/tenants')).text, /HB-12345/);
 });
