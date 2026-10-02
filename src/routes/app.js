@@ -386,6 +386,7 @@ module.exports = function appRoutes(db) {
       prev: shiftMonth(month, -1), next: shiftMonth(month, 1), thisMonth: fmt.today().slice(0, 7), rec, open,
       detail: open ? reconcile.councilTenancies(db, a, month, open.id) : null, rowStatus: reconcile.rowStatus, fmt,
       owedAll: reconcile.owedAllMonths(db, a, fmt.today().slice(0, 7) > month ? fmt.today().slice(0, 7) : month),
+      year: reconcile.yearTotals(db, a, month, fmt.today().slice(0, 7)),
     });
   });
 
@@ -467,6 +468,7 @@ module.exports = function appRoutes(db) {
       const st = reconcile.rowStatus(c);
       const bal = (b) => (b > 0 ? fmt.money(b) : b < 0 ? `${fmt.money(-b)} over` : '—');
       const t = rec.totals;
+      const yr = reconcile.yearTotals(db, a, month, fmt.today().slice(0, 7));
       const all = reconcile.owedAllMonths(db, a, fmt.today().slice(0, 7) > month ? fmt.today().slice(0, 7) : month).balance;
       return res.json({
         ok: true,
@@ -478,6 +480,8 @@ module.exports = function appRoutes(db) {
           { id: 'rec-total-balance', text: bal(t.balance) },
           { id: 'rec-owed-month', text: bal(t.balance), className: `value${t.balance > 0 ? ' bad-text' : ''}` },
           { id: 'rec-owed-all', text: bal(all), className: `value${all > 0 ? ' bad-text' : ''}` },
+          { id: 'rec-year-invoiced', text: fmt.money(yr.invoiced) },
+          { id: 'rec-year-received', text: fmt.money(yr.received) },
         ],
       });
     }

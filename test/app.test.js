@@ -1473,7 +1473,7 @@ test('council reconciliation: every council, money owed and in, notes, totals, m
   assert.match(r.text, /href="\/app\/council-reconciliation\?month=2026-07">‹ Previous month/);
   assert.match(r.text, /href="\/app\/council-reconciliation\?month=2026-09">Next month ›/);
   assert.match(r.text, /August 2026/);
-  assert.match(r.text, /<th[^>]*>Money owed<\/th><th[^>]*>Money in<\/th>/);
+  assert.match(r.text, /<th>Invoice sent<\/th><th[^>]*>Money outstanding<\/th><th[^>]*>Money received<\/th><th>Date received<\/th><th[^>]*>Outstanding<\/th>/);
   assert.match(r.text, /Bristol City Council[\s\S]*?name="owed"[^>]*placeholder="900\.00"[\s\S]*?name="received"[^>]*placeholder="500\.00"[\s\S]*?£400\.00[\s\S]*?Part paid/);
   assert.match(r.text, /Quiet Council[\s\S]*?Nothing due/, 'every council is listed, even with nothing due');
   assert.match(r.text, /class="total"[\s\S]*?£900\.00[\s\S]*?£500\.00[\s\S]*?£400\.00/);
@@ -2386,8 +2386,8 @@ test('council reconciliation: Date received and Email sent date columns save, no
   let r = await c.post('/app/councils', { name: 'Dates Council' });
   const council = idFrom(r.location);
   r = await c.get('/app/council-reconciliation?month=2026-09');
-  assert.match(r.text, /Money in<\/th><th>Date received<\/th><th>Email sent<\/th>/);
-  assert.match(r.text, /name="received_date"[\s\S]*?name="email_sent_date"/);
+  assert.match(r.text, /<th>Invoice sent<\/th><th[^>]*>Money outstanding<\/th><th[^>]*>Money received<\/th><th>Date received<\/th>/);
+  assert.match(r.text, /name="email_sent_date"[\s\S]*?name="received_date"/, 'Invoice sent comes before the money columns');
   assert.match(r.text, /data-autosave data-autosave-quiet/);
   r = await c.req('POST', '/app/council-reconciliation/notes', { council_id: String(council), month: '2026-09', notes: '', owed: '', received: '', received_date: '2026-09-17', email_sent_date: '2026-09-18' });
   const row = db.prepare('SELECT received_date, email_sent_date FROM council_rec_notes WHERE council_id = ?').get(council);
@@ -2414,11 +2414,15 @@ test('council reconciliation: still owed for the month and all months in the top
   assert.equal(upd['rec-owed-month'], '£100.00');
   assert.equal(upd['rec-owed-all'], '£400.00', 'July’s £300 plus August’s £100');
   const page = (await c.get('/app/council-reconciliation?month=2026-08')).text;
-  assert.match(page, /Still owed · August 2026<\/span><span class="value bad-text" id="rec-owed-month">£100\.00/);
-  assert.match(page, /Still owed · all months<\/span><span class="value bad-text" id="rec-owed-all">£400\.00/);
+  assert.match(page, /Outstanding · August 2026<\/span><span class="value bad-text" id="rec-owed-month">£100\.00/);
+  assert.match(page, /Outstanding · all months<\/span><span class="value bad-text" id="rec-owed-all">£400\.00/);
   // An overpayment later offsets what's owed overall.
   await save('2026-09', { owed: '0', received: '450' });
   assert.match((await c.get('/app/council-reconciliation?month=2026-09')).text, /id="rec-owed-all">£50\.00 over/);
+  // Whole-year totals: invoiced 500 + 100 + 0, received 200 + 0 + 450 (January to now).
+  const yearPage = (await c.get('/app/council-reconciliation?month=2026-09')).text;
+  assert.match(yearPage, /Invoiced · whole 2026<\/span><span class="value" id="rec-year-invoiced">£600\.00/);
+  assert.match(yearPage, /Received · whole 2026<\/span><span class="value ok-text" id="rec-year-received">£650\.00/);
 });
 
 test('contractor invoices: choose the landlord to charge and say what is required', async () => {

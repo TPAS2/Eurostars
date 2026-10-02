@@ -95,6 +95,21 @@ function owedAllMonths(db, accountId, uptoMonth) {
   return { balance, months, from: first };
 }
 
+// The year's totals for the month's calendar year: January up to the current month (or all twelve
+// months of a past year), what all councils were invoiced and what came in.
+function yearTotals(db, accountId, month, thisMonth) {
+  const year = Number(month.slice(0, 4));
+  const last = String(year) === thisMonth.slice(0, 4) ? Number(thisMonth.slice(5, 7)) : (String(year) < thisMonth.slice(0, 4) ? 12 : 0);
+  let invoiced = 0;
+  let received = 0;
+  for (let m = 1; m <= last; m++) {
+    const t = reconciliation(db, accountId, `${year}-${String(m).padStart(2, '0')}`).totals;
+    invoiced += t.owed;
+    received += t.received;
+  }
+  return { year, invoiced, received };
+}
+
 // How a council's row reads: the "still owed" text and status badge.
 function rowStatus(c) {
   if (!c.owed && !c.received) return { text: 'Nothing due', cls: 'muted small' };
@@ -103,4 +118,4 @@ function rowStatus(c) {
   return { text: 'Not paid', cls: 'badge bad plain' };
 }
 
-module.exports = { reconciliation, councilTenancies, rowStatus, owedAllMonths };
+module.exports = { reconciliation, councilTenancies, rowStatus, owedAllMonths, yearTotals };

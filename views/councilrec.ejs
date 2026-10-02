@@ -3,12 +3,14 @@
 <header class="page-head with-head-tiles">
   <div class="head-text">
     <h1>Council reconciliation</h1>
-    <p class="muted">Every council: the rent it owes for its tenants this month, the money that came in, and what's still owed.</p>
+    <p class="muted">Every council: the rent it owes for its tenants this month, the money received, and what's outstanding.</p>
   </div>
   <% const owedText = (b) => b > 0 ? fmt.money(b) : b < 0 ? fmt.money(-b) + ' over' : '—'; %>
   <div class="head-tiles">
-    <div class="mini-tile"><span class="label">Still owed · <%= monthLabel %></span><span class="value <%= t.balance > 0 ? 'bad-text' : '' %>" id="rec-owed-month"><%= owedText(t.balance) %></span></div>
-    <div class="mini-tile"><span class="label">Still owed · all months</span><span class="value <%= owedAll.balance > 0 ? 'bad-text' : '' %>" id="rec-owed-all"><%= owedText(owedAll.balance) %></span></div>
+    <div class="mini-tile"><span class="label">Outstanding · <%= monthLabel %></span><span class="value <%= t.balance > 0 ? 'bad-text' : '' %>" id="rec-owed-month"><%= owedText(t.balance) %></span></div>
+    <div class="mini-tile"><span class="label">Invoiced · whole <%= year.year %></span><span class="value" id="rec-year-invoiced"><%= fmt.money(year.invoiced) %></span></div>
+    <div class="mini-tile"><span class="label">Received · whole <%= year.year %></span><span class="value ok-text" id="rec-year-received"><%= fmt.money(year.received) %></span></div>
+    <div class="mini-tile"><span class="label">Outstanding · all months</span><span class="value <%= owedAll.balance > 0 ? 'bad-text' : '' %>" id="rec-owed-all"><%= owedText(owedAll.balance) %></span></div>
   </div>
 </header>
 
@@ -24,7 +26,7 @@
   <% } else { %>
   <div class="table-wrap"><table class="rec-table centered">
     <thead><tr>
-      <th>Council</th><th class="num">Properties</th><th class="num">Money owed</th><th class="num">Money in</th><th>Date received</th><th>Email sent</th><th class="num">Still owed</th><th>Status</th><th class="notes-col">Notes</th>
+      <th>Council</th><th class="num">Properties</th><th>Invoice sent</th><th class="num">Money outstanding</th><th class="num">Money received</th><th>Date received</th><th class="num">Outstanding</th><th>Status</th><th class="notes-col">Notes</th>
     </tr></thead>
     <tbody>
     <% rec.rows.forEach(c => { %>
@@ -32,14 +34,14 @@
         <td><a href="/app/council-reconciliation?month=<%= month %>&council_id=<%= c.id %>#detail"><strong><%= c.name %></strong></a></td>
         <td class="num"><%= c.properties %></td>
         <% const st = rowStatus(c); %>
+        <td class="date-cell"><div class="field"><input form="rec-form-<%= c.id %>" type="date" name="email_sent_date" value="<%= c.emailSentDate %>" aria-label="Date invoice sent to <%= c.name %>"></div></td>
         <td class="num money-cell">
-          <div class="field"><input form="rec-form-<%= c.id %>" name="owed" inputmode="decimal" autocomplete="off" value="<%= c.owedEntered !== null ? fmt.penceToInput(c.owedEntered) : '' %>" placeholder="<%= fmt.penceToInput(c.owedCalculated) %>" aria-label="Money owed by <%= c.name %>"></div>
+          <div class="field"><input form="rec-form-<%= c.id %>" name="owed" inputmode="decimal" autocomplete="off" value="<%= c.owedEntered !== null ? fmt.penceToInput(c.owedEntered) : '' %>" placeholder="<%= fmt.penceToInput(c.owedCalculated) %>" aria-label="Money outstanding from <%= c.name %>"></div>
         </td>
         <td class="num money-cell">
-          <div class="field"><input form="rec-form-<%= c.id %>" name="received" inputmode="decimal" autocomplete="off" value="<%= c.receivedEntered !== null ? fmt.penceToInput(c.receivedEntered) : '' %>" placeholder="<%= fmt.penceToInput(c.receivedCalculated) %>" aria-label="Money in from <%= c.name %>"></div>
+          <div class="field"><input form="rec-form-<%= c.id %>" name="received" inputmode="decimal" autocomplete="off" value="<%= c.receivedEntered !== null ? fmt.penceToInput(c.receivedEntered) : '' %>" placeholder="<%= fmt.penceToInput(c.receivedCalculated) %>" aria-label="Money received from <%= c.name %>"></div>
         </td>
         <td class="date-cell"><div class="field"><input form="rec-form-<%= c.id %>" type="date" name="received_date" value="<%= c.receivedDate %>" aria-label="Date money received from <%= c.name %>"></div></td>
-        <td class="date-cell"><div class="field"><input form="rec-form-<%= c.id %>" type="date" name="email_sent_date" value="<%= c.emailSentDate %>" aria-label="Date email sent to <%= c.name %>"></div></td>
         <td class="num"><span id="rec-balance-<%= c.id %>" class="<%= c.balance > 0 ? 'bad-text strong' : c.balance < 0 ? 'ok-text' : '' %>"><%= c.balance > 0 ? fmt.money(c.balance) : c.balance < 0 ? fmt.money(-c.balance) + ' over' : '—' %></span></td>
         <td><span id="rec-status-<%= c.id %>" class="<%= st.cls %>"><%= st.text %></span></td>
         <td class="notes-col">
@@ -56,9 +58,10 @@
       <tr class="total">
         <td>Total</td>
         <td class="num"><%= t.properties %></td>
+        <td></td>
         <td class="num" id="rec-total-owed"><%= fmt.money(t.owed) %></td>
         <td class="num" id="rec-total-received"><%= fmt.money(t.received) %></td>
-        <td></td><td></td>
+        <td></td>
         <td class="num" id="rec-total-balance"><%= t.balance > 0 ? fmt.money(t.balance) : t.balance < 0 ? fmt.money(-t.balance) + ' over' : '—' %></td>
         <td colspan="2"></td>
       </tr>
@@ -75,7 +78,7 @@
   </div>
   <% if (!detail.length) { %><p class="muted">No tenancies in this council's properties for <%= monthLabel %>.</p><% } else { %>
   <div class="table-wrap"><table>
-    <thead><tr><th>Property</th><th>Tenant</th><th class="num">Money owed</th><th class="num">Money in</th><th class="num">Still owed</th><th>Status</th><th></th></tr></thead>
+    <thead><tr><th>Property</th><th>Tenant</th><th class="num">Money outstanding</th><th class="num">Money received</th><th class="num">Outstanding</th><th>Status</th><th></th></tr></thead>
     <tbody>
     <% detail.forEach(d => { %>
       <tr>
