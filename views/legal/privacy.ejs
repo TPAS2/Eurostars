@@ -31,7 +31,7 @@
     <li><strong>Local councils</strong>, where a tenancy or placement involves them, receive the details needed for invoices and records.</li>
     <li><strong>Contractors</strong> receive the details needed to do a job at a property.</li>
     <li><strong>Our bank</strong> receives payment details when we make payments to landlords.</li>
-    <li><strong>Our service providers</strong> who run the system for us and may only use the information on our instructions: our hosting provider (Render) and our email provider (Resend, or our own email service).<% if (legal.aiEnabled) { %> We also use an AI service (Anthropic) to help write the short summary on a landlord’s statement. It is sent the statement’s figures and the landlord’s name, and is not used to make decisions about anyone.<% } %></li>
+    <li><strong>Our service providers</strong> who run the system for us and may only use the information on our instructions: our hosting provider (Render) and our email provider (Resend, or our own email service).<% if (legal.driveEnabled) { %> Encrypted backup copies are also kept in Google Drive; Google cannot read them because they are scrambled with a password only we hold.<% } %><% if (legal.aiEnabled) { %> We also use an AI service (Anthropic) to help write the short summary on a landlord’s statement. It is sent the statement’s figures and the landlord’s name, and is not used to make decisions about anyone.<% } %></li>
     <li>Anyone the law requires us to tell, such as the police, HMRC or a court.</li>
   </ul>
   <p>We do not sell your information or use it for advertising. Some of our providers may handle information outside the UK; where they do, we rely on the safeguards the law requires, such as approved contract terms.</p>

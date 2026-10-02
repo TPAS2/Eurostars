@@ -20,6 +20,21 @@
   <div class="tile <%= config.backupCopyDir ? '' : 'warn' %>"><span class="label">Second copy</span><span class="value sm"><%= config.backupCopyDir ? 'On' : 'Off' %></span><span class="sub"><%= config.backupCopyDir ? 'Copied to BACKUP_COPY_DIR' : 'Set BACKUP_COPY_DIR, or download regularly' %></span></div>
 </section>
 
+<section class="card" id="google-drive">
+  <h2>Google Drive copy</h2>
+  <% if (!driveOn) { %>
+    <p class="muted">Off. Every backup can also be copied to your own Google Drive, as a safe copy away from the server. Set <code>GOOGLE_CLIENT_ID</code>, <code>GOOGLE_CLIENT_SECRET</code> and <code>GOOGLE_REFRESH_TOKEN</code> in Render to switch it on.</p>
+  <% } else if (!config.backupPassword) { %>
+    <div class="notice err">Google Drive is set up, but nothing is sent because backups aren't encrypted. Set <code>BACKUP_PASSWORD</code> in Render. Only encrypted backups are ever sent to Google.</div>
+  <% } else if (!driveLast) { %>
+    <p>On. The next backup will be copied to the “<%= config.googleDrive.folderName %>” folder in your Google Drive.</p>
+  <% } else if (driveLast.ok) { %>
+    <p><span class="badge s-active">working</span> Last copy sent <%= fmt.ukDateTime(driveLast.at.slice(0, 19).replace('T', ' ')) %> (<code><%= driveLast.name %></code>). Folder: “<%= config.googleDrive.folderName %>”, keeping the latest <%= config.backupKeep %>.</p>
+  <% } else { %>
+    <div class="notice err">The last copy to Google Drive failed (<%= fmt.ukDateTime(driveLast.at.slice(0, 19).replace('T', ' ')) %>): <%= driveLast.error %></div>
+  <% } %>
+</section>
+
 <section class="card">
   <h2>Backup frequency</h2>
   <% if (!config.autoBackups) { %><div class="notice warn">Automatic backups are switched off on the server (<code>AUTO_BACKUPS=false</code>), so this setting has no effect until that's removed.</div><% } %>

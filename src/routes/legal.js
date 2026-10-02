@@ -13,6 +13,7 @@ module.exports = function legalRoutes(config, { aiEnabled = false } = {}) {
     icoNumber: config.icoNumber || '',
     legalAddress: config.legalAddress || '',
     aiEnabled,
+    driveEnabled: !!(config.googleDrive && config.googleDrive.refreshToken),
     updated: '2 October 2026',
   });
   const missing = (req) => !!(req.user && req.user.is_admin && (!config.privacyEmail || !config.icoNumber || !config.legalName));

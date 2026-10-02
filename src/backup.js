@@ -9,6 +9,7 @@ const zlib = require('node:zlib');
 const { once } = require('node:events');
 const crypto = require('node:crypto');
 const { pipeline } = require('node:stream/promises');
+const drive = require('./googleDrive');
 
 // Older backups were called nexus-… (and before that letwise-…); they still list and restore.
 const NAME_RE = /^(?:rift|nexus|letwise)-backup-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}Z(-\d+)?\.tar\.gz(\.enc)?$/;
@@ -188,11 +189,24 @@ async function createBackup(db, config, { reason = 'manual' } = {}) {
     }
   }
   pruneDir(config.backupDir, config.backupKeep);
-  return { name, file, size: fs.statSync(file).size };
+  // Optional copy in Google Drive. It can fail without affecting the backup itself.
+  let driveResult = null;
+  if (drive.enabled(config)) {
+    driveResult = await drive.uploadBackup(config, file, name);
+    try {
+      db.prepare("INSERT INTO app_settings (key, value) VALUES ('drive_last_copy', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value")
+        .run(JSON.stringify({ at: new Date().toISOString(), ok: driveResult.ok, name, error: driveResult.error || '' }));
+    } catch { /* status is only for display */ }
+  }
+  return { name, file, size: fs.statSync(file).size, drive: driveResult };
 }
 
 function pruneDir(dir, keep) {
-  const names = fs.readdirSync(dir).filter((n) => NAME_RE.test(n)).sort().reverse();
+  // Newest first by when each was written (names alone mis-order two backups made in one second).
+  const names = fs.readdirSync(dir).filter((n) => NAME_RE.test(n))
+    .map((n) => ({ n, t: fs.statSync(path.join(dir, n)).mtimeMs }))
+    .sort((a, b) => b.t - a.t || (a.n < b.n ? 1 : -1))
+    .map((x) => x.n);
   for (const old of names.slice(keep)) fs.rmSync(path.join(dir, old), { force: true });
 }
 

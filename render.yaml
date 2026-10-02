@@ -50,6 +50,13 @@ services:
         sync: false
       - key: ICO_NUMBER
         sync: false
+      # Optional: also copy every encrypted backup to your Google Drive (see scripts/google-drive-auth.js).
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_REFRESH_TOKEN
+        sync: false
       - key: ANTHROPIC_API_KEY
         sync: false
       # Email for the Rent run (statements to landlords, the CSV report).

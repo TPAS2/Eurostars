@@ -3610,3 +3610,96 @@ test('privacy notice and terms: public, show the agency details, mention the AI 
   const c = await registerAndLogin('legal-links@example.com', 'Legal Links Lets');
   assert.match((await c.get('/app/account')).text, /href="\/privacy">Privacy notice<\/a>/);
 });
+
+test('Google Drive backups: only encrypted ones are sent, to a private folder, old ones tidied, failures never stop the backup', async () => {
+  const { createBackup } = require('../src/backup');
+  // A pretend Google: records every call and holds the files "in Drive".
+  const calls = [];
+  const driveFiles = [];
+  let folder = null;
+  let tokenOk = true;
+  const fakeGoogle = async (url, opts = {}) => {
+    url = String(url);
+    const method = opts.method || 'GET';
+    const json = (obj, status = 200, headers = {}) => new Response(JSON.stringify(obj), { status, headers: { 'content-type': 'application/json', ...headers } });
+    calls.push(`${method} ${url.replace(/\?.*/, '')}`);
+    if (url === 'https://oauth2.googleapis.com/token') {
+      const p = new URLSearchParams(String(opts.body));
+      assert.equal(p.get('grant_type'), 'refresh_token');
+      assert.equal(p.get('refresh_token'), 'made-up-refresh-token');
+      return tokenOk ? json({ access_token: 'made-up-access-token' }) : json({ error: 'invalid_grant' }, 400);
+    }
+    assert.equal((opts.headers || {}).authorization, url.includes('upload_id') ? undefined : 'Bearer made-up-access-token');
+    if (method === 'GET' && url.includes('mimeType%3D\'application%2Fvnd.google-apps.folder\'') || (method === 'GET' && decodeURIComponent(url).includes("application/vnd.google-apps.folder"))) {
+      return json({ files: folder ? [{ id: folder }] : [] });
+    }
+    if (method === 'POST' && url.includes('/drive/v3/files') && !url.includes('/upload/')) { folder = 'folder-1'; return json({ id: folder }); }
+    if (method === 'POST' && url.includes('uploadType=resumable')) {
+      const meta = JSON.parse(opts.body);
+      assert.deepEqual(meta.parents, ['folder-1']);
+      driveFiles.push({ id: `file-${driveFiles.length + 1}`, name: meta.name });
+      return new Response('', { status: 200, headers: { location: 'https://upload.example/upload_id=abc' } });
+    }
+    if (method === 'PUT' && url.startsWith('https://upload.example/')) {
+      let size = 0; for await (const chunk of opts.body) size += chunk.length;
+      assert.equal(String(size), opts.headers['content-length'], 'the whole file is sent');
+      return json({ id: driveFiles[driveFiles.length - 1].id });
+    }
+    if (method === 'GET' && decodeURIComponent(url).includes("in parents")) return json({ files: [...driveFiles].reverse() });
+    if (method === 'DELETE') { const id = url.split('/').pop(); driveFiles.splice(driveFiles.findIndex((x) => x.id === id), 1); return new Response('', { status: 204 }); }
+    throw new Error(`unexpected Google call: ${method} ${url}`);
+  };
+  const base = { ...config, backupKeep: 2, googleFetch: fakeGoogle, googleDrive: { clientId: 'cid', clientSecret: 'csecret', refreshToken: 'made-up-refresh-token', folderName: 'Rift backups' } };
+
+  // 1. Not encrypted: nothing is sent to Google at all.
+  let b = await createBackup(db, { ...base, backupDir: path.join(tmp, 'drive-plain') }, { reason: 'test' });
+  assert.equal(b.drive.ok, false);
+  assert.match(b.drive.error, /must be encrypted/);
+  assert.equal(calls.length, 0, 'no contact with Google for an unencrypted backup');
+  assert.ok(fs.existsSync(b.file), 'the backup itself is still made');
+
+  // 2. Encrypted: one folder, the file uploaded in full, only the newest two kept.
+  const enc = { ...base, backupDir: path.join(tmp, 'drive-enc'), backupPassword: 'correct horse battery staple' };
+  for (let i = 0; i < 3; i++) b = await createBackup(db, enc, { reason: 'test' });
+  assert.equal(b.drive.ok, true);
+  assert.equal(calls.filter((c) => c.startsWith('POST https://www.googleapis.com/drive/v3/files')).length, 1, 'the folder is made once');
+  assert.equal(driveFiles.length, 2, 'older backups are removed from Drive');
+  assert.ok(driveFiles.every((x) => /^rift-backup-.*\.tar\.gz\.enc$/.test(x.name)));
+  const last = JSON.parse(db.prepare("SELECT value FROM app_settings WHERE key = 'drive_last_copy'").get().value);
+  assert.equal(last.ok, true);
+
+  // 3. Google refuses: the backup is still made, and the reason is recorded.
+  tokenOk = false;
+  b = await createBackup(db, enc, { reason: 'test' });
+  assert.ok(fs.existsSync(b.file));
+  assert.equal(b.drive.ok, false);
+  assert.match(b.drive.error, /run the Google Drive set-up again/i);
+  assert.match(JSON.parse(db.prepare("SELECT value FROM app_settings WHERE key = 'drive_last_copy'").get().value).error, /set-up again/);
+
+  // 4. Not set up: nothing happens and nothing is reported.
+  b = await createBackup(db, { ...enc, googleDrive: { clientId: '', clientSecret: '', refreshToken: '' } }, { reason: 'test' });
+  assert.equal(b.drive, null);
+
+  // The credentials come only from the environment, and the admin page shows the status.
+  const cfg = loadConfig({ GOOGLE_CLIENT_ID: ' id ', GOOGLE_CLIENT_SECRET: 'sec', GOOGLE_REFRESH_TOKEN: 'tok' });
+  assert.deepEqual({ ...cfg.googleDrive }, { clientId: 'id', clientSecret: 'sec', refreshToken: 'tok', folderName: 'Rift backups' });
+  assert.equal(loadConfig({}).googleDrive.refreshToken, '');
+  const admin = new Client();
+  await admin.login('admin', 'owner-password-123');
+  assert.match((await admin.get('/admin/backups')).text, /Google Drive copy[\s\S]*Off\./);
+});
+
+test('dashboard background is GhostFibers (React Bits), following light and dark mode', async () => {
+  const c = await registerAndLogin('fibers@example.com', 'Fibers Lets');
+  const page = (await c.get('/app')).text;
+  assert.match(page, /id="dashboard-bg"/);
+  assert.match(page, /\/static\/dashboard\.js/);
+  const js = fs.readFileSync(path.join(__dirname, '..', 'public', 'dashboard.js'), 'utf8');
+  assert.match(js, /uLightMode/, 'the GhostFibers shader is in the bundle');
+  assert.doesNotMatch(js, /micro-slats|MicroSlats/, 'the old background is gone');
+  const css = fs.readFileSync(path.join(__dirname, '..', 'public', 'dashboard.css'), 'utf8');
+  assert.match(css, /ghost-fibers-container/);
+  const src = fs.readFileSync(path.join(__dirname, '..', 'client', 'dashboard.jsx'), 'utf8');
+  assert.match(src, /glowColor="#1115ee"/);
+  assert.match(src, /lightMode=\{!dark\}/, 'light mode uses the ink-on-light setting');
+});

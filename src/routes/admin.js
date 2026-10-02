@@ -469,13 +469,17 @@ module.exports = function adminRoutes(db, config) {
     res.render('admin/backups', {
       title: 'Backups', section: 'backups', backups: backup.listBackups(config), config, fmt,
       intervalHours: backup.intervalHours(db, config), maxInterval: backup.MAX_INTERVAL_HOURS,
+      driveOn: require('../googleDrive').enabled(config), driveLast: (() => { try { const r = db.prepare("SELECT value FROM app_settings WHERE key = 'drive_last_copy'").get(); return r ? JSON.parse(r.value) : null; } catch { return null; } })(),
       flash: req.query.flash || '', error: req.query.error || '',
     });
   });
 
   router.post('/backups', (req, res, next) => {
     backup.createBackup(db, config, { reason: `manual by ${req.user.username}` })
-      .then((b) => res.redirect('/admin/backups?flash=' + encodeURIComponent(`Backup created: ${b.name}`)))
+      .then((b) => {
+        if (b.drive && !b.drive.ok) return res.redirect('/admin/backups?error=' + encodeURIComponent(`Backup created (${b.name}), but the Google Drive copy failed: ${b.drive.error}`));
+        res.redirect('/admin/backups?flash=' + encodeURIComponent(`Backup created: ${b.name}${b.drive ? ' and copied to Google Drive.' : ''}`));
+      })
       .catch((err) => { console.error(err); res.redirect('/admin/backups?error=' + encodeURIComponent('Backup failed: ' + err.message)); })
       .catch(next);
   });

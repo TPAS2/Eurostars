@@ -21,6 +21,13 @@ function loadConfig(env = process.env) {
     uploadDir: env.UPLOAD_DIR || path.join(__dirname, '..', 'data', 'uploads'),
     backupDir: env.BACKUP_DIR || path.join(__dirname, '..', 'data', 'backups'),
     backupCopyDir: env.BACKUP_COPY_DIR || '',
+    // Optional extra copy of every (encrypted) backup in your own Google Drive.
+    googleDrive: {
+      clientId: (env.GOOGLE_CLIENT_ID || '').trim(),
+      clientSecret: (env.GOOGLE_CLIENT_SECRET || '').trim(),
+      refreshToken: (env.GOOGLE_REFRESH_TOKEN || '').trim(),
+      folderName: (env.GOOGLE_DRIVE_FOLDER || 'Rift backups').trim(),
+    },
     // Encrypts every backup when set. Keep it safe: it's needed to restore.
     backupPassword: env.BACKUP_PASSWORD || '',
     backupKeep: Math.max(1, Number(env.BACKUP_KEEP) || 14),
