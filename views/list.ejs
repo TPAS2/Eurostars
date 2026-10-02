@@ -26,8 +26,8 @@
 <section class="tiles">
   <% if (mv.inMonth) { %>
   <div class="tile"><span class="label">Reported · <%= mv.monthLabel %></span><span class="value"><%= mv.inMonth.n %></span><span class="sub"><%= mv.inMonth.n === 1 ? 'job' : 'jobs' %></span></div>
-  <div class="tile <%= mv.inMonth.open ? 'warn' : '' %>"><span class="label">Still open</span><span class="value"><%= mv.inMonth.open %></span><span class="sub">from <%= mv.monthLabel %></span></div>
-  <div class="tile ok"><span class="label">Completed</span><span class="value"><%= mv.inMonth.done %></span><span class="sub">from <%= mv.monthLabel %></span></div>
+  <div class="tile <%= mv.inMonth.open ? 'warn' : '' %>"><span class="label">Outstanding</span><span class="value"><%= mv.inMonth.open %></span><span class="sub">from <%= mv.monthLabel %></span></div>
+  <div class="tile ok"><span class="label">Completed jobs</span><span class="value"><%= mv.inMonth.done %></span><span class="sub">from <%= mv.monthLabel %></span></div>
   <div class="tile"><span class="label">Cost · <%= mv.monthLabel %></span><span class="value"><%= fmt.money(mv.inMonth.cost) %></span><span class="sub">&nbsp;</span></div>
   <a class="tile <%= mv.olderOpen ? 'warn' : '' %>" href="/app/<%= def.key %>?month=all"><span class="label">Open from earlier months</span><span class="value"><%= mv.olderOpen %></span><span class="sub">Show all months</span></a>
   <% } %>

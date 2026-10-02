@@ -26,7 +26,7 @@ module.exports = function monthlyRoutes(db, writer, mailer = { enabled: false })
     ).all(month, a);
     const months = db.prepare('SELECT DISTINCT month FROM monthly_statements WHERE account_id = ? ORDER BY month DESC LIMIT 24').all(a).map((r) => r.month);
     res.render('monthly/index', {
-      title: 'Monthly statements', section: 'monthly', month, monthLabel: st.monthLabel(month), rows, months,
+      title: 'Landlord statements', section: 'monthly', month, monthLabel: st.monthLabel(month), rows, months,
       aiEnabled: !!writer, fmt,
       flash: String(req.query.flash || '').slice(0, 1000), error: String(req.query.error || '').slice(0, 1000),
     });

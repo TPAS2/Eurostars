@@ -29,12 +29,12 @@
         <% if (!emailEnabled) { %><br><strong class="warn-text">Email isn't set up yet.</strong> Your administrator needs to add the email settings.<% } %>
       </p></div>
       <div class="step-actions">
+        <button class="btn" type="button" data-toggle="#sender-settings" aria-controls="sender-settings" aria-expanded="false">Edit sender</button>
         <form method="post" action="/app/monthly/email" data-busy="Sending emails…" data-confirm="Email <%= monthLabel %> statements to <%= withEmail %> landlord<%= withEmail === 1 ? '' : 's' %>?">
           <%- include('partials/csrf') %><input type="hidden" name="month" value="<%= month %>">
           <% if (emailed) { %><label class="check small"><input type="checkbox" name="skip_sent" value="1" checked> Skip those already emailed</label><% } %>
           <button class="btn primary" type="submit" <%= emailEnabled && withEmail ? '' : 'disabled' %>>Email all landlords</button>
         </form>
-        <button class="btn" type="button" data-toggle="#sender-settings" aria-controls="sender-settings" aria-expanded="false">Edit sender</button>
       </div>
       <div class="sender-now muted small">From: <strong><%= sender.fromName %></strong> &lt;<%= sender.from || sender.defaults.from || 'not set' %>&gt;<% if (sender.replyTo) { %> · replies to <%= sender.replyTo %><% } %></div>
       <form method="post" action="/app/monthly/email/settings" id="sender-settings" class="sender-settings form-grid" hidden data-no-keep>

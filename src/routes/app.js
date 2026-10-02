@@ -870,12 +870,17 @@ module.exports = function appRoutes(db) {
       : null;
     const bankChanges = def.key === 'landlords' ? require('../bankChanges').unchecked(db, a, row.id) : [];
     // A council's page also shows its database and its invoices.
+    // A landlord's page lists their statements, newest first.
+    const landlordStatements = def.key === 'landlords' ? db.prepare(
+      `SELECT id, month, rent_pence, fees_pence, expenses_pence, closing_pence, emailed_at FROM monthly_statements
+        WHERE account_id = ? AND landlord_id = ? ORDER BY month DESC`
+    ).all(a, row.id).map((s) => ({ ...s, monthLabel: statements.monthLabel(s.month) })) : null;
     const councilBoxes = def.key === 'councils' ? {
       live: db.prepare('SELECT * FROM council_db_entries WHERE account_id = ? AND council_id = ? AND ended = 0 ORDER BY id').all(a, row.id),
       previous: db.prepare('SELECT COUNT(*) AS n FROM council_db_entries WHERE account_id = ? AND council_id = ? AND ended = 1').get(a, row.id).n,
       invoices: [],
     } : null;
-    res.render('show', { title: rowTitle(def, row, maps), section: sectionOf(def), def, row, maps, display, rowTitle, children, extra, invoices, related: relatedLists(def, row, a), certs, photo, tenantBoxes, statementLink, jobFiles, jobInvoice, contractorStats, bankChanges, councilBoxes, error: req.query.error ? String(req.query.error).slice(0, 200) : null, flash: req.query.flash ? String(req.query.flash).slice(0, 200) : null, fmt, today: fmt.today() });
+    res.render('show', { title: rowTitle(def, row, maps), section: sectionOf(def), def, row, maps, display, rowTitle, children, extra, invoices, related: relatedLists(def, row, a), certs, photo, tenantBoxes, statementLink, jobFiles, jobInvoice, contractorStats, bankChanges, councilBoxes, landlordStatements, error: req.query.error ? String(req.query.error).slice(0, 200) : null, flash: req.query.flash ? String(req.query.flash).slice(0, 200) : null, fmt, today: fmt.today() });
   });
 
   router.get('/:entity/:id/edit', (req, res) => {

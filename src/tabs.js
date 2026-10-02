@@ -16,7 +16,7 @@ const TABS = [
   { key: 'invoices', label: 'Contractors Invoices', paths: ['/app/invoices'] },
   { key: 'landlordinvoices', label: 'Landlord Invoices', paths: ['/app/landlord-invoices'] },
   { key: 'rentrun', label: 'Rent run', paths: ['/app/rent-run', '/app/monthly/calculate', '/app/monthly/email', '/app/monthly/report'] },
-  { key: 'monthly', label: 'Monthly statements', paths: ['/app/monthly'] },
+  { key: 'monthly', label: 'Landlord statements', paths: ['/app/monthly'] },
 ];
 const KEYS = new Set(TABS.map((t) => t.key));
 

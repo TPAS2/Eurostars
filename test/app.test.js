@@ -1551,7 +1551,7 @@ test('admin Tab access page: every person against every tab, saved in one go', a
   const c = new Client();
   await c.login('grid-co', 'beas-pass-123', 'bea');
   const rail = (await c.get('/app')).text.match(/<nav class="rail"[\s\S]*?<\/nav>/)[0];
-  assert.deepEqual([...rail.matchAll(/aria-label="([^"]+)"/g)].map((m) => m[1]).slice(1), ['Rent run', 'Monthly statements']);
+  assert.deepEqual([...rail.matchAll(/aria-label="([^"]+)"/g)].map((m) => m[1]).slice(1), ['Rent run', 'Landlord statements']);
   assert.equal((await c.get('/app/properties')).status, 403);
 
   // Only the admin can use it; the admin's own login can't be restricted.
@@ -2360,7 +2360,7 @@ test('rent run: Edit sender changes who statement emails come from', async () =>
   const c = await registerAndLogin('sender-edit@example.com', 'Sender Edit Lets');
   const co = db.prepare("SELECT id FROM users WHERE username = 'sender-edit'").get();
   let r = await c.get('/app/rent-run?month=2026-08');
-  assert.match(r.text, /Email all landlords<\/button>\s*<\/form>\s*<button class="btn" type="button" data-toggle="#sender-settings"[^>]*>Edit sender/);
+  assert.match(r.text, /<button class="btn" type="button" data-toggle="#sender-settings"[^>]*>Edit sender<\/button>\s*<form method="post" action="\/app\/monthly\/email"[\s\S]*?Email all landlords/, 'Edit sender is left of Email all landlords');
   r = await c.post('/app/monthly/email/settings', { month: '2026-08', from_email: 'not-an-email', from_name: '', reply_to: '' });
   assert.match(decodeURIComponent(r.location.replace(/\+/g, ' ')), /isn’t a valid email/);
   r = await c.post('/app/monthly/email/settings', { month: '2026-08', from_email: 'statements@agency.example', from_name: 'Sender Edit Team', reply_to: 'office@gmail.com' });

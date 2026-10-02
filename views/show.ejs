@@ -308,6 +308,19 @@
   <% } %>
 <% if (fold) { %></details><% } else { %></section><% } %>
 <% }) %>
+<% if (typeof landlordStatements !== 'undefined' && landlordStatements) { %>
+<details class="card fold" id="landlord-statements">
+  <summary><h2>Statements <span class="count"><%= landlordStatements.length %></span></h2></summary>
+  <% if (!landlordStatements.length) { %><p class="muted">No statements yet. They're made when the rents are calculated on the Rent run.</p><% } else { %>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Month</th><th class="num">Rent received</th><th class="num">Deductions</th><th class="num">Held</th><th>Emailed</th><th></th></tr></thead>
+    <tbody>
+    <% landlordStatements.forEach(s => { %><tr><td><a href="/app/monthly/<%= s.id %>"><%= s.monthLabel %></a></td><td class="num"><%= fmt.money(s.rent_pence) %></td><td class="num"><%= fmt.money(s.fees_pence + s.expenses_pence) %></td><td class="num"><strong><%= fmt.money(s.closing_pence) %></strong></td><td><%= s.emailed_at ? fmt.ukDate(s.emailed_at) : 'Not yet' %></td><td class="num"><a class="btn small" href="/app/monthly/<%= s.id %>">View</a></td></tr><% }) %>
+    </tbody>
+  </table></div>
+  <% } %>
+</details>
+<% } %>
 <% if (typeof councilBoxes !== 'undefined' && councilBoxes) { const cb = councilBoxes; %>
 <details class="card fold" id="council-database">
   <summary><h2>Council Database <span class="count"><%= cb.live.length %></span></h2></summary>
