@@ -646,26 +646,6 @@ details.fold[open] > summary { margin-bottom: 12px; }
 }
 
 /* ---------- welcome animation after signing in ---------- */
-.intro { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; pointer-events: auto; cursor: pointer; animation: intro-gone 0s linear 3.1s forwards; }
-.intro-half { position: absolute; top: 0; bottom: 0; width: 50.5%; background: radial-gradient(ellipse at 100% 50%, #0d1a3a, #050912 70%); animation: intro-open-l .75s cubic-bezier(.7,0,.2,1) 2.25s forwards; }
-.intro-l { left: 0; }
-.intro-r { right: 0; transform-origin: left; background: radial-gradient(ellipse at 0% 50%, #0d1a3a, #050912 70%); animation-name: intro-open-r; }
-.intro-seam { position: absolute; top: 0; bottom: 0; left: 50%; width: 3px; margin-left: -1.5px; background: linear-gradient(180deg, transparent, #bfe9ff 20%, #fff 50%, #bfe9ff 80%, transparent); box-shadow: 0 0 20px 5px rgba(94,225,255,.85), 0 0 80px 24px rgba(31,94,255,.6); transform: scaleY(0); animation: intro-seam 2.5s cubic-bezier(.2,.8,.2,1) .1s forwards; }
-.intro-bloom { position: absolute; width: 70vmin; height: 70vmin; border-radius: 50%; background: radial-gradient(circle, rgba(47,107,255,.45), rgba(47,107,255,.12) 45%, transparent 70%); opacity: 0; transform: scale(.4); animation: intro-bloom 2.9s ease-out .45s forwards; }
-.intro-center { position: relative; display: flex; flex-direction: column; align-items: center; gap: 14px; color: #fff; text-align: center; animation: intro-fade-out .45s ease-in 2.1s forwards; }
-.intro-logo { width: 76px; height: 76px; border-radius: 20px; font-size: 2.3rem; opacity: 0; transform: scale(.6) rotate(-8deg); animation: intro-pop .7s cubic-bezier(.2,1.4,.3,1) .55s forwards; }
-.intro.skip { animation: intro-skip .3s ease forwards; }
-.intro.skip * { animation: none !important; }
-@keyframes intro-seam { 0% { transform: scaleY(0); opacity: 1; } 25% { transform: scaleY(1); } 85% { opacity: 1; } 100% { transform: scaleY(1); opacity: 0; } }
-@keyframes intro-bloom { 0% { opacity: 0; transform: scale(.4); } 35% { opacity: 1; transform: scale(1); } 75% { opacity: .8; } 100% { opacity: 0; transform: scale(1.8); } }
-@keyframes intro-pop { to { opacity: 1; transform: none; } }
-@keyframes intro-letter { to { opacity: 1; transform: none; filter: none; } }
-@keyframes intro-up { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
-@keyframes intro-fade-out { to { opacity: 0; transform: scale(1.04); } }
-@keyframes intro-open-l { to { transform: translateX(-101%); } }
-@keyframes intro-open-r { to { transform: translateX(101%); } }
-@keyframes intro-gone { to { visibility: hidden; pointer-events: none; } }
-@keyframes intro-skip { to { opacity: 0; visibility: hidden; pointer-events: none; } }
 @media (prefers-reduced-motion: reduce) {
   .intro { display: none; }
   .rift-glow, .rift-seam, .auth .auth-card { animation: none; }
@@ -686,8 +666,6 @@ details.fold[open] > summary { margin-bottom: 12px; }
   .auth-main { padding-top: 80px; }
 }
 /* Keep the light line clear of the logo in the welcome animation. */
-.intro-seam { -webkit-mask-image: linear-gradient(180deg, #000 calc(50% - 90px), transparent calc(50% - 55px), transparent calc(50% + 55px), #000 calc(50% + 90px)); mask-image: linear-gradient(180deg, #000 calc(50% - 90px), transparent calc(50% - 55px), transparent calc(50% + 55px), #000 calc(50% + 90px)); }
-.intro-center { z-index: 2; }
 .monthend > li > .sender-now, .monthend > li > .sender-settings { flex: 1 0 100%; }
 .monthend > li > .sender-now { margin-top: -8px; }
 .sender-settings { margin-top: 4px; padding: 16px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-2); }
@@ -954,3 +932,41 @@ input, select, textarea { max-width: 100%; }
 .install-steps { margin: 8px 0 12px; padding-left: 20px; }
 .install-steps li { margin: 6px 0; }
 [data-install][hidden], [data-install-help][hidden], [data-installed][hidden] { display: none; }
+
+/* ---- Welcome: travelling through a magic rift (after signing in) ---- */
+.intro { position: fixed; inset: 0; z-index: 1000; overflow: hidden; background: #02030a; cursor: pointer; animation: intro-fade .6s ease-in 2.8s forwards, intro-gone 0s linear 3.4s forwards; }
+.intro-portal { position: absolute; inset: 0; background: url(/static/rift-portal.webp) 50% 50% / cover no-repeat; transform-origin: 50% 49%; animation: intro-travel 3.1s cubic-bezier(.5, 0, .85, .45) forwards; }
+.intro-flash { position: absolute; inset: 0; opacity: 0; background: radial-gradient(circle at 50% 49%, #fff 0%, #c9f7ff 22%, rgba(130, 100, 255, .6) 55%, rgba(20, 10, 60, 0) 85%); animation: intro-flash 1.5s ease-in 1.5s forwards; }
+.intro-center { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; z-index: 2; }
+.intro-logo { width: 84px; height: 84px; border-radius: 22px; opacity: 0; box-shadow: 0 0 44px rgba(94, 225, 255, .55), 0 0 90px rgba(150, 90, 255, .4); animation: intro-logo 1.5s ease-out .15s forwards; }
+.intro.skip { animation: intro-skip .3s ease forwards; }
+.intro.skip * { animation: none !important; }
+@keyframes intro-travel { 0% { transform: scale(1); filter: brightness(.5) blur(3px); } 22% { filter: brightness(1) blur(0); } 100% { transform: scale(9); filter: brightness(1.5); } }
+@keyframes intro-flash { 0% { opacity: 0; transform: scale(.4); } 60% { opacity: .9; } 100% { opacity: 1; transform: scale(1.6); } }
+@keyframes intro-logo { 0% { opacity: 0; transform: scale(.7); } 30% { opacity: 1; transform: scale(1); } 70% { opacity: 1; } 100% { opacity: 0; transform: scale(1.5); } }
+@keyframes intro-fade { to { opacity: 0; } }
+@keyframes intro-gone { to { visibility: hidden; pointer-events: none; } }
+@keyframes intro-skip { to { opacity: 0; visibility: hidden; pointer-events: none; } }
+
+/* ---- Sign-in: a galaxy split by a rift, with the card in a frosted panel ---- */
+.rift-bg { background: linear-gradient(90deg, rgba(3, 4, 16, .82) 0%, rgba(3, 4, 16, .5) 40%, rgba(3, 4, 16, 0) 72%), url(/static/login-galaxy.webp) 62% center / cover no-repeat; }
+.rift-seam, .rift-grid, .rift-glow { display: none; }
+.auth-logo { width: 40px; height: 40px; border-radius: 11px; box-shadow: 0 0 22px rgba(94, 225, 255, .45), 0 0 40px rgba(150, 90, 255, .35); }
+.auth .auth-card { background: rgba(10, 12, 38, .6); -webkit-backdrop-filter: blur(18px) saturate(1.3); backdrop-filter: blur(18px) saturate(1.3); border: 1px solid rgba(160, 175, 255, .25); color: #eef0ff; box-shadow: 0 30px 80px -20px rgba(0, 0, 0, .85), 0 0 70px -12px rgba(110, 90, 255, .4); }
+.auth .auth-card h1 { color: #fff; }
+.auth .auth-card .muted, .auth .auth-card .help, .auth .auth-card small { color: #b9c1ea; }
+.auth .auth-card a { color: #8fdcff; }
+.auth .auth-card .stack label { color: #e3e7ff; }
+.auth .auth-card input { background: rgba(6, 8, 30, .6); border: 1px solid rgba(150, 165, 255, .32); color: #fff; }
+.auth .auth-card input::placeholder { color: #8b93c4; }
+.auth .auth-card input:focus { border-color: #5ee1ff; box-shadow: 0 0 0 4px rgba(94, 225, 255, .2); }
+.auth .auth-card input:-webkit-autofill { -webkit-text-fill-color: #fff; box-shadow: 0 0 0 40px #0b0e33 inset; }
+.auth .auth-submit { background: linear-gradient(135deg, #7a5cff, #2fb8ff); box-shadow: 0 10px 30px -8px rgba(90, 120, 255, .8); }
+.auth .auth-submit:hover { box-shadow: 0 14px 34px -8px rgba(90, 160, 255, .9); }
+.auth .auth-foot { color: #8d95c2; }
+@media (min-width: 1000px) {
+  .auth-main { place-items: center start; padding-left: clamp(40px, 9vw, 160px); }
+}
+@media (max-width: 999px) {
+  .rift-bg { background: linear-gradient(180deg, rgba(3, 4, 16, .55), rgba(3, 4, 16, .3)), url(/static/login-galaxy.webp) 70% center / cover no-repeat; }
+}

@@ -2264,6 +2264,12 @@ test('signing in plays the welcome animation once, on the first page', async () 
   r = await c.post('/login', { login: 'admin', member: 'Theo', password: 'owner-password-123' });
   r = await c.get(r.location);
   assert.match(r.text, /data-intro/);
+  assert.match(r.text, /class="intro-portal"/, 'travels through the rift');
+  for (const f of ['rift-portal.webp', 'login-galaxy.webp', 'icon-192.png']) {
+    const img = await fetch(`${base}/static/${f}`);
+    assert.equal(img.status, 200, `${f} is served`);
+    assert.ok(Number(img.headers.get('content-length')) > 1000);
+  }
   assert.doesNotMatch(r.text.slice(r.text.indexOf('data-intro'), r.text.indexOf('</div>', r.text.indexOf('intro-center'))), /Welcome/);
   r = await c.get('/admin');
   assert.doesNotMatch(r.text, /data-intro/);

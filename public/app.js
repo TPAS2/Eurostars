@@ -554,7 +554,7 @@ document.addEventListener('click', (e) => {
     const skip = () => { intro.classList.add('skip'); setTimeout(done, 320); };
     intro.addEventListener('click', skip);
     document.addEventListener('keydown', skip, { once: true });
-    setTimeout(done, 3200);
+    setTimeout(done, 3500);
   });
 })();
 

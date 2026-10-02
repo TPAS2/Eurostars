@@ -18,9 +18,8 @@
 <body class="<%= typeof bodyClass !== 'undefined' ? bodyClass : '' %>"<% if (user) { %> data-who="<%= user.person_id || user.id %>"<% } %><% if (user && typeof idleMinutes !== 'undefined' && idleMinutes > 0) { %> data-idle-minutes="<%= idleMinutes %>"<% } %>>
 <% if (user && typeof intro !== 'undefined' && intro) { %>
 <div class="intro" data-intro role="presentation" aria-hidden="true">
-  <span class="intro-half intro-l"></span><span class="intro-half intro-r"></span>
-  <span class="intro-seam"></span><span class="intro-bloom"></span>
-  <div class="intro-center"><span class="intro-logo"><%= appName.charAt(0).toUpperCase() %></span></div>
+  <span class="intro-portal"></span><span class="intro-flash"></span>
+  <div class="intro-center"><img class="intro-logo" src="/static/icon-192.png" alt="" width="84" height="84"></div>
 </div>
 <% } %>
 <% if (user) {
