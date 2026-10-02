@@ -20,7 +20,10 @@ button{font:inherit;font-weight:600;padding:12px 22px;border:0;border-radius:10p
 <button onclick="location.reload()">Try again</button></main></body></html>`;
 
 self.addEventListener('fetch', (event) => {
-  if (event.request.mode !== 'navigate') return;
+  // Only plain page loads. Signing out, forms and uploads (anything but GET) go straight to the
+  // network untouched, so the worker can never get in their way.
+  const url = new URL(event.request.url);
+  if (event.request.mode !== 'navigate' || event.request.method !== 'GET' || url.pathname === '/logout') return;
   event.respondWith(fetch(event.request).catch(() => new Response(OFFLINE, {
     status: 503, headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' },
   })));

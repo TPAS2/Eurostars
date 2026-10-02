@@ -46,6 +46,21 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch { /* storage blocked */ }
   })();
 
+  // Signing out on purpose wipes the copies of unsent forms kept in this browser. Done here, instantly.
+  const signOutForm = document.getElementById('signout-form');
+  if (signOutForm) {
+    signOutForm.addEventListener('submit', () => {
+      try {
+        const store = window.localStorage;
+        for (let i = store.length - 1; i >= 0; i -= 1) {
+          const k = store.key(i);
+          if (/^(draft|keep|unsaved):/.test(k)) store.removeItem(k);
+        }
+        store.removeItem('rift:who');
+      } catch { /* storage blocked */ }
+    });
+  }
+
   // Confirm destructive actions.
   document.querySelectorAll('form[data-confirm]').forEach((form) => {
     form.addEventListener('submit', (e) => {

@@ -210,8 +210,9 @@ module.exports = function authRoutes(db, config) {
   router.post('/logout', (req, res) => {
     const isAdmin = !!(req.user && req.user.is_admin);
     auth.destroySession(db, req, res, config.secureCookies);
-    // Signing out on purpose clears anything this site left in the browser (copies of unsent forms).
-    if (req.body.reason !== 'idle') res.setHeader('Clear-Site-Data', '"cache", "storage"');
+    // Copies of unsent forms are wiped by the page itself when Sign out is clicked (public/app.js).
+    // The browser's "Clear-Site-Data" instruction is not used: it makes the browser empty its whole
+    // cache before showing the next page, which could take many seconds.
     // Signed out for inactivity: say so, and return to the same page after signing back in.
     if (req.body.reason === 'idle') {
       const params = new URLSearchParams({ timeout: '1' });

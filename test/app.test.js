@@ -3094,7 +3094,15 @@ test('security headers, malformed cookies and sign-out clean-up', async () => {
   const agent = await registerAndLogin('headers@example.com', 'Header Lets');
   assert.match((await agent.get('/app')).text, /data-who="\d+"/, 'the page says whose form copies it may keep');
   const out = await agent.post('/logout', {});
-  assert.match(out.headers.get('clear-site-data'), /"storage"/, 'signing out clears copies of forms left in the browser');
+  assert.equal(out.headers.get('clear-site-data'), null, 'no slow "clear everything" instruction when signing out');
+  assert.equal(out.location, '/login');
+  // The page itself wipes unsent-form copies the moment Sign out is clicked.
+  const js = fs.readFileSync(path.join(__dirname, '..', 'public', 'app.js'), 'utf8');
+  assert.match(js, /getElementById\('signout-form'\)[\s\S]{0,300}addEventListener\('submit'[\s\S]{0,400}\(draft\|keep\|unsaved\)/);
+  // The installable-app helper never touches sign-out or form posts.
+  const sw = fs.readFileSync(path.join(__dirname, '..', 'public', 'sw.js'), 'utf8');
+  assert.match(sw, /method !== 'GET'/);
+  assert.match(sw, /'\/logout'/);
 });
 
 test('repeated wrong passwords for one agency are blocked from any address', async () => {
