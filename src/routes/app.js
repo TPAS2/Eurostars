@@ -778,14 +778,14 @@ module.exports = function appRoutes(db) {
   });
 
   // The next landlord code: one more than the highest so far, keeping its letters and zero
-  // padding (L101 → L102, LL009 → LL010); L001 for the first.
+  // padding (L101 → L102, LL009 → LL010); L0001 for the first.
   function nextLandlordCode(accountId) {
     let best = null;
     for (const { code } of db.prepare("SELECT code FROM landlords WHERE account_id = ? AND code IS NOT NULL AND code != ''").all(accountId)) {
       const m = /^(.*?)(\d+)$/.exec(String(code).trim());
       if (m && (!best || Number(m[2]) > best.n)) best = { prefix: m[1], n: Number(m[2]), width: m[2].length };
     }
-    if (!best) return 'L001';
+    if (!best) return 'L0001';
     let next = `${best.prefix}${String(best.n + 1).padStart(best.width, '0')}`;
     // Never hand out a code that's already in use.
     while (db.prepare('SELECT 1 FROM landlords WHERE account_id = ? AND code = ?').get(accountId, next)) {

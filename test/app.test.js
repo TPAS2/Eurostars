@@ -3368,10 +3368,13 @@ test('dashboard: properties box (needing maintenance, empty and ready, booked, a
 test('landlords: codes fill in automatically, one more each time; all boxes required; bank name list', async () => {
   const c = await registerAndLogin('ll-codes@example.com', 'Codes Lets');
   let page = (await c.get('/app/landlords/new')).text;
-  assert.match(page, /name="code" value="L001"/, 'the first code');
+  assert.match(page, /name="code" value="L0001"/, 'the first code');
   assert.match(page, /list="list-bank_name"[\s\S]*?<option value="Lloyds">/);
   for (const name of ['Overseas landlord', 'Payment terms', 'Lease commencement date', 'Telephone number', 'Correspondence address']) assert.match(page, new RegExp(name));
   assert.match(page, /<label for="f-name">[\s\S]*?<label for="f-address">Correspondence address[\s\S]*?<label for="f-phone">Telephone number[\s\S]*?<label for="f-bank_name">Bank name[\s\S]*?<label for="f-bank_account_name">Account name[\s\S]*?<label for="f-bank_account_number">Account number[\s\S]*?<label for="f-bank_sort_code">Sort code/);
+  await c.post('/app/landlords', { ...LANDLORD, name: 'Zero' }); // left blank: gets the first code
+  assert.equal(db.prepare("SELECT code FROM landlords WHERE name = 'Zero' AND account_id = (SELECT id FROM users WHERE username = 'll-codes')").get().code, 'L0001');
+  assert.match((await c.get('/app/landlords/new')).text, /name="code" value="L0002"/, 'then one more each time, keeping four digits');
   await c.post('/app/landlords', { ...LANDLORD, name: 'First', code: 'L101' });
   assert.match((await c.get('/app/landlords/new')).text, /name="code" value="L102"/);
   await c.post('/app/landlords', { ...LANDLORD, name: 'Second' }); // left blank: given the next code
