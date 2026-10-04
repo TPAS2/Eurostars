@@ -1,5 +1,6 @@
 'use strict';
 
+const fs = require('node:fs');
 const path = require('node:path');
 const express = require('express');
 const { openDatabase } = require('./db');
@@ -116,6 +117,15 @@ function createApp(config, db, { writer = null, mailer = null } = {}) {
   if (config.trustProxy) app.set('trust proxy', 1);
 
   app.locals.appName = config.appName;
+  // A fingerprint of the scripts and styles, added to their links (?v=…) so browsers fetch the new
+  // copy as soon as an update is deployed instead of using a cached old one for up to an hour.
+  app.locals.assetV = (() => {
+    const hash = require('node:crypto').createHash('sha256');
+    for (const f of ['app.js', 'style.css', 'dashboard.js', 'dashboard.css', 'print-instruction.css', 'print-rec.css']) {
+      try { hash.update(fs.readFileSync(path.join(__dirname, '..', 'public', f))); } catch { /* optional file */ }
+    }
+    return hash.digest('hex').slice(0, 10);
+  })();
   app.locals.fmt = fmt;
 
   app.use((req, res, next) => {

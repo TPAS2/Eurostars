@@ -3782,3 +3782,12 @@ test('sign-in page has an eye button to show the password being typed', async ()
   assert.match(js, /\[data-show-password\]/);
   assert.match(js, /addEventListener\('submit'[\s\S]{0,200}input\.type = 'password'/, 'hidden again before the form is sent');
 });
+
+test('script and style links carry a version, so browsers load the new copy straight after an update', async () => {
+  const page = (await new Client().get('/login')).text;
+  const v = page.match(/\/static\/app\.js\?v=([0-9a-f]{10})"/);
+  assert.ok(v, 'app.js has a version');
+  assert.match(page, new RegExp(`/static/style\\.css\\?v=${v[1]}"`));
+  const r = await fetch(`${base}/static/app.js?v=${v[1]}`);
+  assert.equal(r.status, 200, 'the versioned link still loads the file');
+});

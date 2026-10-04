@@ -12,8 +12,8 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Rift">
-  <link rel="stylesheet" href="/static/style.css">
-  <script src="/static/app.js" defer></script>
+  <link rel="stylesheet" href="/static/style.css?v=<%= assetV %>">
+  <script src="/static/app.js?v=<%= assetV %>" defer></script>
 </head>
 <body class="<%= typeof bodyClass !== 'undefined' ? bodyClass : '' %>"<% if (user) { %> data-who="<%= user.person_id || user.id %>"<% } %><% if (user && typeof idleMinutes !== 'undefined' && idleMinutes > 0) { %> data-idle-minutes="<%= idleMinutes %>"<% } %>>
 <% if (user && typeof intro !== 'undefined' && intro) { %>

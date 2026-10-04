@@ -6,8 +6,8 @@
     <p class="muted">Welcome back, <%= user.name %>. Here's where things stand today, <%= fmt.ukDate(today) %>.</p>
   </div>
   <div class="actions">
-    <link rel="stylesheet" href="/static/dashboard.css">
-    <script src="/static/dashboard.js" defer></script>
+    <link rel="stylesheet" href="/static/dashboard.css?v=<%= assetV %>">
+    <script src="/static/dashboard.js?v=<%= assetV %>" defer></script>
     <a class="btn" href="/app/landlords/new">+ Landlord</a>
     <a class="btn" href="/app/properties/new">+ Property</a>
     <a class="btn primary" href="/app/transactions/new?txn_type=rent_received">Record rent received</a>
