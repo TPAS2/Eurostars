@@ -3706,3 +3706,31 @@ test('dashboard background is GhostFibers (React Bits), following light and dark
   assert.match(src, /glowColor="#1115ee"/);
   assert.match(src, /lightMode=\{!dark\}/, 'light mode uses the ink-on-light setting');
 });
+
+test('landlord codes written as L plus up to three digits become four-digit, once; other codes are left alone', async () => {
+  const file = path.join(tmp, 'landlord-codes.db');
+  let d = openDatabase(file);
+  const acct = Number(d.prepare("INSERT INTO users (username, name, agency_name, password_hash) VALUES ('code-mig', 'Made Up', 'Made Up Lets', 'x')").run().lastInsertRowid);
+  const add = (name, code) => d.prepare('INSERT INTO landlords (account_id, name, code) VALUES (?, ?, ?)').run(acct, name, code);
+  for (const [n, code] of [['A', 'L1'], ['B', 'L001'], ['C', 'l12'], ['D', 'L0005'], ['E', 'LL001'], ['F', 'AA1'], ['G', null], ['H', 'L7'], ['I', 'L0007'], ['J', 'L12345']]) add(n, code);
+  d.prepare("DELETE FROM app_settings WHERE key = 'landlord_codes_four_digits'").run(); // as on a site that has not run it yet
+  d.close();
+  d = openDatabase(file);
+  const code = (n) => d.prepare('SELECT code FROM landlords WHERE name = ?').get(n).code;
+  assert.equal(code('A'), 'L0001', 'L1 becomes L0001');
+  assert.equal(code('B'), 'L001', 'L0001 was taken by the one above, so this is left alone');
+  assert.equal(code('C'), 'L0012', 'lower case l12 becomes L0012');
+  assert.equal(code('D'), 'L0005', 'already four digits');
+  assert.equal(code('E'), 'LL001', 'a different style is left alone');
+  assert.equal(code('F'), 'AA1');
+  assert.equal(code('G'), null);
+  assert.equal(code('H'), 'L7', 'L0007 already exists, so nothing is overwritten');
+  assert.equal(code('I'), 'L0007');
+  assert.equal(code('J'), 'L12345', 'more than three digits is left alone');
+  // It runs once: a code typed in later is not changed on the next start.
+  d.prepare("UPDATE landlords SET code = 'L9' WHERE name = 'A'").run();
+  d.close();
+  d = openDatabase(file);
+  assert.equal(d.prepare("SELECT code FROM landlords WHERE name = 'A'").get().code, 'L9');
+  d.close();
+});

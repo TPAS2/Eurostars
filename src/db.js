@@ -509,6 +509,7 @@ function openDatabase(file) {
     db.prepare('UPDATE invoices SET contractor_id = ? WHERE id = ?').run(contractorFor(db, inv.account_id, inv.supplier), inv.id);
   }
   allowSharedEmails(db);
+  fourDigitLandlordCodes(db);
   return db;
 }
 
@@ -607,6 +608,30 @@ function transaction(db, fn) {
     db.exec('ROLLBACK');
     throw err;
   }
+}
+
+// One-off (runs once, then is remembered): landlord codes written as the letter L and up to three
+// digits (L1, L001, l12) become L0001, L0001... in four-digit style. Any other style of code, and
+// any code whose new form is already taken, is left exactly as it is.
+function fourDigitLandlordCodes(db) {
+  const KEY = 'landlord_codes_four_digits';
+  if (db.prepare('SELECT 1 FROM app_settings WHERE key = ?').get(KEY)) return;
+  const taken = new Set(db.prepare("SELECT account_id || ':' || code AS k FROM landlords WHERE code IS NOT NULL").all().map((r) => r.k));
+  let changed = 0;
+  transaction(db, () => {
+    for (const l of db.prepare("SELECT id, account_id, code FROM landlords WHERE code IS NOT NULL ORDER BY id").all()) {
+      const m = /^[Ll](\d{1,3})$/.exec(String(l.code).trim());
+      if (!m) continue;
+      const next = `L${String(Number(m[1])).padStart(4, '0')}`;
+      if (next === l.code || taken.has(`${l.account_id}:${next}`)) continue;
+      db.prepare('UPDATE landlords SET code = ? WHERE id = ?').run(next, l.id);
+      taken.delete(`${l.account_id}:${l.code}`);
+      taken.add(`${l.account_id}:${next}`);
+      changed += 1;
+    }
+    db.prepare("INSERT INTO app_settings (key, value) VALUES (?, ?)").run(KEY, new Date().toISOString());
+  });
+  if (changed) console.log(`Landlord codes: ${changed} changed to the four-digit style.`);
 }
 
 module.exports = { contractorFor, openDatabase, transaction, uniqueUsername, signInNameFrom, USERNAME_RE, LOGIN_NAME_RE };
