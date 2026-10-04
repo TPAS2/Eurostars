@@ -3807,3 +3807,13 @@ test('app icons have new names, so installed apps and "Open in app" pick up the 
   const fav = await fetch(`${base}/favicon.ico`, { redirect: 'manual' });
   assert.equal(fav.status, 302, 'not a permanent redirect, so a future change is picked up');
 });
+
+test('dashboard: the eight figures sit together in one box', async () => {
+  const c = await registerAndLogin('kpi-strip@example.com', 'KPI Lets');
+  const page = (await c.get('/app')).text;
+  const strip = page.slice(page.indexOf('<section class="kpi-strip"'), page.indexOf('</section>', page.indexOf('<section class="kpi-strip"')));
+  assert.equal((strip.match(/<a class="kpi /g) || []).length, 8);
+  const labels = [...strip.matchAll(/class="label">([^<]+)</g)].map((m) => m[1]);
+  assert.deepEqual(labels, ['Properties', 'Landlords', 'Active tenancies', 'Open maintenance', 'Total invoiced to councils', 'Total paid to landlords', 'Gross profit', 'Unpaid invoices']);
+  assert.doesNotMatch(page, /<section class="tiles">/, 'the separate boxes are gone');
+});
