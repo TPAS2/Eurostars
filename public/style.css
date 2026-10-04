@@ -958,3 +958,13 @@ input, select, textarea { max-width: 100%; }
   .topbar-btn .topbar-text { display: none; }
   .topbar-btn { padding: 0 8px; }
 }
+
+/* Sign-in: the eye button shows or hides the password being typed (on this screen only). */
+.pw-wrap { position: relative; display: block; }
+.auth .auth-card .pw-wrap input { width: 100%; padding-right: 48px; }
+.pw-eye { position: absolute; right: 6px; top: calc(50% + 3px); transform: translateY(-50%); width: 36px; height: 36px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 8px; background: none; color: #b9c1ea; cursor: pointer; }
+.pw-eye:hover, .pw-eye:focus-visible { color: #fff; background: rgba(255, 255, 255, .08); }
+.pw-eye:focus-visible { outline: 2px solid #5ee1ff; outline-offset: 1px; }
+.pw-icon { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.pw-eye .pw-shut, .pw-eye[aria-pressed="true"] .pw-open { display: none; }
+.pw-eye[aria-pressed="true"] .pw-shut { display: block; }

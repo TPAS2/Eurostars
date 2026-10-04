@@ -9,7 +9,7 @@
     <% if (next) { %><input type="hidden" name="next" value="<%= next %>"><% } %>
     <label>Agency <input id="login" name="login" value="<%= login %>" required maxlength="60" autofocus autocomplete="username" autocapitalize="none" spellcheck="false"></label>
     <label>Your name <input id="member" name="member" value="<%= typeof member !== 'undefined' ? member : '' %>" required maxlength="60" autocomplete="off" autocapitalize="none" spellcheck="false"></label>
-    <label>Password <input id="password" type="password" name="password" required maxlength="200" autocomplete="current-password"></label>
+    <label>Password <span class="pw-wrap"><input id="password" type="password" name="password" required maxlength="200" autocomplete="current-password"><button type="button" class="pw-eye" data-show-password="password" aria-controls="password" aria-pressed="false" aria-label="Show password" title="Show password"><svg class="pw-icon pw-open" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg><svg class="pw-icon pw-shut" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18M10.6 5.1A10.7 10.7 0 0 1 12 5c6.4 0 10 7 10 7a17.6 17.6 0 0 1-3.2 4.1M6.6 6.6C3.8 8.3 2 12 2 12s3.6 7 10 7a10 10 0 0 0 5.4-1.6M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg></button></span></label>
     <button class="btn primary auth-submit" type="submit">Sign in <span aria-hidden="true">→</span></button>
   </form>
   <% if (allowRegistration) { %><p class="muted small">New here? <a href="/register">Create an account</a></p><% } %>

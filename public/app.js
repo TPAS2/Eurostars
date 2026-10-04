@@ -454,6 +454,27 @@ const DRAFT_DAYS = 7;
   });
 })();
 
+// Sign-in: the eye button shows or hides the password being typed. It is always hidden again
+// before the form is sent, so the browser treats it as a password.
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-show-password]');
+  if (!btn) return;
+  const input = document.getElementById(btn.dataset.showPassword);
+  if (!input) return;
+  const show = input.type === 'password';
+  input.type = show ? 'text' : 'password';
+  btn.setAttribute('aria-pressed', String(show));
+  btn.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+  btn.title = show ? 'Hide password' : 'Show password';
+  input.focus();
+});
+document.addEventListener('submit', (e) => {
+  e.target.querySelectorAll('[data-show-password]').forEach((btn) => {
+    const input = document.getElementById(btn.dataset.showPassword);
+    if (input) input.type = 'password';
+  });
+}, true);
+
 // "Suggest one": fill a password box with an easy-to-read random password.
 document.addEventListener('click', (e) => {
   const btn = e.target.closest('[data-generate]');

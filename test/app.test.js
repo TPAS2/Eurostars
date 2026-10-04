@@ -3774,3 +3774,11 @@ test('side menu shows each tab name; a top bar on every page has My account and 
   }
   assert.doesNotMatch((await c.get('/app/council-reconciliation')).text, /Every council: the rent it owes/);
 });
+
+test('sign-in page has an eye button to show the password being typed', async () => {
+  const page = (await new Client().get('/login')).text;
+  assert.match(page, /<input id="password" type="password"[^>]*><button type="button" class="pw-eye" data-show-password="password"[^>]*aria-label="Show password"/);
+  const js = fs.readFileSync(path.join(__dirname, '..', 'public', 'app.js'), 'utf8');
+  assert.match(js, /\[data-show-password\]/);
+  assert.match(js, /addEventListener\('submit'[\s\S]{0,200}input\.type = 'password'/, 'hidden again before the form is sent');
+});
