@@ -15,15 +15,14 @@
 <section class="tiles">
   <div class="tile"><span class="label">Total users</span><span class="value"><%= totals.users %></span><span class="sub"><%= totals.new30 %> joined in 30 days</span></div>
   <div class="tile"><span class="label">Active (30 days)</span><span class="value"><%= totals.active30 %></span><span class="sub"><%= totals.onlineNow %> with a live session</span></div>
-  <div class="tile"><span class="label">Properties managed</span><span class="value"><%= totals.properties %></span><span class="sub"><%= totals.tenancies %> active tenancies</span></div>
   <div class="tile <%= totals.suspended ? 'warn' : '' %>"><span class="label">Suspended</span><span class="value"><%= totals.suspended %></span><span class="sub">&nbsp;</span></div>
   <div class="tile <%= totals.failedLogins24h > 20 ? 'alert' : '' %>"><span class="label">Failed logins (24h)</span><span class="value"><%= totals.failedLogins24h %></span><span class="sub">&nbsp;</span></div>
 </section>
 
-<section class="card">
+<details class="card fold" id="users"<%= q || status ? ' open' : '' %>>
+  <summary><h2>Users <span class="count"><%= users.length %></span></h2></summary>
   <div class="card-head">
-    <h2>Users <span class="count"><%= users.length %></span></h2>
-    <form method="get" class="search inline-form">
+    <form method="get" action="/admin#users" class="search inline-form">
       <input type="search" name="q" value="<%= q %>" placeholder="Search username, name, email, agency…">
       <select name="status">
         <option value="">All statuses</option>
@@ -54,7 +53,7 @@
     </tbody>
   </table>
   </div>
-</section>
+</details>
 
 <details class="card fold">
   <summary><h2>Recent activity</h2><span class="muted small"><%= recentActivity.length %> item<%= recentActivity.length === 1 ? '' : 's' %></span></summary>

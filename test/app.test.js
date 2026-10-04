@@ -3844,3 +3844,13 @@ test('landlord form: pairs side by side, and Statement type, Overseas and Paymen
   assert.equal((await fetch(`${base}/static/segments.js`)).status, 200);
   assert.doesNotMatch((await c.get('/app/properties/new')).text, /segments\.js/, 'only loaded where it is used');
 });
+
+test('admin panel: no Properties managed box, and Users is a fold-down box', async () => {
+  const admin = new Client();
+  await admin.login('admin', 'owner-password-123');
+  let page = (await admin.get('/admin')).text;
+  assert.doesNotMatch(page, /Properties managed/);
+  assert.match(page, /<details class="card fold" id="users">\s*<summary><h2>Users <span class="count">\d+<\/span><\/h2><\/summary>/, 'folded up to start');
+  page = (await admin.get('/admin?q=admin')).text;
+  assert.match(page, /<details class="card fold" id="users" open>/, 'open when searching');
+});
