@@ -15,7 +15,7 @@
     "test": "node --test --disable-warning=ExperimentalWarning test/*.test.js",
     "restore-backup": "node --disable-warning=ExperimentalWarning scripts/restore-backup.js",
     "backup": "node --disable-warning=ExperimentalWarning scripts/backup-now.js",
-    "build:client": "esbuild client/dashboard.jsx --bundle --minify --format=iife --jsx=automatic --define:process.env.NODE_ENV=\\\"production\\\" --outfile=public/dashboard.js --legal-comments=none",
+    "build:client": "esbuild client/dashboard.jsx client/segments.jsx --bundle --minify --format=iife --jsx=automatic --define:process.env.NODE_ENV=\\\"production\\\" --outdir=public --legal-comments=none",
     "notices": "node scripts/third-party-notices.js",
     "google-drive-auth": "node scripts/google-drive-auth.js"
   },

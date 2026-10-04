@@ -5,7 +5,7 @@
   <% if (f.type === 'textarea') { %>
     <textarea id="f-<%= f.name %>" name="<%= f.name %>" rows="3" <%= f.required ? 'required' : '' %>><%= v %></textarea>
   <% } else if (f.type === 'select') { %>
-    <select id="f-<%= f.name %>" name="<%= f.name %>" <%= f.required ? 'required' : '' %>>
+    <select id="f-<%= f.name %>" name="<%= f.name %>" <%= f.required ? 'required' : '' %><%= f.segment ? ' data-segment' : '' %>>
       <% if (!f.required || v === '') { %><option value="" <%= v === '' ? 'selected' : '' %>><%= f.required ? '— Select —' : '—' %></option><% } %>
       <% f.options.forEach(o => { %><option value="<%= o %>" <%= String(v) === o ? 'selected' : '' %>><%= (f.optionLabels && f.optionLabels[o]) || fmt.humanize(o) %></option><% }) %>
     </select>

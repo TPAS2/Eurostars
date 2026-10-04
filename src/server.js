@@ -121,7 +121,7 @@ function createApp(config, db, { writer = null, mailer = null } = {}) {
   // copy as soon as an update is deployed instead of using a cached old one for up to an hour.
   app.locals.assetV = (() => {
     const hash = require('node:crypto').createHash('sha256');
-    for (const f of ['app.js', 'style.css', 'dashboard.js', 'dashboard.css', 'print-instruction.css', 'print-rec.css']) {
+    for (const f of ['app.js', 'style.css', 'dashboard.js', 'dashboard.css', 'segments.js', 'segments.css', 'print-instruction.css', 'print-rec.css']) {
       try { hash.update(fs.readFileSync(path.join(__dirname, '..', 'public', f))); } catch { /* optional file */ }
     }
     return hash.digest('hex').slice(0, 10);

@@ -3830,3 +3830,17 @@ test('landlord payment terms include Nightly', async () => {
   assert.equal(r.status, 302);
   assert.equal(db.prepare("SELECT payment_note FROM landlords WHERE name = 'Nina Nightly'").get().payment_note, 'Nightly');
 });
+
+test('landlord form: pairs side by side, and Statement type, Overseas and Payment terms are sliding controls', async () => {
+  const c = await registerAndLogin('ll-pairs@example.com', 'LL Pairs Lets');
+  const page = (await c.get('/app/landlords/new')).text;
+  const order = [...page.matchAll(/<label for="f-([a-z_]+)">/g)].map((m) => m[1]).slice(0, 8);
+  assert.deepEqual(order, ['name', 'code', 'address', 'statement_type', 'phone', 'date_started', 'email', 'overseas']);
+  for (const n of ['name', 'code', 'address', 'statement_type', 'phone', 'date_started', 'email', 'overseas']) {
+    assert.doesNotMatch(page, new RegExp(`<div class="field wide [^"]*">\\s*<label for="f-${n}">`), `${n} is half width, so it pairs up`);
+  }
+  for (const n of ['statement_type', 'overseas', 'payment_note']) assert.match(page, new RegExp(`<select id="f-${n}" name="${n}" required data-segment>`));
+  assert.match(page, /\/static\/segments\.js\?v=/);
+  assert.equal((await fetch(`${base}/static/segments.js`)).status, 200);
+  assert.doesNotMatch((await c.get('/app/properties/new')).text, /segments\.js/, 'only loaded where it is used');
+});

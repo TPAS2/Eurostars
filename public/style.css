@@ -1008,3 +1008,14 @@ input, select, textarea { max-width: 100%; }
   .kpi:nth-child(odd) { border-left: 0; }
   .kpi .value { font-size: 1.2rem; }
 }
+
+/* Landlord form: Statement type, Overseas landlord and Payment terms as sliding segment controls
+   (RubberSegment). The real select stays in the form, hidden, and holds the value. */
+.field:has(> .rs-native) { position: relative; }
+.rs-native { position: absolute; left: 0; bottom: 0; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.rs-field .rubber-segment { display: grid; width: 100%; }
+.rs-empty .rubber-segment__thumb { opacity: 0; }
+.rs-empty .rubber-segment__item { opacity: .75; }
+@media (max-width: 600px) {
+  .rs-field .rubber-segment { --rs-pad: 4px !important; --rs-min: 0px !important; --rs-font: 12px !important; }
+}

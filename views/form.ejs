@@ -58,4 +58,8 @@
     </div>
   </form>
 </section>
+<% if (def.fields.some((f) => f.segment)) { %>
+<link rel="stylesheet" href="/static/segments.css?v=<%= assetV %>">
+<script src="/static/segments.js?v=<%= assetV %>" defer></script>
+<% } %>
 <%- include('partials/footer') %>
