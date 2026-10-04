@@ -3822,3 +3822,11 @@ test('landlord form: no explanation text under Statement type', async () => {
   const c = await registerAndLogin('st-help@example.com', 'ST Help Lets');
   assert.doesNotMatch((await c.get('/app/landlords/new')).text, /their statement is emailed in the rent run/);
 });
+
+test('landlord payment terms include Nightly', async () => {
+  const c = await registerAndLogin('nightly@example.com', 'Nightly Lets');
+  assert.match((await c.get('/app/landlords/new')).text, /<select id="f-payment_note"[\s\S]*?<option value="Nightly" >Nightly<\/option>\s*<option value="Weekly"/);
+  const r = await c.post('/app/landlords', { ...LANDLORD, name: 'Nina Nightly', payment_note: 'Nightly' });
+  assert.equal(r.status, 302);
+  assert.equal(db.prepare("SELECT payment_note FROM landlords WHERE name = 'Nina Nightly'").get().payment_note, 'Nightly');
+});

@@ -27,7 +27,7 @@ const ENTITIES = {
       { name: 'bank_account_name', label: 'Account name', type: 'text', required: true },
       { name: 'bank_account_number', label: 'Account number', type: 'text', pattern: 'accountnumber', required: true },
       { name: 'bank_sort_code', label: 'Sort code', type: 'text', pattern: 'sortcode', required: true },
-      { name: 'payment_note', label: 'Payment terms', type: 'select', options: ['Weekly', 'Monthly', 'Quarterly', 'Yearly'], required: true, help: 'Shown in yellow beside them on the Bank Transfer sheet.' },
+      { name: 'payment_note', label: 'Payment terms', type: 'select', options: ['Nightly', 'Weekly', 'Monthly', 'Quarterly', 'Yearly'], required: true, help: 'Shown in yellow beside them on the Bank Transfer sheet.' },
       { name: 'notes', label: 'Notes', type: 'textarea', inline: true },
     ],
     columns: ['name', 'code', 'statement_type', 'email', 'phone'],
