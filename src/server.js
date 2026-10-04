@@ -146,7 +146,11 @@ function createApp(config, db, { writer = null, mailer = null } = {}) {
     res.type('application/javascript').setHeader('Cache-Control', 'no-cache');
     res.sendFile(path.join(__dirname, '..', 'public', 'sw.js'));
   });
-  app.get('/favicon.ico', (req, res) => res.redirect(301, '/static/favicon-32.png'));
+  app.get('/favicon.ico', (req, res) => res.redirect(302, '/static/galaxy-favicon-32.png'));
+  // The icons were renamed (so installed apps and browsers pick up the new galaxy icon); anything
+  // still asking for an old name is sent to the new file.
+  app.get(/^\/static\/(icon-192\.png|icon-512\.png|icon-maskable-512\.png|apple-touch-icon\.png|favicon-32\.png|favicon\.svg)$/,
+    (req, res) => res.redirect(302, `/static/galaxy-${req.params[0]}`));
   app.use('/static', express.static(path.join(__dirname, '..', 'public'), {
     maxAge: '1h',
     setHeaders: (res, file) => { if (file.endsWith('.webmanifest')) res.type('application/manifest+json'); },

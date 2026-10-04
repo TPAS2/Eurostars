@@ -4,9 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title><%= title %> · <%= appName %></title>
-  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
-  <link rel="icon" href="/static/favicon-32.png" type="image/png" sizes="32x32">
-  <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+  <link rel="icon" href="/static/galaxy-favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/static/galaxy-favicon-32.png" type="image/png" sizes="32x32">
+  <link rel="apple-touch-icon" href="/static/galaxy-apple-touch-icon.png">
   <meta name="theme-color" content="#1f5eff">
   <link rel="manifest" href="/static/manifest.webmanifest">
   <meta name="mobile-web-app-capable" content="yes">
@@ -21,7 +21,7 @@
   <span class="intro-half intro-l"><img src="/static/intro-sky.jpg" alt=""></span>
   <span class="intro-half intro-r"><img src="/static/intro-sky.jpg" alt=""></span>
   <span class="intro-seam"></span>
-  <div class="intro-center"><img class="intro-logo" src="/static/icon-192.png" alt="" width="84" height="84"></div>
+  <div class="intro-center"><img class="intro-logo" src="/static/galaxy-icon-192.png" alt="" width="84" height="84"></div>
 </div>
 <% } %>
 <% if (user) {
@@ -41,7 +41,7 @@
 <div class="shell">
   <aside class="sidebar">
     <% const home = user.is_admin ? { href: '/admin', label: 'Admin panel', on: s === 'admin' } : { href: '/app', label: 'Dashboard', on: s === 'dashboard' }; %>
-    <a class="rail-btn brand-btn <%= home.on ? 'active' : '' %>" href="<%= home.href %>" aria-label="<%= home.label %>" <%- home.on ? 'aria-current="page"' : '' %>><img class="logo logo-img" src="/static/icon-192.png" alt="" width="30" height="30"><span class="rail-label"><%= home.label %></span></a>
+    <a class="rail-btn brand-btn <%= home.on ? 'active' : '' %>" href="<%= home.href %>" aria-label="<%= home.label %>" <%- home.on ? 'aria-current="page"' : '' %>><img class="logo logo-img" src="/static/galaxy-icon-192.png" alt="" width="30" height="30"><span class="rail-label"><%= home.label %></span></a>
     <nav class="rail" aria-label="Main">
       <% groups.filter(g => g.some(([key]) => !(user.hidden_tabs || []).includes(key))).forEach((g, gi) => { %>
         <% if (gi) { %><span class="rail-sep" aria-hidden="true"></span><% } %>

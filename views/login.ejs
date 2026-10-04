@@ -1,7 +1,7 @@
 <%- include('partials/header', { bodyClass: 'auth' }) %>
 <%- include('partials/auth-open') %>
 <div class="card narrow auth-card">
-  <a class="brand" href="/"><img class="logo logo-img" src="/static/icon-192.png" alt="" width="30" height="30"><%= appName %></a>
+  <a class="brand" href="/"><img class="logo logo-img" src="/static/galaxy-icon-192.png" alt="" width="30" height="30"><%= appName %></a>
   <h1>Welcome back</h1>
   <p class="muted auth-sub">Sign in to your agency.</p>
   <% if (error) { %><div class="notice err"><%= error %></div><% } else if (timedOut) { %><div class="notice warn">You were signed out after <%= idleMinutes >= 60 && idleMinutes % 60 === 0 ? (idleMinutes / 60 === 1 ? '1 hour' : idleMinutes / 60 + ' hours') : idleMinutes + ' minutes' %> without activity. Anything you'd typed has been kept. Sign in to carry on where you left off.</div><% } %>

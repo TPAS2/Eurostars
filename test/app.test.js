@@ -128,9 +128,9 @@ test('public pages and protected areas', async () => {
   const home = await c.get('/');
   assert.equal(home.location, '/login', 'the front page is the sign-in page');
   assert.equal((await c.get('/login')).status, 200);
-  assert.match((await c.get('/login')).text, /rel="icon" href="\/static\/favicon\.svg"/);
-  assert.equal((await c.get('/favicon.ico')).location, '/static/favicon-32.png');
-  const icon = await fetch(base + '/static/favicon.svg');
+  assert.match((await c.get('/login')).text, /rel="icon" href="\/static\/galaxy-favicon\.svg"/);
+  assert.equal((await c.get('/favicon.ico')).location, '/static/galaxy-favicon-32.png');
+  const icon = await fetch(base + '/static/galaxy-favicon.svg');
   assert.equal(icon.status, 200);
   assert.equal((await c.get('/app')).location, '/login');
   assert.equal((await c.get('/admin')).location, '/login');
@@ -2059,7 +2059,7 @@ test('the app is called Rift everywhere people see it', async () => {
   assert.doesNotMatch(login, /Nexus/);
   const c = await registerAndLogin('rift-name@example.com', 'Rift Name Lets');
   const home = (await c.get('/app')).text;
-  assert.match(home, /<img class="logo logo-img" src="\/static\/icon-192\.png"/, 'the rail logo is the galaxy icon');
+  assert.match(home, /<img class="logo logo-img" src="\/static\/galaxy-icon-192\.png"/, 'the rail logo is the galaxy icon');
   assert.doesNotMatch(home, /Nexus/);
   assert.match(fs.readFileSync(path.join(__dirname, '..', 'README.md'), 'utf8'), /^# Rift/);
 });
@@ -2282,7 +2282,7 @@ test('signing in plays the welcome animation once, on the first page', async () 
   assert.match(r.text, /data-intro/);
   assert.match(r.text, /class="intro-seam"/, 'the rift opens');
   assert.doesNotMatch(r.text, /<span class="logo">R<\/span>/, 'the rail logo is the galaxy icon');
-  for (const f of ['intro-sky.jpg', 'login-art.jpg', 'icon-192.png']) {
+  for (const f of ['intro-sky.jpg', 'login-art.jpg', 'galaxy-icon-192.png']) {
     const img = await fetch(`${base}/static/${f}`);
     assert.equal(img.status, 200, `${f} is served`);
     assert.ok(Number(img.headers.get('content-length')) > 1000);
@@ -3790,4 +3790,20 @@ test('script and style links carry a version, so browsers load the new copy stra
   assert.match(page, new RegExp(`/static/style\\.css\\?v=${v[1]}"`));
   const r = await fetch(`${base}/static/app.js?v=${v[1]}`);
   assert.equal(r.status, 200, 'the versioned link still loads the file');
+});
+
+test('app icons have new names, so installed apps and "Open in app" pick up the galaxy icon', async () => {
+  const m = await (await fetch(`${base}/static/manifest.webmanifest`)).json();
+  assert.ok(m.icons.every((i) => i.src.startsWith('/static/galaxy-')), 'manifest uses the renamed icons');
+  for (const i of m.icons) assert.equal((await fetch(`${base}${i.src}`)).status, 200);
+  const page = (await new Client().get('/login')).text;
+  assert.match(page, /rel="apple-touch-icon" href="\/static\/galaxy-apple-touch-icon\.png"/);
+  assert.match(page, /rel="icon" href="\/static\/galaxy-favicon\.svg"/);
+  for (const old of ['icon-192.png', 'apple-touch-icon.png', 'favicon-32.png']) {
+    const r = await fetch(`${base}/static/${old}`, { redirect: 'manual' });
+    assert.equal(r.status, 302, `old ${old} still leads somewhere`);
+    assert.equal(r.headers.get('location'), `/static/galaxy-${old}`);
+  }
+  const fav = await fetch(`${base}/favicon.ico`, { redirect: 'manual' });
+  assert.equal(fav.status, 302, 'not a permanent redirect, so a future change is picked up');
 });
