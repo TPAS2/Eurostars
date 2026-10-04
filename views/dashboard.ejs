@@ -2,8 +2,8 @@
 <div id="dashboard-bg" class="dashboard-bg" aria-hidden="true"></div>
 <header class="page-head">
   <div>
-    <h1 class="co-title"><span class="co-name"><%= user.agency_name %></span><span class="co-sep" aria-hidden="true">/</span><span>Dashboard</span></h1>
-    <p class="muted">Welcome back, <%= user.name %>. Here's where things stand today, <%= fmt.ukDate(today) %>.</p>
+    <h1 class="co-title"><span class="co-name"><%= user.agency_name %></span><span class="co-sep" aria-hidden="true">/</span><span>Dashboard</span><span class="co-date"><%= fmt.ukDate(today) %></span></h1>
+    <p class="muted">Welcome back, <%= user.name %>.</p>
   </div>
   <div class="actions">
     <link rel="stylesheet" href="/static/dashboard.css?v=<%= assetV %>">

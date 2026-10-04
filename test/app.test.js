@@ -3854,3 +3854,11 @@ test('admin panel: no Properties managed box, and Users is a fold-down box', asy
   page = (await admin.get('/admin?q=admin')).text;
   assert.match(page, /<details class="card fold" id="users" open>/, 'open when searching');
 });
+
+test('dashboard heading: the date beside Dashboard, and just "Welcome back, name."', async () => {
+  const c = await registerAndLogin('dash-head@example.com', 'Dash Head Lets');
+  const page = (await c.get('/app')).text;
+  assert.match(page, /<span>Dashboard<\/span><span class="co-date">\d{2}\/\d{2}\/\d{4}<\/span><\/h1>/);
+  assert.match(page, /<p class="muted">Welcome back, [^<.]+\.<\/p>/);
+  assert.doesNotMatch(page, /Here's where things stand/);
+});

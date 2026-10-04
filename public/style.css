@@ -373,6 +373,7 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fo
 .co-title { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
 .co-name { color: var(--brand); }
 .co-sep { color: var(--muted); font-weight: 400; }
+.co-date { align-self: center; margin-left: 4px; padding: 3px 10px; border-radius: 999px; background: var(--surface-2); color: var(--muted); font-size: .85rem; font-weight: 600; font-variant-numeric: tabular-nums; }
 .login-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 8px; }
 .login-summary div { display: flex; flex-direction: column; gap: 2px; }
 
