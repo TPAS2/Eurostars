@@ -40,24 +40,35 @@
 %>
 <div class="shell">
   <aside class="sidebar">
-    <% const home = user.is_admin ? { href: '/admin', label: 'Admin panel', tip: 'Admin panel', on: s === 'admin' } : { href: '/app', label: 'Dashboard', tip: `Dashboard · ${user.agency_name}`, on: s === 'dashboard' }; %>
-    <a class="rail-btn brand-btn <%= home.on ? 'active' : '' %>" href="<%= home.href %>" data-tip="<%= home.tip %>" aria-label="<%= home.label %>" <%- home.on ? 'aria-current="page"' : '' %>><img class="logo logo-img" src="/static/icon-192.png" alt="" width="30" height="30"></a>
+    <% const home = user.is_admin ? { href: '/admin', label: 'Admin panel', on: s === 'admin' } : { href: '/app', label: 'Dashboard', on: s === 'dashboard' }; %>
+    <a class="rail-btn brand-btn <%= home.on ? 'active' : '' %>" href="<%= home.href %>" aria-label="<%= home.label %>" <%- home.on ? 'aria-current="page"' : '' %>><img class="logo logo-img" src="/static/icon-192.png" alt="" width="30" height="30"><span class="rail-label"><%= home.label %></span></a>
     <nav class="rail" aria-label="Main">
       <% groups.filter(g => g.some(([key]) => !(user.hidden_tabs || []).includes(key))).forEach((g, gi) => { %>
         <% if (gi) { %><span class="rail-sep" aria-hidden="true"></span><% } %>
         <% g.filter(([key]) => !(user.hidden_tabs || []).includes(key)).forEach(([key, href, label]) => { %>
-          <a class="rail-btn <%= s === key ? 'active' : '' %> <%= key === 'councilrec' || key === 'rentrun' ? 'rail-red' : '' %>" href="<%= href %>" data-tip="<%= label %>" aria-label="<%= label %>" <%- s === key ? 'aria-current="page"' : '' %>><%- include('icon', { name: key }) %></a>
+          <a class="rail-btn <%= s === key ? 'active' : '' %> <%= key === 'councilrec' || key === 'rentrun' ? 'rail-red' : '' %>" href="<%= href %>" aria-label="<%= label %>" <%- s === key ? 'aria-current="page"' : '' %>><%- include('icon', { name: key }) %><span class="rail-label"><%= label %></span></a>
         <% }) %>
       <% }) %>
     </nav>
-    <div class="rail rail-me">
-      <a class="rail-btn avatar <%= s === 'account' ? 'active' : '' %>" href="/app/account" data-tip="My account · <%= user.name %>" aria-label="My account" <%- s === 'account' ? 'aria-current="page"' : '' %>><span class="avatar-initials"><%= initials %></span></a>
+  </aside>
+  <div class="main-col">
+  <header class="topbar">
+    <span class="topbar-agency"><%= user.is_admin ? appName + ' admin' : user.agency_name %></span>
+    <div class="topbar-actions">
+      <button type="button" class="theme-toggle" role="switch" aria-checked="false" aria-label="Dark mode" title="Switch between light and dark" data-theme-toggle data-csrf="<%= csrfToken %>">
+        <span class="theme-toggle-track" aria-hidden="true">
+          <svg class="tt-icon tt-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6"/></svg>
+          <svg class="tt-icon tt-moon" viewBox="0 0 24 24"><path d="M20.5 14.6A8.5 8.5 0 0 1 9.4 3.5a8.5 8.5 0 1 0 11.1 11.1z"/></svg>
+          <span class="theme-toggle-thumb"></span>
+        </span>
+      </button>
+      <a class="topbar-btn <%= s === 'account' ? 'active' : '' %>" href="/app/account" <%- s === 'account' ? 'aria-current="page"' : '' %>><span class="avatar-initials"><%= initials %></span><span class="topbar-text">My account<span class="topbar-sub"><%= user.name %></span></span></a>
       <form method="post" action="/logout" id="signout-form">
         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-        <button class="rail-btn" type="submit" data-tip="Sign out" aria-label="Sign out"><%- include('icon', { name: 'signout' }) %></button>
+        <button class="topbar-btn" type="submit"><%- include('icon', { name: 'signout' }) %><span class="topbar-text">Sign out</span></button>
       </form>
     </div>
-  </aside>
+  </header>
   <main class="content">
 <% } else { %>
 <main class="public">

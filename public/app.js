@@ -428,32 +428,30 @@ const DRAFT_DAYS = 7;
   });
 })();
 
-// Labels for the icon rail: shown beside the square (or below it on narrow screens)
-// on hover and keyboard focus. Positioned here so the scrolling rail doesn't clip them.
+// The sun / moon switch in the top bar. The choice is saved to the person's account, so every
+// page (and every device) follows it; until they choose, pages follow the computer's setting.
 (() => {
-  let tip = null;
-  const show = (el) => {
-    if (!tip) { tip = document.createElement('div'); tip.className = 'rail-tip'; tip.setAttribute('role', 'tooltip'); document.body.appendChild(tip); }
-    tip.textContent = el.dataset.tip;
-    tip.hidden = false;
-    const r = el.getBoundingClientRect();
-    const narrow = window.matchMedia('(max-width: 900px)').matches;
-    tip.classList.toggle('below', narrow);
-    if (narrow) {
-      const left = Math.min(Math.max(8, r.left + r.width / 2 - tip.offsetWidth / 2), window.innerWidth - tip.offsetWidth - 8);
-      tip.style.left = `${left}px`;
-      tip.style.top = `${r.bottom + 8}px`;
-    } else {
-      tip.style.left = `${r.right + 10}px`;
-      tip.style.top = `${r.top + r.height / 2 - tip.offsetHeight / 2}px`;
-    }
-  };
-  const hide = () => { if (tip) tip.hidden = true; };
-  document.addEventListener('mouseover', (e) => { const el = e.target.closest('[data-tip]'); if (el) show(el); });
-  document.addEventListener('mouseout', (e) => { const el = e.target.closest('[data-tip]'); if (el && !el.contains(e.relatedTarget)) hide(); });
-  document.addEventListener('focusin', (e) => { const el = e.target.closest('[data-tip]'); if (el) show(el); else hide(); });
-  document.addEventListener('focusout', hide);
-  window.addEventListener('scroll', hide, true);
+  document.addEventListener('DOMContentLoaded', () => {
+    const btn = document.querySelector('[data-theme-toggle]');
+    if (!btn) return;
+    const root = document.documentElement;
+    const query = window.matchMedia('(prefers-color-scheme: dark)');
+    const isDark = () => (root.dataset.theme ? root.dataset.theme === 'dark' : query.matches);
+    const sync = () => {
+      const dark = isDark();
+      btn.setAttribute('aria-checked', String(dark));
+      btn.title = dark ? 'Dark mode is on: switch to light' : 'Light mode is on: switch to dark';
+    };
+    sync();
+    query.addEventListener('change', sync);
+    btn.addEventListener('click', () => {
+      const next = !isDark();
+      root.dataset.theme = next ? 'dark' : 'light';
+      sync();
+      const body = new URLSearchParams({ _csrf: btn.dataset.csrf || '', theme: next ? 'dark' : 'light' });
+      fetch('/app/theme', { method: 'POST', body, credentials: 'same-origin', headers: { 'X-Autosave': '1' } }).catch(() => {});
+    });
+  });
 })();
 
 // "Suggest one": fill a password box with an easy-to-read random password.

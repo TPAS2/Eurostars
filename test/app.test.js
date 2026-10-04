@@ -690,7 +690,7 @@ test('councils link to properties, and through them to landlords and tenants', a
 test('account details: companies can only view them; the admin edits them', async () => {
   const c = await registerAndLogin('myaccount@example.com', 'Before Lets');
   let r = await c.get('/app');
-  assert.match(r.text, /class="rail-btn avatar[^"]*" href="\/app\/account"/);
+  assert.match(r.text, /<header class="topbar">[\s\S]*?class="topbar-btn[^"]*" href="\/app\/account"/, 'My account is in the top bar');
   r = await c.get('/app/account');
   assert.equal(r.status, 200);
   assert.match(r.text, /<code>myaccount<\/code>/);
@@ -3137,7 +3137,13 @@ test('repeated wrong passwords for one agency are blocked from any address', asy
 test('dark mode switch is saved per person and applied to every page', async () => {
   const c = await registerAndLogin('theme@example.com', 'Theme Lets');
   const dash = await c.get('/app');
-  assert.match(dash.text, /id="theme-switch"/);
+  assert.doesNotMatch(dash.text, /id="theme-switch"/, 'the old dashboard switch is gone');
+  for (const path of ['/app', '/app/landlords', '/app/account']) {
+    const page = (await c.get(path)).text;
+    const bar = page.slice(page.indexOf('<header class="topbar">'), page.indexOf('</header>', page.indexOf('<header class="topbar">')));
+    assert.match(bar, /role="switch"[^>]*data-theme-toggle/, `the sun and moon switch is in the top bar on ${path}`);
+    assert.match(bar, /class="tt-icon tt-sun"[\s\S]*class="tt-icon tt-moon"/);
+  }
   assert.doesNotMatch(dash.text, /<html lang="en-GB" data-theme/, 'follows the computer until chosen');
   const r = await c.post('/app/theme', { theme: 'dark' });
   assert.equal(r.status, 200);
@@ -3720,7 +3726,9 @@ test('dashboard background is GhostFibers (React Bits), following light and dark
   assert.match(css, /ghost-fibers-container/);
   const src = fs.readFileSync(path.join(__dirname, '..', 'client', 'dashboard.jsx'), 'utf8');
   assert.match(src, /glowColor="#1115ee"/);
-  assert.match(src, /lightMode=\{!dark\}/, 'light mode uses the ink-on-light setting');
+  const style = fs.readFileSync(path.join(__dirname, '..', 'public', 'style.css'), 'utf8');
+  assert.match(style, /\.dashboard-bg \{[^}]*filter: invert\(1\) hue-rotate\(180deg\)/, 'light mode shows the fibers as ink on light');
+  assert.match(style, /:root\[data-theme="dark"\] \.dashboard-bg \{[^}]*filter: none/, 'dark mode shows them glowing');
 });
 
 test('landlord codes written as L plus up to three digits become four-digit, once; other codes are left alone', async () => {
@@ -3749,4 +3757,20 @@ test('landlord codes written as L plus up to three digits become four-digit, onc
   d = openDatabase(file);
   assert.equal(d.prepare("SELECT code FROM landlords WHERE name = 'A'").get().code, 'L9');
   d.close();
+});
+
+test('side menu shows each tab name; a top bar on every page has My account and Sign out', async () => {
+  const c = await registerAndLogin('menu-names@example.com', 'Menu Names Lets');
+  for (const path of ['/app', '/app/landlords', '/app/council-reconciliation']) {
+    const page = (await c.get(path)).text;
+    for (const name of ['Dashboard', 'Councils', 'Council reconciliation', 'Landlords', 'Properties', 'Tenants', 'Maintenance', 'Rent run', 'Landlord statements']) {
+      assert.match(page, new RegExp(`<span class="rail-label">${name}</span>`), `${name} is named in the side menu on ${path}`);
+    }
+    const bar = page.slice(page.indexOf('<header class="topbar">'), page.indexOf('</header>', page.indexOf('<header class="topbar">')));
+    assert.match(bar, /Menu Names Lets/);
+    assert.match(bar, /href="\/app\/account"[\s\S]*?My account/);
+    assert.match(bar, /<form method="post" action="\/logout" id="signout-form">[\s\S]*?Sign out/);
+    assert.doesNotMatch(page.slice(page.indexOf('<aside class="sidebar">'), page.indexOf('</aside>')), /logout|\/app\/account/, 'no longer at the bottom of the side menu');
+  }
+  assert.doesNotMatch((await c.get('/app/council-reconciliation')).text, /Every council: the rent it owes/);
 });

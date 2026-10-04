@@ -98,27 +98,27 @@ h3 { font-size: 1rem; margin: 0 0 .4rem; }
 .pre { white-space: pre-wrap; }
 
 /* ---------- layout ---------- */
-.shell { display: grid; grid-template-columns: 76px 1fr; min-height: 100vh; background: linear-gradient(to right, var(--sidebar) 76px, transparent 76px); }
+.shell { display: grid; grid-template-columns: 116px 1fr; min-height: 100vh; background: linear-gradient(to right, var(--sidebar) 116px, transparent 116px); }
 .sidebar {
   background: var(--sidebar); color: var(--sidebar-text);
-  padding: 12px 8px; display: flex; flex-direction: column; align-items: center; gap: 8px;
+  padding: 12px 8px; display: flex; flex-direction: column; align-items: stretch; gap: 8px;
   position: sticky; top: 0; height: 100vh; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--rail-border) transparent;
   border-right: 1px solid var(--rail-border);
 }
 .sidebar::-webkit-scrollbar { width: 6px; }
 .sidebar::-webkit-scrollbar-thumb { background: var(--rail-border); border-radius: 3px; }
-.rail { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.rail { display: flex; flex-direction: column; align-items: stretch; gap: 6px; }
 nav.rail { flex: 1; }
-.rail-me { padding-top: 10px; border-top: 1px solid var(--rail-border); }
-.rail-me form { margin: 0; }
-.rail-sep { width: 40px; height: 2px; border-radius: 2px; background: var(--rail-border); margin: 4px 0; }
-/* Each menu button is its own clearly outlined box; the name shows on hover. */
+.rail-sep { height: 2px; border-radius: 2px; background: var(--rail-border); margin: 4px 0; }
+/* Each menu button is its own clearly outlined box, with its name under the icon. */
 .rail-btn {
-  width: 50px; height: 50px; flex: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+  width: 100%; min-height: 62px; flex: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
   border-radius: 10px; border: 1px solid var(--rail-border); background: var(--rail-btn); color: var(--sidebar-text);
-  cursor: pointer; font: inherit; padding: 0; text-decoration: none;
+  cursor: pointer; font: inherit; padding: 8px 4px; text-decoration: none; text-align: center;
   transition: background-color .12s, color .12s, border-color .12s;
 }
+.rail-btn .icon, .rail-btn .logo, .rail-btn .avatar-initials { flex: none; }
+.rail-label { font-size: .7rem; font-weight: 600; line-height: 1.15; overflow-wrap: normal; word-break: normal; hyphens: none; }
 .rail-btn .icon { width: 24px; height: 24px; stroke-width: 2; }
 .rail-btn:hover, .rail-btn:focus-visible { background: var(--sidebar-active); border-color: #6b7a96; color: #fff; text-decoration: none; }
 .rail-btn:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
@@ -132,19 +132,21 @@ nav.rail { flex: 1; }
 .brand-btn.active .logo { box-shadow: none; }
 .avatar-initials { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: #fff; color: var(--sidebar); font-size: .78rem; font-weight: 800; }
 
-/* Hover / focus label for the icon rail (positioned by app.js so it isn't clipped). */
-.rail-tip {
-  position: fixed; z-index: 100; pointer-events: none;
-  background: #0b1220; color: #fff; font-size: .82rem; font-weight: 600; white-space: nowrap;
-  padding: 6px 10px; border-radius: 7px; box-shadow: 0 6px 20px rgba(0,0,0,.25);
-}
-.rail-tip::before {
-  content: ""; position: absolute; left: -5px; top: 50%; transform: translateY(-50%);
-  border: 5px solid transparent; border-left: 0; border-right-color: #0b1220;
-}
-.rail-tip.below::before { left: 50%; top: -5px; transform: translateX(-50%); border: 5px solid transparent; border-top: 0; border-bottom-color: #0b1220; }
 .link-btn { background: none; border: 0; padding: 0; color: var(--brand); cursor: pointer; font: inherit; text-decoration: underline; }
+.main-col { min-width: 0; display: flex; flex-direction: column; }
 .content { padding: 28px 32px 60px; width: 100%; min-width: 0; }
+/* The bar along the top of every page: who's signed in, My account and Sign out. Always visible. */
+.topbar { position: sticky; top: 0; z-index: 15; height: 56px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 24px; background: var(--sidebar); color: var(--sidebar-text); border-bottom: 1px solid var(--rail-border); }
+.topbar-agency { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.topbar-actions { display: flex; align-items: center; gap: 10px; flex: none; }
+.topbar-actions form { margin: 0; }
+.topbar-btn { display: inline-flex; align-items: center; gap: 10px; height: 40px; padding: 0 14px 0 8px; border-radius: 10px; border: 1px solid var(--rail-border); background: var(--rail-btn); color: var(--sidebar-text); font: inherit; font-weight: 600; font-size: .88rem; cursor: pointer; text-decoration: none; }
+.topbar-btn:hover, .topbar-btn:focus-visible { background: var(--sidebar-active); border-color: #6b7a96; color: #fff; text-decoration: none; }
+.topbar-btn.active { background: var(--brand-rail); border-color: #fff; color: #fff; }
+.topbar-btn .icon { width: 20px; height: 20px; margin-left: 4px; }
+.topbar-btn .avatar-initials { width: 26px; height: 26px; }
+.topbar-text { display: flex; flex-direction: column; line-height: 1.15; }
+.topbar-sub { font-weight: 400; font-size: .74rem; opacity: .75; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .brand { display: inline-flex; align-items: center; gap: 10px; font-weight: 700; font-size: 1.1rem; color: var(--text); padding: 0 8px 4px; }
 .brand:hover { text-decoration: none; }
@@ -303,10 +305,13 @@ img.thumb { width: 52px; height: 52px; border-radius: 6px; object-fit: contain; 
   .rail { flex-direction: row; }
   nav.rail { flex: none; }
   .rail-sep { width: 2px; height: 32px; margin: 0 4px; }
-  .rail-btn { width: 46px; height: 46px; }
-  .rail-me { border-top: 0; padding-top: 0; padding-left: 10px; border-left: 1px solid rgba(255,255,255,.08); margin-left: auto; }
+  .rail-btn { width: 90px; height: 62px; min-height: 0; padding: 4px 3px; }
+  .rail-label { font-size: .62rem; }
+  .rail-sep { width: 2px; }
   .brand-btn { margin: 0 4px 0 0; }
   .content { padding: 20px 16px 48px; }
+  .topbar { top: 78px; height: 52px; padding: 0 12px; }
+  .topbar-sub { display: none; }
   .grid-2, .form-grid { grid-template-columns: 1fr; }
   .search input { min-width: 0; width: 100%; }
   .with-photo { flex-direction: column; }
@@ -704,8 +709,6 @@ table.council-db tr.new-row .cell-input { border-color: var(--border); backgroun
 .presets-bar select { width: auto; flex: 0 1 320px; }
 
 /* Dark mode switch (dashboard) */
-.theme-switch { display: inline-flex; align-items: center; min-height: 38px; color: var(--muted); font-weight: 600; }
-.theme-switch .squish-switch:focus-visible .squish-switch__track { outline: 2px solid var(--brand); outline-offset: 2px; }
 
 /* Small totals in the top right of a page header */
 .page-head.with-head-tiles { align-items: flex-start; flex-wrap: nowrap; }
@@ -789,9 +792,10 @@ table.transfer-sheet th:nth-child(7) { min-width: 130px; } table.transfer-sheet 
 
 /* Dashboard: the animated GhostFibers background (React Bits), behind everything right of the sidebar */
 .shell { position: relative; z-index: 0; }
-.dashboard-bg { position: fixed; top: 0; right: 0; bottom: 0; left: 76px; z-index: -1; pointer-events: none; opacity: .9; }
-:root[data-theme="dark"] .dashboard-bg { opacity: .9; }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .dashboard-bg { opacity: .9; } }
+/* Light mode: the glowing fibers flipped to blue ink on a light background. */
+.dashboard-bg { position: fixed; top: 0; right: 0; bottom: 0; left: 116px; z-index: -1; pointer-events: none; opacity: 1; filter: invert(1) hue-rotate(180deg); }
+:root[data-theme="dark"] .dashboard-bg { opacity: .9; filter: none; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .dashboard-bg { opacity: .9; filter: none; } }
 @media (max-width: 900px) { .dashboard-bg { left: 0; } }
 @media print { .dashboard-bg { display: none; } }
 
@@ -935,3 +939,22 @@ input, select, textarea { max-width: 100%; }
   .auth .auth-card { padding: 28px 20px; }
 }
 .logo-img { display: block; object-fit: cover; background: none; }
+
+/* Light / dark switch in the top bar: a sun and a moon, the knob slides to the one in use. */
+.theme-toggle { padding: 0; border: 0; background: none; cursor: pointer; border-radius: 999px; }
+.theme-toggle:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+.theme-toggle-track { position: relative; display: block; width: 64px; height: 32px; border-radius: 999px; background: #8fc4ff; border: 1px solid rgba(255, 255, 255, .35); transition: background-color .25s; }
+.theme-toggle[aria-checked="true"] .theme-toggle-track { background: #1d2140; }
+.tt-icon { position: absolute; top: 6px; width: 18px; height: 18px; z-index: 2; fill: none; stroke-width: 2; stroke-linecap: round; transition: opacity .25s, color .25s; }
+.tt-sun { left: 7px; color: #b45309; stroke: currentColor; }
+.tt-sun circle { fill: #fbbf24; }
+.tt-moon { right: 7px; color: #c7cdfa; stroke: currentColor; fill: currentColor; opacity: .55; }
+.theme-toggle-thumb { position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; border-radius: 50%; background: #fff; box-shadow: 0 1px 4px rgba(0, 0, 0, .35); transition: transform .28s cubic-bezier(.3, 1.4, .5, 1), background-color .25s; z-index: 1; }
+.theme-toggle[aria-checked="true"] .theme-toggle-thumb { transform: translateX(32px); background: #33386b; }
+.theme-toggle[aria-checked="true"] .tt-sun { opacity: .45; }
+.theme-toggle[aria-checked="true"] .tt-moon { opacity: 1; color: #fef3c7; }
+@media (prefers-reduced-motion: reduce) { .theme-toggle-track, .theme-toggle-thumb, .tt-icon { transition: none; } }
+@media (max-width: 600px) {
+  .topbar-btn .topbar-text { display: none; }
+  .topbar-btn { padding: 0 8px; }
+}

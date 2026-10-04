@@ -1,30 +1,15 @@
-// Everything the dashboard adds on top of the server-rendered page: the dark mode switch and
-// the animated GhostFibers background (React Bits) behind the dashboard. The background follows
-// the light/dark switch: glowing fibers on dark, soft ink-on-light fibers on light.
-import { useEffect, useState } from 'react';
+// The dashboard's animated GhostFibers background (React Bits). The same glowing fibers are drawn in
+// both themes; in light mode the page's CSS turns them into blue ink on a light background
+// (see .dashboard-bg in public/style.css), so they show clearly behind the cards.
 import { createRoot } from 'react-dom/client';
-import './theme-switch.jsx';
 import GhostFibers from './GhostFibers';
 
-const root = document.documentElement;
-const systemDark = () => window.matchMedia('(prefers-color-scheme: dark)').matches;
-const isDark = () => (root.dataset.theme ? root.dataset.theme === 'dark' : systemDark());
-
-function Background() {
-  const [dark, setDark] = useState(isDark);
-  useEffect(() => {
-    const update = () => setDark(isDark());
-    const observer = new MutationObserver(update);
-    observer.observe(root, { attributes: true, attributeFilter: ['data-theme'] });
-    const query = window.matchMedia('(prefers-color-scheme: dark)');
-    query.addEventListener('change', update);
-    return () => { observer.disconnect(); query.removeEventListener('change', update); };
-  }, []);
-  return (
+const bg = document.getElementById('dashboard-bg');
+if (bg) {
+  createRoot(bg).render(
     <GhostFibers
-      lineColor={dark ? '#140E35' : '#1115ee'}
+      lineColor="#140E35"
       glowColor="#1115ee"
-      lightMode={!dark}
       speed={0.2}
       scale={2}
       rotation={0}
@@ -51,6 +36,3 @@ function Background() {
     />
   );
 }
-
-const bg = document.getElementById('dashboard-bg');
-if (bg) createRoot(bg).render(<Background />);
