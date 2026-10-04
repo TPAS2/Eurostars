@@ -21,7 +21,7 @@ const ENTITIES = {
       { name: 'email', label: 'Email', type: 'email', required: true },
       { name: 'code', label: 'Landlord code', type: 'text', required: true, help: 'Filled in with the next number automatically; change it if you need to.' },
       { name: 'date_started', label: 'Lease commencement date', type: 'date', required: true },
-      { name: 'statement_type', label: 'Statement type', type: 'select', options: ['Email', 'Cheque'], required: true, help: 'Email: their statement is emailed in the rent run. Cheque: their statement is printed and sent with a cheque.' },
+      { name: 'statement_type', label: 'Statement type', type: 'select', options: ['Email', 'Cheque'], required: true },
       { name: 'overseas', label: 'Overseas landlord', type: 'select', options: ['No', 'Yes'], required: true },
       { name: 'bank_name', label: 'Bank name', type: 'text', required: true, suggest: 'banks', startRow: true, help: 'Pick from the list or type a new bank.' },
       { name: 'bank_account_name', label: 'Account name', type: 'text', required: true },

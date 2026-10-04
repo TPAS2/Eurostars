@@ -3817,3 +3817,8 @@ test('dashboard: the eight figures sit together in one box', async () => {
   assert.deepEqual(labels, ['Properties', 'Landlords', 'Active tenancies', 'Open maintenance', 'Total invoiced to councils', 'Total paid to landlords', 'Gross profit', 'Unpaid invoices']);
   assert.doesNotMatch(page, /<section class="tiles">/, 'the separate boxes are gone');
 });
+
+test('landlord form: no explanation text under Statement type', async () => {
+  const c = await registerAndLogin('st-help@example.com', 'ST Help Lets');
+  assert.doesNotMatch((await c.get('/app/landlords/new')).text, /their statement is emailed in the rent run/);
+});
