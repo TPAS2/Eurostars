@@ -305,6 +305,15 @@ const DRAFT_DAYS = 7;
     const hasServerErrors = !!form.querySelector('.field-err');
     let saved = null;
     try { saved = JSON.parse(store.getItem(key) || 'null'); } catch { saved = null; }
+    // "Add new" starts with every box empty. An unsent draft only comes back after a reload, the back
+    // button, or being signed out for inactivity (so nothing typed is ever lost).
+    const navType = ((performance.getEntriesByType && performance.getEntriesByType('navigation')[0]) || {}).type;
+    let resume = false;
+    try { resume = Date.now() - Number(store.getItem('rift:resume-drafts') || 0) < 6 * 3600000; } catch { resume = false; }
+    if (!hasServerErrors && navType !== 'reload' && navType !== 'back_forward' && !resume) {
+      try { store.removeItem(key); } catch { /* ignore */ }
+      saved = null;
+    }
 
     // Restore a draft unless the server just re-rendered the form with the user's input.
     if (saved && !hasServerErrors && Date.now() - saved.at < 7 * 86400000) {
@@ -409,6 +418,7 @@ const DRAFT_DAYS = 7;
     });
     document.querySelectorAll('form[data-autosave]').forEach(setupAutosave);
     document.querySelectorAll('form[data-draft]').forEach(setupDraft);
+    try { window.localStorage.removeItem('rift:resume-drafts'); } catch { /* storage blocked */ }
     if (document.body.dataset.idleMinutes) {
       document.querySelectorAll('form[method="post"]:not([data-autosave]):not([data-draft]):not([data-no-keep])').forEach((form) => {
         const typed = form.querySelector('input:not([type=hidden]):not([type=submit]):not([type=button]):not([type=file]):not([type=password]), textarea, select');
@@ -482,6 +492,7 @@ document.addEventListener('click', (e) => {
 
   function goToSignIn(timedOut) {
     const next = location.pathname + location.search;
+    if (timedOut) { try { window.localStorage.setItem('rift:resume-drafts', String(Date.now())); } catch { /* storage blocked */ } }
     const params = new URLSearchParams(timedOut ? { timeout: '1', next } : { next });
     location.href = `/login?${params}`;
   }

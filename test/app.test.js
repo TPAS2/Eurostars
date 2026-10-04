@@ -1382,10 +1382,10 @@ test('mailer: needs a sender and a provider, and refuses bad addresses', async (
 test('landlords have a statement type (Email or Cheque); cheque landlords are left out of the email run', async () => {
   const c = await registerAndLogin('statement-type@example.com', 'Type Lets');
   let r = await c.get('/app/landlords/new');
-  assert.match(r.text, /<label for="f-statement_type">Statement type[\s\S]*?<option value="Email" selected>Email<\/option><option value="Cheque" >Cheque<\/option>/);
+  assert.match(r.text, /<label for="f-statement_type">Statement type[\s\S]*?<option value="" selected>— Select —<\/option>\s*<option value="Email" >Email<\/option><option value="Cheque" >Cheque<\/option>/, 'nothing chosen to start with');
   r = await c.post('/app/landlords', { ...LANDLORD, name: 'Eve Email', email: 'eve@example.com' });
   const eve = idFrom(r.location);
-  assert.equal(db.prepare('SELECT statement_type FROM landlords WHERE id = ?').get(eve).statement_type, 'Email', 'Email by default');
+  assert.equal(db.prepare('SELECT statement_type FROM landlords WHERE id = ?').get(eve).statement_type, 'Email');
   r = await c.post('/app/landlords', { ...LANDLORD, name: 'Chad Cheque', email: 'chad@example.com', statement_type: 'Cheque' });
   const chad = idFrom(r.location);
   r = await c.post('/app/landlords', { ...LANDLORD, name: 'X', statement_type: 'Carrier pigeon' });
@@ -2142,17 +2142,33 @@ test('maintenance jobs: upload photos and files, view, download, remove', async 
   assert.equal(db.prepare('SELECT COUNT(*) n FROM maintenance_files WHERE job_id = ?').get(job).n, 0);
 });
 
-test('landlords list shows their councils to the right of phone', async () => {
-  const c = await registerAndLogin('ll-councils@example.com', 'LL Councils Lets');
+test('landlords list has no Councils column, and is in landlord code order', async () => {
+  const c = await registerAndLogin('ll-order@example.com', 'LL Order Lets');
   const leeds = idFrom((await c.post('/app/councils', { name: 'Leeds City Council' })).location);
-  const york = idFrom((await c.post('/app/councils', { name: 'York Council' })).location);
-  const ll = idFrom((await c.post('/app/landlords', { ...LANDLORD, name: 'Two Council Tom', phone: '07700 900001' })).location);
-  await c.post('/app/properties', { address_line1: 'A1', landlord_id: String(ll), council_id: String(leeds), status: 'let' });
-  await c.post('/app/properties', { address_line1: 'A2', landlord_id: String(ll), council_id: String(york), status: 'let' });
-  await c.post('/app/properties', { address_line1: 'A3', landlord_id: String(ll), council_id: String(leeds), status: 'let' });
+  const zed = idFrom((await c.post('/app/landlords', { ...LANDLORD, name: 'Zed Last Name', code: 'L0003' })).location);
+  await c.post('/app/landlords', { ...LANDLORD, name: 'Amy Middle', code: 'L0002' });
+  await c.post('/app/landlords', { ...LANDLORD, name: 'Bob First', code: 'L0001' });
+  await c.post('/app/properties', { address_line1: 'A1', landlord_id: String(zed), council_id: String(leeds), status: 'let' });
+  db.prepare("UPDATE landlords SET code = NULL WHERE name = 'Amy Middle' AND account_id = (SELECT id FROM users WHERE username = 'll-order')").run();
+  await c.post('/app/landlords', { ...LANDLORD, name: 'Cat Second', code: 'L0002' });
   const r = await c.get('/app/landlords');
-  assert.match(r.text, /<th[^>]*>Telephone number<\/th>\s*<th[^>]*>Councils<\/th>/);
-  assert.match(r.text, /07700 900001[\s\S]*?<span class="cell-text">Leeds City Council\nYork Council<\/span>/);
+  assert.doesNotMatch(r.text, /<th[^>]*>Councils<\/th>/);
+  assert.doesNotMatch(r.text, /Leeds City Council/);
+  const order = ['Bob First', 'Cat Second', 'Zed Last Name', 'Amy Middle'].map((n) => r.text.indexOf(`>${n}</a>`));
+  assert.ok(order.every((x) => x > 0) && order.every((x, k) => k === 0 || x > order[k - 1]), 'L0001, L0002, L0003, then the one with no code');
+});
+
+test('adding a landlord starts with every box empty (apart from the next landlord code)', async () => {
+  const c = await registerAndLogin('ll-blank@example.com', 'LL Blank Lets');
+  const page = (await c.get('/app/landlords/new')).text;
+  assert.match(page, /data-draft="new-landlords" autocomplete="off"/, 'the browser may not autofill it');
+  const form = page.slice(page.indexOf('<form method="post" action="/app/landlords"'), page.indexOf('</form>', page.indexOf('<form method="post" action="/app/landlords"')));
+  const filled = [...form.matchAll(/<input[^>]*name="([a-z_]+)"[^>]*value="([^"]+)"/g)].filter((m) => !['_csrf', 'code'].includes(m[1]));
+  assert.deepEqual(filled.map((m) => m[1]), [], 'no box already has something in it');
+  for (const name of ['statement_type', 'overseas', 'payment_note']) {
+    assert.match(form, new RegExp(`<select id="f-${name}"[^>]*>\\s*<option value="" selected>— Select —</option>`), `${name} has nothing chosen`);
+  }
+  assert.match(form, /name="code" value="L0001"/);
 });
 
 test('a landlord page has no Transactions list', async () => {
@@ -2930,7 +2946,7 @@ test('contractor page: boxes for paid in a chosen month, paid all time, unpaid a
 test('landlords have a Date started, shown in their info box', async () => {
   const c = await registerAndLogin('ll-started@example.com', 'LL Started Lets');
   let r = await c.get('/app/landlords/new');
-  assert.match(r.text, /Lease commencement date[\s\S]*?name="date_started"[^>]*value="\d{4}-\d{2}-\d{2}"/, 'defaults to today');
+  assert.doesNotMatch(r.text, /name="date_started"[^>]*value="\d{4}/, 'starts empty');
   const id = idFrom((await c.post('/app/landlords', { ...LANDLORD, name: 'Stella Start', date_started: '2019-04-01', statement_type: 'Email' })).location);
   r = await c.get(`/app/landlords/${id}`);
   assert.match(r.text, /<dt>Lease commencement date<\/dt>[\s\S]*?01\/04\/2019/);

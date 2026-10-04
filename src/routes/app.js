@@ -668,18 +668,6 @@ module.exports = function appRoutes(db) {
     let totalsRow = null;
     const maps = refLabelMaps(def, a);
     let tenantFilter = null;
-    if (def.key === 'landlords') {
-      // The councils their properties are in, one per line.
-      const byLandlord = new Map();
-      for (const r of db.prepare(
-        `SELECT DISTINCT p.landlord_id, c.name FROM properties p JOIN councils c ON c.id = p.council_id
-          WHERE p.account_id = ? AND p.landlord_id IS NOT NULL ORDER BY c.name COLLATE NOCASE`
-      ).all(a)) {
-        if (!byLandlord.has(r.landlord_id)) byLandlord.set(r.landlord_id, []);
-        byLandlord.get(r.landlord_id).push(r.name);
-      }
-      for (const row of rows) row.councils = { text: (byLandlord.get(row.id) || []).join('\n') };
-    }
     if (def.key === 'properties') {
       // Who lives there now: tenants on an active (or upcoming) tenancy, one per line.
       const byProperty = new Map();
