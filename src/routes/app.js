@@ -421,7 +421,7 @@ module.exports = function appRoutes(db) {
     const councilId = Number(req.query.council_id);
     const open = Number.isInteger(councilId) ? rec.rows.find((c) => c.id === councilId) : null;
     res.render('councilrec', {
-      title: 'Council reconciliation', section: 'councilrec', month, monthLabel: statements.monthLabel(month),
+      title: 'Council Reconciliation', section: 'councilrec', month, monthLabel: statements.monthLabel(month),
       prev: shiftMonth(month, -1), next: shiftMonth(month, 1), thisMonth: fmt.today().slice(0, 7), rec, open,
       detail: open ? reconcile.councilTenancies(db, a, month, open.id) : null, rowStatus: reconcile.rowStatus, fmt,
       owedAll: reconcile.owedAllMonths(db, a, fmt.today().slice(0, 7) > month ? fmt.today().slice(0, 7) : month),

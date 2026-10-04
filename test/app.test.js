@@ -3763,7 +3763,7 @@ test('side menu shows each tab name; a top bar on every page has My account and 
   const c = await registerAndLogin('menu-names@example.com', 'Menu Names Lets');
   for (const path of ['/app', '/app/landlords', '/app/council-reconciliation']) {
     const page = (await c.get(path)).text;
-    for (const name of ['Dashboard', 'Councils', 'Council reconciliation', 'Landlords', 'Properties', 'Tenants', 'Maintenance', 'Rent run', 'Landlord statements']) {
+    for (const name of ['Dashboard', 'Councils', 'Council Reconciliation', 'Landlords', 'Properties', 'Tenants', 'Maintenance', 'Rent run', 'Landlord statements']) {
       assert.match(page, new RegExp(`<span class="rail-label">${name}</span>`), `${name} is named in the side menu on ${path}`);
     }
     const bar = page.slice(page.indexOf('<header class="topbar">'), page.indexOf('</header>', page.indexOf('<header class="topbar">')));
