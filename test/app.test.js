@@ -1105,8 +1105,8 @@ test('councils list shows how many properties each has, and which', async () => 
   await c.post('/app/councils', { name: 'Empty Council' });
   for (const a of ['1 A Street', '2 B Street', '3 C Street', '4 D Street']) await c.post('/app/properties', { address_line1: a, council_id: leeds, status: 'let' });
   r = await c.get('/app/councils');
-  assert.match(r.text, /<th[^>]*>Properties With This Council<\/th>/);
-  assert.match(r.text, /<th[^>]*>Council<\/th>\s*<th[^>]*>Properties With This Council<\/th>\s*<th[^>]*>Email<\/th>\s*<th[^>]*>Phone number<\/th>/, 'name, property amount, email, phone');
+  assert.match(r.text, /<th[^>]*>Properties With Council<\/th>/);
+  assert.match(r.text, /<th[^>]*>Council<\/th>\s*<th[^>]*>Properties With Council<\/th>\s*<th[^>]*>Email<\/th>\s*<th[^>]*>Phone number<\/th>/, 'name, property amount, email, phone');
   const page = (await c.get(`/app/councils/${leeds}`)).text + (await c.get(`/app/councils/${leeds}/edit`)).text;
   assert.doesNotMatch(page, /Licensing email|Environmental health phone/, 'those two fields are gone');
   assert.match(r.text, /Leeds City Council<\/a>\s*<\/td>\s*<td class="">\s*4\s*<\/td>[\s\S]*?0113 222 4404/);
