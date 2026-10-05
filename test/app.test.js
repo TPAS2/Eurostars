@@ -659,6 +659,20 @@ test('admin adds an account and resets passwords', async () => {
   await admin.get(`/admin/users/${harbourId}`);
   r = await admin.post(`/admin/users/${harbourId}/details`, { username: 'coastal', login_name: 'Kim', name: 'Kim', agency_name: 'Harbourlets' });
   assert.match(decodeURIComponent(r.location), /error=.*already has its own records/);
+  // All logins: an Edit button beside Status; people get their own edit page.
+  r = await admin.get('/admin/accounts');
+  assert.match(r.text, new RegExp(`href="/admin/users/${id}#details">Edit</a>`), 'the main login edits on the agency page');
+  const samId = db.prepare("SELECT id FROM users WHERE login_name = 'Sam' AND company_id = ?").get(id).id;
+  assert.match(r.text, new RegExp(`href="/admin/people/${samId}/edit">Edit</a>`));
+  assert.doesNotMatch(r.text, /<th>Password<\/th>|••••/, 'no password column');
+  assert.equal((await admin.get(`/admin/people/${samId}/edit`)).status, 200);
+  r = await admin.post(`/admin/people/${samId}/edit`, { name: 'Sam Reed', login_name: 'Lou', email: '' });
+  assert.equal(r.status, 422, 'sign-in names stay unique within the agency');
+  r = await admin.post(`/admin/people/${samId}/edit`, { name: 'Samuel Reed', login_name: 'Samuel', email: 'sam@example.com', password: 'brook-field-6620' });
+  assert.match(decodeURIComponent(r.location), /Saved Samuel Reed's details/);
+  assert.equal((await new Client().login('coastal', 'brook-field-6620', 'Samuel')).location, '/app');
+  assert.equal((await sam.get('/app')).location, '/login', 'a new password signs them out');
+  assert.equal((await lou.post(`/admin/people/${samId}/edit`, { name: 'X', login_name: 'X' })).status, 404, 'only the admin can edit logins');
   // The admin's own username is still refused.
   r = await admin.post('/admin/users', { agency_name: 'X', name: 'X', username: 'admin', password: 'kettle-harbour-58' });
   assert.equal(r.status, 422);

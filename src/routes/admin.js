@@ -319,6 +319,46 @@ module.exports = function adminRoutes(db, config) {
     back(`Password changed for ${m.name}. They have been signed out and must use the new password.`, true);
   });
 
+  // Editing one person's login: their name, sign-in name, email and (optionally) password.
+  function renderPerson(res, m, values, error, status = 200) {
+    const company = db.prepare('SELECT id, username, agency_name FROM users WHERE id = ?').get(m.company_id);
+    res.status(status).render('admin/person', { title: `Edit ${m.name}`, section: 'accounts', m, company, values, error, minPassword: MIN_PASSWORD });
+  }
+
+  router.get('/people/:pid/edit', (req, res) => {
+    const m = person(req, res);
+    if (m) renderPerson(res, m, m, '');
+  });
+
+  router.post('/people/:pid/edit', (req, res) => {
+    const m = person(req, res);
+    if (!m) return;
+    const values = {
+      name: String(req.body.name || '').trim().slice(0, 200),
+      login_name: String(req.body.login_name || '').trim().slice(0, 60),
+      email: String(req.body.email || '').trim().toLowerCase().slice(0, 254),
+    };
+    const password = String(req.body.password || '');
+    const company = db.prepare('SELECT * FROM users WHERE id = ?').get(m.company_id);
+    let error = '';
+    if (!values.name) error = 'Enter their full name.';
+    else if (!LOGIN_NAME_RE.test(values.login_name)) error = 'The sign-in name must be 1–30 letters, numbers, dashes or underscores (no spaces or dots).';
+    else if (db.prepare('SELECT 1 FROM users WHERE (company_id = ? OR id = ?) AND login_name = ? COLLATE NOCASE AND id != ?').get(company.id, company.id, values.login_name, m.id)) {
+      error = `${company.agency_name} already has someone signing in as "${values.login_name}".`;
+    } else if (values.email && !EMAIL_RE.test(values.email)) error = 'Enter a valid email address, or leave it blank.';
+    else if (password && (password.length < MIN_PASSWORD || password.length > 200)) error = `The new password must be at least ${MIN_PASSWORD} characters.`;
+    else if (password) error = auth.weakPassword(password, [company.username, company.agency_name, values.name, values.login_name]) || '';
+    if (error) return renderPerson(res, m, values, error, 422);
+    db.prepare('UPDATE users SET name = ?, login_name = ?, email = ?, username = ? WHERE id = ?')
+      .run(values.name, values.login_name, values.email || null, `${company.username}.${values.login_name}`, m.id);
+    if (password) {
+      db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(auth.hashPassword(password), m.id);
+      db.prepare('DELETE FROM sessions WHERE user_id = ?').run(m.id);
+    }
+    const msg = `Saved ${values.name}'s details.${password ? ' They have been signed out and must use the new password.' : ''}`;
+    res.redirect(`/admin/accounts?flash=${encodeURIComponent(msg)}`);
+  });
+
   router.post('/people/:pid/:change(suspend|activate|delete)', (req, res) => {
     const m = person(req, res);
     if (!m) return;

@@ -1,0 +1,40 @@
+<%- include('../partials/header') %>
+<header class="page-head">
+  <div>
+    <a class="crumb" href="/admin/accounts">← All logins</a>
+    <h1>Edit <%= m.name %></h1>
+    <p class="muted">A login at <a href="/admin/users/<%= company.id %>"><%= company.agency_name %></a>. They sign in with agency <code><%= company.username %></code>, their name and their password.</p>
+  </div>
+</header>
+<section class="card">
+  <% if (error) { %><div class="notice err"><%= error %></div><% } %>
+  <form method="post" action="/admin/people/<%= m.id %>/edit" class="form-grid" data-no-keep>
+    <%- include('../partials/csrf') %>
+    <div class="field">
+      <label for="name">Full name <span class="req">*</span></label>
+      <input id="name" name="name" value="<%= values.name || '' %>" required maxlength="200" autocomplete="off">
+    </div>
+    <div class="field">
+      <label for="login_name">Name they sign in with <span class="req">*</span></label>
+      <input id="login_name" name="login_name" value="<%= values.login_name || '' %>" required maxlength="30" autocomplete="off" autocapitalize="none" spellcheck="false">
+      <div class="help">What they type in "Your name". Capitals count.</div>
+    </div>
+    <div class="field">
+      <label for="email">Email <span class="muted small">(optional)</span></label>
+      <input id="email" name="email" type="email" value="<%= values.email || '' %>" autocomplete="off">
+    </div>
+    <div class="field">
+      <label for="password">New password <span class="muted small">(optional)</span></label>
+      <div class="input-row">
+        <input id="password" name="password" type="text" minlength="<%= minPassword %>" maxlength="200" autocomplete="off">
+        <button class="btn" type="button" data-generate="#password">Suggest one</button>
+      </div>
+      <div class="help">Leave blank to keep their current password. A new one signs them out.</div>
+    </div>
+    <div class="form-actions wide">
+      <button class="btn primary" type="submit">Save</button>
+      <a class="btn" href="/admin/accounts">Cancel</a>
+    </div>
+  </form>
+</section>
+<%- include('../partials/footer') %>
