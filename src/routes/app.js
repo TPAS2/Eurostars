@@ -738,6 +738,9 @@ module.exports = function appRoutes(db) {
         unpaid: fmt.money([...stats.values()].reduce((t, s) => t + s.unpaid, 0)),
       } };
     }
+    if (def.key === 'properties') {
+      totalsRow = { label: 'Total', cells: { rent_pence: fmt.money(rows.reduce((t, r) => t + (Number(r.rent_pence) || 0), 0)) } };
+    }
     if (def.key === 'councils') {
       // How many properties are in each council, and which ones.
       const byCouncil = new Map();

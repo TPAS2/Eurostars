@@ -182,6 +182,9 @@ test('full lettings workflow: landlord → property → tenant → rent → fee 
   assert.equal(db.prepare('SELECT property_type FROM properties WHERE id = ?').get(propertyId).property_type, 'Maisonette');
   assert.deepEqual({ ...db.prepare('SELECT bathrooms, parking, rent_pence FROM properties WHERE id = ?').get(propertyId) }, { bathrooms: 2, parking: 'Driveway', rent_pence: 95050 });
   assert.match((await c.get(`/app/properties/${propertyId}`)).text, /£950\.50/);
+  r = await c.get('/app/properties');
+  assert.match(r.text, /<th[^>]*>Rent amount<\/th>/, 'rent is a column on the properties list');
+  assert.match(r.text, /<tr class="total">[\s\S]*?Total[\s\S]*?£950\.50/, 'with a total at the bottom');
 
   r = await c.get(`/app/landlords/${landlordId}`);
   assert.match(r.text, /Properties owned/);
@@ -2439,7 +2442,7 @@ test('properties list columns: Property name, Council, Landlord, Tenant, Status'
   await c.post(`/app/properties/${prop}/add-tenant`, { tenant_mode: 'new', name: 'Cora Tenant', booking_date: '2026-07-10', start_date: '2026-08-01', rent_pence: '850', rent_frequency: 'monthly', status: 'active' });
   r = await c.get('/app/properties');
   const heads = [...r.text.slice(r.text.indexOf('<thead'), r.text.indexOf('</thead>')).matchAll(/<th[^>]*>([^<]+)</g)].map((m) => m[1].trim()).filter(Boolean);
-  assert.deepEqual(heads.slice(0, 6), ['Property code', 'Property address', 'Council', 'Landlord', 'Tenant', 'Status']);
+  assert.deepEqual(heads.slice(0, 7), ['Property code', 'Property address', 'Council', 'Landlord', 'Tenant', 'Rent amount', 'Status']);
   assert.match(r.text, /3 Column Close[\s\S]*Col Council[\s\S]*Col Landlord[\s\S]*Cora Tenant/);
 });
 
