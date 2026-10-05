@@ -48,7 +48,8 @@ function bookManagementFee(db, accountId, txnId) {
 
 // Credit each fixed-payment property's landlord with their monthly rent for the month (YYYY-MM),
 // whether or not the rent has come in, and take any management fee from it. Skips properties
-// already credited that month, not yet taken on, or handed back before the month. Returns how many.
+// already credited that month, whose lease with the landlord starts after the month, or handed back
+// before the month. (Not "date acquired": that's filled in with the day a property is entered.)
 function creditLandlordRent(db, accountId, month) {
   const [y, m] = month.split('-').map(Number);
   const daysInMonth = new Date(Date.UTC(y, m, 0)).getUTCDate();
@@ -57,7 +58,7 @@ function creditLandlordRent(db, accountId, month) {
   const props = db.prepare(
     `SELECT id, landlord_id, landlord_rent_pence FROM properties
       WHERE account_id = ? AND landlord_id IS NOT NULL AND landlord_rent_pence > 0
-        AND (acquired_date IS NULL OR acquired_date <= ?)
+        AND (lease_start_date IS NULL OR lease_start_date = '' OR lease_start_date <= ?)
         AND (handed_back_date IS NULL OR handed_back_date >= ?)
         AND NOT (status = 'handed back' AND handed_back_date IS NULL)`
   ).all(accountId, monthEnd, monthStart);
@@ -171,4 +172,14 @@ function landlordStatement(db, accountId, landlordId, from, to) {
   return { opening, closing: running, rows, totals };
 }
 
-module.exports = { resolveLinks, bookManagementFee, creditLandlordRent, raiseMonthlyRent, monthlyRent, arrears, clientAccountBalance, landlordStatement, landlordBalanceSql };
+// Why a landlord might not be paid: properties with a landlord but no Rent to landlord, and
+// properties with Rent to landlord but no landlord (handed-back ones left out).
+function landlordRentGaps(db, accountId) {
+  const live = "account_id = ? AND NOT (status = 'handed back' AND handed_back_date IS NULL) AND (handed_back_date IS NULL OR handed_back_date >= date('now', 'start of month', '-1 month'))";
+  return {
+    noRent: db.prepare(`SELECT id, code, address_line1 FROM properties WHERE ${live} AND landlord_id IS NOT NULL AND (landlord_rent_pence IS NULL OR landlord_rent_pence <= 0) ORDER BY code COLLATE NOCASE, address_line1 COLLATE NOCASE`).all(accountId),
+    noLandlord: db.prepare(`SELECT id, code, address_line1 FROM properties WHERE ${live} AND landlord_id IS NULL AND landlord_rent_pence > 0 ORDER BY code COLLATE NOCASE, address_line1 COLLATE NOCASE`).all(accountId),
+  };
+}
+
+module.exports = { landlordRentGaps, resolveLinks, bookManagementFee, creditLandlordRent, raiseMonthlyRent, monthlyRent, arrears, clientAccountBalance, landlordStatement, landlordBalanceSql };

@@ -2502,7 +2502,8 @@ test('rent run: landlords on a fixed monthly rent are paid it whether or not ren
   let r = await c.get('/app/properties/new');
   assert.match(r.text, /Rent from council \(£ per month\)[\s\S]*?Rent to landlord \(£ per month\)/);
   const prop = idFrom((await c.post('/app/properties', { address_line1: '5 Steady Street', status: 'let', landlord_id: String(ll),
-    rent_pence: '1200', landlord_rent_pence: '1000', management_fee_pct: '10', acquired_date: '2026-01-01' })).location);
+    rent_pence: '1200', landlord_rent_pence: '1000', management_fee_pct: '10' })).location);
+  // (Entered today, so its Date acquired is today; it's still paid for earlier months.)
   // Rent that did come in from the council belongs to the agency once the landlord is on a fixed rent.
   db.prepare("INSERT INTO transactions (account_id, txn_date, txn_type, landlord_id, property_id, amount_pence) VALUES (?, '2026-07-10', 'rent_received', ?, ?, 120000)").run(a, ll, prop);
   await c.get('/app/rent-run?month=2026-07');
@@ -2515,6 +2516,19 @@ test('rent run: landlords on a fixed monthly rent are paid it whether or not ren
   await c.post('/app/monthly/calculate', { month: '2026-07' });
   assert.equal(db.prepare("SELECT COUNT(*) n FROM transactions WHERE property_id = ? AND txn_type = 'landlord_rent'").get(prop).n, 1);
   assert.equal(require('../src/monthend').cfpReport(db, a, '2026-07').total, 90000);
+  // The Rent run says how many landlords are paid, and which properties are missing a Rent to landlord.
+  const ll2 = idFrom((await c.post('/app/landlords', { ...LANDLORD, name: 'Unset Landlord', code: 'L0002' })).location);
+  await c.post('/app/properties', { address_line1: '6 Blank Road', status: 'let', landlord_id: String(ll2) });
+  r = await c.get('/app/rent-run?month=2026-07');
+  assert.match(r.text, /1 landlord to pay · £900\.00/);
+  assert.match(r.text, /1 property has a landlord but no <em>Rent to landlord<\/em>[\s\S]*?6 Blank Road/);
+  r = await c.get('/app/rent-run?month=2026-06');
+  assert.match(r.text, /No landlords to pay for June 2026 yet/);
+  // A lease with the landlord starting after the month isn't paid for it.
+  db.prepare("UPDATE properties SET lease_start_date = '2026-09-15' WHERE id = ?").run(prop);
+  await c.post('/app/monthly/calculate', { month: '2026-08' });
+  assert.equal(db.prepare("SELECT COUNT(*) n FROM transactions WHERE property_id = ? AND txn_type = 'landlord_rent'").get(prop).n, 1);
+  db.prepare('UPDATE properties SET lease_start_date = NULL WHERE id = ?').run(prop);
   // A property handed back before the month isn't paid.
   await c.get(`/app/properties/${prop}/edit`);
   db.prepare("UPDATE properties SET handed_back_date = '2026-07-31', status = 'handed back' WHERE id = ?").run(prop);

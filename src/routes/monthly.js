@@ -78,6 +78,7 @@ module.exports = function monthlyRoutes(db, writer, mailer = { enabled: false })
     const template = db.prepare('SELECT filename, uploaded_at FROM payment_templates WHERE account_id = ?').get(a) || null;
     res.render('rentrun', {
       title: 'Rent run', section: 'rentrun', month, thisMonth: fmt.today().slice(0, 7), monthLabel: st.monthLabel(month), rows, template,
+      report: monthend.cfpReport(db, a, month), gaps: ledger.landlordRentGaps(db, a),
       emailEnabled: mailer.enabled, reportTo: (me && me.email) || '', sender: senderFor(a), fmt,
       step5: require('../paymentInstruction')(db).formFor(req.user, month),
       bulkFile: require('../bulkPayment').bulkRows(db, a, month),

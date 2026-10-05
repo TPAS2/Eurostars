@@ -61,7 +61,22 @@
       </form>
     </li>
     <li>
-      <div><strong>Rift report</strong><p class="muted small">The Excel workbook of every landlord being paid for <%= monthLabel %>: date, name, amount and landlord code, with the total. Check it in the preview first.</p></div>
+      <div><strong>Rift report</strong><p class="muted small">The Excel workbook of every landlord being paid for <%= monthLabel %>: date, name, amount and landlord code, with the total. Check it in the preview first.</p>
+        <% if (report.rows.length) { %><p class="small"><strong><%= report.rows.length %> landlord<%= report.rows.length === 1 ? '' : 's' %> to pay · <%= fmt.money(report.total) %></strong></p><% } %>
+        <% if (!report.rows.length || gaps.noRent.length || gaps.noLandlord.length) { %>
+        <div class="notice warn small pay-gaps">
+          <% if (!report.rows.length) { %><p><strong>No landlords to pay for <%= monthLabel %> yet.</strong> Landlords are paid each property’s <em>Rent to landlord</em> when the rents are calculated (step 1).</p><% } %>
+          <% if (gaps.noRent.length) { %>
+          <p><%= gaps.noRent.length %> propert<%= gaps.noRent.length === 1 ? 'y has' : 'ies have' %> a landlord but no <em>Rent to landlord</em>, so <%= gaps.noRent.length === 1 ? 'its landlord isn’t' : 'their landlords aren’t' %> paid. Fill it in, then calculate the rents again:</p>
+          <p class="gap-list"><% gaps.noRent.slice(0, 30).forEach(p => { %><a href="/app/properties/<%= p.id %>/edit"><%= p.code ? `${p.code} · ` : '' %><%= p.address_line1 %></a><% }) %><% if (gaps.noRent.length > 30) { %><span class="muted">and <%= gaps.noRent.length - 30 %> more</span><% } %></p>
+          <% } %>
+          <% if (gaps.noLandlord.length) { %>
+          <p><%= gaps.noLandlord.length %> propert<%= gaps.noLandlord.length === 1 ? 'y has' : 'ies have' %> a <em>Rent to landlord</em> but no landlord chosen:</p>
+          <p class="gap-list"><% gaps.noLandlord.slice(0, 30).forEach(p => { %><a href="/app/properties/<%= p.id %>/edit"><%= p.code ? `${p.code} · ` : '' %><%= p.address_line1 %></a><% }) %></p>
+          <% } %>
+        </div>
+        <% } %>
+      </div>
       <div class="step-actions">
         <a class="btn" href="/app/monthly/report?month=<%= month %>">Preview report</a>
         <a class="btn primary <%= generated ? '' : 'disabled' %>" href="/app/monthly/report.xlsx?month=<%= month %>" <%- generated ? '' : 'aria-disabled="true" tabindex="-1"' %>>Download Excel</a>
