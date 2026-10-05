@@ -50,7 +50,7 @@ const ENTITIES = {
       { name: 'town', label: 'Town / city', type: 'text' },
       { name: 'postcode', label: 'Postcode', type: 'text' },
       { name: 'landlord_id', label: 'Landlord', type: 'ref', ref: 'landlords', search: true, help: 'Type a name or landlord code, then pick from the list.' },
-      { name: 'property_type', label: 'Type', type: 'select', options: ['House', 'Flat', 'HMO', 'Bungalow', 'Studio', 'Commercial', 'Other'] },
+      { name: 'property_type', label: 'Type', type: 'select', options: ['House', 'Flat', 'Maisonette', 'HMO', 'Bungalow', 'Studio', 'Commercial', 'Other'] },
       { name: 'bedrooms', label: 'Bedrooms', type: 'integer' },
       { name: 'management_fee_pct', label: 'Management fee %', type: 'number', help: 'Deducted automatically from rent received.' },
       { name: 'status', label: 'Status', type: 'select', options: ['vacant', 'let', 'under offer', 'unavailable', 'handed back'], required: true, default: 'vacant' },
