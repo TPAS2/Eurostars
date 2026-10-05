@@ -300,6 +300,47 @@
   <% } %>
 </section>
 <% } %>
+<% if (typeof inspectionSheet !== 'undefined' && inspectionSheet) { const ck = inspectionSheet.checklist; const s = inspectionSheet.signature; %>
+<section class="card" id="inspection-sheet">
+  <div class="card-head">
+    <h2>Property safety inspection sheet</h2>
+    <div class="actions">
+      <a class="btn small" href="/app/inspections/<%= row.id %>/edit">Fill in / change</a>
+      <a class="btn small primary" href="/app/inspections/<%= row.id %>/sheet.pdf" download>Download PDF</a>
+    </div>
+  </div>
+  <div class="tick-sheet read-only">
+    <div class="tick-head"><span>Safety Requirement</span><span>Answer</span></div>
+    <% inspectionSheet.items.forEach(({ key, label }) => { %>
+    <div class="tick-row"><span class="tick-label"><%= label %></span><span class="tick-answer tick-<%= ck[key] === 'N/A' ? 'na' : ck[key].toLowerCase() %>"><%= ck[key] %><%= key === 'fire_door' && ck.fire_door_place ? ` · ${ck.fire_door_place}` : '' %></span></div>
+    <% }) %>
+  </div>
+  <div class="sign-grid">
+    <div class="sign-box">
+      <h3>Signed by Tenant</h3>
+      <% if (s) { %>
+        <img class="sign-img" src="/app/inspections/<%= row.id %>/sign.png?v=<%= s.v %>" alt="Signature of <%= s.signer_name || 'the tenant' %>">
+        <p class="small"><%= s.signer_name || '' %><%= s.signer_name ? ' · ' : '' %><%= fmt.ukDateTime(s.signed_at) %></p>
+        <form method="post" action="/app/inspections/<%= row.id %>/sign/delete" class="inline" data-confirm="Remove this signature?">
+          <%- include('partials/csrf') %><button class="btn small link" type="submit">Remove signature</button>
+        </form>
+      <% } else { %>
+      <form method="post" action="/app/inspections/<%= row.id %>/sign" data-signature data-no-keep>
+        <%- include('partials/csrf') %>
+        <input type="hidden" name="signature">
+        <label class="small">Tenant’s name <input name="name" maxlength="100" autocomplete="off"></label>
+        <canvas class="sign-pad" width="600" height="200" aria-label="Sign here"></canvas>
+        <p class="muted small sign-hint" data-signature-hint>Sign in the box with a finger, pen or mouse.</p>
+        <div class="sign-actions">
+          <button class="btn small" type="button" data-signature-clear>Clear</button>
+          <button class="btn small primary" type="submit">Save signature</button>
+        </div>
+      </form>
+      <% } %>
+    </div>
+  </div>
+</section>
+<% } %>
 <% if (typeof jobSignatures !== 'undefined' && jobSignatures) { %>
 <section class="card" id="job-sheet">
   <div class="card-head">

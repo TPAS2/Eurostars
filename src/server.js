@@ -111,6 +111,7 @@ function createApp(config, db, { writer = null, mailer = null } = {}) {
   mailer = mailer || createMailer(config);
   const app = express();
   app.locals.emailEnabled = !!(mailer && mailer.enabled);
+  app.locals.inspectionSheet = require('./inspectionSheet');
   app.set('view engine', 'ejs');
   app.set('views', path.join(__dirname, '..', 'views'));
   app.disable('x-powered-by');
@@ -193,6 +194,7 @@ function createApp(config, db, { writer = null, mailer = null } = {}) {
   app.use('/app/properties', auth.requireLogin, certFiles.newProperty);
   app.use('/app/properties', auth.requireLogin, require('./routes/propertyPhotos')(db, 'properties'));
   app.use('/app/inspections', auth.requireLogin, require('./routes/propertyPhotos')(db, 'inspections'));
+  app.use('/app/inspections', auth.requireLogin, require('./routes/inspectionSheet')(db));
   app.use('/app/properties', auth.requireLogin, require('./routes/propertyEmail')(db, mailer));
   app.use('/app/maintenance', auth.requireLogin, require('./routes/jobInvoice')(db, mailer));
   app.use('/app/landlord-invoices', auth.requireLogin, require('./routes/landlordInvoices')(db, mailer));

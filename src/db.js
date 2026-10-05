@@ -392,6 +392,15 @@ CREATE TABLE IF NOT EXISTS inspection_photos (
   uploaded_at    TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_inspection_photos ON inspection_photos(account_id, inspection_id);
+-- The tenant's signature on an inspection sheet, drawn on screen.
+CREATE TABLE IF NOT EXISTS inspection_signatures (
+  id             INTEGER PRIMARY KEY,
+  account_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  inspection_id  INTEGER NOT NULL UNIQUE REFERENCES inspections(id) ON DELETE CASCADE,
+  signer_name    TEXT,
+  png            BLOB NOT NULL,
+  signed_at      TEXT NOT NULL DEFAULT (datetime('now'))
+);
 
 -- Scans or PDFs of a certificate (gas, EICR, EPC, insurance...), kept in the database for backups.
 CREATE TABLE IF NOT EXISTS compliance_files (
@@ -530,6 +539,8 @@ function openDatabase(file) {
   addColumnIfMissing(db, 'maintenance_jobs', 'estimate_required', 'TEXT');
   addColumnIfMissing(db, 'maintenance_jobs', 'preferred_start_date', 'TEXT');
   addColumnIfMissing(db, 'maintenance_jobs', 'go_ahead', 'TEXT');
+  // An inspection's safety tick sheet (JSON of each requirement's Yes / No / N/A).
+  addColumnIfMissing(db, 'inspections', 'checklist', 'TEXT');
   // On street and Off street became one parking option, Street.
   db.prepare("UPDATE properties SET parking = 'Street' WHERE parking IN ('On street', 'Off street', 'On / off street')").run();
   // Tenants: the council's reference. Tenancies: the term as booked (rent is no longer entered).

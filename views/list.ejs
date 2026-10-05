@@ -6,6 +6,7 @@
     <form method="get" class="search"><% if (typeof monthView !== 'undefined' && monthView) { %><input type="hidden" name="month" value="<%= monthView.month %>"><% } %><input type="search" name="q" value="<%= q %>" placeholder="Search <%= def.plural.toLowerCase() %>…"></form>
     <% } %>
     <% if (def.key === 'maintenance') { %><a class="btn" href="/app/maintenance/job-sheet.pdf" download>Blank job sheet (PDF)</a><% } %>
+    <% if (def.key === 'inspections') { %><a class="btn" href="/app/inspections/sheet.pdf" download>Blank inspection sheet (PDF)</a><% } %>
     <a class="btn primary" href="/app/<%= def.key %>/new">+ Add <%= def.singular.toLowerCase() %></a>
   </div>
 </header>

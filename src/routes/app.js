@@ -68,6 +68,7 @@ module.exports = function appRoutes(db) {
       case 'ref': return { text: maps[f.ref].get(v) || '(deleted)', href: `/app/${f.ref}/${v}` };
       case 'person': return { text: (maps.people && maps.people.get(v)) || 'Someone who has left' };
       case 'select': return { text: (f.optionLabels && f.optionLabels[v]) || fmt.humanize(v), badge: true };
+      case 'checklist': return { text: require('../inspectionSheet').summary(v) };
       default: return { text: String(v) };
     }
   }
@@ -84,6 +85,8 @@ module.exports = function appRoutes(db) {
     const values = {};
     const errors = {};
     for (const f of def.fields) {
+      // An inspection's tick sheet: one Yes / No / N/A per safety requirement, kept together.
+      if (f.type === 'checklist') { values[f.name] = JSON.stringify(require('../inspectionSheet').parseChecklist(body)); continue; }
       let raw = body[f.name];
       // A dropdown left out of the submission entirely takes its default (e.g. Statement type: Email).
       if (raw === undefined && f.type === 'select' && f.default !== undefined) raw = f.default;
@@ -946,6 +949,12 @@ module.exports = function appRoutes(db) {
                       FROM maintenance_files f LEFT JOIN users u ON u.id = f.uploaded_by
                      WHERE f.account_id = ? AND f.job_id = ? ORDER BY f.id DESC`).all(a, row.id)
       : null;
+    // On an inspection: its tick sheet and the tenant's signature (without the picture).
+    const inspectionSheet = def.key === 'inspections' ? {
+      checklist: require('../inspectionSheet').readChecklist(row.checklist),
+      items: require('../inspectionSheet').SAFETY_ITEMS,
+      signature: db.prepare("SELECT signer_name, strftime('%s', signed_at) AS v, signed_at FROM inspection_signatures WHERE account_id = ? AND inspection_id = ?").get(a, row.id) || null,
+    } : null;
     // On a maintenance job: its job sheet's signatures (without the pictures).
     const jobSignatures = def.key === 'maintenance'
       ? Object.fromEntries(db.prepare("SELECT role, signer_name, satisfied, strftime('%s', signed_at) AS v, signed_at FROM job_signatures WHERE account_id = ? AND job_id = ?").all(a, row.id).map((s) => [s.role, s]))
@@ -997,7 +1006,7 @@ module.exports = function appRoutes(db) {
       previous: db.prepare('SELECT COUNT(*) AS n FROM council_db_entries WHERE account_id = ? AND council_id = ? AND ended = 1').get(a, row.id).n,
       invoices: [],
     } : null;
-    res.render('show', { title: rowTitle(def, row, maps), section: sectionOf(def), def, row, maps, display, rowTitle, children, extra, invoices, related: relatedLists(def, row, a), certs, photo, tenantBoxes, statementLink, jobFiles, jobSignatures, propertyPhotos, photoBox, listing, jobInvoice, contractorStats, bankChanges, councilBoxes, landlordStatements, callNotes, certFiles, error: req.query.error ? String(req.query.error).slice(0, 200) : null, flash: req.query.flash ? String(req.query.flash).slice(0, 200) : null, fmt, today: fmt.today() });
+    res.render('show', { title: rowTitle(def, row, maps), section: sectionOf(def), def, row, maps, display, rowTitle, children, extra, invoices, related: relatedLists(def, row, a), certs, photo, tenantBoxes, statementLink, jobFiles, jobSignatures, inspectionSheet, propertyPhotos, photoBox, listing, jobInvoice, contractorStats, bankChanges, councilBoxes, landlordStatements, callNotes, certFiles, error: req.query.error ? String(req.query.error).slice(0, 200) : null, flash: req.query.flash ? String(req.query.flash).slice(0, 200) : null, fmt, today: fmt.today() });
   });
 
   router.get('/:entity/:id/edit', (req, res) => {

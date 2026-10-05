@@ -6,9 +6,8 @@
 const express = require('express');
 const fmt = require('../format');
 const { buildJobSheet } = require('../jobSheet');
+const { readSignature } = require('../signature');
 
-const MAX_SIGNATURE_BYTES = 60 * 1024;
-const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 const RATING = { low: 'Low', normal: 'Normal', high: 'High', emergency: 'Emergency' };
 
 module.exports = function jobSheetRoutes(db) {
@@ -92,10 +91,8 @@ module.exports = function jobSheetRoutes(db) {
     const job = ownedJob(req, res);
     if (!job) return;
     const role = req.params.role;
-    const m = /^data:image\/png;base64,([A-Za-z0-9+/=]+)$/.exec(String(req.body.signature || ''));
-    const png = m ? Buffer.from(m[1], 'base64') : null;
-    if (!png || png.length < 60 || !png.subarray(0, 8).equals(PNG)) return back(res, job.id, 'error', 'Sign in the box first.');
-    if (png.length > MAX_SIGNATURE_BYTES) return back(res, job.id, 'error', 'That signature is too large. Clear it and sign again.');
+    const { png, error } = readSignature(req.body.signature);
+    if (error) return back(res, job.id, 'error', error);
     const name = String(req.body.name || '').trim().slice(0, 100);
     const satisfied = role === 'tenant' ? (['Yes', 'No'].includes(req.body.satisfied) ? req.body.satisfied : null) : null;
     if (role === 'tenant' && !satisfied) return back(res, job.id, 'error', 'Choose whether the work was done to the tenant’s satisfaction.');

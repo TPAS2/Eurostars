@@ -2452,6 +2452,50 @@ test('maintenance job sheet: blank template, each job filled-in sheet, signed on
   assert.equal(db.prepare("SELECT COUNT(*) n FROM job_signatures WHERE job_id = ? AND role = 'tenant'").get(job).n, 0);
 });
 
+test('inspection sheet: tick sheet filled in, signed by the tenant, downloadable; blank template too', async () => {
+  const c = await registerAndLogin('insp-sheet@example.com', 'Insp Sheet Lets');
+  let r = await c.get('/app/inspections');
+  assert.match(r.text, /href="\/app\/inspections\/sheet\.pdf" download>Blank inspection sheet/);
+  r = await c.get('/app/inspections/sheet.pdf');
+  assert.equal(r.headers.get('content-type'), 'application/pdf');
+  assert.ok(r.buf.subarray(0, 5).toString() === '%PDF-');
+
+  const prop = idFrom((await c.post('/app/properties', { address_line1: '9 Alarm Avenue', status: 'let' })).location);
+  r = await c.get(`/app/inspections/new?property_id=${prop}`);
+  assert.match(r.text, /class="tick-sheet"[\s\S]*?Window Restrictor \(All rooms above ground level\)[\s\S]*?name="checklist__window_restrictor" value="Yes"[\s\S]*?name="checklist__fire_door_place"[\s\S]*?Thumb Turn Lock \(To back door\)/);
+  assert.match(r.text, /name="checklist__heat_sensor" value="N\/A" checked/, 'each starts as N/A, like the paper sheet');
+  const ins = idFrom((await c.post('/app/inspections', { property_id: String(prop), inspection_date: '2026-10-03', inspection_type: 'Routine',
+    checklist__window_restrictor: 'Yes', checklist__smoke_alarms: 'Yes', checklist__fire_blanket: 'No', checklist__fire_door: 'Yes',
+    checklist__fire_door_place: 'Kitchen', checklist__heat_sensor: 'Maybe', notes: 'Fire blanket missing' })).location);
+  const saved = JSON.parse(db.prepare('SELECT checklist FROM inspections WHERE id = ?').get(ins).checklist);
+  assert.equal(saved.window_restrictor, 'Yes');
+  assert.equal(saved.fire_blanket, 'No');
+  assert.equal(saved.heat_sensor, 'N/A', 'anything else counts as N/A');
+  assert.equal(saved.fire_door_place, 'Kitchen');
+  r = await c.get(`/app/inspections/${ins}`);
+  assert.match(r.text, /id="inspection-sheet"[\s\S]*?sheet\.pdf" download>Download PDF[\s\S]*?Fire Blanket<\/span><span class="tick-answer tick-no">No[\s\S]*?Yes · Kitchen/);
+  assert.match(r.text, /3 Yes · 1 No · 11 N\/A/);
+  // The tenant signs on screen.
+  const png = 'data:image/png;base64,' + Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(80)]).toString('base64');
+  r = await c.post(`/app/inspections/${ins}/sign`, { name: 'Made-up Tenant', signature: 'nope' });
+  assert.match(decodeURIComponent(r.location), /error=Sign in the box first/);
+  r = await c.post(`/app/inspections/${ins}/sign`, { name: 'Made-up Tenant', signature: png });
+  assert.match(decodeURIComponent(r.location), /flash=Tenant’s signature saved/);
+  r = await c.get(`/app/inspections/${ins}`);
+  assert.match(r.text, /sign\.png\?v=\d+[\s\S]*?Made-up Tenant/);
+  r = await c.get(`/app/inspections/${ins}/sheet.pdf`);
+  assert.equal(r.headers.get('content-type'), 'application/pdf');
+  assert.match(r.headers.get('content-disposition'), /Inspection 2026-10-03 9 Alarm Avenue\.pdf/);
+  // Saved on the property, in date order.
+  r = await c.get(`/app/properties/${prop}`);
+  assert.match(r.text, /Inspections <span class="count">1<\/span>[\s\S]*?03\/10\/2026/);
+  // Private to the company.
+  const other = await registerAndLogin('insp-sheet-2@example.com', 'Other Insp Sheet');
+  assert.equal((await other.get(`/app/inspections/${ins}/sheet.pdf`)).status, 404);
+  assert.equal((await other.get(`/app/inspections/${ins}/sign.png`)).status, 404);
+  assert.equal((await other.post(`/app/inspections/${ins}/sign`, { signature: png })).status, 404);
+});
+
 test('landlords list has no Councils column, and is in landlord code order', async () => {
   const c = await registerAndLogin('ll-order@example.com', 'LL Order Lets');
   const leeds = idFrom((await c.post('/app/councils', { name: 'Leeds City Council' })).location);

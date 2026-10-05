@@ -18,6 +18,22 @@
       <option value="">— Select —</option>
       <% opts.forEach(o => { %><option value="<%= o.id %>" <%= Number(v) === o.id ? 'selected' : '' %><% if (o.hint) { %> data-hint="<%= o.hint %>"<% } %>><%= o.label %></option><% }) %>
     </select>
+  <% } else if (f.type === 'checklist') { const sheet = inspectionSheet; const c = sheet.readChecklist(v); %>
+    <div class="tick-sheet" id="f-<%= f.name %>" role="group" aria-label="<%= f.label %>">
+      <div class="tick-head"><span>Safety Requirement</span><span>Yes</span><span>No</span><span>N/A</span></div>
+      <% sheet.SAFETY_ITEMS.forEach(({ key, label }) => { %>
+      <div class="tick-row">
+        <span class="tick-label"><%= label %></span>
+        <% sheet.ANSWERS.forEach((a) => { %><label class="tick tick-<%= a === 'N/A' ? 'na' : a.toLowerCase() %>"><input type="radio" name="checklist__<%= key %>" value="<%= a %>" <%= c[key] === a ? 'checked' : '' %>><span><%= a %></span></label><% }) %>
+        <% if (key === 'fire_door') { %>
+        <select class="tick-place" name="checklist__fire_door_place" aria-label="Where is the fire check door?">
+          <option value="">Where?</option>
+          <% sheet.FIRE_DOOR_PLACES.forEach((p) => { %><option value="<%= p %>" <%= c.fire_door_place === p ? 'selected' : '' %>><%= p %></option><% }) %>
+        </select>
+        <% } %>
+      </div>
+      <% }) %>
+    </div>
   <% } else if (f.type === 'money') { %>
     <input id="f-<%= f.name %>" name="<%= f.name %>" inputmode="decimal" value="<%= typeof v === 'number' ? fmt.penceToInput(v) : v %>" <%= f.required ? 'required' : '' %> placeholder="0.00">
   <% } else { %>

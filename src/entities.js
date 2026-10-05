@@ -195,6 +195,7 @@ const ENTITIES = {
       { name: 'inspection_type', label: 'Type', type: 'select', options: ['Routine', 'Check-in', 'Check-out', 'Mid-term', 'Other'], required: true, default: 'Routine' },
       { name: 'condition', label: 'Condition', type: 'select', options: ['Good', 'Fair', 'Poor'] },
       { name: 'inspected_by', label: 'Inspected by', type: 'person', required: true },
+      { name: 'checklist', label: 'Safety requirements', type: 'checklist', wide: true },
       { name: 'notes', label: 'Notes', type: 'textarea', help: 'What was found, and anything that needs doing.' },
     ],
     columns: ['inspection_date', 'inspection_type', 'property_id', 'condition', 'inspected_by'],

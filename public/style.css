@@ -1106,3 +1106,34 @@ input, select, textarea { max-width: 100%; }
 .sign-img { display: block; width: 100%; max-width: 360px; aspect-ratio: 3 / 1; object-fit: contain; background: #fff; border: 1px solid var(--border); border-radius: 8px; }
 .sign-actions { display: flex; gap: 8px; justify-content: flex-end; }
 .sign-hint.err { color: var(--bad); font-weight: 700; }
+
+/* An inspection's safety tick sheet: a Yes / No / N/A choice per requirement. */
+.tick-sheet { border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.tick-head, .tick-row { display: grid; grid-template-columns: minmax(0, 1fr) repeat(3, 64px) 160px; align-items: center; gap: 6px; padding: 6px 10px; }
+.tick-sheet.read-only .tick-head, .tick-sheet.read-only .tick-row { grid-template-columns: minmax(0, 1fr) 200px; }
+.tick-head { background: #8ea9db; color: #0a0e17; font-weight: 800; font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; }
+.tick-head span:not(:first-child) { text-align: center; }
+.tick-row { border-top: 1px solid var(--border); }
+.tick-row:nth-child(odd) { background: var(--surface-2); }
+.tick-label { font-size: .92rem; }
+.tick { display: flex; justify-content: center; cursor: pointer; }
+.tick input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.tick span { display: inline-grid; place-items: center; min-width: 52px; padding: 7px 0; border: 2px solid var(--border); border-radius: 8px; font-weight: 800; font-size: .85rem; color: var(--muted); background: var(--surface); }
+.tick input:focus-visible + span { outline: 3px solid var(--brand); outline-offset: 1px; }
+.tick-yes input:checked + span { background: var(--ok); border-color: var(--ok); color: #fff; }
+.tick-no input:checked + span { background: var(--bad); border-color: var(--bad); color: #fff; }
+.tick-na input:checked + span { background: var(--muted); border-color: var(--muted); color: var(--surface); }
+.tick-place { font-size: .85rem; padding: 6px; }
+.tick-answer { font-weight: 800; text-align: center; border-radius: 6px; padding: 4px 6px; }
+.tick-answer.tick-yes { background: var(--ok-soft); color: var(--ok); }
+.tick-answer.tick-no { background: var(--bad-soft); color: var(--bad); }
+.tick-answer.tick-na { color: var(--muted); }
+#inspection-sheet .sign-grid { margin-top: 16px; }
+@media (max-width: 700px) {
+  .tick-head { display: none; }
+  .tick-row { grid-template-columns: repeat(3, 1fr); }
+  .tick-label { grid-column: 1 / -1; font-weight: 700; }
+  .tick-place { grid-column: 1 / -1; }
+  .tick-sheet.read-only .tick-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .tick-sheet.read-only .tick-label { grid-column: auto; }
+}
