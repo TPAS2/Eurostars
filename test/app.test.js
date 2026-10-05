@@ -630,6 +630,12 @@ test('admin adds an account and resets passwords', async () => {
   assert.equal((await sam.login('coastal', 'tidal-pool-4471', 'Sam')).location, '/app');
   assert.match((await sam.get('/app')).text, /Coastal Homes/);
   assert.equal((await new Client().post('/login', { login: 'coastal', member: 'Pat', password: 'tidal-pool-4471' })).status, 401);
+  // The form only needs Agency, Name and Password: the company name starts as the agency.
+  r = await admin.post('/admin/users', { username: 'Harbourlets', login_name: 'Kim', password: 'lantern-quay-208' });
+  assert.equal(r.status, 302);
+  assert.match(r.location, /\?created=1/);
+  assert.equal((await new Client().login('Harbourlets', 'lantern-quay-208', 'Kim')).location, '/app');
+  assert.doesNotMatch((await admin.get('/admin/users/new')).text, /name="agency_name"|name="email"|Company name/);
   // The admin's own username is still refused.
   r = await admin.post('/admin/users', { agency_name: 'X', name: 'X', username: 'admin', password: 'kettle-harbour-58' });
   assert.equal(r.status, 422);

@@ -3,7 +3,7 @@
   <div>
     <a class="crumb" href="/admin">← All users</a>
     <h1>Add account</h1>
-    <p class="muted">Create a login for a company. They get their own private workspace and only see their own data.</p>
+    <p class="muted">The same three things they type to sign in. A new agency gets its own private workspace; its company name and contact details can be filled in afterwards under Account details.</p>
   </div>
 </header>
 <section class="card">
@@ -11,25 +11,14 @@
   <form method="post" action="/admin/users" class="form-grid">
     <%- include('../partials/csrf') %>
     <div class="field">
-      <label for="agency_name">Company name <span class="req">*</span></label>
-      <input id="agency_name" name="agency_name" value="<%= values.agency_name || '' %>" autocomplete="off">
-      <div class="help">Leave blank when adding someone to an agency that already exists.</div>
-      <% if (errors.agency_name) { %><div class="field-err"><%= errors.agency_name %></div><% } %>
-    </div>
-    <div class="field">
-      <label for="name">Contact name <span class="req">*</span></label>
-      <input id="name" name="name" value="<%= values.name || '' %>" required autocomplete="off">
-      <% if (errors.name) { %><div class="field-err"><%= errors.name %></div><% } %>
-    </div>
-    <div class="field">
-      <label for="username">Username <span class="req">*</span></label>
+      <label for="username">Agency <span class="req">*</span></label>
       <input id="username" name="username" value="<%= values.username || '' %>" required maxlength="60" autocomplete="off" autocapitalize="none" spellcheck="false">
-      <% if (errors.username) { %><div class="field-err"><%= errors.username %></div><% } else { %><div class="help">What they type in "Agency" when signing in. Capitals count. To add someone to an agency that already exists, use that agency's username: they get their own sign-in name and password.</div><% } %>
+      <% if (errors.username) { %><div class="field-err"><%= errors.username %></div><% } else { %><div class="help">Capitals count. Use an existing agency to add another person to it.</div><% } %>
     </div>
     <div class="field">
-      <label for="login_name">Their sign-in name</label>
-      <input id="login_name" name="login_name" value="<%= values.login_name || '' %>" maxlength="30" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="e.g. Sam">
-      <% if (errors.login_name) { %><div class="field-err"><%= errors.login_name %></div><% } else { %><div class="help">What the contact types in "Your name". Leave blank to use their first name. Capitals count.</div><% } %>
+      <label for="login_name">Name <span class="req">*</span></label>
+      <input id="login_name" name="login_name" value="<%= values.login_name || '' %>" required maxlength="30" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="e.g. Sam">
+      <% if (errors.login_name) { %><div class="field-err"><%= errors.login_name %></div><% } else { %><div class="help">Capitals count. Must be different from everyone else in the agency.</div><% } %>
     </div>
     <div class="field">
       <label for="password">Password <span class="req">*</span></label>
@@ -38,11 +27,6 @@
         <button class="btn" type="button" data-generate="#password">Suggest one</button>
       </div>
       <% if (errors.password) { %><div class="field-err"><%= errors.password %></div><% } else { %><div class="help">At least <%= minPassword %> characters. Shown as you type so you can pass it on.</div><% } %>
-    </div>
-    <div class="field">
-      <label for="email">Email <span class="muted small">(optional)</span></label>
-      <input id="email" name="email" type="email" value="<%= values.email || '' %>" autocomplete="off">
-      <% if (errors.email) { %><div class="field-err"><%= errors.email %></div><% } %>
     </div>
     <div class="form-actions wide">
       <button class="btn primary" type="submit">Create account</button>
