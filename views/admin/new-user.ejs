@@ -12,7 +12,8 @@
     <%- include('../partials/csrf') %>
     <div class="field">
       <label for="agency_name">Company name <span class="req">*</span></label>
-      <input id="agency_name" name="agency_name" value="<%= values.agency_name || '' %>" required autocomplete="off">
+      <input id="agency_name" name="agency_name" value="<%= values.agency_name || '' %>" autocomplete="off">
+      <div class="help">Leave blank when adding someone to an agency that already exists.</div>
       <% if (errors.agency_name) { %><div class="field-err"><%= errors.agency_name %></div><% } %>
     </div>
     <div class="field">
@@ -23,7 +24,7 @@
     <div class="field">
       <label for="username">Username <span class="req">*</span></label>
       <input id="username" name="username" value="<%= values.username || '' %>" required maxlength="60" autocomplete="off" autocapitalize="none" spellcheck="false">
-      <% if (errors.username) { %><div class="field-err"><%= errors.username %></div><% } else { %><div class="help">The company's username. Capitals count: they must type it exactly.</div><% } %>
+      <% if (errors.username) { %><div class="field-err"><%= errors.username %></div><% } else { %><div class="help">What they type in "Agency" when signing in. Capitals count. To add someone to an agency that already exists, use that agency's username: they get their own sign-in name and password.</div><% } %>
     </div>
     <div class="field">
       <label for="login_name">Their sign-in name</label>

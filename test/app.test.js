@@ -617,6 +617,22 @@ test('admin adds an account and resets passwords', async () => {
   assert.equal((await coastal.get('/app')).location, '/login');
   assert.equal((await new Client().post('/login', { login: 'coastal', member: 'Pat', password: 'sea-view-2026' })).status, 401);
   assert.equal((await new Client().login('coastal', 'new-pass-2027', 'Pat')).location, '/app');
+
+  // Using an existing agency's username adds another person to that agency.
+  r = await admin.post('/admin/users', { agency_name: '', name: 'Sam Reed', username: 'Coastal', login_name: 'Pat', password: 'tidal-pool-4471' });
+  assert.equal(r.status, 422, 'the sign-in name must differ from the people already there');
+  assert.match(r.text, /already has someone signing in as/);
+  assert.doesNotMatch(r.text, /That username is taken/);
+  r = await admin.post('/admin/users', { agency_name: '', name: 'Sam Reed', username: 'Coastal', login_name: 'Sam', password: 'tidal-pool-4471' });
+  assert.equal(r.status, 302);
+  assert.match(decodeURIComponent(r.location), new RegExp(`/admin/users/${id}\\?flash=Added Sam Reed to Coastal Homes`));
+  const sam = new Client();
+  assert.equal((await sam.login('coastal', 'tidal-pool-4471', 'Sam')).location, '/app');
+  assert.match((await sam.get('/app')).text, /Coastal Homes/);
+  assert.equal((await new Client().post('/login', { login: 'coastal', member: 'Pat', password: 'tidal-pool-4471' })).status, 401);
+  // The admin's own username is still refused.
+  r = await admin.post('/admin/users', { agency_name: 'X', name: 'X', username: 'admin', password: 'kettle-harbour-58' });
+  assert.equal(r.status, 422);
 });
 
 test('admin account is set by username, and its password can be reset on restart', async () => {

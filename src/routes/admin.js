@@ -122,11 +122,35 @@ module.exports = function adminRoutes(db, config) {
     if (!values.login_name && values.name) values.login_name = signInNameFrom(values.name);
     const password = String(req.body.password || '');
     const errors = {};
+    // An agency that already exists: this adds another person to it. They share the agency's
+    // sign-in (its username) but have their own name and password.
+    const agency = USERNAME_RE.test(values.username)
+      ? db.prepare('SELECT * FROM users WHERE username = ? COLLATE NOCASE AND company_id IS NULL').get(values.username) : null;
+    if (agency && !agency.is_admin) {
+      if (!values.name) errors.name = 'Enter the person\'s full name.';
+      if (!LOGIN_NAME_RE.test(values.login_name)) errors.login_name = 'Use 1–30 letters, numbers, dashes or underscores (no spaces or dots).';
+      else if (db.prepare('SELECT 1 FROM users WHERE (company_id = ? OR id = ?) AND login_name = ? COLLATE NOCASE').get(agency.id, agency.id, values.login_name)) {
+        errors.login_name = `${agency.agency_name} already has someone signing in as "${values.login_name}". Give this person a different sign-in name.`;
+      }
+      if (values.email && !EMAIL_RE.test(values.email)) errors.email = 'Enter a valid email address, or leave it blank.';
+      if (password.length < MIN_PASSWORD) errors.password = `Use at least ${MIN_PASSWORD} characters.`;
+      else if (password.length > 200) errors.password = 'Password is too long.';
+      else if (auth.weakPassword(password, [agency.username, agency.agency_name, values.name, values.login_name])) errors.password = auth.weakPassword(password, [agency.username, agency.agency_name, values.name, values.login_name]);
+      if (Object.keys(errors).length) {
+        return res.status(422).render('admin/new-user', { title: 'Add account', section: 'admin', values: { ...values, agency_name: agency.agency_name }, errors, minPassword: MIN_PASSWORD });
+      }
+      db.prepare('INSERT INTO users (username, company_id, login_name, email, name, agency_name, password_hash) VALUES (?, ?, ?, ?, ?, ?, ?)')
+        .run(`${agency.username}.${values.login_name}`, agency.id, values.login_name, values.email || null, values.name, agency.agency_name, auth.hashPassword(password));
+      const msg = `Added ${values.name} to ${agency.agency_name}. They sign in with agency "${agency.username}", name "${values.login_name}" and the password you chose.`;
+      return res.redirect(`/admin/users/${agency.id}?flash=${encodeURIComponent(msg)}#people`);
+    }
     if (!values.agency_name) errors.agency_name = 'Enter the company name.';
     if (!values.name) errors.name = 'Enter the contact name.';
     if (!USERNAME_RE.test(values.username)) errors.username = 'Enter a username (up to 60 characters).';
     else if (RESERVED_USERNAMES.has(values.username.toLowerCase()) || values.username.toLowerCase() === config.adminUsername.toLowerCase()
-      || db.prepare('SELECT 1 FROM users WHERE username = ? COLLATE NOCASE').get(values.username)) errors.username = 'That username is taken.';
+      || db.prepare('SELECT 1 FROM users WHERE username = ? COLLATE NOCASE').get(values.username)) {
+      errors.username = agency && agency.is_admin ? 'That is the admin account\'s username. Choose another.' : 'That username is reserved. Choose another.';
+    }
     if (!LOGIN_NAME_RE.test(values.login_name)) errors.login_name = 'Use 1–30 letters, numbers, dashes or underscores (no spaces or dots).';
     if (values.email && !EMAIL_RE.test(values.email)) errors.email = 'Enter a valid email address, or leave it blank.';
     if (password.length < MIN_PASSWORD) errors.password = `Use at least ${MIN_PASSWORD} characters.`;
