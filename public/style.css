@@ -1092,3 +1092,17 @@ input, select, textarea { max-width: 100%; }
 .badge.s-Fair { background: var(--warn-soft); color: var(--warn); }
 .badge.s-Poor { background: var(--bad-soft); color: var(--bad); }
 .rentrun-month { display: flex; align-items: center; gap: 8px; }
+
+/* A maintenance job's sheet: two signature boxes, signed on screen. */
+.sign-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-top: 10px; }
+.sign-box { border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; }
+.sign-box h3 { margin: 0 0 8px; font-size: 1rem; }
+.sign-box form[data-signature] { display: grid; gap: 8px; }
+.sign-box label { display: grid; gap: 4px; font-weight: 700; }
+.sign-satisfied { border: 0; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: center; }
+.sign-satisfied legend { padding: 0; margin-bottom: 4px; width: 100%; }
+.sign-satisfied label { display: inline-flex; gap: 6px; font-weight: 600; }
+.sign-pad { width: 100%; aspect-ratio: 3 / 1; height: auto; background: #fff; border: 1px dashed var(--border); border-radius: 8px; touch-action: none; cursor: crosshair; }
+.sign-img { display: block; width: 100%; max-width: 360px; aspect-ratio: 3 / 1; object-fit: contain; background: #fff; border: 1px solid var(--border); border-radius: 8px; }
+.sign-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.sign-hint.err { color: var(--bad); font-weight: 700; }

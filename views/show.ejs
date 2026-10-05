@@ -300,6 +300,48 @@
   <% } %>
 </section>
 <% } %>
+<% if (typeof jobSignatures !== 'undefined' && jobSignatures) { %>
+<section class="card" id="job-sheet">
+  <div class="card-head">
+    <h2>Job sheet</h2>
+    <a class="btn small primary" href="/app/maintenance/<%= row.id %>/job-sheet.pdf" download>Download job sheet (PDF)</a>
+  </div>
+  <p class="muted small">Filled in from this job, its property, landlord, tenants and contractor. Signatures saved below are printed at the bottom of the sheet.</p>
+  <div class="sign-grid">
+    <% [['tenant', 'Tenant / SU'], ['contractor', 'Maintenance / Contractor']].forEach(([role, label]) => { const s = jobSignatures[role]; %>
+    <div class="sign-box">
+      <h3>Signed by <%= label %></h3>
+      <% if (s) { %>
+        <img class="sign-img" src="/app/maintenance/<%= row.id %>/sign/<%= role %>.png?v=<%= s.v %>" alt="Signature of <%= s.signer_name || label %>">
+        <p class="small"><%= s.signer_name || '' %><%= s.signer_name ? ' · ' : '' %><%= fmt.ukDateTime(s.signed_at) %><% if (s.satisfied) { %> · Works done to their satisfaction: <strong><%= s.satisfied %></strong><% } %></p>
+        <form method="post" action="/app/maintenance/<%= row.id %>/sign/<%= role %>/delete" class="inline" data-confirm="Remove this signature?">
+          <%- include('partials/csrf') %><button class="btn small link" type="submit">Remove signature</button>
+        </form>
+      <% } else { %>
+      <form method="post" action="/app/maintenance/<%= row.id %>/sign/<%= role %>" data-signature data-no-keep>
+        <%- include('partials/csrf') %>
+        <input type="hidden" name="signature">
+        <% if (role === 'tenant') { %>
+        <fieldset class="sign-satisfied">
+          <legend class="small">Works carried out to the satisfaction of the tenant?</legend>
+          <label class="check small"><input type="radio" name="satisfied" value="Yes" required> Yes</label>
+          <label class="check small"><input type="radio" name="satisfied" value="No"> No</label>
+        </fieldset>
+        <% } %>
+        <label class="small">Name <input name="name" maxlength="100" autocomplete="off"></label>
+        <canvas class="sign-pad" width="600" height="200" aria-label="Sign here"></canvas>
+        <p class="muted small sign-hint" data-signature-hint>Sign in the box with a finger, pen or mouse.</p>
+        <div class="sign-actions">
+          <button class="btn small" type="button" data-signature-clear>Clear</button>
+          <button class="btn small primary" type="submit">Save signature</button>
+        </div>
+      </form>
+      <% } %>
+    </div>
+    <% }) %>
+  </div>
+</section>
+<% } %>
 <% if (jobFiles) { %>
 <section class="card" id="files">
   <div class="card-head">

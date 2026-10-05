@@ -790,7 +790,7 @@ module.exports = function appRoutes(db) {
 
   // The next landlord or property code: one more than the highest so far, keeping its letters and
   // zero padding (L101 → L102, LL009 → LL010); L0001 / P0001 for the first.
-  const CODED = { landlords: 'L0001', properties: 'P0001' };
+  const CODED = { landlords: 'L0001', properties: 'P0001', contractors: 'C0001' };
   function nextCode(table, accountId) {
     let best = null;
     for (const { code } of db.prepare(`SELECT code FROM ${table} WHERE account_id = ? AND code IS NOT NULL AND code != ''`).all(accountId)) {
@@ -946,6 +946,10 @@ module.exports = function appRoutes(db) {
                       FROM maintenance_files f LEFT JOIN users u ON u.id = f.uploaded_by
                      WHERE f.account_id = ? AND f.job_id = ? ORDER BY f.id DESC`).all(a, row.id)
       : null;
+    // On a maintenance job: its job sheet's signatures (without the pictures).
+    const jobSignatures = def.key === 'maintenance'
+      ? Object.fromEntries(db.prepare("SELECT role, signer_name, satisfied, strftime('%s', signed_at) AS v, signed_at FROM job_signatures WHERE account_id = ? AND job_id = ?").all(a, row.id).map((s) => [s.role, s]))
+      : null;
     // On a maintenance job: the landlord's invoice, once the job is completed.
     const jobInvoice = def.key === 'maintenance' ? db.prepare(
       `SELECT j.status, j.cost_pence, j.invoice_date, j.invoice_emailed_at, j.invoice_emailed_to, l.id AS landlord_id, l.name AS landlord_name, l.email AS landlord_email
@@ -993,7 +997,7 @@ module.exports = function appRoutes(db) {
       previous: db.prepare('SELECT COUNT(*) AS n FROM council_db_entries WHERE account_id = ? AND council_id = ? AND ended = 1').get(a, row.id).n,
       invoices: [],
     } : null;
-    res.render('show', { title: rowTitle(def, row, maps), section: sectionOf(def), def, row, maps, display, rowTitle, children, extra, invoices, related: relatedLists(def, row, a), certs, photo, tenantBoxes, statementLink, jobFiles, propertyPhotos, photoBox, listing, jobInvoice, contractorStats, bankChanges, councilBoxes, landlordStatements, callNotes, certFiles, error: req.query.error ? String(req.query.error).slice(0, 200) : null, flash: req.query.flash ? String(req.query.flash).slice(0, 200) : null, fmt, today: fmt.today() });
+    res.render('show', { title: rowTitle(def, row, maps), section: sectionOf(def), def, row, maps, display, rowTitle, children, extra, invoices, related: relatedLists(def, row, a), certs, photo, tenantBoxes, statementLink, jobFiles, jobSignatures, propertyPhotos, photoBox, listing, jobInvoice, contractorStats, bankChanges, councilBoxes, landlordStatements, callNotes, certFiles, error: req.query.error ? String(req.query.error).slice(0, 200) : null, flash: req.query.flash ? String(req.query.flash).slice(0, 200) : null, fmt, today: fmt.today() });
   });
 
   router.get('/:entity/:id/edit', (req, res) => {

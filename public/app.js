@@ -416,6 +416,55 @@ const DRAFT_DAYS = 7;
         input.form.submit();
       });
     });
+    // Signing a job sheet on screen: draw in the box; the drawing is sent as a PNG picture.
+    document.querySelectorAll('form[data-signature]').forEach((form) => {
+      const canvas = form.querySelector('canvas');
+      const input = form.querySelector('input[name=signature]');
+      const hint = form.querySelector('[data-signature-hint]');
+      const ctx = canvas.getContext('2d');
+      ctx.lineWidth = 3;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.strokeStyle = '#0d2a8c';
+      let drawing = false;
+      let drew = false;
+      const at = (e) => {
+        const r = canvas.getBoundingClientRect();
+        return [(e.clientX - r.left) * (canvas.width / r.width), (e.clientY - r.top) * (canvas.height / r.height)];
+      };
+      canvas.addEventListener('pointerdown', (e) => {
+        drawing = true;
+        canvas.setPointerCapture(e.pointerId);
+        const [x, y] = at(e);
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x + 0.1, y + 0.1);
+        ctx.stroke();
+        drew = true;
+        e.preventDefault();
+      });
+      canvas.addEventListener('pointermove', (e) => {
+        if (!drawing) return;
+        const [x, y] = at(e);
+        ctx.lineTo(x, y);
+        ctx.stroke();
+      });
+      const stop = () => { drawing = false; };
+      canvas.addEventListener('pointerup', stop);
+      canvas.addEventListener('pointercancel', stop);
+      form.querySelector('[data-signature-clear]').addEventListener('click', () => {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        drew = false;
+      });
+      form.addEventListener('submit', (e) => {
+        if (!drew) {
+          e.preventDefault();
+          if (hint) { hint.textContent = 'Please sign in the box first.'; hint.classList.add('err'); }
+          return;
+        }
+        input.value = canvas.toDataURL('image/png');
+      });
+    });
     // A property's photo gallery: clicking a smaller photo shows it as the big one.
     document.querySelectorAll('[data-gallery]').forEach((gallery) => {
       const main = gallery.querySelector('[data-gallery-main]');

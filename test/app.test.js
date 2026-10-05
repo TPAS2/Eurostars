@@ -2407,6 +2407,51 @@ test('rent run: a This month button goes back to the current month', async () =>
   assert.match(r.text, /<span class="btn disabled" aria-disabled="true">This month<\/span>/, 'greyed out when already on this month');
 });
 
+test('maintenance job sheet: blank template, each job filled-in sheet, signed on screen', async () => {
+  const c = await registerAndLogin('job-sheet@example.com', 'Job Sheet Lets');
+  let r = await c.get('/app/maintenance');
+  assert.match(r.text, /href="\/app\/maintenance\/job-sheet\.pdf" download>Blank job sheet/);
+  r = await c.get('/app/maintenance/job-sheet.pdf');
+  assert.equal(r.headers.get('content-type'), 'application/pdf');
+  assert.ok(r.buf.subarray(0, 5).toString() === '%PDF-');
+
+  const landlord = idFrom((await c.post('/app/landlords', { ...LANDLORD, name: 'Sheet Landlord' })).location);
+  const prop = idFrom((await c.post('/app/properties', { address_line1: '7 Spanner Row', status: 'let', landlord_id: String(landlord) })).location);
+  await c.get('/app/contractors/new');
+  const con = idFrom((await c.post('/app/contractors', { name: 'Fixit Maintenance', phone: '0100 000000' })).location);
+  assert.equal(db.prepare('SELECT code FROM contractors WHERE id = ?').get(con).code, 'C0001', 'contractors get codes');
+  const job = idFrom((await c.post('/app/maintenance', { property_id: String(prop), title: 'Door lock not catching', contractor: 'Fixit Maintenance', priority: 'high', status: 'open', estimate_required: 'No', go_ahead: 'Yes' })).location);
+  r = await c.get(`/app/maintenance/${job}`);
+  assert.match(r.text, /id="job-sheet"[\s\S]*?job-sheet\.pdf" download>Download job sheet[\s\S]*?data-signature[\s\S]*?name="satisfied"[\s\S]*?<canvas class="sign-pad"/);
+  r = await c.get(`/app/maintenance/${job}/job-sheet.pdf`);
+  assert.equal(r.headers.get('content-type'), 'application/pdf');
+  assert.match(r.headers.get('content-disposition'), new RegExp(`Job sheet ${job}\\.pdf`));
+
+  // Signing: needs a drawing (a real PNG), and the tenant's yes/no.
+  const png = 'data:image/png;base64,' + Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(80)]).toString('base64');
+  await c.get(`/app/maintenance/${job}`);
+  r = await c.post(`/app/maintenance/${job}/sign/tenant`, { name: 'Pat Tenant', signature: png });
+  assert.match(decodeURIComponent(r.location), /error=Choose whether the work was done/);
+  r = await c.post(`/app/maintenance/${job}/sign/tenant`, { name: 'Pat Tenant', satisfied: 'Yes', signature: 'data:image/png;base64,AAAA' });
+  assert.match(decodeURIComponent(r.location), /error=Sign in the box first/);
+  r = await c.post(`/app/maintenance/${job}/sign/tenant`, { name: 'Pat Tenant', satisfied: 'Yes', signature: png });
+  assert.match(decodeURIComponent(r.location), /flash=Tenant’s signature saved/);
+  r = await c.post(`/app/maintenance/${job}/sign/contractor`, { name: 'Sam Fixer', signature: png });
+  assert.match(decodeURIComponent(r.location), /flash=Maintenance \/ contractor signature saved/);
+  r = await c.get(`/app/maintenance/${job}`);
+  assert.match(r.text, /sign\/tenant\.png\?v=\d+[\s\S]*?Pat Tenant[\s\S]*?satisfaction: <strong>Yes<\/strong>/);
+  assert.equal((await c.get(`/app/maintenance/${job}/sign/contractor.png`)).headers.get('content-type'), 'image/png');
+  assert.equal((await c.get(`/app/maintenance/${job}/job-sheet.pdf`)).status, 200, 'the sheet still builds with signatures on it');
+  // Private to the company.
+  const other = await registerAndLogin('job-sheet-2@example.com', 'Other Sheet');
+  assert.equal((await other.get(`/app/maintenance/${job}/job-sheet.pdf`)).status, 404);
+  assert.equal((await other.get(`/app/maintenance/${job}/sign/tenant.png`)).status, 404);
+  assert.equal((await other.post(`/app/maintenance/${job}/sign/tenant`, { satisfied: 'No', signature: png })).status, 404);
+  // Removing a signature.
+  await c.post(`/app/maintenance/${job}/sign/tenant/delete`, {});
+  assert.equal(db.prepare("SELECT COUNT(*) n FROM job_signatures WHERE job_id = ? AND role = 'tenant'").get(job).n, 0);
+});
+
 test('landlords list has no Councils column, and is in landlord code order', async () => {
   const c = await registerAndLogin('ll-order@example.com', 'LL Order Lets');
   const leeds = idFrom((await c.post('/app/councils', { name: 'Leeds City Council' })).location);

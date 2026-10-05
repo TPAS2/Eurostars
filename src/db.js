@@ -353,6 +353,20 @@ CREATE TABLE IF NOT EXISTS property_photos (
 );
 CREATE INDEX IF NOT EXISTS idx_property_photos ON property_photos(account_id, property_id);
 
+-- Signatures on a maintenance job sheet: the tenant's (with whether they were satisfied) and the
+-- maintenance person's or contractor's, drawn on screen and kept as PNG pictures.
+CREATE TABLE IF NOT EXISTS job_signatures (
+  id           INTEGER PRIMARY KEY,
+  account_id   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  job_id       INTEGER NOT NULL REFERENCES maintenance_jobs(id) ON DELETE CASCADE,
+  role         TEXT NOT NULL CHECK (role IN ('tenant', 'contractor')),
+  signer_name  TEXT,
+  satisfied    TEXT,
+  png          BLOB NOT NULL,
+  signed_at    TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE (job_id, role)
+);
+
 -- Property inspections (routine, check-in, check-out...), each with its own photos.
 CREATE TABLE IF NOT EXISTS inspections (
   id               INTEGER PRIMARY KEY,
@@ -511,6 +525,11 @@ function openDatabase(file) {
   addColumnIfMissing(db, 'properties', 'parking', 'TEXT');
   addColumnIfMissing(db, 'properties', 'rent_pence', 'INTEGER');
   addColumnIfMissing(db, 'properties', 'price_per_night_pence', 'INTEGER');
+  // What the maintenance job sheet needs: the contractor's details, and a few job details.
+  for (const col of ['code', 'address', 'mobile', 'fax']) addColumnIfMissing(db, 'contractors', col, 'TEXT');
+  addColumnIfMissing(db, 'maintenance_jobs', 'estimate_required', 'TEXT');
+  addColumnIfMissing(db, 'maintenance_jobs', 'preferred_start_date', 'TEXT');
+  addColumnIfMissing(db, 'maintenance_jobs', 'go_ahead', 'TEXT');
   // On street and Off street became one parking option, Street.
   db.prepare("UPDATE properties SET parking = 'Street' WHERE parking IN ('On street', 'Off street', 'On / off street')").run();
   // Tenants: the council's reference. Tenancies: the term as booked (rent is no longer entered).
