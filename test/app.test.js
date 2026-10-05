@@ -2322,7 +2322,18 @@ test('inspections: own tab, own photos (separate from property photos), listed o
   r = await c.get(`/app/properties/${prop}`);
   assert.match(r.text, /gallery-empty/, 'the property itself still has no photos');
   assert.match(r.text, /Inspections <span class="count">2<\/span>[\s\S]*?15\/09\/2026[\s\S]*?02\/03\/2026/, 'newest first on the property');
-  r = await c.get('/app/inspections');
+  // Listed one month at a time, like the invoice tabs; All months shows every one, newest first.
+  r = await c.get('/app/inspections?month=2026-09');
+  assert.match(r.text, /15\/09\/2026/);
+  assert.doesNotMatch(r.text, /02\/03\/2026/);
+  assert.match(r.text, /Inspections · September 2026<\/span><span class="value">1</);
+  assert.match(r.text, /href="\/app\/inspections\?month=2026-08"[\s\S]*?href="\/app\/inspections\?month=2026-10"/, 'previous and next month buttons');
+  r = await c.get('/app/inspections?month=2026-03');
+  assert.match(r.text, /02\/03\/2026/);
+  assert.doesNotMatch(r.text, /15\/09\/2026/);
+  r = await c.get('/app/inspections?month=2026-05');
+  assert.match(r.text, /No inspections in May 2026\./);
+  r = await c.get('/app/inspections?month=all');
   assert.match(r.text, /15\/09\/2026[\s\S]*?02\/03\/2026/);
   // Private to the company.
   const other = await registerAndLogin('inspect-2@example.com', 'Other Inspect');

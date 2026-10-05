@@ -668,6 +668,20 @@ module.exports = function appRoutes(db) {
       monthView = { month, thisMonth, prev: shift(-1), next: shift(1), inMonth, olderOpen,
         monthLabel: month === 'all' ? 'All months' : require('../statements').monthLabel(month) };
     }
+    // Inspections too, one month at a time by the date of the inspection.
+    if (def.key === 'inspections') {
+      const thisMonth = fmt.today().slice(0, 7);
+      const month = req.query.month === 'all' ? 'all' : /^\d{4}-(0[1-9]|1[0-2])$/.test(String(req.query.month || '')) ? String(req.query.month) : thisMonth;
+      if (month !== 'all') { where += ' AND substr(inspection_date, 1, 7) = ?'; params.push(month); }
+      const shift = (by) => { const [y, m] = (month === 'all' ? thisMonth : month).split('-').map(Number); return new Date(Date.UTC(y, m - 1 + by, 1)).toISOString().slice(0, 7); };
+      const inMonth = month === 'all' ? null : db.prepare(
+        `SELECT COUNT(*) AS n, COALESCE(SUM(condition = 'Good'), 0) AS good, COALESCE(SUM(condition = 'Fair'), 0) AS fair,
+                COALESCE(SUM(condition = 'Poor'), 0) AS poor
+           FROM inspections WHERE account_id = ? AND substr(inspection_date, 1, 7) = ?`
+      ).get(a, month);
+      monthView = { kind: 'inspections', month, thisMonth, prev: shift(-1), next: shift(1), inMonth,
+        monthLabel: month === 'all' ? 'All months' : require('../statements').monthLabel(month) };
+    }
     let rows = db.prepare(`SELECT * FROM ${def.table} WHERE ${where} ORDER BY ${def.order} LIMIT ${LIST_LIMIT + 1}`).all(...params);
     const truncated = rows.length > LIST_LIMIT;
     if (truncated) rows.pop();

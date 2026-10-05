@@ -1087,3 +1087,7 @@ input, select, textarea { max-width: 100%; }
 .cert-edit-row .field { margin: 0; }
 .cert-edit-actions { display: flex; gap: 6px; align-items: center; }
 @media (max-width: 900px) { .cert-edit-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .cert-edit-row > div:first-of-type, .cert-edit-actions { grid-column: 1 / -1; } }
+/* An inspection's condition. */
+.badge.s-Good { background: var(--ok-soft); color: var(--ok); }
+.badge.s-Fair { background: var(--warn-soft); color: var(--warn); }
+.badge.s-Poor { background: var(--bad-soft); color: var(--bad); }

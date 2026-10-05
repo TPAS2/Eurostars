@@ -24,7 +24,13 @@
 <% if (typeof monthView !== 'undefined' && monthView) { const mv = monthView; %>
 <%- include('partials/month-nav', { base: `/app/${def.key}`, month: mv.month, prev: mv.prev, next: mv.next, thisMonth: mv.thisMonth, keep: q ? { q } : {}, allowAll: true }) %>
 <section class="tiles">
-  <% if (mv.inMonth) { %>
+  <% if (mv.inMonth && mv.kind === 'inspections') { %>
+  <div class="tile"><span class="label">Inspections · <%= mv.monthLabel %></span><span class="value"><%= mv.inMonth.n %></span><span class="sub"><%= mv.inMonth.n === 1 ? 'inspection' : 'inspections' %></span></div>
+  <div class="tile ok"><span class="label">Good</span><span class="value"><%= mv.inMonth.good %></span><span class="sub">from <%= mv.monthLabel %></span></div>
+  <div class="tile <%= mv.inMonth.fair ? 'warn' : '' %>"><span class="label">Fair</span><span class="value"><%= mv.inMonth.fair %></span><span class="sub">from <%= mv.monthLabel %></span></div>
+  <div class="tile <%= mv.inMonth.poor ? 'alert' : '' %>"><span class="label">Poor</span><span class="value"><%= mv.inMonth.poor %></span><span class="sub">from <%= mv.monthLabel %></span></div>
+  <a class="tile" href="/app/<%= def.key %>?month=all"><span class="label">Every month</span><span class="value">All</span><span class="sub">Show all inspections</span></a>
+  <% } else if (mv.inMonth) { %>
   <div class="tile"><span class="label">Reported · <%= mv.monthLabel %></span><span class="value"><%= mv.inMonth.n %></span><span class="sub"><%= mv.inMonth.n === 1 ? 'job' : 'jobs' %></span></div>
   <div class="tile <%= mv.inMonth.open ? 'warn' : '' %>"><span class="label">Outstanding</span><span class="value"><%= mv.inMonth.open %></span><span class="sub">from <%= mv.monthLabel %></span></div>
   <div class="tile ok"><span class="label">Completed jobs</span><span class="value"><%= mv.inMonth.done %></span><span class="sub">from <%= mv.monthLabel %></span></div>
@@ -35,7 +41,7 @@
 <% } %>
 <section class="card">
   <% if (!rows.length) { %>
-    <p class="muted"><%= q ? 'No matches.' : (typeof monthView !== 'undefined' && monthView && monthView.month !== 'all') ? `No maintenance jobs reported in ${monthView.monthLabel}.` : `No ${def.plural.toLowerCase()} yet.` %></p>
+    <p class="muted"><%= q ? 'No matches.' : (typeof monthView !== 'undefined' && monthView && monthView.month !== 'all') ? (monthView.kind === 'inspections' ? `No inspections in ${monthView.monthLabel}.` : `No maintenance jobs reported in ${monthView.monthLabel}.`) : `No ${def.plural.toLowerCase()} yet.` %></p>
   <% } else { %>
     <%- include('partials/table', { rows, hideField: null }) %>
     <% if (truncated) { %><p class="muted small">Showing the first 500. Use search to narrow down.</p><% } %>
