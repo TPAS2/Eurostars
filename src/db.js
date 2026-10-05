@@ -339,6 +339,20 @@ CREATE TABLE IF NOT EXISTS maintenance_files (
 );
 CREATE INDEX IF NOT EXISTS idx_maintenance_files ON maintenance_files(account_id, job_id);
 
+-- Photos of a property, kept in the database so backups include them.
+CREATE TABLE IF NOT EXISTS property_photos (
+  id           INTEGER PRIMARY KEY,
+  account_id   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  property_id  INTEGER NOT NULL REFERENCES properties(id) ON DELETE CASCADE,
+  filename     TEXT NOT NULL,
+  mime         TEXT NOT NULL,
+  size         INTEGER NOT NULL,
+  data         BLOB NOT NULL,
+  uploaded_by  INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  uploaded_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_property_photos ON property_photos(account_id, property_id);
+
 -- Scans or PDFs of a certificate (gas, EICR, EPC, insurance...), kept in the database for backups.
 CREATE TABLE IF NOT EXISTS compliance_files (
   id           INTEGER PRIMARY KEY,

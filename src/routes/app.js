@@ -905,6 +905,12 @@ module.exports = function appRoutes(db) {
                       FROM compliance_files f LEFT JOIN users u ON u.id = f.uploaded_by
                      WHERE f.account_id = ? AND f.item_id = ? ORDER BY f.id DESC`).all(a, row.id)
       : null;
+    // On a property: its photos (without the file contents).
+    const propertyPhotos = def.key === 'properties'
+      ? db.prepare(`SELECT f.id, f.filename, f.mime, f.uploaded_at, u.name AS uploaded_by_name
+                      FROM property_photos f LEFT JOIN users u ON u.id = f.uploaded_by
+                     WHERE f.account_id = ? AND f.property_id = ? ORDER BY f.id DESC`).all(a, row.id)
+      : null;
     // On a maintenance job: its photos and files (without the file contents).
     const jobFiles = def.key === 'maintenance'
       ? db.prepare(`SELECT f.id, f.filename, f.mime, f.size, f.uploaded_at, u.name AS uploaded_by_name
@@ -958,7 +964,7 @@ module.exports = function appRoutes(db) {
       previous: db.prepare('SELECT COUNT(*) AS n FROM council_db_entries WHERE account_id = ? AND council_id = ? AND ended = 1').get(a, row.id).n,
       invoices: [],
     } : null;
-    res.render('show', { title: rowTitle(def, row, maps), section: sectionOf(def), def, row, maps, display, rowTitle, children, extra, invoices, related: relatedLists(def, row, a), certs, photo, tenantBoxes, statementLink, jobFiles, jobInvoice, contractorStats, bankChanges, councilBoxes, landlordStatements, callNotes, certFiles, error: req.query.error ? String(req.query.error).slice(0, 200) : null, flash: req.query.flash ? String(req.query.flash).slice(0, 200) : null, fmt, today: fmt.today() });
+    res.render('show', { title: rowTitle(def, row, maps), section: sectionOf(def), def, row, maps, display, rowTitle, children, extra, invoices, related: relatedLists(def, row, a), certs, photo, tenantBoxes, statementLink, jobFiles, propertyPhotos, jobInvoice, contractorStats, bankChanges, councilBoxes, landlordStatements, callNotes, certFiles, error: req.query.error ? String(req.query.error).slice(0, 200) : null, flash: req.query.flash ? String(req.query.flash).slice(0, 200) : null, fmt, today: fmt.today() });
   });
 
   router.get('/:entity/:id/edit', (req, res) => {

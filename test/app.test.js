@@ -2210,6 +2210,41 @@ test('maintenance jobs: upload photos and files, view, download, remove', async 
   assert.equal(db.prepare('SELECT COUNT(*) n FROM maintenance_files WHERE job_id = ?').get(job).n, 0);
 });
 
+test('property photos: upload several, view, remove; private to the company', async () => {
+  const c = await registerAndLogin('prop-photos@example.com', 'Prop Photos Lets');
+  const prop = idFrom((await c.post('/app/properties', { address_line1: '8 Camera Street', status: 'vacant' })).location);
+  let r = await c.get(`/app/properties/${prop}`);
+  assert.match(r.text, /id="photos"[\s\S]*?Property photos[\s\S]*?name="photos" multiple/);
+  assert.match(r.text, /No photos yet/);
+
+  const png = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(30)]);
+  const jpg = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(30)]);
+  const form = new FormData();
+  form.append('_csrf', c.csrf);
+  form.append('photos', new File([png], 'front.png'));
+  form.append('photos', new File([jpg], 'kitchen.jpg'));
+  form.append('photos', new File([Buffer.from('%PDF-1.4\n')], 'not-a-photo.pdf'));
+  const res = await fetch(`${base}/app/properties/${prop}/photos`, { method: 'POST', headers: { cookie: c.cookie }, body: form, redirect: 'manual' });
+  assert.match(decodeURIComponent(res.headers.get('location')), /Uploaded 2 photos\. Not uploaded .*not-a-photo\.pdf/);
+
+  r = await c.get(`/app/properties/${prop}`);
+  assert.match(r.text, /Property photos <span class="count">2<\/span>/);
+  assert.match(r.text, /<img src="\/app\/properties\/\d+\/photos\/\d+" alt="kitchen\.jpg"/);
+  const photos = db.prepare('SELECT id FROM property_photos WHERE property_id = ? ORDER BY id').all(prop);
+  r = await c.get(`/app/properties/${prop}/photos/${photos[0].id}`);
+  assert.equal(r.headers.get('content-type'), 'image/png');
+  assert.match(r.headers.get('content-security-policy'), /sandbox/);
+
+  const other = await registerAndLogin('prop-photos-2@example.com', 'Other Photos');
+  assert.equal((await other.get(`/app/properties/${prop}/photos/${photos[0].id}`)).status, 404);
+  assert.equal((await other.post(`/app/properties/${prop}/photos/${photos[0].id}/delete`, {})).status, 404);
+  await c.get(`/app/properties/${prop}`);
+  await c.post(`/app/properties/${prop}/photos/${photos[0].id}/delete`, {});
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM property_photos WHERE property_id = ?').get(prop).n, 1);
+  await c.post(`/app/properties/${prop}/delete`, {});
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM property_photos WHERE property_id = ?').get(prop).n, 0, 'deleting the property removes its photos');
+});
+
 test('landlords list has no Councils column, and is in landlord code order', async () => {
   const c = await registerAndLogin('ll-order@example.com', 'LL Order Lets');
   const leeds = idFrom((await c.post('/app/councils', { name: 'Leeds City Council' })).location);

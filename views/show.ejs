@@ -249,6 +249,37 @@
 </section>
 <% } %>
 
+<% if (typeof propertyPhotos !== 'undefined' && propertyPhotos) { %>
+<section class="card" id="photos">
+  <div class="card-head">
+    <h2>Property photos <span class="count"><%= propertyPhotos.length %></span></h2>
+    <form method="post" action="/app/properties/<%= row.id %>/photos" enctype="multipart/form-data" class="inline" data-busy="Uploading…">
+      <%- include('partials/csrf') %>
+      <label class="btn small primary">+ Add photos<input type="file" name="photos" multiple accept="image/*,.heic,.heif" data-autosubmit hidden></label>
+      <noscript><button class="btn small" type="submit">Upload</button></noscript>
+    </form>
+  </div>
+  <% if (!propertyPhotos.length) { %><p class="muted">No photos yet. You can pick several at once, up to 25 MB each.</p><% } else { %>
+  <div class="file-grid">
+    <% propertyPhotos.forEach(f => { const url = `/app/properties/${row.id}/photos/${f.id}`; const isImg = f.mime !== 'image/heic'; %>
+    <figure class="file-tile">
+      <a href="<%= url %>" target="_blank" rel="noopener" class="file-thumb">
+        <% if (isImg) { %><img src="<%= url %>" alt="<%= f.filename %>" loading="lazy"><% } else { %><span class="file-type">HEIC</span><% } %>
+      </a>
+      <figcaption>
+        <span class="file-name" title="<%= f.filename %>"><%= f.filename %></span>
+        <span class="muted small"><%= fmt.ukDate(f.uploaded_at.slice(0, 10)) %><%= f.uploaded_by_name ? ` · ${f.uploaded_by_name}` : '' %></span>
+        <span class="file-actions">
+          <a class="small" href="<%= url %>?download=1">Download</a>
+          <form method="post" action="<%= url %>/delete" data-confirm="Remove <%= f.filename %>?" class="inline"><%- include('partials/csrf') %><button class="btn small link" type="submit">Remove</button></form>
+        </span>
+      </figcaption>
+    </figure>
+    <% }) %>
+  </div>
+  <% } %>
+</section>
+<% } %>
 <% if (certs) { %>
 <section class="card" id="certificates">
   <div class="card-head"><h2>Certificates &amp; insurance</h2></div>
