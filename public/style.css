@@ -1091,3 +1091,4 @@ input, select, textarea { max-width: 100%; }
 .badge.s-Good { background: var(--ok-soft); color: var(--ok); }
 .badge.s-Fair { background: var(--warn-soft); color: var(--warn); }
 .badge.s-Poor { background: var(--bad-soft); color: var(--bad); }
+.rentrun-month { display: flex; align-items: center; gap: 8px; }

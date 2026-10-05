@@ -77,7 +77,7 @@ module.exports = function monthlyRoutes(db, writer, mailer = { enabled: false })
     const me = db.prepare('SELECT COALESCE(m.email, c.email) AS email FROM users m JOIN users c ON c.id = COALESCE(m.company_id, m.id) WHERE m.id = ?').get(req.user.person_id);
     const template = db.prepare('SELECT filename, uploaded_at FROM payment_templates WHERE account_id = ?').get(a) || null;
     res.render('rentrun', {
-      title: 'Rent run', section: 'rentrun', month, monthLabel: st.monthLabel(month), rows, template,
+      title: 'Rent run', section: 'rentrun', month, thisMonth: fmt.today().slice(0, 7), monthLabel: st.monthLabel(month), rows, template,
       emailEnabled: mailer.enabled, reportTo: (me && me.email) || '', sender: senderFor(a), fmt,
       step5: require('../paymentInstruction')(db).formFor(req.user, month),
       bulkFile: require('../bulkPayment').bulkRows(db, a, month),

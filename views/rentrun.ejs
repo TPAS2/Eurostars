@@ -4,10 +4,13 @@
     <h1>Rent run</h1>
     <p class="muted">Month end: calculate the rents, email every landlord their statement, check and email the Rift report, then the bank transfer sheet, Metro&rsquo;s bulk payment file and the payment instruction to pay the landlords.</p>
   </div>
-  <form method="get" data-autogo class="inline-form">
-    <input type="month" name="month" value="<%= month %>" aria-label="Month">
-    <noscript><button class="btn" type="submit">Show</button></noscript>
-  </form>
+  <div class="rentrun-month">
+    <form method="get" data-autogo class="inline-form">
+      <input type="month" name="month" value="<%= month %>" aria-label="Month">
+      <noscript><button class="btn" type="submit">Show</button></noscript>
+    </form>
+    <% if (month === thisMonth) { %><span class="btn disabled" aria-disabled="true">This month</span><% } else { %><a class="btn primary" href="/app/rent-run?month=<%= thisMonth %>">This month</a><% } %>
+  </div>
 </header>
 <% if (flash) { %><div class="notice ok"><%= flash %></div><% } %>
 <% if (error) { %><div class="notice err"><%= error %></div><% } %>

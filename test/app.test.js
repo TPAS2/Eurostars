@@ -2398,6 +2398,15 @@ test('editing a property: its certificates can be changed there too', async () =
   assert.equal(res.status, 404);
 });
 
+test('rent run: a This month button goes back to the current month', async () => {
+  const c = await registerAndLogin('this-month@example.com', 'This Month Lets');
+  const now = new Date().toISOString().slice(0, 7);
+  let r = await c.get('/app/rent-run?month=2025-01');
+  assert.match(r.text, new RegExp(`<a class="btn primary" href="/app/rent-run\\?month=${now}">This month</a>`));
+  r = await c.get(`/app/rent-run?month=${now}`);
+  assert.match(r.text, /<span class="btn disabled" aria-disabled="true">This month<\/span>/, 'greyed out when already on this month');
+});
+
 test('landlords list has no Councils column, and is in landlord code order', async () => {
   const c = await registerAndLogin('ll-order@example.com', 'LL Order Lets');
   const leeds = idFrom((await c.post('/app/councils', { name: 'Leeds City Council' })).location);
