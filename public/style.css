@@ -1177,3 +1177,19 @@ input, select, textarea { max-width: 100%; }
 .sheet-count { text-align: center; }
 .sheet-preview { width: 720px; max-width: 100%; }
 .sheet-preview table.cfp { width: 100%; }
+
+/* The inspection sheet and job sheet: everything centred. */
+#inspection-sheet, #job-sheet { text-align: center; }
+#inspection-sheet > .card-head, #job-sheet > .card-head { flex-direction: column; align-items: center; justify-content: center; gap: 8px; }
+#inspection-sheet > .card-head .actions, #job-sheet > .card-head .actions { justify-content: center; }
+.tick-sheet .tick-head span, .tick-sheet .tick-label, .tick-sheet .tick-answer { text-align: center; }
+.tick-sheet .tick-place { justify-self: center; text-align: center; }
+.sign-box { text-align: center; }
+.sign-box .sign-img { margin: 0 auto; }
+.sign-box form[data-signature] { justify-items: center; }
+.sign-box form[data-signature] label { justify-items: center; width: 100%; max-width: 420px; }
+.sign-box form[data-signature] label input { text-align: center; }
+.sign-box .sign-pad { max-width: 600px; }
+.sign-satisfied { justify-content: center; }
+.sign-satisfied legend { text-align: center; }
+.sign-actions { justify-content: center; }
