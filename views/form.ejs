@@ -10,6 +10,11 @@
   <form method="post" action="/app/<%= def.key %><%= row ? '/' + row.id : '' %>" class="form-grid form-<%= def.key %>"<%- (def.files || def.key === 'properties') && !row ? ' enctype="multipart/form-data"' : '' %>
         <%- row ? 'data-autosave' : `data-draft="new-${def.key}" autocomplete="off"` %>>
     <%- include('partials/csrf') %>
+    <% if (typeof sheet !== 'undefined' && sheet && def.key === 'inspections') { %>
+      <%- include('sheets/inspection-form') %>
+    <% } else if (typeof sheet !== 'undefined' && sheet && def.key === 'maintenance') { %>
+      <%- include('sheets/job-form') %>
+    <% } else { %>
     <% def.fields.forEach(f => { %>
       <%- include('partials/field', { f, value: values[f.name], error: errors[f.name], opts: options[f.name] }) %>
       <% if (typeof tenantCouncil !== 'undefined' && tenantCouncil && f.name === 'phone') { %>
@@ -24,6 +29,7 @@
       </div>
       <% } %>
     <% }) %>
+    <% } %>
     <% if (def.key === 'properties' && !row) { %>
     <div class="wide new-certs">
       <h3 class="form-subhead">Certificates</h3>
@@ -37,41 +43,6 @@
         <div class="field"><label for="c-<%= i %>-f">Certificate file</label><input id="c-<%= i %>-f" type="file" name="cert_<%= i %>_file" accept="application/pdf,image/*,.heic,.heif,.doc,.docx"></div>
       </div>
       <% }) %>
-    </div>
-    <% } %>
-    <% if (def.key === 'inspections' && !row) { %>
-    <div class="wide sign-box new-sign" data-signature-optional>
-      <h3>Signed by Tenant</h3>
-      <input type="hidden" name="signature">
-      <label class="small">Tenant’s name <input name="signature_name" maxlength="100" autocomplete="off"></label>
-      <canvas class="sign-pad" width="600" height="200" aria-label="Tenant signs here"></canvas>
-      <p class="muted small sign-hint" data-signature-hint>The tenant signs in the box with a finger, pen or mouse. Optional: they can sign later on the inspection’s page.</p>
-      <div class="sign-actions"><button class="btn small" type="button" data-signature-clear>Clear</button></div>
-    </div>
-    <% } %>
-    <% if (def.key === 'maintenance' && !row) { %>
-    <div class="wide sign-grid new-signs">
-      <div class="sign-box new-sign" data-signature-optional>
-        <h3>Signed by Tenant / SU</h3>
-        <input type="hidden" name="signature_tenant">
-        <fieldset class="sign-satisfied">
-          <legend class="small">Works carried out to the satisfaction of the tenant?</legend>
-          <label class="check small"><input type="radio" name="satisfied" value="Yes"> Yes</label>
-          <label class="check small"><input type="radio" name="satisfied" value="No"> No</label>
-        </fieldset>
-        <label class="small">Name <input name="signature_tenant_name" maxlength="100" autocomplete="off"></label>
-        <canvas class="sign-pad" width="600" height="200" aria-label="Tenant signs here"></canvas>
-        <p class="muted small sign-hint" data-signature-hint>Optional: they can sign later on the job’s page.</p>
-        <div class="sign-actions"><button class="btn small" type="button" data-signature-clear>Clear</button></div>
-      </div>
-      <div class="sign-box new-sign" data-signature-optional>
-        <h3>Signed by Maintenance / Contractor</h3>
-        <input type="hidden" name="signature_contractor">
-        <label class="small">Name <input name="signature_contractor_name" maxlength="100" autocomplete="off"></label>
-        <canvas class="sign-pad" width="600" height="200" aria-label="Maintenance or contractor signs here"></canvas>
-        <p class="muted small sign-hint" data-signature-hint>Optional: they can sign later on the job’s page.</p>
-        <div class="sign-actions"><button class="btn small" type="button" data-signature-clear>Clear</button></div>
-      </div>
     </div>
     <% } %>
     <% if (def.files && !row) { %>

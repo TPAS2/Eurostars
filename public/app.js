@@ -470,6 +470,32 @@ const DRAFT_DAYS = 7;
         input.value = canvas.toDataURL('image/png');
       });
     });
+    // The job sheet form: choosing the property fills in the billing name and contact for access,
+    // and choosing the contractor fills in their code and contact details.
+    document.querySelectorAll('[data-sheet-job]').forEach((sheet) => {
+      let props = {};
+      let cons = [];
+      try { props = JSON.parse(sheet.dataset.properties || '{}'); cons = JSON.parse(sheet.dataset.contractors || '[]'); } catch { /* leave blank */ }
+      const fill = (name, text) => { const el = sheet.querySelector(`[data-fill="${name}"]`); if (el) el.textContent = text || ''; };
+      const propSelect = sheet.querySelector('select[name=property_id]');
+      const conInput = sheet.querySelector('input[name=contractor]');
+      const showProperty = () => {
+        const p = props[propSelect.value] || null;
+        fill('prop-code', p && p.code);
+        fill('prop-landlord', p && p.landlord);
+        const access = sheet.querySelector('[data-fill="prop-access"]');
+        if (access) {
+          access.replaceChildren(...((p && p.access) || []).map((line) => { const d = document.createElement('div'); d.textContent = line; return d; }));
+        }
+      };
+      const showContractor = () => {
+        const name = conInput.value.trim().toLowerCase();
+        const c = cons.find((x) => x.name.toLowerCase() === name) || null;
+        for (const k of ['code', 'phone', 'mobile', 'fax', 'email', 'address']) fill(`con-${k}`, c && c[k]);
+      };
+      if (propSelect) propSelect.addEventListener('change', showProperty);
+      if (conInput) conInput.addEventListener('input', showContractor);
+    });
     // A property's photo gallery: clicking a smaller photo shows it as the big one.
     document.querySelectorAll('[data-gallery]').forEach((gallery) => {
       const main = gallery.querySelector('[data-gallery-main]');

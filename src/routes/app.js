@@ -215,7 +215,35 @@ module.exports = function appRoutes(db) {
       flash: String(res.req.query.cert_flash || '').slice(0, 200),
       error: String(res.req.query.cert_error || '').slice(0, 200),
     } : null;
-    res.status(status).render('form', { title: row ? `Edit ${def.singular.toLowerCase()}` : `New ${def.singular.toLowerCase()}`, def, row, values, errors, options, tenantCouncil, editCerts, fmt, section: sectionOf(def) });
+    // Inspections and maintenance jobs are filled in on a form laid out like their printed sheet.
+    let sheet = null;
+    if (def.key === 'inspections' || def.key === 'maintenance') {
+      const co = db.prepare('SELECT agency_name, address, phone, email FROM users WHERE id = ?').get(accountId);
+      sheet = { company: { name: co.agency_name, address: String(co.address || '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean).join(' '), phone: co.phone || '', email: co.email || '' } };
+      if (def.key === 'maintenance') {
+        // What the sheet fills in as a property or contractor is chosen.
+        const tenants = new Map();
+        for (const t of db.prepare(
+          `SELECT ty.property_id, t.name, t.phone FROM tenancies ty JOIN tenants t ON t.id = ty.tenant_id
+            WHERE ty.account_id = ? AND ty.status IN ('active', 'pending') ORDER BY ty.status = 'active' DESC, t.name COLLATE NOCASE`
+        ).all(accountId)) {
+          if (!tenants.has(t.property_id)) tenants.set(t.property_id, []);
+          tenants.get(t.property_id).push(`${t.name}${t.phone ? ` - Tel: ${t.phone}` : ''}`);
+        }
+        sheet.properties = Object.fromEntries(db.prepare(
+          `SELECT p.id, p.code, p.address_line1, p.town, p.postcode, l.name AS landlord FROM properties p
+             LEFT JOIN landlords l ON l.id = p.landlord_id AND l.account_id = p.account_id WHERE p.account_id = ?`
+        ).all(accountId).map((p) => [p.id, {
+          code: p.code || '', address: [p.address_line1, p.town, p.postcode].filter(Boolean).join(' '),
+          landlord: p.landlord || '', access: [p.address_line1, ...(tenants.get(p.id) || [])].filter(Boolean),
+        }]));
+        sheet.contractors = db.prepare('SELECT name, code, phone, mobile, fax, email, address FROM contractors WHERE account_id = ? ORDER BY name COLLATE NOCASE').all(accountId)
+          .map((c) => ({ name: c.name, code: c.code || '', phone: c.phone || '', mobile: c.mobile || '', fax: c.fax || '', email: c.email || '', address: c.address || '' }));
+        sheet.jobNumber = row ? row.id : '';
+        sheet.date = fmt.ukDate(row && row.created_at ? String(row.created_at).slice(0, 10) : fmt.today());
+      }
+    }
+    res.status(status).render('form', { title: row ? `Edit ${def.singular.toLowerCase()}` : `New ${def.singular.toLowerCase()}`, def, row, values, errors, options, tenantCouncil, editCerts, sheet, fmt, section: sectionOf(def) });
   }
 
   // The property of a tenant's current tenancy (or latest one), whose council the tenant's Edit form can change.

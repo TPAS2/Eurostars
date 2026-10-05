@@ -1199,3 +1199,107 @@ input, select, textarea { max-width: 100%; }
 .new-sign .sign-pad { max-width: 600px; }
 .new-signs { margin-top: 6px; }
 .new-signs .sign-satisfied label { display: inline-flex; width: auto; }
+
+/* Inspection and job sheet forms, laid out like the printed sheets: a white page in both themes. */
+.paper { --paper-ink: #111; --paper-line: #222; background: #fff; color: var(--paper-ink); border: 1px solid #b9bec7; border-radius: 4px;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, .12); max-width: 860px; width: 100%; margin: 0 auto 8px; padding: 34px 40px 30px;
+  font-family: Calibri, Carlito, "Segoe UI", Arial, sans-serif; }
+.paper a { color: #1646c8; }
+.paper .muted { color: #555; }
+.paper input:not([type=radio]):not([type=checkbox]), .paper select, .paper textarea { background: #fff; color: #111; border: 1px solid #9aa1ab; border-radius: 4px; min-height: 32px; padding: 4px 8px; font: inherit; font-size: .95rem; }
+.paper input:focus, .paper select:focus, .paper textarea:focus { outline: 2px solid #1646c8; outline-offset: 1px; }
+.paper .field-err { color: #a3150c; font-size: .8rem; }
+.paper-k { font-weight: 700; }
+
+/* Inspection sheet */
+.paper-head { margin-bottom: 26px; }
+.paper-agency { font-family: Arial, sans-serif; font-weight: 800; font-size: 2rem; color: #3f5273; line-height: 1.1; }
+.paper-sub { color: #66708a; font-size: .95rem; }
+.paper-lines { display: grid; gap: 10px; margin-bottom: 20px; }
+.paper-line { display: grid; grid-template-columns: 150px minmax(0, 1fr); align-items: center; gap: 10px; }
+.paper-line > label { font-weight: 700; font-size: .92rem; }
+.paper-line select, .paper-line input { width: 100%; max-width: 460px; }
+.paper-pair { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+.paper-pair select { width: auto; }
+.paper-pair label { font-weight: 700; font-size: .92rem; }
+.paper-checks { display: grid; }
+.paper-check { display: grid; grid-template-columns: minmax(0, 360px) auto auto; align-items: center; column-gap: 26px; }
+.paper-check .paper-cell { border: 1.5px solid var(--paper-line); border-top-width: 0; padding: 7px 6px 3px; font-size: .9rem; min-height: 33px; display: flex; align-items: flex-end; }
+.paper-check-head .paper-cell { background: #8ea9db; border-top-width: 1.5px; font-weight: 700; justify-content: center; align-items: center; min-height: 24px; padding: 3px 6px; }
+.paper-answers { display: flex; gap: 6px; }
+.paper-check-head .paper-answers span { width: 52px; text-align: center; font-weight: 700; font-size: .78rem; color: #333; }
+.paper-answers .tick span { min-width: 52px; padding: 4px 0; }
+.paper-place { font-size: .88rem; }
+.paper-notes { margin-top: 22px; display: grid; gap: 4px; }
+.paper-notes label { font-weight: 700; font-size: .92rem; }
+.paper-notes textarea { width: 100%; max-width: 620px; min-height: 140px; border: 1.5px solid var(--paper-line); border-radius: 0; }
+.paper-sign { margin-top: 18px; display: grid; gap: 6px; }
+.paper-sign-label { font-weight: 700; font-size: .92rem; }
+.paper .new-sign { justify-items: start; text-align: left; max-width: 420px; }
+.paper .new-sign label { justify-items: start; }
+.paper .new-sign label input { text-align: left; }
+.paper .sign-pad { background: #fff; border: 1px dashed #9aa1ab; }
+.paper .sign-actions { justify-content: flex-start; }
+
+/* Job sheet */
+.paper-job { font-family: "Times New Roman", Times, serif; padding: 0 0 26px; border: 1.5px solid var(--paper-line); border-radius: 0; }
+.paper-job input:not([type=radio]):not([type=checkbox]), .paper-job select, .paper-job textarea { font-family: inherit; }
+.paper-band { background: #dcdcdc; border-bottom: 1.5px solid var(--paper-line); text-align: center; padding: 10px 12px 8px; }
+.paper-band-name { font-weight: 700; font-size: 1.6rem; }
+.paper-band-line { font-weight: 700; font-size: .78rem; }
+.paper-job > *:not(.paper-band) { margin-left: 36px; margin-right: 36px; }
+.paper-job-top { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; margin-top: 64px; }
+.paper-contractor { display: grid; gap: 4px; align-content: start; }
+.paper-contractor input { max-width: 300px; }
+.paper-address { white-space: pre-line; font-size: .95rem; min-height: 1.2em; }
+.paper-kv { margin: 0; display: grid; gap: 6px; }
+.paper-kv > div { display: grid; grid-template-columns: 150px minmax(0, 1fr); align-items: center; }
+.paper-kv dt { font-weight: 700; }
+.paper-kv dd { margin: 0; text-align: right; min-height: 1.2em; }
+.paper-kv dd input, .paper-kv dd select { max-width: 170px; }
+.paper-kv-left dd { text-align: left; }
+.paper-title-row { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; margin-top: 46px; padding-bottom: 8px; border-bottom: 1.5px solid var(--paper-line); }
+.paper-title { font-weight: 700; font-size: 2rem; letter-spacing: .01em; }
+.paper-jobno { display: flex; align-items: center; gap: 14px; }
+.paper-box { display: inline-grid; place-items: center; min-width: 110px; min-height: 34px; border: 1.5px solid var(--paper-line); font-size: 1.1rem; }
+.paper-prop { margin-top: 14px; display: grid; gap: 4px; }
+.paper-boxed { border: 1.5px solid var(--paper-line); padding: 4px 6px; }
+.paper-prop .paper-boxed select { width: 100%; border: 0; min-height: 26px; padding: 0; }
+.paper-details { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; margin-top: 18px; }
+.paper-details .paper-kv-left > div { grid-template-columns: 140px minmax(0, 1fr); }
+.paper-section { margin-top: 18px; display: grid; gap: 5px; }
+.paper-access { min-height: 56px; font-size: .95rem; }
+.paper-work { display: grid; gap: 6px; padding: 10px 12px; }
+.paper-work input, .paper-work textarea { width: 100%; }
+.paper-signs { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; margin-top: 10px; padding-top: 10px; border-top: 1px dotted #777; }
+.paper-signs > p { grid-column: 1 / -1; margin: 0; }
+.paper-sat { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: center; font-size: .92rem; }
+.paper-sign-later { margin: 8px 0 0; }
+.paper-office { margin-top: 22px; padding-top: 14px; border-top: 1px dashed #9aa1ab; font-family: Calibri, Carlito, "Segoe UI", Arial, sans-serif; }
+.paper-office-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 6px; }
+.paper-office .field label, .paper-office .label { font-size: .85rem; }
+.paper .locked-value { background: #f2f3f5; color: #111; border-color: #9aa1ab; }
+@media (max-width: 760px) {
+  .paper { padding: 20px 16px; }
+  .paper-job { padding: 0 0 18px; }
+  .paper-job > *:not(.paper-band) { margin-left: 14px; margin-right: 14px; }
+  .paper-line { grid-template-columns: 1fr; gap: 3px; }
+  .paper-check { grid-template-columns: minmax(0, 1fr); row-gap: 4px; margin-bottom: 6px; }
+  .paper-check-head .paper-answers { display: none; }
+  .paper-job-top, .paper-details, .paper-signs, .paper-office-grid { grid-template-columns: 1fr; }
+  .paper-job-top { margin-top: 24px; }
+  .paper-kv > div { grid-template-columns: 140px minmax(0, 1fr); }
+  .paper-title { font-size: 1.5rem; }
+  .paper input:not([type=radio]):not([type=checkbox]), .paper select, .paper textarea { font-size: 16px; }
+}
+.paper-sat label.check { display: inline-flex; align-items: center; gap: 6px; width: auto; font-weight: 700; }
+.paper-signs .new-sign { align-content: start; }
+.paper .sign-actions { align-self: start; }
+.paper .sign-actions .btn { height: auto; }
+.paper-prop-head { display: flex; align-items: baseline; gap: 10px; }
+.paper-prop-head label { display: inline; margin: 0; }
+@media (max-width: 760px) {
+  .paper-title-row { flex-wrap: wrap; }
+  .paper-jobno { gap: 8px; }
+  .paper-box { min-width: 72px; }
+}

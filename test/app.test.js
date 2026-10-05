@@ -2475,7 +2475,7 @@ test('inspection sheet: tick sheet filled in, signed by the tenant, downloadable
 
   const prop = idFrom((await c.post('/app/properties', { address_line1: '9 Alarm Avenue', status: 'let' })).location);
   r = await c.get(`/app/inspections/new?property_id=${prop}`);
-  assert.match(r.text, /class="tick-sheet"[\s\S]*?Window Restrictor \(All rooms above ground level\)[\s\S]*?name="checklist__window_restrictor" value="Yes"[\s\S]*?name="checklist__fire_door_place"[\s\S]*?Thumb Turn Lock \(To back door\)/);
+  assert.match(r.text, /class="paper paper-inspection[\s\S]*?Property Address:[\s\S]*?Date of Inspection:[\s\S]*?Inspected By:[\s\S]*?Safety Requirement[\s\S]*?Window Restrictor \(All rooms above ground level\)[\s\S]*?name="checklist__window_restrictor" value="Yes"[\s\S]*?name="checklist__fire_door_place"[\s\S]*?Thumb Turn Lock \(To back door\)/);
   assert.match(r.text, /name="checklist__heat_sensor" value="N\/A" checked/, 'each starts as N/A, like the paper sheet');
   const ins = idFrom((await c.post('/app/inspections', { property_id: String(prop), inspection_date: '2026-10-03', inspection_type: 'Routine',
     checklist__window_restrictor: 'Yes', checklist__smoke_alarms: 'Yes', checklist__fire_blanket: 'No', checklist__fire_door: 'Yes',
@@ -2490,7 +2490,7 @@ test('inspection sheet: tick sheet filled in, signed by the tenant, downloadable
   assert.match(r.text, /3 Yes · 1 No · 11 N\/A/);
   // The tenant can sign on the new inspection form itself.
   r = await c.get(`/app/inspections/new?property_id=${prop}`);
-  assert.match(r.text, /data-signature-optional[\s\S]*?Signed by Tenant[\s\S]*?name="signature"[\s\S]*?name="signature_name"[\s\S]*?<canvas class="sign-pad"/);
+  assert.match(r.text, /Signed by Tenant[\s\S]*?data-signature-optional[\s\S]*?name="signature"[\s\S]*?<canvas class="sign-pad"[\s\S]*?name="signature_name"/);
   const sig = 'data:image/png;base64,' + Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(80)]).toString('base64');
   const signedNow = idFrom((await c.post('/app/inspections', { property_id: String(prop), inspection_date: '2026-10-04', inspection_type: 'Check-in', signature: sig, signature_name: 'New Tenant' })).location);
   assert.equal(db.prepare('SELECT signer_name FROM inspection_signatures WHERE inspection_id = ?').get(signedNow).signer_name, 'New Tenant');
@@ -2581,7 +2581,7 @@ test('new maintenance job: the tenant and contractor can sign on the form itself
   const c = await registerAndLogin('job-sign-new@example.com', 'Job Sign New Lets');
   const prop = idFrom((await c.post('/app/properties', { address_line1: '4 Sign Street', status: 'let' })).location);
   const r = await c.get(`/app/maintenance/new?property_id=${prop}`);
-  assert.match(r.text, /Signed by Tenant \/ SU[\s\S]*?name="signature_tenant"[\s\S]*?name="satisfied"[\s\S]*?Signed by Maintenance \/ Contractor[\s\S]*?name="signature_contractor"/);
+  assert.match(r.text, /class="paper paper-job[\s\S]*?WORKSHEET[\s\S]*?name="satisfied"[\s\S]*?Signed By Tenant\/SU:[\s\S]*?name="signature_tenant"[\s\S]*?Signed By Maintenance \/ Contractor:[\s\S]*?name="signature_contractor"/);
   const sig = 'data:image/png;base64,' + Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(80)]).toString('base64');
   const body = new FormData();
   for (const [k, v] of Object.entries({ _csrf: c.csrf, property_id: String(prop), title: 'Boiler check', priority: 'normal', status: 'open',
@@ -3886,10 +3886,10 @@ test('maintenance: files when adding, contractor list, who added it, date comple
   const sam = db.prepare("SELECT id FROM users WHERE login_name = 'Sam' AND company_id = ?").get(co).id;
   const form = (await c.get('/app/maintenance/new')).text;
   assert.match(form, /enctype="multipart\/form-data"/);
-  assert.match(form, /Property address/);
-  assert.match(form, /Description of work/);
+  assert.match(form, /Re: Property:/);
+  assert.match(form, /Description of Work:/);
   assert.match(form, /<option value="Made Up Plumbing">/, 'contractors to pick from');
-  assert.match(form, /<div class="locked-value" id="f-added_by">Test User<\/div>/, 'Added by is the person signed in');
+  assert.match(form, /<span class="label">Added by<\/span><div class="locked-value">Test User<\/div>/, 'Added by is the person signed in');
   assert.doesNotMatch(form, /name="added_by"/, 'and can\'t be changed');
   // Someone else sent in as "Added by" is ignored; with a photo and a Word file.
   const png = new Blob([Buffer.from('89504e470d0a1a0a0000000d49484452', 'hex')]);

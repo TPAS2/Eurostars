@@ -1,0 +1,80 @@
+<%# The inspection form, laid out like the printed Property Safety Inspection sheet. Same field names as the plain form. %>
+<% const ck = inspectionSheet.readChecklist(values.checklist); const esc = (x) => String(x).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); const err = (n) => errors[n] ? `<div class="field-err">${esc(errors[n])}</div>` : ''; %>
+<div class="paper paper-inspection wide">
+  <div class="paper-head">
+    <div class="paper-agency"><%= sheet.company.name %></div>
+    <div class="paper-sub">Property Safety Inspection</div>
+  </div>
+
+  <div class="paper-lines">
+    <div class="paper-line">
+      <label for="f-property_id">Property Address:</label>
+      <div><select id="f-property_id" name="property_id" required>
+        <option value="">— Choose the property —</option>
+        <% (options.property_id || []).forEach(o => { %><option value="<%= o.id %>" <%= Number(values.property_id) === o.id ? 'selected' : '' %>><%= o.label %></option><% }) %>
+      </select><%- err('property_id') %></div>
+    </div>
+    <div class="paper-line">
+      <label for="f-inspection_date">Date of Inspection:</label>
+      <div><input id="f-inspection_date" type="date" name="inspection_date" value="<%= values.inspection_date || '' %>" required><%- err('inspection_date') %></div>
+    </div>
+    <div class="paper-line">
+      <label for="f-inspected_by">Inspected By:</label>
+      <div><select id="f-inspected_by" name="inspected_by" required>
+        <% (options.inspected_by || []).forEach(o => { %><option value="<%= o.id %>" <%= Number(values.inspected_by) === o.id ? 'selected' : '' %>><%= o.label %></option><% }) %>
+      </select><%- err('inspected_by') %></div>
+    </div>
+    <div class="paper-line paper-extra-line">
+      <label for="f-inspection_type">Type:</label>
+      <div class="paper-pair">
+        <select id="f-inspection_type" name="inspection_type" required>
+          <% def.fieldMap.inspection_type.options.forEach(o => { %><option value="<%= o %>" <%= values.inspection_type === o ? 'selected' : '' %>><%= o %></option><% }) %>
+        </select>
+        <label for="f-condition">Condition:</label>
+        <select id="f-condition" name="condition">
+          <option value="">—</option>
+          <% def.fieldMap.condition.options.forEach(o => { %><option value="<%= o %>" <%= values.condition === o ? 'selected' : '' %>><%= o %></option><% }) %>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="paper-checks" role="group" aria-label="Safety requirements">
+    <div class="paper-check paper-check-head"><div class="paper-cell">Safety Requirement</div><div class="paper-answers"><span>Yes</span><span>No</span><span>N/A</span></div></div>
+    <% inspectionSheet.SAFETY_ITEMS.forEach(({ key, label }) => { %>
+    <div class="paper-check">
+      <div class="paper-cell"><%= label %></div>
+      <div class="paper-answers">
+        <% inspectionSheet.ANSWERS.forEach((a) => { %><label class="tick tick-<%= a === 'N/A' ? 'na' : a.toLowerCase() %>"><input type="radio" name="checklist__<%= key %>" value="<%= a %>" <%= ck[key] === a ? 'checked' : '' %>><span><%= a %></span></label><% }) %>
+      </div>
+      <% if (key === 'fire_door') { %>
+      <select class="paper-place" name="checklist__fire_door_place" aria-label="Where is the fire check door?">
+        <option value="">Where?</option>
+        <% inspectionSheet.FIRE_DOOR_PLACES.forEach((p) => { %><option value="<%= p %>" <%= ck.fire_door_place === p ? 'selected' : '' %>><%= p %></option><% }) %>
+      </select>
+      <% } %>
+    </div>
+    <% }) %>
+  </div>
+
+  <div class="paper-notes">
+    <label for="f-notes">Notes</label>
+    <textarea id="f-notes" name="notes" rows="6" maxlength="10000"><%= values.notes || '' %></textarea>
+    <%- err('notes') %>
+  </div>
+
+  <div class="paper-sign">
+    <div class="paper-sign-label">Signed by Tenant</div>
+    <% if (!row) { %>
+    <div class="new-sign" data-signature-optional>
+      <input type="hidden" name="signature">
+      <canvas class="sign-pad" width="600" height="200" aria-label="Tenant signs here"></canvas>
+      <label class="small">Tenant’s name <input name="signature_name" maxlength="100" autocomplete="off"></label>
+      <p class="muted small sign-hint" data-signature-hint>The tenant signs in the box with a finger, pen or mouse. Optional: they can sign later on the inspection’s page.</p>
+      <div class="sign-actions"><button class="btn small" type="button" data-signature-clear>Clear</button></div>
+    </div>
+    <% } else { %>
+    <p class="small"><a href="/app/inspections/<%= row.id %>#inspection-sheet">Sign, or see the tenant’s signature, on the inspection’s page</a></p>
+    <% } %>
+  </div>
+</div>

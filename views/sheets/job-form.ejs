@@ -1,0 +1,113 @@
+<%# The maintenance job form, laid out like the printed WORKSHEET. Same field names as the plain form.
+    Billing name, contact for access and the contractor's details fill in as the property and contractor are chosen. %>
+<% const esc = (x) => String(x).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+   const err = (n) => errors[n] ? `<div class="field-err">${esc(errors[n])}</div>` : '';
+   const prop = sheet.properties[Number(values.property_id)] || null;
+   const con = sheet.contractors.find((c) => c.name.toLowerCase() === String(values.contractor || '').toLowerCase()) || null;
+   const sel = (name, list, labels) => list.map((o) => `<option value="${esc(o)}"${String(values[name] || '') === o ? ' selected' : ''}>${esc((labels && labels[o]) || o)}</option>`).join(''); %>
+<div class="paper paper-job wide" data-sheet-job data-properties="<%= JSON.stringify(sheet.properties) %>" data-contractors="<%= JSON.stringify(sheet.contractors) %>">
+  <div class="paper-band">
+    <div class="paper-band-name"><%= sheet.company.name %></div>
+    <% if (sheet.company.address) { %><div class="paper-band-line"><%= sheet.company.address %></div><% } %>
+    <% if (sheet.company.phone || sheet.company.email) { %><div class="paper-band-line"><%= [sheet.company.phone && `Tel: ${sheet.company.phone}`, sheet.company.email && `Email: ${sheet.company.email}`].filter(Boolean).join('   ') %></div><% } %>
+  </div>
+
+  <div class="paper-job-top">
+    <div class="paper-contractor">
+      <label for="f-contractor" class="paper-k">Contractor</label>
+      <input id="f-contractor" name="contractor" value="<%= values.contractor || '' %>" list="list-contractor" autocomplete="off" placeholder="Pick or type the contractor">
+      <datalist id="list-contractor"><% sheet.contractors.forEach(c => { %><option value="<%= c.name %>"><% }) %></datalist>
+      <div class="paper-address" data-fill="con-address"><%= con ? con.address : '' %></div>
+      <%- err('contractor') %>
+    </div>
+    <dl class="paper-kv">
+      <div><dt>Contractor Code:</dt><dd data-fill="con-code"><%= con ? con.code : '' %></dd></div>
+      <div><dt>Phone:</dt><dd data-fill="con-phone"><%= con ? con.phone : '' %></dd></div>
+      <div><dt>Mobile:</dt><dd data-fill="con-mobile"><%= con ? con.mobile : '' %></dd></div>
+      <div><dt>Fax:</dt><dd data-fill="con-fax"><%= con ? con.fax : '' %></dd></div>
+      <div><dt>E-mail:</dt><dd data-fill="con-email"><%= con ? con.email : '' %></dd></div>
+      <div><dt>Date:</dt><dd><%= sheet.date %></dd></div>
+    </dl>
+  </div>
+
+  <div class="paper-title-row">
+    <div class="paper-title">WORKSHEET</div>
+    <div class="paper-jobno"><span class="paper-k">Job Number:</span><span class="paper-box"><%= sheet.jobNumber || 'New' %></span></div>
+  </div>
+
+  <div class="paper-prop">
+    <div class="paper-prop-head"><label for="f-property_id" class="paper-k">Re: Property:</label> <span data-fill="prop-code"><%= prop ? prop.code : '' %></span></div>
+    <div class="paper-boxed">
+      <select id="f-property_id" name="property_id" required>
+        <option value="">— Choose the property —</option>
+        <% (options.property_id || []).forEach(o => { %><option value="<%= o.id %>" <%= Number(values.property_id) === o.id ? 'selected' : '' %>><%= o.label %></option><% }) %>
+      </select>
+    </div>
+    <%- err('property_id') %>
+  </div>
+
+  <div class="paper-details">
+    <dl class="paper-kv paper-kv-left">
+      <div><dt>Billing Name:</dt><dd data-fill="prop-landlord"><%= prop ? prop.landlord : '' %></dd></div>
+      <div><dt><label for="f-reported_date">Date Reported:</label></dt><dd><input id="f-reported_date" type="date" name="reported_date" value="<%= values.reported_date || '' %>"><%- err('reported_date') %></dd></div>
+      <div><dt><label for="f-estimate_required">Estimate Required:</label></dt><dd><select id="f-estimate_required" name="estimate_required"><%- sel('estimate_required', def.fieldMap.estimate_required.options) %></select></dd></div>
+      <div><dt><label for="f-cost_pence">Our Estimate:</label></dt><dd><input id="f-cost_pence" name="cost_pence" inputmode="decimal" placeholder="0.00" value="<%= typeof values.cost_pence === 'number' ? fmt.penceToInput(values.cost_pence) : (values.cost_pence || '') %>"><%- err('cost_pence') %></dd></div>
+    </dl>
+    <dl class="paper-kv">
+      <div><dt><label for="f-preferred_start_date">Preferred Start Date:</label></dt><dd><input id="f-preferred_start_date" type="date" name="preferred_start_date" value="<%= values.preferred_start_date || '' %>"></dd></div>
+      <div><dt><label for="f-go_ahead">Go Ahead?</label></dt><dd><select id="f-go_ahead" name="go_ahead"><%- sel('go_ahead', def.fieldMap.go_ahead.options) %></select></dd></div>
+      <div><dt><label for="f-priority">Rating:</label></dt><dd><select id="f-priority" name="priority" required><%- sel('priority', def.fieldMap.priority.options, { low: 'Low', normal: 'Normal', high: 'High', emergency: 'Emergency' }) %></select><%- err('priority') %></dd></div>
+    </dl>
+  </div>
+
+  <div class="paper-section">
+    <div class="paper-k">Contact for Access:</div>
+    <div class="paper-boxed paper-access" data-fill="prop-access"><% (prop ? prop.access : []).forEach(l => { %><div><%= l %></div><% }) %></div>
+  </div>
+
+  <div class="paper-section">
+    <div class="paper-k">Description of Work:</div>
+    <div class="paper-boxed paper-work">
+      <label for="f-title" class="small">Issue</label>
+      <input id="f-title" name="title" value="<%= values.title || '' %>" required placeholder="e.g. Front door lock not catching"><%- err('title') %>
+      <label for="f-description" class="small">More detail</label>
+      <textarea id="f-description" name="description" rows="4"><%= values.description || '' %></textarea>
+
+      <% if (!row) { %>
+      <div class="paper-signs">
+        <div class="new-sign" data-signature-optional>
+          <div class="paper-sat">
+            <span>Works Carried out to the Satisfaction of the Tenant/SU:</span>
+            <label class="check small"><input type="radio" name="satisfied" value="Yes"> Yes</label>
+            <label class="check small"><input type="radio" name="satisfied" value="No"> No</label>
+          </div>
+          <div class="paper-sign-label">Signed By Tenant/SU:</div>
+          <input type="hidden" name="signature_tenant">
+          <canvas class="sign-pad" width="600" height="200" aria-label="Tenant signs here"></canvas>
+          <label class="small">Name <input name="signature_tenant_name" maxlength="100" autocomplete="off"></label>
+          <div class="sign-actions"><button class="btn small" type="button" data-signature-clear>Clear</button></div>
+        </div>
+        <div class="new-sign" data-signature-optional>
+          <div class="paper-sign-label">Signed By Maintenance / Contractor:</div>
+          <input type="hidden" name="signature_contractor">
+          <canvas class="sign-pad" width="600" height="200" aria-label="Maintenance or contractor signs here"></canvas>
+          <label class="small">Name <input name="signature_contractor_name" maxlength="100" autocomplete="off"></label>
+          <div class="sign-actions"><button class="btn small" type="button" data-signature-clear>Clear</button></div>
+        </div>
+        <p class="muted small" data-signature-hint>Signing is optional here: anyone can sign later on the job’s page.</p>
+      </div>
+      <% } else { %>
+      <p class="small paper-sign-later"><a href="/app/maintenance/<%= row.id %>#job-sheet">Sign, or see the signatures, on the job’s page</a></p>
+      <% } %>
+    </div>
+  </div>
+
+  <div class="paper-office">
+    <div class="paper-k">For the office</div>
+    <div class="paper-office-grid">
+      <div class="field"><label for="f-status">Status</label><select id="f-status" name="status" required><%- sel('status', def.fieldMap.status.options, { open: 'Open', 'in progress': 'In progress', completed: 'Completed' }) %></select></div>
+      <div class="field"><label for="f-completed_date">Date completed</label><input id="f-completed_date" type="date" name="completed_date" value="<%= values.completed_date || '' %>"></div>
+      <div class="field"><span class="label">Added by</span><% const who = (options.added_by || []).find(o => Number(values.added_by) === o.id); %><div class="locked-value"><%= who ? who.label : (values.added_by ? 'Someone who has left' : 'You') %></div></div>
+    </div>
+  </div>
+</div>
