@@ -176,10 +176,12 @@ test('full lettings workflow: landlord → property → tenant → rent → fee 
   // "Add property" from the landlord page pre-selects the landlord.
   r = await c.get(`/app/properties/new?landlord_id=${landlordId}`);
   assert.match(r.text, new RegExp(`<option value="${landlordId}" selected[^>]*>`));
-  r = await c.post('/app/properties', { address_line1: '1 High Street', town: 'Leeds', postcode: 'LS1 1AA', landlord_id: landlordId, status: 'vacant', management_fee_pct: '10', property_type: 'Maisonette' });
+  r = await c.post('/app/properties', { address_line1: '1 High Street', town: 'Leeds', postcode: 'LS1 1AA', landlord_id: landlordId, status: 'vacant', management_fee_pct: '10', property_type: 'Maisonette', bathrooms: '2', parking: 'Driveway', rent_pence: '950.50' });
   assert.equal(r.status, 302, r.text);
   const propertyId = idFrom(r.location);
   assert.equal(db.prepare('SELECT property_type FROM properties WHERE id = ?').get(propertyId).property_type, 'Maisonette');
+  assert.deepEqual({ ...db.prepare('SELECT bathrooms, parking, rent_pence FROM properties WHERE id = ?').get(propertyId) }, { bathrooms: 2, parking: 'Driveway', rent_pence: 95050 });
+  assert.match((await c.get(`/app/properties/${propertyId}`)).text, /£950\.50/);
 
   r = await c.get(`/app/landlords/${landlordId}`);
   assert.match(r.text, /Properties owned/);
