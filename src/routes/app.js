@@ -910,9 +910,9 @@ module.exports = function appRoutes(db) {
                       FROM ${table} f LEFT JOIN users u ON u.id = f.uploaded_by
                      WHERE f.account_id = ? AND f.${fk} = ? ORDER BY f.id DESC`).all(a, row.id);
     const propertyPhotos = def.key === 'properties' ? photosOf('property_photos', 'property_id') : null;
-    // The photos box: a property's own photos, or an inspection's (kept separately).
-    const photoBox = def.key === 'properties' ? { title: 'Property photos', list: propertyPhotos }
-      : def.key === 'inspections' ? { title: 'Inspection photos', list: photosOf('inspection_photos', 'inspection_id') } : null;
+    // The photos box on an inspection (kept apart from the property's own photos).
+    // (A property's photos are shown and managed in the listing at the top.)
+    const photoBox = def.key === 'inspections' ? { title: 'Inspection photos', list: photosOf('inspection_photos', 'inspection_id') } : null;
     // On a property: the Rightmove-style listing at the top, and who an emailed copy is from.
     let listing = null;
     if (def.key === 'properties') {

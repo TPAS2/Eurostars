@@ -2214,8 +2214,8 @@ test('property photos: upload several, view, remove; private to the company', as
   const c = await registerAndLogin('prop-photos@example.com', 'Prop Photos Lets');
   const prop = idFrom((await c.post('/app/properties', { address_line1: '8 Camera Street', status: 'vacant' })).location);
   let r = await c.get(`/app/properties/${prop}`);
-  assert.match(r.text, /id="photos"[\s\S]*?Property photos[\s\S]*?name="photos" multiple/);
-  assert.match(r.text, /No photos yet/);
+  assert.match(r.text, /gallery-empty" id="photos"[\s\S]*?No photos yet[\s\S]*?name="photos" multiple/);
+  assert.doesNotMatch(r.text, /Property photos/, 'no separate photos box: they are in the listing');
 
   const png = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(30)]);
   const jpg = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(30)]);
@@ -2228,8 +2228,8 @@ test('property photos: upload several, view, remove; private to the company', as
   assert.match(decodeURIComponent(res.headers.get('location')), /Uploaded 2 photos\. Not uploaded .*not-a-photo\.pdf/);
 
   r = await c.get(`/app/properties/${prop}`);
-  assert.match(r.text, /Property photos <span class="count">2<\/span>/);
-  assert.match(r.text, /<img src="\/app\/properties\/\d+\/photos\/\d+" alt="kitchen\.jpg"/);
+  assert.match(r.text, /<span data-gallery-at>1<\/span>\/2/, 'both in the gallery');
+  assert.match(r.text, /gallery-tools" id="photos"[\s\S]*?\+ Add photos[\s\S]*?data-gallery-remove[\s\S]*?Remove this photo/);
   const photos = db.prepare('SELECT id FROM property_photos WHERE property_id = ? ORDER BY id').all(prop);
   r = await c.get(`/app/properties/${prop}/photos/${photos[0].id}`);
   assert.equal(r.headers.get('content-type'), 'image/png');
@@ -2285,8 +2285,17 @@ test('property page: listing at the top, and emailing it sends only the listing'
   assert.equal(m.attachments.length, 2);
   assert.equal(m.attachments[0].cid, 'photo1@rift');
   assert.doesNotMatch(m.html + m.text, /Private Landlord Name|Key is with neighbour|certificate|P0\d{3}/i);
+  // PDF overview to download, under Send email.
+  r = await c.get(`/app/properties/${prop}`);
+  assert.match(r.text, /Send email<\/button>[\s\S]*?href="\/app\/properties\/\d+\/overview\.pdf" download/);
+  r = await c.get(`/app/properties/${prop}/overview.pdf`);
+  assert.equal(r.headers.get('content-type'), 'application/pdf');
+  assert.match(r.headers.get('content-disposition'), /attachment; filename="4 Listing Lane overview\.pdf"/);
+  assert.ok(r.buf.subarray(0, 5).toString() === '%PDF-');
+  assert.equal((await c.get(`/app/properties/${bare}/overview.pdf`)).status, 200, 'works without photos or a price');
   // Private to the company.
   const other = await registerAndLogin('listing-2@example.com', 'Other Listing');
+  assert.equal((await other.get(`/app/properties/${prop}/overview.pdf`)).status, 404);
   assert.equal((await other.post(`/app/properties/${prop}/email`, { from: 'a@example.com', to: 'b@example.com' })).status, 404);
 });
 
@@ -2310,7 +2319,7 @@ test('inspections: own tab, own photos (separate from property photos), listed o
   assert.match(r.text, new RegExp(`<img src="/app/inspections/${newer}/photos/\\d+" alt="damp\\.png"`));
   assert.equal(db.prepare('SELECT COUNT(*) n FROM property_photos WHERE property_id = ?').get(prop).n, 0, 'kept apart from the property photos');
   r = await c.get(`/app/properties/${prop}`);
-  assert.match(r.text, /Property photos <span class="count">0<\/span>/);
+  assert.match(r.text, /gallery-empty/, 'the property itself still has no photos');
   assert.match(r.text, /Inspections <span class="count">2<\/span>[\s\S]*?15\/09\/2026[\s\S]*?02\/03\/2026/, 'newest first on the property');
   r = await c.get('/app/inspections');
   assert.match(r.text, /15\/09\/2026[\s\S]*?02\/03\/2026/);
@@ -2323,6 +2332,23 @@ test('inspections: own tab, own photos (separate from property photos), listed o
   await c.get(`/app/inspections/${newer}`);
   await c.post(`/app/inspections/${newer}/delete`, {});
   assert.equal(db.prepare('SELECT COUNT(*) n FROM inspection_photos WHERE inspection_id = ?').get(newer).n, 0);
+});
+
+test('parking: On street and Off street are one option, and saved ones are changed over', async () => {
+  const c = await registerAndLogin('parking@example.com', 'Parking Lets');
+  const r = await c.get('/app/properties/new');
+  assert.match(r.text, /<option value="On \/ off street"/);
+  assert.doesNotMatch(r.text, /<option value="(On|Off) street"/);
+  const file = path.join(os.tmpdir(), `rift-parking-${process.pid}.db`);
+  try {
+    let d = openDatabase(file);
+    const u = d.prepare("INSERT INTO users (username, login_name, name, agency_name, password_hash) VALUES ('parkco', 'Pat', 'Pat', 'Park Co', 'x')").run().lastInsertRowid;
+    d.prepare("INSERT INTO properties (account_id, address_line1, status, parking) VALUES (?, '1 A Road', 'vacant', 'Off street'), (?, '2 B Road', 'vacant', 'On street'), (?, '3 C Road', 'vacant', 'Garage')").run(u, u, u);
+    d.close();
+    d = openDatabase(file);
+    assert.deepEqual(d.prepare('SELECT parking FROM properties ORDER BY id').all().map((x) => x.parking), ['On / off street', 'On / off street', 'Garage']);
+    d.close();
+  } finally { for (const f of [file, `${file}-wal`, `${file}-shm`]) fs.rmSync(f, { force: true }); }
 });
 
 test('landlords list has no Councils column, and is in landlord code order', async () => {

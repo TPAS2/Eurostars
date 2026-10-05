@@ -73,8 +73,19 @@
       <% ph.forEach((f, i) => { %><button type="button" class="gallery-thumb<%= i === 0 ? ' active' : '' %>" data-gallery-thumb="<%= purl(f) %>" data-index="<%= i + 1 %>" aria-label="Photo <%= i + 1 %>"><img src="<%= purl(f) %>" alt="" loading="lazy"></button><% }) %>
     </div>
     <% } %>
+    <div class="gallery-tools" id="photos">
+      <form method="post" action="/app/properties/<%= row.id %>/photos" enctype="multipart/form-data" class="inline" data-busy="Uploading…">
+        <%- include('partials/csrf') %>
+        <label class="btn small">+ Add photos<input type="file" name="photos" multiple accept="image/*,.heic,.heif" data-autosubmit hidden></label>
+      </form>
+      <form method="post" action="<%= purl(ph[0]) %>/delete" class="inline" data-gallery-remove data-confirm="Remove the photo that's showing?">
+        <%- include('partials/csrf') %>
+        <button class="btn small link" type="submit">Remove this photo</button>
+      </form>
+      <% const heic = (propertyPhotos || []).length - ph.length; if (heic > 0) { %><span class="muted small"><%= heic %> iPhone (HEIC) photo<%= heic === 1 ? '' : 's' %> can’t be shown here.</span><% } %>
+    </div>
     <% } else { %>
-    <div class="gallery-empty">
+    <div class="gallery-empty" id="photos">
       <p>No photos yet</p>
       <form method="post" action="/app/properties/<%= row.id %>/photos" enctype="multipart/form-data" class="inline" data-busy="Uploading…">
         <%- include('partials/csrf') %>
@@ -114,6 +125,10 @@
       <button class="btn primary" type="submit">Send email</button>
     </form>
     <% } %>
+    <a class="btn listing-pdf" href="/app/properties/<%= row.id %>/overview.pdf" download>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11"/><path d="M7 10l5 5 5-5"/><path d="M5 20h14"/></svg>
+      Download PDF overview
+    </a>
   </aside>
 </section>
 <% } %>

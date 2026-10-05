@@ -425,6 +425,8 @@ const DRAFT_DAYS = 7;
       thumbs.forEach((btn) => btn.addEventListener('click', () => {
         main.src = btn.dataset.galleryThumb;
         link.href = btn.dataset.galleryThumb;
+        const remove = document.querySelector('[data-gallery-remove]');
+        if (remove) remove.action = `${btn.dataset.galleryThumb}/delete`;
         if (at) at.textContent = btn.dataset.index;
         thumbs.forEach((t) => t.classList.toggle('active', t.classList.contains('gallery-thumb') && t.dataset.index === btn.dataset.index));
       }));

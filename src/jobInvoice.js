@@ -156,4 +156,4 @@ function jobInvoiceData(db, accountId, jobId) {
   };
 }
 
-module.exports = { buildJobInvoice, jobInvoiceData, longDate };
+module.exports = { buildJobInvoice, jobInvoiceData, longDate, safe, wrap };

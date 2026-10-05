@@ -511,6 +511,8 @@ function openDatabase(file) {
   addColumnIfMissing(db, 'properties', 'parking', 'TEXT');
   addColumnIfMissing(db, 'properties', 'rent_pence', 'INTEGER');
   addColumnIfMissing(db, 'properties', 'price_per_night_pence', 'INTEGER');
+  // On street and Off street became one parking option.
+  db.prepare("UPDATE properties SET parking = 'On / off street' WHERE parking IN ('On street', 'Off street')").run();
   // Tenants: the council's reference. Tenancies: the term as booked (rent is no longer entered).
   addColumnIfMissing(db, 'tenants', 'council_ref', 'TEXT');
   addColumnIfMissing(db, 'tenancies', 'term_booked', 'TEXT');

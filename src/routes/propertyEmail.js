@@ -7,6 +7,7 @@ const express = require('express');
 const fmt = require('../format');
 const { isEmail } = require('../mailer');
 const { senderFor } = require('../sender');
+const { buildPropertyPdf } = require('../propertyPdf');
 
 const MAX_PHOTOS = 8;
 const MAX_PHOTO_BYTES = 15 * 1024 * 1024;
@@ -36,6 +37,27 @@ module.exports = function propertyEmailRoutes(db, mailer) {
   const sent = new Map(); // account id -> times of recent sends
 
   const back = (res, id, key, msg) => res.redirect(`/app/properties/${id}?${key}=${encodeURIComponent(msg)}#email-listing`);
+
+  // A PDF overview of the listing to download.
+  router.get('/:id(\\d+)/overview.pdf', async (req, res, next) => {
+    try {
+      const a = req.user.id;
+      const p = db.prepare('SELECT * FROM properties WHERE id = ? AND account_id = ?').get(Number(req.params.id), a);
+      if (!p) return res.status(404).render('error', { title: 'Not found', message: 'That property was not found.' });
+      const { prices, facts, place } = listingOf(p);
+      const co = db.prepare('SELECT agency_name FROM users WHERE id = ?').get(a);
+      const photos = db.prepare("SELECT mime, data FROM property_photos WHERE property_id = ? AND account_id = ? AND mime IN ('image/jpeg', 'image/png') ORDER BY id LIMIT 6").all(p.id, a)
+        .map((ph) => ({ mime: ph.mime, data: Buffer.from(ph.data) }));
+      const pdf = await buildPropertyPdf({
+        agency: co.agency_name, address: p.address_line1, place, prices, facts, status: p.status, date: fmt.ukDate(fmt.today()), photos,
+      });
+      const name = `${String(p.address_line1).replace(/[^\w ,.-]/g, '').trim().slice(0, 80) || 'Property'} overview.pdf`;
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${name}"`);
+      res.setHeader('Cache-Control', 'private, no-store');
+      res.end(Buffer.from(pdf));
+    } catch (err) { next(err); }
+  });
 
   router.post('/:id(\\d+)/email', async (req, res, next) => {
     try {
