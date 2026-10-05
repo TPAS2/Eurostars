@@ -416,11 +416,15 @@ const DRAFT_DAYS = 7;
         input.form.submit();
       });
     });
-    // Signing a job sheet on screen: draw in the box; the drawing is sent as a PNG picture.
-    document.querySelectorAll('form[data-signature]').forEach((form) => {
-      const canvas = form.querySelector('canvas');
-      const input = form.querySelector('input[name=signature]');
-      const hint = form.querySelector('[data-signature-hint]');
+    // Signing on screen: draw in the box; the drawing is sent as a PNG picture. A signature form
+    // (data-signature) needs one; a signing box inside a bigger form (data-signature-optional),
+    // like a new inspection's, can be left blank.
+    document.querySelectorAll('form[data-signature], [data-signature-optional]').forEach((box) => {
+      const form = box.tagName === 'FORM' ? box : box.closest('form');
+      const optional = box.hasAttribute('data-signature-optional');
+      const canvas = box.querySelector('canvas');
+      const input = box.querySelector('input[type=hidden][name^="signature"]');
+      const hint = box.querySelector('[data-signature-hint]');
       const ctx = canvas.getContext('2d');
       ctx.lineWidth = 3;
       ctx.lineCap = 'round';
@@ -452,11 +456,12 @@ const DRAFT_DAYS = 7;
       const stop = () => { drawing = false; };
       canvas.addEventListener('pointerup', stop);
       canvas.addEventListener('pointercancel', stop);
-      form.querySelector('[data-signature-clear]').addEventListener('click', () => {
+      box.querySelector('[data-signature-clear]').addEventListener('click', () => {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         drew = false;
       });
       form.addEventListener('submit', (e) => {
+        if (!drew && optional) { input.value = ''; return; }
         if (!drew) {
           e.preventDefault();
           if (hint) { hint.textContent = 'Please sign in the box first.'; hint.classList.add('err'); }

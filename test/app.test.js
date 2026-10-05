@@ -2488,6 +2488,15 @@ test('inspection sheet: tick sheet filled in, signed by the tenant, downloadable
   r = await c.get(`/app/inspections/${ins}`);
   assert.match(r.text, /id="inspection-sheet"[\s\S]*?sheet\.pdf" download>Download PDF[\s\S]*?Fire Blanket<\/span><span class="tick-answer tick-no">No[\s\S]*?Yes · Kitchen/);
   assert.match(r.text, /3 Yes · 1 No · 11 N\/A/);
+  // The tenant can sign on the new inspection form itself.
+  r = await c.get(`/app/inspections/new?property_id=${prop}`);
+  assert.match(r.text, /data-signature-optional[\s\S]*?Signed by Tenant[\s\S]*?name="signature"[\s\S]*?name="signature_name"[\s\S]*?<canvas class="sign-pad"/);
+  const sig = 'data:image/png;base64,' + Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(80)]).toString('base64');
+  const signedNow = idFrom((await c.post('/app/inspections', { property_id: String(prop), inspection_date: '2026-10-04', inspection_type: 'Check-in', signature: sig, signature_name: 'New Tenant' })).location);
+  assert.equal(db.prepare('SELECT signer_name FROM inspection_signatures WHERE inspection_id = ?').get(signedNow).signer_name, 'New Tenant');
+  const unsigned = idFrom((await c.post('/app/inspections', { property_id: String(prop), inspection_date: '2026-10-04', inspection_type: 'Check-in', signature: '' })).location);
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM inspection_signatures WHERE inspection_id = ?').get(unsigned).n, 0, 'signing is optional');
+  db.prepare('DELETE FROM inspections WHERE id IN (?, ?)').run(signedNow, unsigned);
   // The tenant signs on screen.
   const png = 'data:image/png;base64,' + Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(80)]).toString('base64');
   r = await c.post(`/app/inspections/${ins}/sign`, { name: 'Made-up Tenant', signature: 'nope' });
@@ -2566,6 +2575,22 @@ test('Rift report: a row per property, the amount to its landlord and the landlo
   assert.equal(report.landlords, 1);
   const r = await c.get('/app/monthly/report?month=2026-09');
   assert.match(r.text, /2 properties · 1 landlord/);
+});
+
+test('new maintenance job: the tenant and contractor can sign on the form itself', async () => {
+  const c = await registerAndLogin('job-sign-new@example.com', 'Job Sign New Lets');
+  const prop = idFrom((await c.post('/app/properties', { address_line1: '4 Sign Street', status: 'let' })).location);
+  const r = await c.get(`/app/maintenance/new?property_id=${prop}`);
+  assert.match(r.text, /Signed by Tenant \/ SU[\s\S]*?name="signature_tenant"[\s\S]*?name="satisfied"[\s\S]*?Signed by Maintenance \/ Contractor[\s\S]*?name="signature_contractor"/);
+  const sig = 'data:image/png;base64,' + Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(80)]).toString('base64');
+  const body = new FormData();
+  for (const [k, v] of Object.entries({ _csrf: c.csrf, property_id: String(prop), title: 'Boiler check', priority: 'normal', status: 'open',
+    signature_tenant: sig, signature_tenant_name: 'Made-up Tenant', satisfied: 'Yes', signature_contractor: '' })) body.append(k, v);
+  const res = await fetch(`${base}/app/maintenance`, { method: 'POST', headers: { cookie: c.cookie }, body, redirect: 'manual' });
+  assert.equal(res.status, 302);
+  const job = idFrom(res.headers.get('location'));
+  const sigs = db.prepare('SELECT role, signer_name, satisfied FROM job_signatures WHERE job_id = ? ORDER BY role').all(job).map((x) => ({ ...x }));
+  assert.deepEqual(sigs, [{ role: 'tenant', signer_name: 'Made-up Tenant', satisfied: 'Yes' }], 'the contractor left theirs blank, which is fine');
 });
 
 test('landlords list has no Councils column, and is in landlord code order', async () => {

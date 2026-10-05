@@ -1193,3 +1193,9 @@ input, select, textarea { max-width: 100%; }
 .sign-satisfied { justify-content: center; }
 .sign-satisfied legend { text-align: center; }
 .sign-actions { justify-content: center; }
+.new-sign { display: grid; justify-items: center; gap: 8px; text-align: center; }
+.new-sign label { display: grid; gap: 4px; justify-items: center; width: 100%; max-width: 420px; font-weight: 700; }
+.new-sign label input { text-align: center; }
+.new-sign .sign-pad { max-width: 600px; }
+.new-signs { margin-top: 6px; }
+.new-signs .sign-satisfied label { display: inline-flex; width: auto; }

@@ -863,6 +863,24 @@ module.exports = function appRoutes(db) {
       }
       return newId;
     });
+    // A new maintenance job signed there and then (each signature optional).
+    if (def.key === 'maintenance') {
+      for (const role of ['tenant', 'contractor']) {
+        const { png } = req.body[`signature_${role}`] ? require('../signature').readSignature(req.body[`signature_${role}`]) : {};
+        if (!png) continue;
+        const satisfied = role === 'tenant' && ['Yes', 'No'].includes(req.body.satisfied) ? req.body.satisfied : null;
+        db.prepare('INSERT INTO job_signatures (account_id, job_id, role, signer_name, satisfied, png) VALUES (?, ?, ?, ?, ?, ?)')
+          .run(a, id, role, String(req.body[`signature_${role}_name`] || '').trim().slice(0, 100) || null, satisfied, png);
+      }
+    }
+    // A new inspection signed by the tenant there and then.
+    if (def.key === 'inspections' && req.body.signature) {
+      const { png } = require('../signature').readSignature(req.body.signature);
+      if (png) {
+        db.prepare('INSERT INTO inspection_signatures (account_id, inspection_id, signer_name, png) VALUES (?, ?, ?, ?)')
+          .run(a, id, String(req.body.signature_name || '').trim().slice(0, 100) || null, png);
+      }
+    }
     if (refusedCerts.length) {
       return res.redirect(`/app/properties/${id}?error=${encodeURIComponent(`Property added, but these certificate files weren’t uploaded (use PDFs or photos): ${refusedCerts.join(', ')}.`)}#certificates`);
     }
