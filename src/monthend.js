@@ -212,7 +212,15 @@ async function cfpWorkbook(report) {
   const last = 3 + report.rows.length;
   const totalCell = ws.getCell(`C${last + 2}`);
   totalCell.value = { formula: `SUM(C4:C${last + 1})`, result: report.total / 100 };
-  totalCell.font = font;
+  totalCell.font = { ...font, bold: true };
+  // TOTAL, in bold, to the left of the sum.
+  ws.getCell(`B${last + 2}`).value = 'TOTAL';
+  ws.getCell(`B${last + 2}`).font = { ...font, bold: true };
+  // The title across A1 to D1, and every cell centred.
+  ws.mergeCells('A1:D1');
+  for (let r = 1; r <= last + 2; r++) {
+    for (let c = 1; c <= 4; c++) ws.getRow(r).getCell(c).alignment = { horizontal: 'center', vertical: 'middle' };
+  }
   return Buffer.from(await wb.xlsx.writeBuffer());
 }
 

@@ -1387,6 +1387,7 @@ test('month end: calculate rents, email landlords, Rift report (Excel) with prev
   const calcDay = db.prepare("SELECT substr(MAX(generated_at), 1, 10) AS d FROM monthly_statements WHERE month = '2026-08' AND landlord_id = ?").get(ann).d;
   const calcUk = calcDay.split('-').reverse().join('/');
   assert.match(r.text, new RegExp(`${calcUk.replace(/\//g, '\\/')}</td><td><a[^>]*>1 First Street</a></td><td class="num">£900\\.00</td><td>AA1</td>`));
+  assert.match(r.text, /<strong>TOTAL<\/strong><\/td><td class="num"><strong>£900\.00<\/strong>/);
   assert.match(r.text, /1 property · 1 landlord/);
   assert.match(r.text, /Download Excel/);
   r = await c.get('/app/monthly/report.xlsx?month=2026-08');
@@ -1406,6 +1407,11 @@ test('month end: calculate rents, email landlords, Rift report (Excel) with prev
   assert.equal(new Date(ws.getCell('A4').value).toISOString().slice(0, 10), calcDay);
   assert.equal(ws.getCell('C6').value.formula, 'SUM(C4:C5)');
   assert.equal(ws.getCell('C6').value.result, 900);
+  assert.equal(ws.getCell('B6').value, 'TOTAL');
+  assert.equal(ws.getCell('B6').font.bold, true);
+  assert.equal(ws.getCell('C6').font.bold, true, 'the sum is bold');
+  assert.ok(ws.model.merges.includes('A1:D1'), 'title merged across A1 to D1');
+  for (const ref of ['A1', 'A3', 'B4', 'C4', 'D4', 'C6']) assert.equal(ws.getCell(ref).alignment.horizontal, 'center', `${ref} centred`);
 
   // 4. Preview, then email the same report with the workbook attached.
   r = await c.get('/app/monthly/report?month=2026-08&step=4');

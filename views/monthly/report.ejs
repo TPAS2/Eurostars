@@ -51,8 +51,9 @@
         <tr><td><%= fmt.ukDate(r.date) %></td><td><a href="/app/monthly/<%= r.statement_id %>"><%= r.name %></a></td><td class="num"><%= fmt.money(r.debit) %></td><td><%= r.code || '' %></td></tr>
       <% }) %>
       </tbody>
-      <tfoot><tr class="total"><td></td><td><%= report.rows.length %> propert<%= report.rows.length === 1 ? 'y' : 'ies' %> · <%= report.landlords %> landlord<%= report.landlords === 1 ? '' : 's' %></td><td class="num"><%= fmt.money(report.total) %></td><td></td></tr></tfoot>
+      <tfoot><tr class="total"><td></td><td><strong>TOTAL</strong></td><td class="num"><strong><%= fmt.money(report.total) %></strong></td><td></td></tr></tfoot>
     </table></div>
+    <p class="muted small sheet-count"><%= report.rows.length %> propert<%= report.rows.length === 1 ? 'y' : 'ies' %> · <%= report.landlords %> landlord<%= report.landlords === 1 ? '' : 's' %></p>
   </div>
   <% } %>
 </section>

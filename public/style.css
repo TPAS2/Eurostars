@@ -1171,3 +1171,9 @@ input, select, textarea { max-width: 100%; }
 .field > .label { display: block; font-weight: 700; margin-bottom: 4px; }
 .pay-gaps p { margin: 4px 0; }
 .gap-list { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+/* The Rift report preview: every cell centred, like the workbook. */
+.sheet-preview .sheet-title { text-align: center; }
+.sheet-preview table.cfp th, .sheet-preview table.cfp td, .sheet-preview table.cfp .num { text-align: center; }
+.sheet-count { text-align: center; }
+.sheet-preview { width: 720px; max-width: 100%; }
+.sheet-preview table.cfp { width: 100%; }
