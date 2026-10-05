@@ -2303,6 +2303,7 @@ test('inspections: own tab, own photos (separate from property photos), listed o
   const c = await registerAndLogin('inspect@example.com', 'Inspect Lets');
   const prop = idFrom((await c.post('/app/properties', { address_line1: '3 Survey Road', status: 'let' })).location);
   assert.match((await c.get('/app')).text, /href="\/app\/inspections" aria-label="Inspections"/, 'Inspections is a tab');
+  assert.match((await c.get('/app')).text, /aria-label="Maintenance"[\s\S]*?<\/a>\s*<a[^>]*href="\/app\/inspections"/, 'straight under Maintenance');
   let r = await c.get(`/app/inspections/new?property_id=${prop}`);
   assert.equal(r.status, 200);
   const older = idFrom((await c.post('/app/inspections', { property_id: String(prop), inspection_date: '2026-03-02', inspection_type: 'Check-in', condition: 'Good' })).location);
