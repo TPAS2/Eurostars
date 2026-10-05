@@ -3862,3 +3862,25 @@ test('dashboard heading: the date beside Dashboard, and just "Welcome back, name
   assert.match(page, /<p class="muted">Welcome back, [^<.]+\.<\/p>/);
   assert.doesNotMatch(page, /Here's where things stand/);
 });
+
+test('property form: Property code top left (filled in automatically), Council beside Status', async () => {
+  const c = await registerAndLogin('prop-code@example.com', 'Prop Code Lets');
+  let page = (await c.get('/app/properties/new')).text;
+  const order = [...page.matchAll(/<label for="f-([a-z_0-9]+)">/g)].map((m) => m[1]);
+  assert.equal(order[0], 'code', 'Property code is the first box');
+  assert.equal(order[order.indexOf('status') + 1], 'council_id', 'Council comes straight after Status');
+  assert.match(page, /name="code" value="P0001"/);
+  let r = await c.post('/app/properties', { address_line1: '1 Code Street', status: 'vacant' }); // code left blank
+  const first = idFrom(r.location);
+  assert.equal(db.prepare('SELECT code FROM properties WHERE id = ?').get(first).code, 'P0001');
+  assert.match((await c.get('/app/properties/new')).text, /name="code" value="P0002"/, 'one more each time');
+  await c.post('/app/properties', { address_line1: '2 Code Street', status: 'vacant', code: 'P0100' });
+  assert.match((await c.get('/app/properties/new')).text, /name="code" value="P0101"/);
+  // An older property with no code gets one when it's next edited.
+  db.prepare('UPDATE properties SET code = NULL WHERE id = ?').run(first);
+  assert.match((await c.get(`/app/properties/${first}/edit`)).text, /name="code" value=""/);
+  await c.post(`/app/properties/${first}`, { address_line1: '1 Code Street', status: 'vacant', code: '' });
+  assert.equal(db.prepare('SELECT code FROM properties WHERE id = ?').get(first).code, 'P0101');
+  page = (await c.get(`/app/properties/${first}`)).text;
+  assert.match(page, /<dt>Property code<\/dt>\s*<dd><span class="pre">P0101<\/span>/);
+});

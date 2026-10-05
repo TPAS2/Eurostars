@@ -760,23 +760,24 @@ module.exports = function appRoutes(db) {
     const def = getEntity(req, res);
     if (!def) return;
     const values = formDefaults(def, req.query);
-    if (def.key === 'landlords' && !values.code) values.code = nextLandlordCode(req.user.id);
+    if (CODED[def.key] && !values.code) values.code = nextCode(def.key, req.user.id);
     for (const f of def.fields) if (f.type === 'person' && !values[f.name]) values[f.name] = req.user.person_id || req.user.id;
     renderForm(res, def, { row: null, values, errors: {}, accountId: req.user.id });
   });
 
-  // The next landlord code: one more than the highest so far, keeping its letters and zero
-  // padding (L101 → L102, LL009 → LL010); L0001 for the first.
-  function nextLandlordCode(accountId) {
+  // The next landlord or property code: one more than the highest so far, keeping its letters and
+  // zero padding (L101 → L102, LL009 → LL010); L0001 / P0001 for the first.
+  const CODED = { landlords: 'L0001', properties: 'P0001' };
+  function nextCode(table, accountId) {
     let best = null;
-    for (const { code } of db.prepare("SELECT code FROM landlords WHERE account_id = ? AND code IS NOT NULL AND code != ''").all(accountId)) {
+    for (const { code } of db.prepare(`SELECT code FROM ${table} WHERE account_id = ? AND code IS NOT NULL AND code != ''`).all(accountId)) {
       const m = /^(.*?)(\d+)$/.exec(String(code).trim());
       if (m && (!best || Number(m[2]) > best.n)) best = { prefix: m[1], n: Number(m[2]), width: m[2].length };
     }
-    if (!best) return 'L0001';
+    if (!best) return CODED[table];
     let next = `${best.prefix}${String(best.n + 1).padStart(best.width, '0')}`;
     // Never hand out a code that's already in use.
-    while (db.prepare('SELECT 1 FROM landlords WHERE account_id = ? AND code = ?').get(accountId, next)) {
+    while (db.prepare(`SELECT 1 FROM ${table} WHERE account_id = ? AND code = ?`).get(accountId, next)) {
       best.n += 1;
       next = `${best.prefix}${String(best.n + 1).padStart(best.width, '0')}`;
     }
@@ -788,7 +789,7 @@ module.exports = function appRoutes(db) {
     if (!def) return;
     const a = req.user.id;
     // A landlord left without a code gets the next one.
-    if (def.key === 'landlords' && !String(req.body.code || '').trim()) req.body.code = nextLandlordCode(a);
+    if (CODED[def.key] && !String(req.body.code || '').trim()) req.body.code = nextCode(def.key, a);
     // Certificates typed in while adding a property (any left blank are skipped).
     const newCerts = [];
     if (def.key === 'properties') {
@@ -1000,7 +1001,7 @@ module.exports = function appRoutes(db) {
     if (!row) return;
     const a = req.user.id;
     const autosave = req.get('X-Autosave') === '1';
-    if (def.key === 'landlords' && !String(req.body.code || '').trim()) req.body.code = row.code || nextLandlordCode(a);
+    if (CODED[def.key] && !String(req.body.code || '').trim()) req.body.code = row.code || nextCode(def.key, a);
     const { values, errors } = parseForm(def, req.body, a);
     // A tenant's Edit form can change the council of the property they rent.
     let councilChange = null;

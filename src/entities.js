@@ -45,7 +45,7 @@ const ENTITIES = {
     order: 'address_line1 COLLATE NOCASE',
     searchBar: true,
     fields: [
-      { name: 'council_id', label: 'Council', type: 'ref', ref: 'councils', help: 'The local authority for this address.' },
+      { name: 'code', label: 'Property code', type: 'text', required: true, help: 'Filled in with the next number automatically; change it if you need to.' },
       { name: 'address_line1', label: 'Property address', type: 'text', required: true },
       { name: 'town', label: 'Town / city', type: 'text' },
       { name: 'postcode', label: 'Postcode', type: 'text' },
@@ -54,11 +54,14 @@ const ENTITIES = {
       { name: 'bedrooms', label: 'Bedrooms', type: 'integer' },
       { name: 'management_fee_pct', label: 'Management fee %', type: 'number', help: 'Deducted automatically from rent received.' },
       { name: 'status', label: 'Status', type: 'select', options: ['vacant', 'let', 'under offer', 'unavailable', 'handed back'], required: true, default: 'vacant' },
+      { name: 'council_id', label: 'Council', type: 'ref', ref: 'councils', help: 'The local authority for this address.' },
       { name: 'lease_start_date', label: 'Lease start date with landlord', type: 'date', help: 'When your lease with the landlord for this property began.', startRow: true },
       { name: 'acquired_date', label: 'Date acquired', type: 'date', default: 'today', help: 'When you took the property on.' },
       { name: 'handed_back_date', label: 'Date handed back', type: 'date', help: 'When it went back to the landlord. Filling this in sets the status to handed back.' },
       { name: 'notes', label: 'Notes', type: 'textarea' },
     ],
+    // The property page's info box keeps Council near the top (the form has it beside Status).
+    detailsOrder: ['council_id', 'code', 'address_line1', 'town', 'postcode', 'landlord_id', 'property_type', 'bedrooms', 'management_fee_pct', 'status', 'lease_start_date', 'acquired_date', 'handed_back_date', 'notes'],
     columns: ['address_line1', 'council_id', 'landlord_id', 'cur_tenant', 'status'],
     computed: { cur_tenant: { label: 'Tenant' } },
     children: [
