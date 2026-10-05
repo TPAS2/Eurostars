@@ -36,7 +36,7 @@ module.exports = function appRoutes(db) {
 
   function refOptions(refKey, accountId) {
     const r = REF_LABELS[refKey];
-    return db.prepare(`SELECT ${r.alias}.id AS id, ${r.label} AS label FROM ${r.from} WHERE ${r.alias}.account_id = ? ORDER BY label COLLATE NOCASE`).all(accountId);
+    return db.prepare(`SELECT ${r.alias}.id AS id, ${r.label} AS label${r.hint ? `, ${r.hint} AS hint` : ''} FROM ${r.from} WHERE ${r.alias}.account_id = ? ORDER BY label COLLATE NOCASE`).all(accountId);
   }
 
   // Everyone at the company (its main login and its people), for "Added by" boxes.

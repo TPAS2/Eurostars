@@ -42,14 +42,14 @@ const ENTITIES = {
     singular: 'Property',
     plural: 'Properties',
     titleField: 'address_line1',
-    order: 'address_line1 COLLATE NOCASE',
+    order: "CASE WHEN code IS NULL OR code = '' THEN 1 ELSE 0 END, code COLLATE NOCASE, address_line1 COLLATE NOCASE",
     searchBar: true,
     fields: [
       { name: 'code', label: 'Property code', type: 'text', required: true, help: 'Filled in with the next number automatically; change it if you need to.' },
       { name: 'address_line1', label: 'Property address', type: 'text', required: true },
       { name: 'town', label: 'Town / city', type: 'text' },
       { name: 'postcode', label: 'Postcode', type: 'text' },
-      { name: 'landlord_id', label: 'Landlord', type: 'ref', ref: 'landlords' },
+      { name: 'landlord_id', label: 'Landlord', type: 'ref', ref: 'landlords', search: true, help: 'Type a name or landlord code, then pick from the list.' },
       { name: 'property_type', label: 'Type', type: 'select', options: ['House', 'Flat', 'HMO', 'Bungalow', 'Studio', 'Commercial', 'Other'] },
       { name: 'bedrooms', label: 'Bedrooms', type: 'integer' },
       { name: 'management_fee_pct', label: 'Management fee %', type: 'number', help: 'Deducted automatically from rent received.' },
@@ -212,7 +212,7 @@ const ENTITIES = {
 
 // SQL used to label rows of each entity in dropdowns and tables.
 const REF_LABELS = {
-  landlords: { from: 'landlords l', label: 'l.name', alias: 'l' },
+  landlords: { from: 'landlords l', label: 'l.name', alias: 'l', hint: "COALESCE(l.code, '')" },
   properties: { from: 'properties p', label: PROPERTY_LABEL, alias: 'p' },
   tenants: { from: 'tenants t', label: 't.name', alias: 't' },
   councils: { from: 'councils c', label: 'c.name', alias: 'c' },

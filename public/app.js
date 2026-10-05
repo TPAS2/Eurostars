@@ -811,3 +811,58 @@ document.addEventListener('DOMContentLoaded', () => {
   document.addEventListener('change', monthPicked, true);
   document.addEventListener('submit', monthPicked, true);
 })();
+
+// Search boxes for long dropdowns (e.g. a property's Landlord): type part of a name or code and pick
+// from the matching list. The real <select> stays in the form, hidden, and holds the choice, so
+// saving, autosave and drafts work as before. Text that matches nobody stops the form being sent.
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('select[data-search]').forEach((select, n) => {
+    const choices = [...select.options].filter((o) => o.value).map((o) => ({
+      value: o.value,
+      text: o.dataset.hint ? `${o.textContent.trim()} (${o.dataset.hint})` : o.textContent.trim(),
+      find: `${o.textContent} ${o.dataset.hint || ''}`.toLowerCase(),
+    }));
+    const listId = `search-list-${n}`;
+    const list = document.createElement('datalist');
+    list.id = listId;
+    choices.forEach((c) => { const o = document.createElement('option'); o.value = c.text; list.appendChild(o); });
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'search-box';
+    input.id = `${select.id}-search`;
+    input.setAttribute('list', listId);
+    input.autocomplete = 'off';
+    input.placeholder = 'Start typing a name or code…';
+    const current = choices.find((c) => c.value === select.value);
+    input.value = current ? current.text : '';
+    select.insertAdjacentElement('afterend', input);
+    input.insertAdjacentElement('afterend', list);
+    select.classList.add('search-native');
+    select.tabIndex = -1;
+    const label = document.querySelector(`label[for="${select.id}"]`);
+    if (label) label.htmlFor = input.id;
+
+    const set = (value) => {
+      if (select.value === value) return;
+      select.value = value;
+      select.dispatchEvent(new Event('input', { bubbles: true }));
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+    };
+    const match = () => {
+      const typed = input.value.trim().toLowerCase();
+      if (!typed) { input.setCustomValidity(''); set(''); return; }
+      const exact = choices.find((c) => c.text.toLowerCase() === typed);
+      if (exact) { input.setCustomValidity(''); set(exact.value); return; }
+      set('');
+      input.setCustomValidity('Pick one from the list (type part of the name or code).');
+    };
+    input.addEventListener('input', match);
+    // Leaving the box with text that fits exactly one choice picks it.
+    input.addEventListener('blur', () => {
+      const typed = input.value.trim().toLowerCase();
+      if (!typed || choices.some((c) => c.text.toLowerCase() === typed)) return;
+      const hits = choices.filter((c) => c.find.includes(typed));
+      if (hits.length === 1) { input.value = hits[0].text; match(); }
+    });
+  });
+});

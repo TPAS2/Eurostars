@@ -175,7 +175,7 @@ test('full lettings workflow: landlord → property → tenant → rent → fee 
 
   // "Add property" from the landlord page pre-selects the landlord.
   r = await c.get(`/app/properties/new?landlord_id=${landlordId}`);
-  assert.match(r.text, new RegExp(`<option value="${landlordId}" selected>`));
+  assert.match(r.text, new RegExp(`<option value="${landlordId}" selected[^>]*>`));
   r = await c.post('/app/properties', { address_line1: '1 High Street', town: 'Leeds', postcode: 'LS1 1AA', landlord_id: landlordId, status: 'vacant', management_fee_pct: '10' });
   assert.equal(r.status, 302, r.text);
   const propertyId = idFrom(r.location);
@@ -3914,4 +3914,25 @@ test('existing properties without a code are given one, once, in the order they 
   d = openDatabase(file);
   assert.equal(d.prepare("SELECT code FROM properties WHERE address_line1 = 'First Road'").get().code, null, 'runs only once');
   d.close();
+});
+
+test('property form: Landlord is a search box (name or code), backed by the real dropdown', async () => {
+  const c = await registerAndLogin('ll-search@example.com', 'LL Search Lets');
+  const ll = idFrom((await c.post('/app/landlords', { ...LANDLORD, name: 'Searchable Sue', code: 'L0007' })).location);
+  const page = (await c.get('/app/properties/new')).text;
+  assert.match(page, new RegExp(`<select id="f-landlord_id" name="landlord_id"\\s+data-search>[\\s\\S]*?<option value="${ll}" [^>]*data-hint="L0007">Searchable Sue</option>`));
+  const js = fs.readFileSync(path.join(__dirname, '..', 'public', 'app.js'), 'utf8');
+  assert.match(js, /select\[data-search\]/);
+  const r = await c.post('/app/properties', { address_line1: '4 Search Street', status: 'vacant', landlord_id: String(ll) });
+  assert.equal(db.prepare('SELECT landlord_id FROM properties WHERE id = ?').get(idFrom(r.location)).landlord_id, ll);
+});
+
+test('properties list is in property code order', async () => {
+  const c = await registerAndLogin('prop-order@example.com', 'Prop Order Lets');
+  await c.post('/app/properties', { address_line1: 'A Third', status: 'vacant', code: 'P0003' });
+  await c.post('/app/properties', { address_line1: 'Z First', status: 'vacant', code: 'P0001' });
+  await c.post('/app/properties', { address_line1: 'M Second', status: 'vacant', code: 'P0002' });
+  const list = (await c.get('/app/properties')).text;
+  const at = ['Z First', 'M Second', 'A Third'].map((n) => list.indexOf(`>${n}</a>`));
+  assert.ok(at.every((x) => x > 0) && at[0] < at[1] && at[1] < at[2], 'P0001, P0002, P0003');
 });

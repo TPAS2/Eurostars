@@ -14,9 +14,9 @@
       <% (opts || []).forEach(o => { %><option value="<%= o.id %>" <%= Number(v) === o.id ? 'selected' : '' %>><%= o.label %></option><% }) %>
     </select>
   <% } else if (f.type === 'ref') { %>
-    <select id="f-<%= f.name %>" name="<%= f.name %>" <%= f.required ? 'required' : '' %>>
+    <select id="f-<%= f.name %>" name="<%= f.name %>" <%= f.required ? 'required' : '' %><%= f.search ? ' data-search' : '' %>>
       <option value="">— Select —</option>
-      <% opts.forEach(o => { %><option value="<%= o.id %>" <%= Number(v) === o.id ? 'selected' : '' %>><%= o.label %></option><% }) %>
+      <% opts.forEach(o => { %><option value="<%= o.id %>" <%= Number(v) === o.id ? 'selected' : '' %><% if (o.hint) { %> data-hint="<%= o.hint %>"<% } %>><%= o.label %></option><% }) %>
     </select>
   <% } else if (f.type === 'money') { %>
     <input id="f-<%= f.name %>" name="<%= f.name %>" inputmode="decimal" value="<%= typeof v === 'number' ? fmt.penceToInput(v) : v %>" <%= f.required ? 'required' : '' %> placeholder="0.00">
