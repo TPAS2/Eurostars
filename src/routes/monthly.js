@@ -107,9 +107,9 @@ module.exports = function monthlyRoutes(db, writer, mailer = { enabled: false })
     const a = req.user.id;
     const month = monthFrom(req);
     if (!month) return backTo(res, st.previousMonth(), { error: 'Choose a valid month.' });
-    const raised = transaction(db, () => ledger.raiseMonthlyRent(db, a, month));
+    const { raised, credited } = transaction(db, () => ({ raised: ledger.raiseMonthlyRent(db, a, month), credited: ledger.creditLandlordRent(db, a, month) }));
     const n = await st.generateForAccount(db, { accountId: a, agencyName: req.user.agency_name, month, writer });
-    backTo(res, month, { flash: `Raised ${plural(raised, 'new rent charge')} and calculated ${plural(n, 'statement')} for ${st.monthLabel(month)}.` });
+    backTo(res, month, { flash: `Raised ${plural(raised, 'new rent charge')}${credited ? `, credited ${plural(credited, 'landlord rent payment')}` : ''} and calculated ${plural(n, 'statement')} for ${st.monthLabel(month)}. The Rift report is ready below.` });
   }));
 
   // Step 2: email each landlord their statement (or one landlord, from their row).

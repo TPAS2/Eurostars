@@ -12,7 +12,7 @@ function councilTenancies(db, accountId, month, councilId = null) {
   const { from, to } = monthBounds(month);
   const rows = db.prepare(
     `SELECT ty.id AS tenancy_id, ty.status, ty.start_date, ty.end_date, ty.rent_pence, ty.rent_frequency,
-            t.name AS tenant, p.id AS property_id, p.address_line1, p.council_id,
+            t.name AS tenant, p.id AS property_id, p.address_line1, p.council_id, p.rent_pence AS property_rent_pence,
             COALESCE(SUM(CASE WHEN tx.txn_type = 'rent_charge' THEN tx.amount_pence END), 0) AS charged,
             COALESCE(SUM(CASE WHEN tx.txn_type = 'rent_received' THEN tx.amount_pence END), 0) AS received
        FROM tenancies ty

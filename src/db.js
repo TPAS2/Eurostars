@@ -534,6 +534,7 @@ function openDatabase(file) {
   addColumnIfMissing(db, 'properties', 'parking', 'TEXT');
   addColumnIfMissing(db, 'properties', 'rent_pence', 'INTEGER');
   addColumnIfMissing(db, 'properties', 'price_per_night_pence', 'INTEGER');
+  addColumnIfMissing(db, 'properties', 'landlord_rent_pence', 'INTEGER');
   // What the maintenance job sheet needs: the contractor's details, and a few job details.
   for (const col of ['code', 'address', 'mobile', 'fax']) addColumnIfMissing(db, 'contractors', col, 'TEXT');
   addColumnIfMissing(db, 'maintenance_jobs', 'estimate_required', 'TEXT');

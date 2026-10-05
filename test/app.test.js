@@ -183,7 +183,7 @@ test('full lettings workflow: landlord → property → tenant → rent → fee 
   assert.deepEqual({ ...db.prepare('SELECT bathrooms, parking, rent_pence FROM properties WHERE id = ?').get(propertyId) }, { bathrooms: 2, parking: 'Driveway', rent_pence: 95050 });
   assert.match((await c.get(`/app/properties/${propertyId}`)).text, /£950\.50/);
   r = await c.get('/app/properties');
-  assert.match(r.text, /<th[^>]*>Rent amount<\/th>/, 'rent is a column on the properties list');
+  assert.match(r.text, /<th[^>]*>Rent from council<\/th>\s*<th[^>]*>Rent to landlord<\/th>/, 'both rents are columns on the properties list');
   assert.match(r.text, /<tr class="total">[\s\S]*?Total[\s\S]*?£950\.50/, 'with a total at the bottom');
   // Managed is a property status of its own; starting a tenancy doesn't change it to let.
   r = await c.post('/app/properties', { address_line1: '5 Managed Row', status: 'managed' });
@@ -2501,6 +2501,34 @@ test('inspection sheet: tick sheet filled in, signed by the tenant, downloadable
   assert.equal((await other.post(`/app/inspections/${ins}/sign`, { signature: png })).status, 404);
 });
 
+test('rent run: landlords on a fixed monthly rent are paid it whether or not rent has come in; the report fills in', async () => {
+  const c = await registerAndLogin('fixed-rent@example.com', 'Fixed Rent Lets');
+  const a = db.prepare("SELECT id FROM users WHERE username = 'fixed-rent'").get().id;
+  const ll = idFrom((await c.post('/app/landlords', { ...LANDLORD, name: 'Fixed Rent Landlord', code: 'L0001' })).location);
+  let r = await c.get('/app/properties/new');
+  assert.match(r.text, /Rent from council \(£ per month\)[\s\S]*?Rent to landlord \(£ per month\)/);
+  const prop = idFrom((await c.post('/app/properties', { address_line1: '5 Steady Street', status: 'let', landlord_id: String(ll),
+    rent_pence: '1200', landlord_rent_pence: '1000', management_fee_pct: '10', acquired_date: '2026-01-01' })).location);
+  // Rent that did come in from the council belongs to the agency once the landlord is on a fixed rent.
+  db.prepare("INSERT INTO transactions (account_id, txn_date, txn_type, landlord_id, property_id, amount_pence) VALUES (?, '2026-07-10', 'rent_received', ?, ?, 120000)").run(a, ll, prop);
+  await c.get('/app/rent-run?month=2026-07');
+  r = await c.post('/app/monthly/calculate', { month: '2026-07' });
+  assert.match(decodeURIComponent(r.location.replace(/\+/g, ' ')), /credited 1 landlord rent payment[\s\S]*?The Rift report is ready/);
+  const report = require('../src/monthend').cfpReport(db, a, '2026-07');
+  assert.deepEqual(report.rows.map((x) => [x.name, x.debit]), [['Fixed Rent Landlord', 90000]], '£1,000 less the 10% fee, and not the £1,200 received');
+  // Calculating again doesn't pay twice.
+  await c.get('/app/rent-run?month=2026-07');
+  await c.post('/app/monthly/calculate', { month: '2026-07' });
+  assert.equal(db.prepare("SELECT COUNT(*) n FROM transactions WHERE property_id = ? AND txn_type = 'landlord_rent'").get(prop).n, 1);
+  assert.equal(require('../src/monthend').cfpReport(db, a, '2026-07').total, 90000);
+  // A property handed back before the month isn't paid.
+  await c.get(`/app/properties/${prop}/edit`);
+  db.prepare("UPDATE properties SET handed_back_date = '2026-07-31', status = 'handed back' WHERE id = ?").run(prop);
+  await c.get('/app/rent-run?month=2026-08');
+  await c.post('/app/monthly/calculate', { month: '2026-08' });
+  assert.equal(db.prepare("SELECT COUNT(*) n FROM transactions WHERE property_id = ? AND txn_type = 'landlord_rent'").get(prop).n, 1);
+});
+
 test('landlords list has no Councils column, and is in landlord code order', async () => {
   const c = await registerAndLogin('ll-order@example.com', 'LL Order Lets');
   const leeds = idFrom((await c.post('/app/councils', { name: 'Leeds City Council' })).location);
@@ -2738,7 +2766,7 @@ test('properties list columns: Property name, Council, Landlord, Tenant, Status'
   await c.post(`/app/properties/${prop}/add-tenant`, { tenant_mode: 'new', name: 'Cora Tenant', booking_date: '2026-07-10', start_date: '2026-08-01', rent_pence: '850', rent_frequency: 'monthly', status: 'active' });
   r = await c.get('/app/properties');
   const heads = [...r.text.slice(r.text.indexOf('<thead'), r.text.indexOf('</thead>')).matchAll(/<th[^>]*>([^<]+)</g)].map((m) => m[1].trim()).filter(Boolean);
-  assert.deepEqual(heads.slice(0, 7), ['Property code', 'Property address', 'Council', 'Landlord', 'Tenant', 'Rent amount', 'Status']);
+  assert.deepEqual(heads.slice(0, 8), ['Property code', 'Property address', 'Council', 'Landlord', 'Tenant', 'Rent from council', 'Rent to landlord', 'Status']);
   assert.match(r.text, /3 Column Close[\s\S]*Col Council[\s\S]*Col Landlord[\s\S]*Cora Tenant/);
 });
 

@@ -45,14 +45,14 @@ function computeStatement(db, accountId, landlordId, month) {
   let payments = 0;
   for (const r of rows) {
     const bucket = (r.property_id && byProperty.get(r.property_id)) || other;
-    if (r.txn_type === 'rent_received') bucket.rent += r.amount_pence;
+    if (r.txn_type === 'rent_received' || r.txn_type === 'landlord_rent') bucket.rent += r.amount_pence;
     else if (r.txn_type === 'fee') bucket.fees += r.amount_pence;
     else if (r.txn_type === 'expense') bucket.expenses += r.amount_pence;
     else if (r.txn_type === 'landlord_payment') payments += r.amount_pence;
     lines.push({
       date: r.txn_date, type: r.txn_type, property: r.address_line1 || '',
       description: r.description || fmt.humanize(r.txn_type), amount: r.amount_pence,
-      direction: r.txn_type === 'rent_received' ? 'in' : 'out', balance: r.balance,
+      direction: r.txn_type === 'rent_received' || r.txn_type === 'landlord_rent' ? 'in' : 'out', balance: r.balance,
     });
   }
 

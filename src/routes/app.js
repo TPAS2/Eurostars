@@ -762,7 +762,8 @@ module.exports = function appRoutes(db) {
       } };
     }
     if (def.key === 'properties') {
-      totalsRow = { label: 'Total', cells: { rent_pence: fmt.money(rows.reduce((t, r) => t + (Number(r.rent_pence) || 0), 0)) } };
+      const sum = (k) => fmt.money(rows.reduce((t, r) => t + (Number(r[k]) || 0), 0));
+      totalsRow = { label: 'Total', cells: { rent_pence: sum('rent_pence'), landlord_rent_pence: sum('landlord_rent_pence') } };
     }
     if (def.key === 'councils') {
       // How many properties are in each council, and which ones.

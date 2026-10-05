@@ -54,8 +54,9 @@ const ENTITIES = {
       { name: 'bedrooms', label: 'Bedrooms', type: 'integer' },
       { name: 'bathrooms', label: 'Bathrooms', type: 'integer' },
       { name: 'parking', label: 'Parking', type: 'select', options: ['None', 'Street', 'Permit', 'Driveway', 'Allocated space', 'Garage'] },
-      { name: 'rent_pence', label: 'Rent amount (£)', type: 'money', help: 'The monthly rent for this property.' },
+      { name: 'rent_pence', label: 'Rent from council (£ per month)', type: 'money', help: 'The monthly rent for this property. Charged on the Rent run for a tenancy with no rent of its own.' },
       { name: 'price_per_night_pence', label: 'Price per night (£)', type: 'money', help: 'For short stays.' },
+      { name: 'landlord_rent_pence', label: 'Rent to landlord (£ per month)', type: 'money', help: 'Paid on the Rent run every month, even if the rent hasn’t come in.' },
       { name: 'management_fee_pct', label: 'Management fee %', type: 'number', help: 'Deducted automatically from rent received.' },
       { name: 'status', label: 'Status', type: 'select', options: ['vacant', 'let', 'managed', 'under offer', 'unavailable', 'handed back'], required: true, default: 'vacant', startRow: true },
       { name: 'council_id', label: 'Council', type: 'ref', ref: 'councils', help: 'The local authority for this address.' },
@@ -65,8 +66,8 @@ const ENTITIES = {
       { name: 'notes', label: 'Notes', type: 'textarea' },
     ],
     // The property page's info box keeps Council near the top (the form has it beside Status).
-    detailsOrder: ['council_id', 'code', 'address_line1', 'town', 'postcode', 'landlord_id', 'property_type', 'bedrooms', 'bathrooms', 'parking', 'rent_pence', 'price_per_night_pence', 'management_fee_pct', 'status', 'lease_start_date', 'acquired_date', 'handed_back_date', 'notes'],
-    columns: ['code', 'address_line1', 'council_id', 'landlord_id', 'cur_tenant', 'rent_pence', 'status'],
+    detailsOrder: ['council_id', 'code', 'address_line1', 'town', 'postcode', 'landlord_id', 'property_type', 'bedrooms', 'bathrooms', 'parking', 'rent_pence', 'price_per_night_pence', 'landlord_rent_pence', 'management_fee_pct', 'status', 'lease_start_date', 'acquired_date', 'handed_back_date', 'notes'],
+    columns: ['code', 'address_line1', 'council_id', 'landlord_id', 'cur_tenant', 'rent_pence', 'landlord_rent_pence', 'status'],
     computed: { cur_tenant: { label: 'Tenant' } },
     children: [
       { entity: 'tenancies', fk: 'property_id' },
@@ -228,8 +229,8 @@ const ENTITIES = {
     fields: [
       { name: 'txn_date', label: 'Date', type: 'date', required: true, default: 'today' },
       { name: 'txn_type', label: 'Type', type: 'select', required: true,
-        options: ['rent_charge', 'rent_received', 'expense', 'landlord_payment', 'fee'],
-        optionLabels: { rent_charge: 'Rent due (charge)', rent_received: 'Rent received', expense: 'Expense paid for landlord', landlord_payment: 'Payment to landlord', fee: 'Agency fee' } },
+        options: ['rent_charge', 'rent_received', 'landlord_rent', 'expense', 'landlord_payment', 'fee'],
+        optionLabels: { rent_charge: 'Rent due (charge)', rent_received: 'Rent received', landlord_rent: 'Rent due to landlord (fixed monthly)', expense: 'Expense paid for landlord', landlord_payment: 'Payment to landlord', fee: 'Agency fee' } },
       { name: 'tenancy_id', label: 'Tenancy', type: 'ref', ref: 'tenancies', help: 'For rent charges and receipts.' },
       { name: 'property_id', label: 'Property', type: 'ref', ref: 'properties', help: 'Filled from the tenancy if left blank.' },
       { name: 'landlord_id', label: 'Landlord', type: 'ref', ref: 'landlords', help: 'Filled from the property if left blank.' },
