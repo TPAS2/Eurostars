@@ -24,10 +24,8 @@
         <% if (errors.supplier) { %><div class="field-err"><%= errors.supplier %></div><% } %>
       </div>
       <div class="field">
-        <label for="f-added_by">Added by <span class="req">*</span></label>
-        <select id="f-added_by" name="added_by" required>
-          <% people.forEach(m => { %><option value="<%= m.id %>" <%= Number(values.added_by) === m.id ? 'selected' : '' %>><%= m.name %></option><% }) %>
-        </select>
+        <span class="label">Added by</span>
+        <div class="locked-value"><%= addedByName %></div>
       </div>
     </div>
     <div class="field price-trio wide" data-profit>

@@ -82,12 +82,7 @@ module.exports = function invoiceRoutes(db, config) {
       v[k] = text(k, 10);
       if (v[k] && !fmt.isIsoDate(v[k])) errors[k] = 'Enter a valid date.';
     }
-    // Who in the company added it.
-    if (body.added_by !== undefined) {
-      const who = Number(body.added_by);
-      const ok = Number.isInteger(who) && db.prepare('SELECT 1 FROM users WHERE id = ? AND (id = ? OR company_id = ?)').get(who, accountId, accountId);
-      if (!ok) errors.added_by = 'Choose who added it.'; else v.added_by = who;
-    }
+    // "Added by" is always the person signed in when it was added (set on create, never changed).
     // Optional: blank counts as £0.00.
     const cost = String(body.amount || '').trim();
     v.amount_pence = cost ? fmt.parseMoney(cost) : 0;
@@ -133,10 +128,11 @@ module.exports = function invoiceRoutes(db, config) {
 
   function renderForm(req, res, { invoice, values, errors, status = 200 }) {
     const a = req.user.id;
-    const people = db.prepare("SELECT id, name FROM users WHERE (id = ? OR company_id = ?) AND status = 'active' ORDER BY company_id IS NOT NULL, name COLLATE NOCASE").all(a, a);
-    if (values.added_by === undefined || values.added_by === null || values.added_by === '') values = { ...values, added_by: req.user.person_id };
+    // Who added it: the person signed in for a new invoice, or whoever added it originally.
+    const by = invoice ? invoice.added_by : (req.user.person_id || a);
+    const addedBy = (by && db.prepare('SELECT name FROM users WHERE id = ? AND (id = ? OR company_id = ?)').get(by, a, a)) || null;
     res.status(status).render('invoices/form', {
-      title: invoice ? 'Edit contractor invoice' : 'Upload contractor invoice', section: 'invoices', invoice, values, errors, people,
+      title: invoice ? 'Edit contractor invoice' : 'Upload contractor invoice', section: 'invoices', invoice, values, errors, addedByName: addedBy ? addedBy.name : (invoice && invoice.added_by ? 'Someone who has left' : '—'),
       contractors: db.prepare('SELECT name, trade FROM contractors WHERE account_id = ? ORDER BY name COLLATE NOCASE').all(a),
       jobs: db.prepare(JOB_OPTS).all(a), properties: db.prepare(PROPERTY_OPTS).all(a), fmt,
       landlords: db.prepare('SELECT id, name FROM landlords WHERE account_id = ? ORDER BY name COLLATE NOCASE').all(a),
@@ -225,7 +221,7 @@ module.exports = function invoiceRoutes(db, config) {
       if (stored) removeFile(a, stored.file_name);
       return renderForm(req, res, { invoice: null, values: req.body, errors, status: 422 });
     }
-    const row = { ...v, ...stored, contractor_id: contractorFor(db, a, v.supplier) };
+    const row = { ...v, ...stored, added_by: req.user.person_id || a, contractor_id: contractorFor(db, a, v.supplier) };
     const cols = Object.keys(row);
     const info = db.prepare(`INSERT INTO invoices (account_id, ${cols.join(', ')}) VALUES (?, ${cols.map(() => '?').join(', ')})`)
       .run(a, ...cols.map((c) => row[c]));

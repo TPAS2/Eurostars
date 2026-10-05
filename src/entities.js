@@ -178,7 +178,7 @@ const ENTITIES = {
       { name: 'preferred_start_date', label: 'Preferred start date', type: 'date' },
       { name: 'estimate_required', label: 'Estimate required', type: 'select', options: ['No', 'Yes'], default: 'No' },
       { name: 'go_ahead', label: 'Go ahead?', type: 'select', options: ['No', 'Yes'], default: 'No' },
-      { name: 'added_by', label: 'Added by', type: 'person', required: true },
+      { name: 'added_by', label: 'Added by', type: 'person', locked: true },
     ],
     files: true,
     columns: ['title', 'property_id', 'priority', 'status', 'reported_date', 'cost_pence', 'added_by'],

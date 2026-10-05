@@ -1965,26 +1965,20 @@ test('contractor invoices: no invoice number or due date on the form; file, supp
 
   let r = await c.get('/app/invoices/new');
   assert.doesNotMatch(r.text, /name="invoice_number"|name="due_date"/);
-  assert.match(r.text, /<div class="field wide top-trio">\s*<div class="field">\s*<label for="f-file">[\s\S]*?<label for="f-supplier">[\s\S]*?<label for="f-added_by">Added by <span class="req">\*<\/span><\/label>/, 'Invoice file, Supplier and Added by share one line');
-  assert.match(r.text, new RegExp(`<option value="${companyId}" selected>Test User</option><option value="${pat}" >Pat Clerk</option>`), 'defaults to whoever is signed in');
+  assert.match(r.text, /<div class="field wide top-trio">\s*<div class="field">\s*<label for="f-file">[\s\S]*?<label for="f-supplier">[\s\S]*?<span class="label">Added by<\/span>\s*<div class="locked-value">Test User<\/div>/, 'Invoice file, Supplier and Added by share one line');
+  assert.doesNotMatch(r.text, /name="added_by"/, 'Added by is the person signed in and can\'t be changed');
 
   const pdf = new File([Buffer.from('%PDF-1.4\n%x\n')], 'i.pdf');
   r = await c.post('/app/invoices', await invoiceBody(c, { supplier: 'Lock Co', amount: '75', invoice_date: '2026-09-01', added_by: String(pat), file: pdf }), { multipart: true });
   const id = idFrom(r.location);
-  assert.equal(db.prepare('SELECT added_by FROM invoices WHERE id = ?').get(id).added_by, pat);
-  assert.match((await c.get(`/app/invoices/${id}`)).text, /<dt>Added by<\/dt><dd>Pat Clerk<\/dd>/);
-  // Someone from another company can't be picked.
-  const other = await registerAndLogin('added-by-2@example.com', 'Other Added');
-  const otherId = db.prepare("SELECT id FROM users WHERE username = 'added-by-2'").get().id;
-  r = await c.post('/app/invoices', await invoiceBody(c, { supplier: 'Lock Co', amount: '5', added_by: String(otherId), file: new File([Buffer.from('%PDF-1.4\n')], 'j.pdf') }), { multipart: true });
-  assert.equal(r.status, 422);
-  assert.ok(other);
+  assert.equal(db.prepare('SELECT added_by FROM invoices WHERE id = ?').get(id).added_by, companyId, 'a different person sent in is ignored: it is whoever is signed in');
+  assert.match((await c.get(`/app/invoices/${id}`)).text, /<dt>Added by<\/dt><dd>Test User<\/dd>/);
   // Editing keeps an existing invoice number / due date.
   db.prepare("UPDATE invoices SET invoice_number = 'INV-9', due_date = '2026-09-30' WHERE id = ?").run(id);
   await c.get(`/app/invoices/${id}/edit`);
   const cur = db.prepare('SELECT maintenance_job_id, property_id FROM invoices WHERE id = ?').get(id);
   await c.post(`/app/invoices/${id}`, { supplier: 'Lock Co', amount: '80', invoice_date: '2026-09-01', added_by: String(pat), maintenance_job_id: String(cur.maintenance_job_id), property_id: String(cur.property_id), description: 'Lock change', charge_landlord: 'yes', landlord_amount: '80' }, { multipart: true });
-  assert.deepEqual({ ...db.prepare('SELECT invoice_number, due_date, amount_pence FROM invoices WHERE id = ?').get(id) }, { invoice_number: 'INV-9', due_date: '2026-09-30', amount_pence: 8000 });
+  assert.deepEqual({ ...db.prepare('SELECT invoice_number, due_date, amount_pence, added_by FROM invoices WHERE id = ?').get(id) }, { invoice_number: 'INV-9', due_date: '2026-09-30', amount_pence: 8000, added_by: companyId });
 });
 
 test('contractor invoice form offers the saved contractors as a type-to-narrow list', async () => {
@@ -2046,7 +2040,7 @@ test('"Deduct from landlord" straight from adding a contractor or landlord invoi
 test('every section must be filled in when adding a contractor or landlord invoice', async () => {
   const c = await registerAndLogin('all-required@example.com', 'Required Lets');
   let r = await c.get('/app/invoices/new');
-  for (const name of ['supplier', 'invoice_date', 'property_id', 'added_by', 'charge_landlord']) {
+  for (const name of ['supplier', 'invoice_date', 'property_id', 'charge_landlord']) {
     assert.match(r.text, new RegExp(`name="${name}"[^>]*required|required[^>]*name="${name}"`), `${name} is required on the contractor invoice form`);
   }
   // Notes, the maintenance job and the invoice file are optional.
@@ -3825,9 +3819,9 @@ test('maintenance: files when adding, contractor list, who added it, date comple
   assert.match(form, /Property address/);
   assert.match(form, /Description of work/);
   assert.match(form, /<option value="Made Up Plumbing">/, 'contractors to pick from');
-  assert.match(form, new RegExp(`<option value="${co}" selected>`), 'Added by starts as the person signed in');
-  assert.match(form, /Sam Helper/);
-  // Added by someone else, with a photo and a Word file.
+  assert.match(form, /<div class="locked-value" id="f-added_by">Test User<\/div>/, 'Added by is the person signed in');
+  assert.doesNotMatch(form, /name="added_by"/, 'and can\'t be changed');
+  // Someone else sent in as "Added by" is ignored; with a photo and a Word file.
   const png = new Blob([Buffer.from('89504e470d0a1a0a0000000d49484452', 'hex')]);
   const docx = new Blob([Buffer.from('504b0304140000000800', 'hex')]);
   const body = new FormData();
@@ -3838,16 +3832,18 @@ test('maintenance: files when adding, contractor list, who added it, date comple
   assert.equal(r.status, 302);
   assert.match(decodeURIComponent(r.headers.get('location')), /Added with 2 files/);
   const job = db.prepare("SELECT * FROM maintenance_jobs WHERE title = 'Leaking tap'").get();
-  assert.equal(job.added_by, sam);
+  assert.equal(job.added_by, co, 'always the person signed in');
+  assert.ok(sam);
   assert.equal(db.prepare('SELECT COUNT(*) n FROM maintenance_files WHERE job_id = ?').get(job.id).n, 2);
-  assert.match((await c.get(`/app/maintenance/${job.id}`)).text, /Sam Helper/);
   // Saved as completed: dated today.
   await c.get(`/app/maintenance/${job.id}/edit`);
   await c.post(`/app/maintenance/${job.id}`, { property_id: prop, title: 'Leaking tap', priority: 'normal', status: 'completed', reported_date: '2026-10-01', added_by: String(sam) });
   assert.equal(db.prepare('SELECT completed_date FROM maintenance_jobs WHERE id = ?').get(job.id).completed_date, new Date().toISOString().slice(0, 10));
   // Someone from another company can't be named as having added it.
+  // Someone from another company sent in as "Added by" is ignored too.
   const bad = await c.post('/app/maintenance', { property_id: prop, title: 'X', priority: 'normal', status: 'open', added_by: '1' });
-  assert.equal(bad.status, 422);
+  assert.equal(bad.status, 302);
+  assert.equal(db.prepare('SELECT added_by FROM maintenance_jobs WHERE id = ?').get(idFrom(bad.location)).added_by, co);
 });
 
 test('properties: address label, lease start with landlord, certificates when adding, notes of tenant calls', async () => {
@@ -3873,25 +3869,26 @@ test('properties: address label, lease start with landlord, certificates when ad
   assert.deepEqual(certs.map((x) => [x.item_type, x.issued_date, x.expiry_date]), [['EPC', null, '2035-05-05'], ['Gas Safety (CP12)', '2026-01-01', '2027-01-01']]);
   // Notes: separate boxes, newest date first, added by someone else.
   await c.post(`/app/properties/${pid}/notes`, { note_date: '2026-09-01', body: 'Tenant rang about the boiler' });
-  await c.post(`/app/properties/${pid}/notes`, { note_date: '2026-09-20', body: 'Tenant rang about the bins', added_by: String(kim) });
+  await c.post(`/app/properties/${pid}/notes`, { note_date: '2026-09-20', body: 'Tenant rang about the bins', added_by: String(kim) }); // ignored
   const page = (await c.get(`/app/properties/${pid}`)).text;
   assert.match(page, /Tenant calls/);
   assert.ok(page.indexOf('about the bins') < page.indexOf('about the boiler'), 'newest first');
-  assert.match(page, /Added by Kim Helper/);
+  assert.doesNotMatch(page, /Added by Kim Helper/, 'always the person signed in');
+  assert.match(page, /Added by Test User/);
   assert.equal(page.match(/class="call-note"/g).length, 2);
   // Empty notes, and other companies' people or properties, are refused.
   r = await c.post(`/app/properties/${pid}/notes`, { note_date: '2026-09-21', body: '  ' });
   assert.match(decodeURIComponent(r.location), /Write the note first/);
   r = await c.post(`/app/properties/${pid}/notes`, { body: 'x', added_by: '1' });
-  assert.match(decodeURIComponent(r.location), /Choose who added the note/);
+  assert.equal(db.prepare("SELECT added_by FROM property_notes WHERE property_id = ? AND body = 'x'").get(pid).added_by, co, 'someone else sent in is ignored');
   const other = await registerAndLogin('prop-notes2@example.com', 'Other Lets');
   r = await other.post(`/app/properties/${pid}/notes`, { body: 'sneaky' });
   assert.equal(r.status, 404);
   const nid = db.prepare("SELECT id FROM property_notes WHERE body LIKE '%boiler%'").get().id;
   await other.post(`/app/properties/${pid}/notes/${nid}/delete`, {});
-  assert.equal(db.prepare('SELECT COUNT(*) n FROM property_notes WHERE property_id = ?').get(pid).n, 2);
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM property_notes WHERE property_id = ?').get(pid).n, 3, 'the two notes plus "x" (saved under the person signed in)');
   await c.post(`/app/properties/${pid}/notes/${nid}/delete`, {});
-  assert.equal(db.prepare('SELECT COUNT(*) n FROM property_notes WHERE property_id = ?').get(pid).n, 1);
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM property_notes WHERE property_id = ?').get(pid).n, 2);
 });
 
 test('tenants: council reference number; tenancies: reservation date, term as booked, no rent boxes', async () => {

@@ -9,6 +9,8 @@
       <% if (!f.required || v === '') { %><option value="" <%= v === '' ? 'selected' : '' %>><%= f.required ? '— Select —' : '—' %></option><% } %>
       <% f.options.forEach(o => { %><option value="<%= o %>" <%= String(v) === o ? 'selected' : '' %>><%= (f.optionLabels && f.optionLabels[o]) || fmt.humanize(o) %></option><% }) %>
     </select>
+  <% } else if (f.type === 'person' && f.locked) { const who = (opts || []).find(o => Number(v) === o.id); %>
+    <div class="locked-value" id="f-<%= f.name %>"><%= who ? who.label : (v ? 'Someone who has left' : 'You') %></div>
   <% } else if (f.type === 'person') { %>
     <select id="f-<%= f.name %>" name="<%= f.name %>" <%= f.required ? 'required' : '' %>>
       <% (opts || []).forEach(o => { %><option value="<%= o.id %>" <%= Number(v) === o.id ? 'selected' : '' %>><%= o.label %></option><% }) %>

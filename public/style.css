@@ -1166,3 +1166,6 @@ input, select, textarea { max-width: 100%; }
   .form-properties .new-certs .cert-row label { font-size: .78rem; }
   .form-properties .new-certs .cert-row { margin: 2px 0; }
 }
+/* A value set automatically that can't be changed, e.g. "Added by". */
+.locked-value { padding: 8px 10px; border: 1px dashed var(--border); border-radius: 8px; background: var(--surface-2); color: var(--text); font-weight: 600; min-height: 38px; display: flex; align-items: center; }
+.field > .label { display: block; font-weight: 700; margin-bottom: 4px; }

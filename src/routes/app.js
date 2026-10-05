@@ -87,6 +87,8 @@ module.exports = function appRoutes(db) {
     for (const f of def.fields) {
       // An inspection's tick sheet: one Yes / No / N/A per safety requirement, kept together.
       if (f.type === 'checklist') { values[f.name] = JSON.stringify(require('../inspectionSheet').parseChecklist(body)); continue; }
+      // "Added by": set to the person signed in when the record is added (see the create route), never changed.
+      if (f.locked) continue;
       let raw = body[f.name];
       // A dropdown left out of the submission entirely takes its default (e.g. Statement type: Email).
       if (raw === undefined && f.type === 'select' && f.default !== undefined) raw = f.default;
@@ -831,6 +833,7 @@ module.exports = function appRoutes(db) {
     // "Added by" left out: the person signed in.
     for (const f of def.fields) if (f.type === 'person' && !String(req.body[f.name] || '').trim()) req.body[f.name] = String(req.user.person_id || a);
     const { values, errors } = parseForm(def, req.body, a);
+    for (const f of def.fields) if (f.locked) values[f.name] = req.user.person_id || a;
     for (const cert of newCerts) {
       if (!fmt.isIsoDate(cert.expiry)) errors[`cert_${cert.i}_expiry`] = `Enter when the ${cert.type} expires.`;
       if (cert.issued && !fmt.isIsoDate(cert.issued)) errors[`cert_${cert.i}_issued`] = 'Enter a valid date.';
@@ -1032,7 +1035,7 @@ module.exports = function appRoutes(db) {
     const back = (key, msg) => res.redirect(`/app/properties/${p.id}?${key}=${encodeURIComponent(msg)}#call-notes`);
     const date = String(req.body.note_date || '').trim() || fmt.today();
     const body = String(req.body.body || '').trim().slice(0, 5000);
-    const who = Number(req.body.added_by) || req.user.person_id || a;
+    const who = req.user.person_id || a; // always the person signed in
     if (!fmt.isIsoDate(date)) return back('error', 'Enter a valid date for the note.');
     if (!body) return back('error', 'Write the note first.');
     if (!db.prepare('SELECT 1 FROM users WHERE id = ? AND (id = ? OR company_id = ?)').get(who, a, a)) return back('error', 'Choose who added the note.');
