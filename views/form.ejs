@@ -58,6 +58,31 @@
     </div>
   </form>
 </section>
+<% if (typeof editCerts !== 'undefined' && editCerts) { %>
+<section class="card" id="edit-certs">
+  <h2>Certificates</h2>
+  <p class="muted small">Change the dates or upload the certificate (PDF or photo, up to 25 MB), then press Save on that row. For a renewal, use <strong>+ Renewal</strong> so the old one is kept in the history.</p>
+  <% if (editCerts.flash) { %><div class="notice ok"><%= editCerts.flash %></div><% } %>
+  <% if (editCerts.error) { %><div class="notice err"><%= editCerts.error %></div><% } %>
+  <% editCerts.list.forEach((c, i) => { const cur = c.current; %>
+  <form method="post" action="/app/properties/<%= row.id %>/certs/<%= i %>" enctype="multipart/form-data" class="cert-row cert-edit-row">
+    <%- include('partials/csrf') %>
+    <div>
+      <strong><%= c.title %></strong>
+      <span class="badge cert-badge-<%= c.status.key %>"><%= c.status.label %></span>
+      <% if (cur && cur.files.length) { %><div class="small"><% cur.files.forEach(f => { %><a href="/app/compliance/<%= cur.id %>/files/<%= f.id %>" target="_blank" rel="noopener">📄 <%= f.filename %></a> <% }) %></div><% } %>
+    </div>
+    <div class="field"><label for="ec-<%= i %>-i">Issued</label><input id="ec-<%= i %>-i" type="date" name="issued" value="<%= cur && cur.issued_date || '' %>"></div>
+    <div class="field"><label for="ec-<%= i %>-e">Expires</label><input id="ec-<%= i %>-e" type="date" name="expiry" value="<%= cur && cur.expiry_date || '' %>" required></div>
+    <div class="field"><label for="ec-<%= i %>-f"><%= cur && cur.files.length ? 'Add another file' : 'Certificate file' %></label><input id="ec-<%= i %>-f" type="file" name="file" accept="application/pdf,image/*,.heic,.heif,.doc,.docx"></div>
+    <div class="cert-edit-actions">
+      <button class="btn small primary" type="submit">Save</button>
+      <% if (cur) { %><a class="btn small" href="/app/compliance/new?property_id=<%= row.id %>&item_type=<%= encodeURIComponent(c.type) %>">+ Renewal</a><% } %>
+    </div>
+  </form>
+  <% }) %>
+</section>
+<% } %>
 <% if (def.fields.some((f) => f.segment)) { %>
 <link rel="stylesheet" href="/static/segments.css?v=<%= assetV %>">
 <script src="/static/segments.js?v=<%= assetV %>" defer></script>

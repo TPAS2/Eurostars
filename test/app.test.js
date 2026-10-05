@@ -2334,21 +2334,56 @@ test('inspections: own tab, own photos (separate from property photos), listed o
   assert.equal(db.prepare('SELECT COUNT(*) n FROM inspection_photos WHERE inspection_id = ?').get(newer).n, 0);
 });
 
-test('parking: On street and Off street are one option, and saved ones are changed over', async () => {
+test('parking: On street and Off street are one option, Street, and saved ones are changed over', async () => {
   const c = await registerAndLogin('parking@example.com', 'Parking Lets');
   const r = await c.get('/app/properties/new');
-  assert.match(r.text, /<option value="On \/ off street"/);
-  assert.doesNotMatch(r.text, /<option value="(On|Off) street"/);
+  assert.match(r.text, /<option value="Street"/);
+  assert.doesNotMatch(r.text, /<option value="(On|Off) street"|On \/ off street/);
   const file = path.join(os.tmpdir(), `rift-parking-${process.pid}.db`);
   try {
     let d = openDatabase(file);
     const u = d.prepare("INSERT INTO users (username, login_name, name, agency_name, password_hash) VALUES ('parkco', 'Pat', 'Pat', 'Park Co', 'x')").run().lastInsertRowid;
-    d.prepare("INSERT INTO properties (account_id, address_line1, status, parking) VALUES (?, '1 A Road', 'vacant', 'Off street'), (?, '2 B Road', 'vacant', 'On street'), (?, '3 C Road', 'vacant', 'Garage')").run(u, u, u);
+    d.prepare("INSERT INTO properties (account_id, address_line1, status, parking) VALUES (?, '1 A Road', 'vacant', 'Off street'), (?, '2 B Road', 'vacant', 'On street'), (?, '3 C Road', 'vacant', 'Garage'), (?, '4 D Road', 'vacant', 'On / off street')").run(u, u, u, u);
     d.close();
     d = openDatabase(file);
-    assert.deepEqual(d.prepare('SELECT parking FROM properties ORDER BY id').all().map((x) => x.parking), ['On / off street', 'On / off street', 'Garage']);
+    assert.deepEqual(d.prepare('SELECT parking FROM properties ORDER BY id').all().map((x) => x.parking), ['Street', 'Street', 'Garage', 'Street']);
     d.close();
   } finally { for (const f of [file, `${file}-wal`, `${file}-shm`]) fs.rmSync(f, { force: true }); }
+});
+
+test('editing a property: its certificates can be changed there too', async () => {
+  const c = await registerAndLogin('edit-certs@example.com', 'Edit Certs Lets');
+  const prop = idFrom((await c.post('/app/properties', { address_line1: '2 Gauge Street', status: 'let' })).location);
+  let r = await c.get(`/app/properties/${prop}/edit`);
+  assert.match(r.text, /id="edit-certs"[\s\S]*?action="\/app\/properties\/\d+\/certs\/0"[\s\S]*?Gas certificate[\s\S]*?Insurance/);
+  const send = async (slot, fields, file) => {
+    const form = new FormData();
+    form.append('_csrf', c.csrf);
+    for (const [k, v] of Object.entries(fields)) form.append(k, v);
+    if (file) form.append('file', file);
+    const res = await fetch(`${base}/app/properties/${prop}/certs/${slot}`, { method: 'POST', headers: { cookie: c.cookie }, body: form, redirect: 'manual' });
+    return decodeURIComponent(res.headers.get('location'));
+  };
+  // Adds a gas certificate with its file, then changes its dates (the same certificate).
+  assert.match(await send(0, { issued: '2026-01-10', expiry: '2027-01-09' }, new File([Buffer.from('%PDF-1.4\n')], 'gas.pdf')), /cert_flash=Gas Safety \(CP12\) saved/);
+  const gas = db.prepare("SELECT * FROM compliance_items WHERE property_id = ? AND item_type = 'Gas Safety (CP12)'").all(prop);
+  assert.equal(gas.length, 1);
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM compliance_files WHERE item_id = ?').get(gas[0].id).n, 1);
+  await c.get(`/app/properties/${prop}/edit`);
+  assert.match(await send(0, { issued: '2026-01-12', expiry: '2027-01-11' }), /saved/);
+  const after = db.prepare("SELECT issued_date, expiry_date FROM compliance_items WHERE property_id = ? AND item_type = 'Gas Safety (CP12)'").all(prop);
+  assert.deepEqual(after.map((x) => ({ ...x })), [{ issued_date: '2026-01-12', expiry_date: '2027-01-11' }]);
+  // An expiry date is needed; another company can't touch it.
+  assert.match(await send(3, { issued: '2026-02-01', expiry: '' }), /cert_error=Enter when the Insurance expires/);
+  r = await c.get(`/app/properties/${prop}/edit`);
+  assert.match(r.text, /value="2027-01-11"/);
+  assert.match(r.text, /📄 gas\.pdf/);
+  const other = await registerAndLogin('edit-certs-2@example.com', 'Other Certs');
+  const form = new FormData();
+  form.append('_csrf', other.csrf);
+  form.append('expiry', '2030-01-01');
+  const res = await fetch(`${base}/app/properties/${prop}/certs/0`, { method: 'POST', headers: { cookie: other.cookie }, body: form, redirect: 'manual' });
+  assert.equal(res.status, 404);
 });
 
 test('landlords list has no Councils column, and is in landlord code order', async () => {

@@ -9,10 +9,12 @@ const path = require('node:path');
 const express = require('express');
 const multer = require('multer');
 const auth = require('../auth');
+const fmt = require('../format');
 const { typeOf, REFUSED, SHOWABLE, MAX_BYTES } = require('./jobFiles');
 
 const MAX_FILES = 10;
 const CERT_SLOTS = 4; // the certificate rows on the new-property form
+const CERT_TYPES = ['Gas Safety (CP12)', 'EICR', 'EPC', 'Insurance']; // in the same order
 
 module.exports = function certFileRoutes(db) {
   const router = express.Router();
@@ -50,6 +52,43 @@ module.exports = function certFileRoutes(db) {
         next();
       });
     });
+  });
+
+  // Editing a property: one certificate row saved at a time (its dates, and a file if chosen).
+  // It changes the current certificate of that kind, or adds one if there isn't one yet.
+  const uploadOne = multer({ dest: tmpDir, limits: { fileSize: MAX_BYTES, files: 1, fields: 10 } }).single('file');
+  newProperty.post('/:id(\\d+)/certs/:slot(\\d)', (req, res, next) => {
+    uploadOne(req, res, (err) => {
+      if (err) req.uploadError = uploadError(err);
+      req.body = req.body || {};
+      auth.checkCsrfAfterUpload(req, res, next);
+    });
+  }, (req, res) => {
+    if (req.file) res.on('finish', () => cleanUp([req.file]));
+    const a = req.user.id;
+    const property = db.prepare('SELECT id FROM properties WHERE id = ? AND account_id = ?').get(Number(req.params.id), a);
+    const type = CERT_TYPES[Number(req.params.slot)];
+    if (!property || !type) return res.status(404).render('error', { title: 'Not found', message: 'That property was not found.' });
+    const back = (key, msg) => res.redirect(`/app/properties/${property.id}/edit?cert_${key}=${encodeURIComponent(msg)}#edit-certs`);
+    if (req.uploadError) return back('error', req.uploadError);
+    const issued = String(req.body.issued || '').trim();
+    const expiry = String(req.body.expiry || '').trim();
+    if (!fmt.isIsoDate(expiry)) return back('error', `Enter when the ${type} expires.`);
+    if (issued && !fmt.isIsoDate(issued)) return back('error', `Enter a valid issued date for the ${type}.`);
+    const current = db.prepare('SELECT id FROM compliance_items WHERE account_id = ? AND property_id = ? AND item_type = ? ORDER BY expiry_date DESC, id DESC').get(a, property.id, type);
+    let itemId;
+    if (current) {
+      db.prepare('UPDATE compliance_items SET issued_date = ?, expiry_date = ? WHERE id = ? AND account_id = ?').run(issued || null, expiry, current.id, a);
+      itemId = current.id;
+    } else {
+      itemId = Number(db.prepare('INSERT INTO compliance_items (account_id, property_id, item_type, issued_date, expiry_date) VALUES (?, ?, ?, ?, ?)')
+        .run(a, property.id, type, issued || null, expiry).lastInsertRowid);
+    }
+    if (req.file && req.file.size) {
+      const saved = saveFile(a, itemId, req.file, req.user.person_id);
+      if (!saved.ok) return back('error', `${type} dates saved, but ${saved.name} wasn’t uploaded (use a PDF or photo).`);
+    }
+    back('flash', `${type} saved.`);
   });
 
   function ownedItem(req, res) {

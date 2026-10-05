@@ -1081,3 +1081,9 @@ input, select, textarea { max-width: 100%; }
 .gallery-tools { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 8px; }
 .listing-pdf { display: flex; justify-content: center; align-items: center; gap: 8px; width: 100%; margin-top: 12px; }
 .listing-pdf svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+/* Editing a property: one row per certificate, each with its own Save. */
+.cert-edit-row { grid-template-columns: 200px repeat(3, minmax(0, 1fr)) 170px; padding: 12px 0; border-top: 1px solid var(--border); margin: 0; }
+.cert-edit-row .badge { margin-left: 6px; }
+.cert-edit-row .field { margin: 0; }
+.cert-edit-actions { display: flex; gap: 6px; align-items: center; }
+@media (max-width: 900px) { .cert-edit-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .cert-edit-row > div:first-of-type, .cert-edit-actions { grid-column: 1 / -1; } }

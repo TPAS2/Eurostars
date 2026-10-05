@@ -204,7 +204,13 @@ module.exports = function appRoutes(db) {
     }
     const tenantCouncil = def.key === 'tenants' && row ? tenantProperty(accountId, row.id) : null;
     if (tenantCouncil) tenantCouncil.options = refOptions('councils', accountId);
-    res.status(status).render('form', { title: row ? `Edit ${def.singular.toLowerCase()}` : `New ${def.singular.toLowerCase()}`, def, row, values, errors, options, tenantCouncil, fmt, section: sectionOf(def) });
+    // Editing a property: its four main certificates can be changed on the same page.
+    const editCerts = def.key === 'properties' && row ? {
+      list: keyCertificates(accountId, row.id),
+      flash: String(res.req.query.cert_flash || '').slice(0, 200),
+      error: String(res.req.query.cert_error || '').slice(0, 200),
+    } : null;
+    res.status(status).render('form', { title: row ? `Edit ${def.singular.toLowerCase()}` : `New ${def.singular.toLowerCase()}`, def, row, values, errors, options, tenantCouncil, editCerts, fmt, section: sectionOf(def) });
   }
 
   // The property of a tenant's current tenancy (or latest one), whose council the tenant's Edit form can change.

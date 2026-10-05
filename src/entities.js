@@ -53,7 +53,7 @@ const ENTITIES = {
       { name: 'property_type', label: 'Type', type: 'select', options: ['House', 'Flat', 'Maisonette', 'HMO', 'Bungalow', 'Studio', 'Commercial', 'Other'] },
       { name: 'bedrooms', label: 'Bedrooms', type: 'integer' },
       { name: 'bathrooms', label: 'Bathrooms', type: 'integer' },
-      { name: 'parking', label: 'Parking', type: 'select', options: ['None', 'On / off street', 'Permit', 'Driveway', 'Allocated space', 'Garage'] },
+      { name: 'parking', label: 'Parking', type: 'select', options: ['None', 'Street', 'Permit', 'Driveway', 'Allocated space', 'Garage'] },
       { name: 'rent_pence', label: 'Rent amount (£)', type: 'money', help: 'The monthly rent for this property.' },
       { name: 'price_per_night_pence', label: 'Price per night (£)', type: 'money', help: 'For short stays.' },
       { name: 'management_fee_pct', label: 'Management fee %', type: 'number', help: 'Deducted automatically from rent received.' },
