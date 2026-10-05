@@ -2245,6 +2245,51 @@ test('property photos: upload several, view, remove; private to the company', as
   assert.equal(db.prepare('SELECT COUNT(*) n FROM property_photos WHERE property_id = ?').get(prop).n, 0, 'deleting the property removes its photos');
 });
 
+test('property page: listing at the top, and emailing it sends only the listing', async () => {
+  const c = await registerAndLogin('listing@example.com', 'Listing Lets');
+  const landlord = idFrom((await c.post('/app/landlords', { ...LANDLORD, name: 'Private Landlord Name' })).location);
+  const prop = idFrom((await c.post('/app/properties', { address_line1: '4 Listing Lane', town: 'Testford', postcode: 'TE1 2AB', status: 'let',
+    landlord_id: String(landlord), property_type: 'Flat', bedrooms: '2', bathrooms: '1', parking: 'Permit', rent_pence: '1100', price_per_night_pence: '80', notes: 'Key is with neighbour' })).location);
+  const png = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(30)]);
+  const form = new FormData();
+  form.append('_csrf', c.csrf);
+  form.append('photos', new File([png], 'front.png'));
+  form.append('photos', new File([png], 'lounge.png'));
+  await fetch(`${base}/app/properties/${prop}/photos`, { method: 'POST', headers: { cookie: c.cookie }, body: form, redirect: 'manual' });
+
+  let r = await c.get(`/app/properties/${prop}`);
+  assert.match(r.text, /class="listing"[\s\S]*?data-gallery[\s\S]*?listing-price">£1,100\.00 pcm[\s\S]*?£80\.00 per night[\s\S]*?4 Listing Lane, Testford, TE1 2AB/);
+  assert.match(r.text, /key-facts[\s\S]*?Property type[\s\S]*?Flat[\s\S]*?Bedrooms[\s\S]*?Bathrooms[\s\S]*?Parking[\s\S]*?Permit/);
+  assert.match(r.text, /Management details[\s\S]*?Private Landlord Name/);
+  assert.match(r.text, /id="email-listing"[\s\S]*?name="from"[\s\S]*?name="to"/);
+  assert.match(r.text, /<div class="below-certs">[\s\S]*?Invoices[\s\S]*?Tenancies[\s\S]*?Tenant calls[\s\S]*?<\/div>/);
+  // Only filled-in details appear: no bathrooms fact on a property without one.
+  const bare = idFrom((await c.post('/app/properties', { address_line1: '1 Bare Street', status: 'vacant' })).location);
+  r = await c.get(`/app/properties/${bare}`);
+  assert.doesNotMatch(r.text, /class="key-facts"|listing-price/);
+  assert.match(r.text, /gallery-empty[\s\S]*?\+ Add photos/);
+
+  // Emailing: needs both addresses; sends photos inline; never the landlord, notes or certificates.
+  await c.get(`/app/properties/${prop}`);
+  r = await c.post(`/app/properties/${prop}/email`, { from: 'agent@example.com', to: 'not-an-address' });
+  assert.match(decodeURIComponent(r.location), /error=Enter the email address to send it to/);
+  sentMail.length = 0;
+  r = await c.post(`/app/properties/${prop}/email`, { from: 'agent@example.com', to: 'viewer@example.com', message: 'As discussed' });
+  assert.match(decodeURIComponent(r.location), /flash=Emailed this property to viewer@example\.com/);
+  assert.equal(sentMail.length, 1);
+  const m = sentMail[0];
+  assert.equal(m.to, 'viewer@example.com');
+  assert.equal(m.replyTo, 'agent@example.com');
+  assert.match(m.subject, /4 Listing Lane, Testford, TE1 2AB - £1,100\.00 pcm/);
+  assert.match(m.html, /As discussed[\s\S]*?cid:photo1@rift[\s\S]*?£1,100\.00 pcm[\s\S]*?£80\.00 per night[\s\S]*?Permit/);
+  assert.equal(m.attachments.length, 2);
+  assert.equal(m.attachments[0].cid, 'photo1@rift');
+  assert.doesNotMatch(m.html + m.text, /Private Landlord Name|Key is with neighbour|certificate|P0\d{3}/i);
+  // Private to the company.
+  const other = await registerAndLogin('listing-2@example.com', 'Other Listing');
+  assert.equal((await other.post(`/app/properties/${prop}/email`, { from: 'a@example.com', to: 'b@example.com' })).status, 404);
+});
+
 test('landlords list has no Councils column, and is in landlord code order', async () => {
   const c = await registerAndLogin('ll-order@example.com', 'LL Order Lets');
   const leeds = idFrom((await c.post('/app/councils', { name: 'Leeds City Council' })).location);

@@ -51,7 +51,74 @@
   <div class="tile"><span class="label">Last paid</span><span class="value sm"><%= cs.last ? fmt.ukDate(cs.last) : '—' %></span><span class="sub"><%= plural(cs.invoicesN) %> in total</span></div>
 </section>
 <% } %>
+<% if (typeof listing !== 'undefined' && listing) { const ph = (propertyPhotos || []).filter(f => f.mime !== 'image/heic'); const purl = (f) => `/app/properties/${row.id}/photos/${f.id}`; const icons = { 'Property type': '<path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/>', 'Bedrooms': '<path d="M3 18v-8a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v8"/><path d="M3 14h18"/><path d="M7 8V6h4v2"/><path d="M3 18v2M21 18v2"/>', 'Bathrooms': '<path d="M4 12h16v3a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4z"/><path d="M6 12V6a2 2 0 0 1 4 0"/><path d="M7 19l-1 2M17 19l1 2"/>', 'Parking': '<rect x="4" y="3" width="16" height="18" rx="3"/><path d="M10 16V8h3a2.5 2.5 0 0 1 0 5h-3"/>' }; %>
+<section class="listing">
+  <div class="listing-main">
+    <% if (ph.length) { %>
+    <div class="gallery<%= ph.length === 1 ? ' single' : '' %>" data-gallery>
+      <a class="gallery-main" href="<%= purl(ph[0]) %>" target="_blank" rel="noopener" data-gallery-link>
+        <img src="<%= purl(ph[0]) %>" alt="Photo of <%= row.address_line1 %>" data-gallery-main>
+        <span class="gallery-count"><span data-gallery-at>1</span>/<%= ph.length %></span>
+      </a>
+      <% if (ph.length > 1) { %>
+      <div class="gallery-side">
+        <% ph.slice(1, 3).forEach((f, i) => { %>
+        <button type="button" class="gallery-side-img" data-gallery-thumb="<%= purl(f) %>" data-index="<%= i + 2 %>"><img src="<%= purl(f) %>" alt="" loading="lazy"><% if (i === 1 && ph.length > 3) { %><span class="gallery-more">+<%= ph.length - 3 %> photos</span><% } %></button>
+        <% }) %>
+      </div>
+      <% } %>
+    </div>
+    <% if (ph.length > 1) { %>
+    <div class="gallery-strip">
+      <% ph.forEach((f, i) => { %><button type="button" class="gallery-thumb<%= i === 0 ? ' active' : '' %>" data-gallery-thumb="<%= purl(f) %>" data-index="<%= i + 1 %>" aria-label="Photo <%= i + 1 %>"><img src="<%= purl(f) %>" alt="" loading="lazy"></button><% }) %>
+    </div>
+    <% } %>
+    <% } else { %>
+    <div class="gallery-empty">
+      <p>No photos yet</p>
+      <form method="post" action="/app/properties/<%= row.id %>/photos" enctype="multipart/form-data" class="inline" data-busy="Uploading…">
+        <%- include('partials/csrf') %>
+        <label class="btn primary">+ Add photos<input type="file" name="photos" multiple accept="image/*,.heic,.heif" data-autosubmit hidden></label>
+      </form>
+    </div>
+    <% } %>
+    <div class="listing-head">
+      <div>
+        <% if (listing.prices.length) { %>
+          <div class="listing-price"><%= listing.prices[0] %></div>
+          <% if (listing.prices[1]) { %><div class="listing-price-sub"><%= listing.prices[1] %></div><% } %>
+        <% } %>
+        <p class="listing-address"><%= row.address_line1 %><% if (listing.place) { %>, <%= listing.place %><% } %></p>
+      </div>
+      <span class="badge s-<%= String(row.status).replace(/\W+/g, '-') %>"><%= row.status %></span>
+    </div>
+    <% if (listing.facts.length) { %>
+    <dl class="key-facts">
+      <% listing.facts.forEach(([label, value]) => { %>
+      <div><dt><%= label %></dt><dd><svg viewBox="0 0 24 24" aria-hidden="true"><%- icons[label] %></svg><span><%= value %></span></dd></div>
+      <% }) %>
+    </dl>
+    <% } %>
+  </div>
+  <aside class="card listing-side" id="email-listing">
+    <h2>Email this property</h2>
+    <p class="muted small">Sends the photos, price, address and key facts. Nothing else from Rift.</p>
+    <% if (!emailEnabled) { %>
+      <p class="muted small">Email isn’t set up yet.</p>
+    <% } else { %>
+    <form method="post" action="/app/properties/<%= row.id %>/email" class="stack" data-no-keep>
+      <%- include('partials/csrf') %>
+      <label>From <input type="email" name="from" value="<%= listing.from %>" required maxlength="254" autocomplete="email"></label>
+      <label>To <input type="email" name="to" required maxlength="254" placeholder="name@example.com" autocomplete="off"></label>
+      <label>Message <span class="muted small">(optional)</span><textarea name="message" rows="3" maxlength="2000"></textarea></label>
+      <button class="btn primary" type="submit">Send email</button>
+    </form>
+    <% } %>
+  </aside>
+</section>
+<% } %>
 <section class="card">
+  <% if (typeof listing !== 'undefined' && listing) { %><div class="card-head"><h2>Management details</h2></div><% } %>
   <% if (extra) { %><div class="callout <%= extra.alert ? 'alert' : '' %>"><span><%= extra.label %></span><strong><%= extra.value %></strong></div><% } %>
   <% if (photo) { %>
   <div class="with-photo">
@@ -78,7 +145,8 @@
     </div>
   <% } %>
   <dl class="details">
-    <% (def.detailsOrder ? def.detailsOrder.map((n) => def.fieldMap[n]) : def.fields).forEach(f => { const d = display(def, f.name, row, maps); %>
+    <% const inListing = typeof listing !== 'undefined' && listing ? ['address_line1', 'town', 'postcode', 'property_type', 'bedrooms', 'bathrooms', 'parking', 'rent_pence', 'price_per_night_pence', 'status'] : []; %>
+    <% (def.detailsOrder ? def.detailsOrder.map((n) => def.fieldMap[n]) : def.fields).filter(f => !inListing.includes(f.name)).forEach(f => { const d = display(def, f.name, row, maps); %>
       <div class="<%= f.type === 'textarea' && !f.inline ? 'wide' : '' %><%= f.startRow ? ' row-start' : '' %>">
         <dt><%= f.label %></dt>
         <dd><% if (!d.text) { %><span class="muted">—</span><% } else if (d.href) { %><a href="<%= d.href %>"><%= d.text %></a><% } else if (d.badge) { %><span class="badge s-<%= String(row[f.name]).replace(/\W+/g, '-') %>"><%= d.text %></span><% } else { %><span class="pre"><%= d.text %></span><% } %></dd>
@@ -323,6 +391,7 @@
 </section>
 <% } %>
 
+<% const strip = def.key === 'properties'; if (strip) { %><div class="below-certs"><% } %>
 <% if (invoices) { const q = { maintenance: 'maintenance_job_id', contractors: 'contractor_id' }[def.key] || 'property_id'; %>
 <section class="card">
   <div class="card-head">
@@ -365,7 +434,7 @@
 <% if (fold) { %></details><% } else { %></section><% } %>
 <% }) %>
 <% if (typeof callNotes !== 'undefined' && callNotes) { %>
-<details class="card fold" id="call-notes" open>
+<details class="card fold" id="call-notes"<%= strip ? '' : ' open' %>>
   <summary><h2>Tenant calls <span class="count"><%= callNotes.notes.length %></span></h2></summary>
   <form method="post" action="/app/properties/<%= row.id %>/notes" class="call-note-form" data-no-keep>
     <%- include('partials/csrf') %>
@@ -385,6 +454,7 @@
   <% }) %>
 </details>
 <% } %>
+<% if (strip) { %></div><% } %>
 <% if (typeof landlordStatements !== 'undefined' && landlordStatements) { %>
 <details class="card fold" id="landlord-statements">
   <summary><h2>Statements <span class="count"><%= landlordStatements.length %></span></h2></summary>

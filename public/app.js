@@ -416,6 +416,19 @@ const DRAFT_DAYS = 7;
         input.form.submit();
       });
     });
+    // A property's photo gallery: clicking a smaller photo shows it as the big one.
+    document.querySelectorAll('[data-gallery]').forEach((gallery) => {
+      const main = gallery.querySelector('[data-gallery-main]');
+      const link = gallery.querySelector('[data-gallery-link]');
+      const at = gallery.querySelector('[data-gallery-at]');
+      const thumbs = [...document.querySelectorAll('[data-gallery-thumb]')];
+      thumbs.forEach((btn) => btn.addEventListener('click', () => {
+        main.src = btn.dataset.galleryThumb;
+        link.href = btn.dataset.galleryThumb;
+        if (at) at.textContent = btn.dataset.index;
+        thumbs.forEach((t) => t.classList.toggle('active', t.classList.contains('gallery-thumb') && t.dataset.index === btn.dataset.index));
+      }));
+    });
     document.querySelectorAll('form[data-autosave]').forEach(setupAutosave);
     document.querySelectorAll('form[data-draft]').forEach(setupDraft);
     try { window.localStorage.removeItem('rift:resume-drafts'); } catch { /* storage blocked */ }

@@ -37,7 +37,10 @@ function createMailer(config) {
         body: JSON.stringify({
           from: msg.from, to: [msg.to], subject: msg.subject, text: msg.text, html: msg.html,
           reply_to: msg.replyTo || undefined,
-          attachments: (msg.attachments || []).map((a) => ({ filename: a.filename, content: Buffer.from(a.content).toString('base64') })),
+          attachments: (msg.attachments || []).map((a) => ({
+            filename: a.filename, content: Buffer.from(a.content).toString('base64'),
+            ...(a.cid ? { content_id: a.cid, content_type: a.contentType } : {}),
+          })),
         }),
       });
       if (!res.ok) {
@@ -56,7 +59,7 @@ function createMailer(config) {
     });
     transport = (msg) => smtp.sendMail({
       from: msg.from, to: msg.to, subject: msg.subject, text: msg.text, html: msg.html, replyTo: msg.replyTo || undefined,
-      attachments: (msg.attachments || []).map((a) => ({ filename: a.filename, content: a.content, contentType: a.contentType })),
+      attachments: (msg.attachments || []).map((a) => ({ filename: a.filename, content: a.content, contentType: a.contentType, ...(a.cid ? { cid: a.cid } : {}) })),
     });
   }
 

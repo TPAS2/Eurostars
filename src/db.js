@@ -484,6 +484,7 @@ function openDatabase(file) {
   addColumnIfMissing(db, 'properties', 'bathrooms', 'INTEGER');
   addColumnIfMissing(db, 'properties', 'parking', 'TEXT');
   addColumnIfMissing(db, 'properties', 'rent_pence', 'INTEGER');
+  addColumnIfMissing(db, 'properties', 'price_per_night_pence', 'INTEGER');
   // Tenants: the council's reference. Tenancies: the term as booked (rent is no longer entered).
   addColumnIfMissing(db, 'tenants', 'council_ref', 'TEXT');
   addColumnIfMissing(db, 'tenancies', 'term_booked', 'TEXT');

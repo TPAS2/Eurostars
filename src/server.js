@@ -191,6 +191,7 @@ function createApp(config, db, { writer = null, mailer = null } = {}) {
   app.use('/app/compliance', auth.requireLogin, certFiles);
   app.use('/app/properties', auth.requireLogin, certFiles.newProperty);
   app.use('/app/properties', auth.requireLogin, require('./routes/propertyPhotos')(db));
+  app.use('/app/properties', auth.requireLogin, require('./routes/propertyEmail')(db, mailer));
   app.use('/app/maintenance', auth.requireLogin, require('./routes/jobInvoice')(db, mailer));
   app.use('/app/landlord-invoices', auth.requireLogin, require('./routes/landlordInvoices')(db, mailer));
   app.use(auth.rejectUncheckedMultipart);

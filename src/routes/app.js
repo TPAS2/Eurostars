@@ -911,6 +911,13 @@ module.exports = function appRoutes(db) {
                       FROM property_photos f LEFT JOIN users u ON u.id = f.uploaded_by
                      WHERE f.account_id = ? AND f.property_id = ? ORDER BY f.id DESC`).all(a, row.id)
       : null;
+    // On a property: the Rightmove-style listing at the top, and who an emailed copy is from.
+    let listing = null;
+    if (def.key === 'properties') {
+      const me = db.prepare('SELECT email FROM users WHERE id = ?').get(req.user.person_id) || {};
+      const co = db.prepare('SELECT email, agency_name, statement_from_email FROM users WHERE id = ?').get(a);
+      listing = { ...require('./propertyEmail').listingOf(row), agency: co.agency_name, from: co.statement_from_email || me.email || co.email || '' };
+    }
     // On a maintenance job: its photos and files (without the file contents).
     const jobFiles = def.key === 'maintenance'
       ? db.prepare(`SELECT f.id, f.filename, f.mime, f.size, f.uploaded_at, u.name AS uploaded_by_name
@@ -964,7 +971,7 @@ module.exports = function appRoutes(db) {
       previous: db.prepare('SELECT COUNT(*) AS n FROM council_db_entries WHERE account_id = ? AND council_id = ? AND ended = 1').get(a, row.id).n,
       invoices: [],
     } : null;
-    res.render('show', { title: rowTitle(def, row, maps), section: sectionOf(def), def, row, maps, display, rowTitle, children, extra, invoices, related: relatedLists(def, row, a), certs, photo, tenantBoxes, statementLink, jobFiles, propertyPhotos, jobInvoice, contractorStats, bankChanges, councilBoxes, landlordStatements, callNotes, certFiles, error: req.query.error ? String(req.query.error).slice(0, 200) : null, flash: req.query.flash ? String(req.query.flash).slice(0, 200) : null, fmt, today: fmt.today() });
+    res.render('show', { title: rowTitle(def, row, maps), section: sectionOf(def), def, row, maps, display, rowTitle, children, extra, invoices, related: relatedLists(def, row, a), certs, photo, tenantBoxes, statementLink, jobFiles, propertyPhotos, listing, jobInvoice, contractorStats, bankChanges, councilBoxes, landlordStatements, callNotes, certFiles, error: req.query.error ? String(req.query.error).slice(0, 200) : null, flash: req.query.flash ? String(req.query.flash).slice(0, 200) : null, fmt, today: fmt.today() });
   });
 
   router.get('/:entity/:id/edit', (req, res) => {
