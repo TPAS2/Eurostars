@@ -1,0 +1,29 @@
+<%- include('partials/header') %>
+<header class="page-head">
+  <div>
+    <h1>Support</h1>
+    <p class="muted">Need help with <%= appName %>, found something not working, or want something changed? Get in touch.</p>
+  </div>
+</header>
+<section class="card support-card">
+  <% if (!support.email && !support.phone) { %>
+    <p class="muted">The support contact details haven’t been set up yet.</p>
+  <% } else { %>
+  <div class="support-grid">
+    <% if (support.email) { %>
+    <a class="support-item" href="mailto:<%= support.email %>">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>
+      <span><span class="support-label">Email</span><strong><%= support.email %></strong></span>
+    </a>
+    <% } %>
+    <% if (support.phone) { %>
+    <a class="support-item" href="tel:<%= support.phone.replace(/[^\d+]/g, '') %>">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/></svg>
+      <span><span class="support-label">Phone</span><strong><%= support.phone %></strong></span>
+    </a>
+    <% } %>
+  </div>
+  <p class="muted small">When you get in touch, say which page you were on and what you were trying to do. Please don’t send passwords or bank details.</p>
+  <% } %>
+</section>
+<%- include('partials/footer') %>

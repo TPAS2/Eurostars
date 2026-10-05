@@ -1137,3 +1137,12 @@ input, select, textarea { max-width: 100%; }
   .tick-sheet.read-only .tick-row { grid-template-columns: minmax(0, 1fr) auto; }
   .tick-sheet.read-only .tick-label { grid-column: auto; }
 }
+
+/* Support page. */
+.support-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin-bottom: 14px; }
+.support-item { display: flex; align-items: center; gap: 14px; padding: 16px; border: 1px solid var(--border); border-radius: var(--radius); text-decoration: none; color: var(--text); background: var(--surface-2); }
+.support-item:hover { border-color: var(--brand); }
+.support-item svg { width: 30px; height: 30px; flex: none; fill: none; stroke: var(--brand); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.support-item > span { display: grid; gap: 2px; min-width: 0; }
+.support-item strong { font-size: 1.1rem; overflow-wrap: anywhere; }
+.support-label { font-size: .75rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 700; }

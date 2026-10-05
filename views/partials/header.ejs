@@ -62,6 +62,7 @@
           <span class="theme-toggle-thumb"></span>
         </span>
       </button>
+      <a class="topbar-btn <%= s === 'support' ? 'active' : '' %>" href="/support" <%- s === 'support' ? 'aria-current="page"' : '' %>><%- include('icon', { name: 'support' }) %><span class="topbar-text">Support</span></a>
       <a class="topbar-btn <%= s === 'account' ? 'active' : '' %>" href="/app/account" <%- s === 'account' ? 'aria-current="page"' : '' %>><span class="avatar-initials"><%= initials %></span><span class="topbar-text">My account<span class="topbar-sub"><%= user.name %></span></span></a>
       <form method="post" action="/logout" id="signout-form">
         <input type="hidden" name="_csrf" value="<%= csrfToken %>">

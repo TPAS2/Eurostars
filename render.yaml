@@ -50,6 +50,11 @@ services:
         sync: false
       - key: ICO_NUMBER
         sync: false
+      # Optional: change the contact details on the Support page (they default to Theo's).
+      - key: SUPPORT_EMAIL
+        sync: false
+      - key: SUPPORT_PHONE
+        sync: false
       # Optional: also copy every encrypted backup to your Google Drive (see scripts/google-drive-auth.js).
       - key: GOOGLE_CLIENT_ID
         sync: false

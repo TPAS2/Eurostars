@@ -40,6 +40,9 @@ function loadConfig(env = process.env) {
     legalAddress: (env.LEGAL_ADDRESS || '').trim(),
     privacyEmail: (env.PRIVACY_EMAIL || env.ADMIN_EMAIL || '').trim().toLowerCase(),
     icoNumber: (env.ICO_NUMBER || '').trim(),
+    // Who to contact for help with Rift, shown on the Support page (Render settings can change them).
+    supportEmail: (env.SUPPORT_EMAIL || 'theo@theomieproperties.com').trim(),
+    supportPhone: (env.SUPPORT_PHONE || '07725712571').trim(),
     adminEmail: (env.ADMIN_EMAIL || '').trim().toLowerCase(),
     adminPassword: env.ADMIN_PASSWORD || '',
     adminPasswordReset: env.ADMIN_PASSWORD_RESET === 'true',
@@ -112,6 +115,7 @@ function createApp(config, db, { writer = null, mailer = null } = {}) {
   const app = express();
   app.locals.emailEnabled = !!(mailer && mailer.enabled);
   app.locals.inspectionSheet = require('./inspectionSheet');
+  app.locals.support = { email: config.supportEmail || '', phone: config.supportPhone || '' };
   app.set('view engine', 'ejs');
   app.set('views', path.join(__dirname, '..', 'views'));
   app.disable('x-powered-by');
@@ -182,6 +186,7 @@ function createApp(config, db, { writer = null, mailer = null } = {}) {
   });
   app.use('/', require('./routes/legal')(config, { aiEnabled: !!writer }));
   app.use('/', require('./routes/auth')(db, config));
+  app.get('/support', auth.requireLogin, (req, res) => res.render('support', { title: 'Support', section: 'support' }));
   app.use('/app/invoices', auth.requireLogin, require('./routes/invoices')(db, config));
   app.use('/app/councils', auth.requireLogin, require('./routes/councilPhotos')(db));
   app.use('/app/councils', auth.requireLogin, require('./routes/councilDatabase')(db));

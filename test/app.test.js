@@ -3677,6 +3677,25 @@ test('council page: Council Database and Council Invoices boxes under Properties
   assert.equal((await other.get(`/app/councils/${council}`)).status, 404);
 });
 
+test('support: a Support button in the top bar, before My account, goes to the contact page', async () => {
+  const c = await registerAndLogin('help-page@example.com', 'Help Page Lets');
+  let r = await c.get('/app');
+  assert.match(r.text, /data-theme-toggle[\s\S]*?<a class="topbar-btn " href="\/support"[\s\S]*?Support<\/span><\/a>\s*<a class="topbar-btn[^"]*" href="\/app\/account"/, 'between the day/night switch and My account');
+  r = await c.get('/support');
+  assert.equal(r.status, 200);
+  assert.match(r.text, /href="mailto:theo@theomieproperties\.com"[\s\S]*?theo@theomieproperties\.com/);
+  assert.match(r.text, /href="tel:07725712571"[\s\S]*?07725712571/);
+  assert.equal((await new Client().get('/support')).location, '/login?next=%2Fsupport', 'signed-in people only');
+  // The details can be changed in Render's settings (made-up ones here).
+  const s = createApp({ ...config, supportEmail: 'help@example.com', supportPhone: '01632 960 000' }, db, { mailer: fakeMailer }).listen(0);
+  await new Promise((done) => s.once('listening', done));
+  try {
+    const html = await (await fetch(`http://127.0.0.1:${s.address().port}/support`, { headers: { cookie: c.cookie } })).text();
+    assert.match(html, /href="mailto:help@example\.com"/);
+    assert.match(html, /href="tel:01632960000"[\s\S]*?01632 960 000/);
+  } finally { s.close(); }
+});
+
 test('with the idle sign-out turned off (0), people stay signed in', async () => {
   const s = createApp({ ...config, idleTimeoutMinutes: 0 }, db, { mailer: fakeMailer }).listen(0);
   await new Promise((r) => s.once('listening', r));
