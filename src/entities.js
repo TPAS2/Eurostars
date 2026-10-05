@@ -71,6 +71,7 @@ const ENTITIES = {
     children: [
       { entity: 'tenancies', fk: 'property_id' },
       { entity: 'maintenance', fk: 'property_id' },
+      { entity: 'inspections', fk: 'property_id' },
       { entity: 'transactions', fk: 'property_id' },
     ],
   },
@@ -173,6 +174,23 @@ const ENTITIES = {
     ],
     files: true,
     columns: ['title', 'property_id', 'priority', 'status', 'reported_date', 'cost_pence', 'added_by'],
+  },
+
+  inspections: {
+    table: 'inspections',
+    singular: 'Inspection',
+    plural: 'Inspections',
+    titleField: 'inspection_type',
+    order: 'inspection_date DESC, id DESC',
+    fields: [
+      { name: 'property_id', label: 'Property', type: 'ref', ref: 'properties', required: true },
+      { name: 'inspection_date', label: 'Date of inspection', type: 'date', required: true, default: 'today' },
+      { name: 'inspection_type', label: 'Type', type: 'select', options: ['Routine', 'Check-in', 'Check-out', 'Mid-term', 'Other'], required: true, default: 'Routine' },
+      { name: 'condition', label: 'Condition', type: 'select', options: ['Good', 'Fair', 'Poor'] },
+      { name: 'inspected_by', label: 'Inspected by', type: 'person', required: true },
+      { name: 'notes', label: 'Notes', type: 'textarea', help: 'What was found, and anything that needs doing.' },
+    ],
+    columns: ['inspection_date', 'inspection_type', 'property_id', 'condition', 'inspected_by'],
   },
 
   compliance: {

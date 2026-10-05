@@ -317,19 +317,19 @@
 </section>
 <% } %>
 
-<% if (typeof propertyPhotos !== 'undefined' && propertyPhotos) { %>
+<% if (typeof photoBox !== 'undefined' && photoBox) { %>
 <section class="card" id="photos">
   <div class="card-head">
-    <h2>Property photos <span class="count"><%= propertyPhotos.length %></span></h2>
-    <form method="post" action="/app/properties/<%= row.id %>/photos" enctype="multipart/form-data" class="inline" data-busy="Uploading…">
+    <h2><%= photoBox.title %> <span class="count"><%= photoBox.list.length %></span></h2>
+    <form method="post" action="/app/<%= def.key %>/<%= row.id %>/photos" enctype="multipart/form-data" class="inline" data-busy="Uploading…">
       <%- include('partials/csrf') %>
       <label class="btn small primary">+ Add photos<input type="file" name="photos" multiple accept="image/*,.heic,.heif" data-autosubmit hidden></label>
       <noscript><button class="btn small" type="submit">Upload</button></noscript>
     </form>
   </div>
-  <% if (!propertyPhotos.length) { %><p class="muted">No photos yet. You can pick several at once, up to 25 MB each.</p><% } else { %>
+  <% if (!photoBox.list.length) { %><p class="muted">No photos yet. You can pick several at once, up to 25 MB each.</p><% } else { %>
   <div class="file-grid">
-    <% propertyPhotos.forEach(f => { const url = `/app/properties/${row.id}/photos/${f.id}`; const isImg = f.mime !== 'image/heic'; %>
+    <% photoBox.list.forEach(f => { const url = `/app/${def.key}/${row.id}/photos/${f.id}`; const isImg = f.mime !== 'image/heic'; %>
     <figure class="file-tile">
       <a href="<%= url %>" target="_blank" rel="noopener" class="file-thumb">
         <% if (isImg) { %><img src="<%= url %>" alt="<%= f.filename %>" loading="lazy"><% } else { %><span class="file-type">HEIC</span><% } %>

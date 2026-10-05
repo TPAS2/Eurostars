@@ -906,11 +906,13 @@ module.exports = function appRoutes(db) {
                      WHERE f.account_id = ? AND f.item_id = ? ORDER BY f.id DESC`).all(a, row.id)
       : null;
     // On a property: its photos (without the file contents).
-    const propertyPhotos = def.key === 'properties'
-      ? db.prepare(`SELECT f.id, f.filename, f.mime, f.uploaded_at, u.name AS uploaded_by_name
-                      FROM property_photos f LEFT JOIN users u ON u.id = f.uploaded_by
-                     WHERE f.account_id = ? AND f.property_id = ? ORDER BY f.id DESC`).all(a, row.id)
-      : null;
+    const photosOf = (table, fk) => db.prepare(`SELECT f.id, f.filename, f.mime, f.uploaded_at, u.name AS uploaded_by_name
+                      FROM ${table} f LEFT JOIN users u ON u.id = f.uploaded_by
+                     WHERE f.account_id = ? AND f.${fk} = ? ORDER BY f.id DESC`).all(a, row.id);
+    const propertyPhotos = def.key === 'properties' ? photosOf('property_photos', 'property_id') : null;
+    // The photos box: a property's own photos, or an inspection's (kept separately).
+    const photoBox = def.key === 'properties' ? { title: 'Property photos', list: propertyPhotos }
+      : def.key === 'inspections' ? { title: 'Inspection photos', list: photosOf('inspection_photos', 'inspection_id') } : null;
     // On a property: the Rightmove-style listing at the top, and who an emailed copy is from.
     let listing = null;
     if (def.key === 'properties') {
@@ -971,7 +973,7 @@ module.exports = function appRoutes(db) {
       previous: db.prepare('SELECT COUNT(*) AS n FROM council_db_entries WHERE account_id = ? AND council_id = ? AND ended = 1').get(a, row.id).n,
       invoices: [],
     } : null;
-    res.render('show', { title: rowTitle(def, row, maps), section: sectionOf(def), def, row, maps, display, rowTitle, children, extra, invoices, related: relatedLists(def, row, a), certs, photo, tenantBoxes, statementLink, jobFiles, propertyPhotos, listing, jobInvoice, contractorStats, bankChanges, councilBoxes, landlordStatements, callNotes, certFiles, error: req.query.error ? String(req.query.error).slice(0, 200) : null, flash: req.query.flash ? String(req.query.flash).slice(0, 200) : null, fmt, today: fmt.today() });
+    res.render('show', { title: rowTitle(def, row, maps), section: sectionOf(def), def, row, maps, display, rowTitle, children, extra, invoices, related: relatedLists(def, row, a), certs, photo, tenantBoxes, statementLink, jobFiles, propertyPhotos, photoBox, listing, jobInvoice, contractorStats, bankChanges, councilBoxes, landlordStatements, callNotes, certFiles, error: req.query.error ? String(req.query.error).slice(0, 200) : null, flash: req.query.flash ? String(req.query.flash).slice(0, 200) : null, fmt, today: fmt.today() });
   });
 
   router.get('/:entity/:id/edit', (req, res) => {

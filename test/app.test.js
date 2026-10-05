@@ -1494,8 +1494,8 @@ test('the admin chooses which tabs each person sees; hidden tabs are blocked', a
   assert.match(r.text, new RegExp(`action="/admin/users/${companyId}/tabs/${ada}"`));
   // Ada only gets Properties, Tenants and Repairs.
   r = await admin.post(`/admin/users/${companyId}/tabs/${ada}`, { tabs: ['properties', 'tenants', 'maintenance'] });
-  assert.match(decodeURIComponent(r.location), /Ada Assistant now sees 3 of 11 tabs/);
-  assert.match((await admin.get(`/admin/users/${companyId}`)).text, /3 of 11 tabs/);
+  assert.match(decodeURIComponent(r.location), /Ada Assistant now sees 3 of 12 tabs/);
+  assert.match((await admin.get(`/admin/users/${companyId}`)).text, /3 of 12 tabs/);
 
   const c = new Client();
   await c.login('tabs-co', 'adas-pass-123', 'ada');
@@ -1515,7 +1515,7 @@ test('the admin chooses which tabs each person sees; hidden tabs are blocked', a
   // The main login still sees everything; ticking all tabs gives Ada everything back.
   assert.equal((await boss.get('/app/landlords')).status, 200);
   await admin.get(`/admin/users/${companyId}`);
-  await admin.post(`/admin/users/${companyId}/tabs/${ada}`, { tabs: ['councils', 'councilrec', 'properties', 'landlords', 'tenants', 'maintenance', 'contractors', 'invoices', 'landlordinvoices', 'rentrun', 'monthly'] });
+  await admin.post(`/admin/users/${companyId}/tabs/${ada}`, { tabs: ['councils', 'councilrec', 'properties', 'inspections', 'landlords', 'tenants', 'maintenance', 'contractors', 'invoices', 'landlordinvoices', 'rentrun', 'monthly'] });
   assert.equal(db.prepare('SELECT hidden_tabs FROM users WHERE id = ?').get(ada).hidden_tabs, null);
   assert.equal((await c.get('/app/landlords')).status, 200);
 
@@ -1615,11 +1615,11 @@ test('admin Tab access page: every person against every tab, saved in one go', a
   assert.match(r.text, /Grid Lets[\s\S]*?Test User[\s\S]*?main login[\s\S]*?Bea Clerk/);
   assert.match(r.text, new RegExp(`name="t_${bea}" value="councilrec" checked`));
   // Bea: only Rent run and Monthly statements. The main login (companyId) keeps everything.
-  const all = ['councils', 'councilrec', 'properties', 'landlords', 'tenants', 'maintenance', 'contractors', 'invoices', 'landlordinvoices', 'rentrun', 'monthly'];
+  const all = ['councils', 'councilrec', 'properties', 'inspections', 'landlords', 'tenants', 'maintenance', 'contractors', 'invoices', 'landlordinvoices', 'rentrun', 'monthly'];
   r = await admin.post('/admin/access', { company: String(companyId), people: [String(companyId), String(bea)], [`t_${companyId}`]: all, [`t_${bea}`]: ['rentrun', 'monthly'] });
   assert.match(decodeURIComponent(r.location), /Saved tab access for 2 people/);
   assert.equal(db.prepare('SELECT hidden_tabs FROM users WHERE id = ?').get(companyId).hidden_tabs, null);
-  assert.deepEqual(JSON.parse(db.prepare('SELECT hidden_tabs FROM users WHERE id = ?').get(bea).hidden_tabs).length, 9);
+  assert.deepEqual(JSON.parse(db.prepare('SELECT hidden_tabs FROM users WHERE id = ?').get(bea).hidden_tabs).length, 10);
 
   const c = new Client();
   await c.login('grid-co', 'beas-pass-123', 'bea');
@@ -2288,6 +2288,41 @@ test('property page: listing at the top, and emailing it sends only the listing'
   // Private to the company.
   const other = await registerAndLogin('listing-2@example.com', 'Other Listing');
   assert.equal((await other.post(`/app/properties/${prop}/email`, { from: 'a@example.com', to: 'b@example.com' })).status, 404);
+});
+
+test('inspections: own tab, own photos (separate from property photos), listed on the property by date', async () => {
+  const c = await registerAndLogin('inspect@example.com', 'Inspect Lets');
+  const prop = idFrom((await c.post('/app/properties', { address_line1: '3 Survey Road', status: 'let' })).location);
+  assert.match((await c.get('/app')).text, /href="\/app\/inspections" aria-label="Inspections"/, 'Inspections is a tab');
+  let r = await c.get(`/app/inspections/new?property_id=${prop}`);
+  assert.equal(r.status, 200);
+  const older = idFrom((await c.post('/app/inspections', { property_id: String(prop), inspection_date: '2026-03-02', inspection_type: 'Check-in', condition: 'Good' })).location);
+  const newer = idFrom((await c.post('/app/inspections', { property_id: String(prop), inspection_date: '2026-09-15', inspection_type: 'Routine', condition: 'Fair', notes: 'Damp in bathroom' })).location);
+
+  const png = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(30)]);
+  const form = new FormData();
+  form.append('_csrf', c.csrf);
+  form.append('photos', new File([png], 'damp.png'));
+  const res = await fetch(`${base}/app/inspections/${newer}/photos`, { method: 'POST', headers: { cookie: c.cookie }, body: form, redirect: 'manual' });
+  assert.match(decodeURIComponent(res.headers.get('location')), new RegExp(`/app/inspections/${newer}\\?flash=Uploaded 1 photo`));
+  r = await c.get(`/app/inspections/${newer}`);
+  assert.match(r.text, /Inspection photos <span class="count">1<\/span>/);
+  assert.match(r.text, new RegExp(`<img src="/app/inspections/${newer}/photos/\\d+" alt="damp\\.png"`));
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM property_photos WHERE property_id = ?').get(prop).n, 0, 'kept apart from the property photos');
+  r = await c.get(`/app/properties/${prop}`);
+  assert.match(r.text, /Property photos <span class="count">0<\/span>/);
+  assert.match(r.text, /Inspections <span class="count">2<\/span>[\s\S]*?15\/09\/2026[\s\S]*?02\/03\/2026/, 'newest first on the property');
+  r = await c.get('/app/inspections');
+  assert.match(r.text, /15\/09\/2026[\s\S]*?02\/03\/2026/);
+  // Private to the company.
+  const other = await registerAndLogin('inspect-2@example.com', 'Other Inspect');
+  assert.equal((await other.get(`/app/inspections/${older}`)).status, 404);
+  const photo = db.prepare('SELECT id FROM inspection_photos WHERE inspection_id = ?').get(newer).id;
+  assert.equal((await other.get(`/app/inspections/${newer}/photos/${photo}`)).status, 404);
+  // Deleting the inspection removes its photos.
+  await c.get(`/app/inspections/${newer}`);
+  await c.post(`/app/inspections/${newer}/delete`, {});
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM inspection_photos WHERE inspection_id = ?').get(newer).n, 0);
 });
 
 test('landlords list has no Councils column, and is in landlord code order', async () => {
