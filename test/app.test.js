@@ -3857,7 +3857,7 @@ test('properties: address label, lease start with landlord, certificates when ad
   const kim = db.prepare("SELECT id FROM users WHERE login_name = 'Kim' AND company_id = ?").get(co).id;
   const form = (await c.get('/app/properties/new')).text;
   assert.match(form, /Property address/);
-  assert.match(form, /Lease start date with landlord/);
+  assert.match(form, /Lease start with landlord/);
   assert.match(form, /Gas Safety \(CP12\)/);
   assert.match(form, /name="cert_1_expiry"/);
   // A certificate with an issued date but no expiry is refused.
@@ -3922,7 +3922,7 @@ test('tenants: council reference number; tenancies: reservation date, term as bo
 test('properties: upload a file for each certificate when adding, view it, add more on the certificate page', async () => {
   const c = await registerAndLogin('cert-files@example.com', 'Cert Files Lets');
   const form = (await c.get('/app/properties/new')).text;
-  assert.match(form, /action="\/app\/properties" class="form-grid" enctype="multipart\/form-data"/);
+  assert.match(form, /action="\/app\/properties" class="form-grid form-properties" enctype="multipart\/form-data"/);
   assert.match(form, /name="cert_0_file"/);
   assert.match(form, /name="cert_3_file"/);
   const pdf = new Blob([Buffer.from('%PDF-1.4 made up certificate')]);

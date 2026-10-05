@@ -7,7 +7,7 @@
 </header>
 <section class="card">
   <% if (Object.keys(errors).length) { %><div class="notice err">Please fix the highlighted fields.</div><% } %>
-  <form method="post" action="/app/<%= def.key %><%= row ? '/' + row.id : '' %>" class="form-grid"<%- (def.files || def.key === 'properties') && !row ? ' enctype="multipart/form-data"' : '' %>
+  <form method="post" action="/app/<%= def.key %><%= row ? '/' + row.id : '' %>" class="form-grid form-<%= def.key %>"<%- (def.files || def.key === 'properties') && !row ? ' enctype="multipart/form-data"' : '' %>
         <%- row ? 'data-autosave' : `data-draft="new-${def.key}" autocomplete="off"` %>>
     <%- include('partials/csrf') %>
     <% def.fields.forEach(f => { %>
