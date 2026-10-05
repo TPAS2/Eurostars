@@ -2379,7 +2379,7 @@ test('properties list columns: Property name, Council, Landlord, Tenant, Status'
   await c.post(`/app/properties/${prop}/add-tenant`, { tenant_mode: 'new', name: 'Cora Tenant', booking_date: '2026-07-10', start_date: '2026-08-01', rent_pence: '850', rent_frequency: 'monthly', status: 'active' });
   r = await c.get('/app/properties');
   const heads = [...r.text.slice(r.text.indexOf('<thead'), r.text.indexOf('</thead>')).matchAll(/<th[^>]*>([^<]+)</g)].map((m) => m[1].trim()).filter(Boolean);
-  assert.deepEqual(heads.slice(0, 5), ['Property address', 'Council', 'Landlord', 'Tenant', 'Status']);
+  assert.deepEqual(heads.slice(0, 6), ['Property code', 'Property address', 'Council', 'Landlord', 'Tenant', 'Status']);
   assert.match(r.text, /3 Column Close[\s\S]*Col Council[\s\S]*Col Landlord[\s\S]*Cora Tenant/);
 });
 
@@ -3883,4 +3883,35 @@ test('property form: Property code top left (filled in automatically), Council b
   assert.equal(db.prepare('SELECT code FROM properties WHERE id = ?').get(first).code, 'P0101');
   page = (await c.get(`/app/properties/${first}`)).text;
   assert.match(page, /<dt>Property code<\/dt>\s*<dd><span class="pre">P0101<\/span>/);
+});
+
+test('properties list: Property code column before Property address, and the address is still the link', async () => {
+  const c = await registerAndLogin('prop-list-code@example.com', 'Prop List Lets');
+  const id = idFrom((await c.post('/app/properties', { address_line1: '9 Listing Lane', status: 'vacant', code: 'P0042' })).location);
+  const list = (await c.get('/app/properties')).text;
+  assert.match(list, /<th[^>]*>Property code<\/th>\s*<th[^>]*>Property address<\/th>/);
+  assert.match(list, new RegExp(`<td[^>]*>\\s*P0042\\s*</td>\\s*<td[^>]*>\\s*<a href="/app/properties/${id}"[^>]*>9 Listing Lane</a>`));
+  await c.post('/app/landlords', { ...LANDLORD, name: 'Link Landlord' });
+  assert.match((await c.get('/app/landlords')).text, /<tbody>\s*<tr>\s*<td[^>]*>\s*<a href="\/app\/landlords\/\d+"[^>]*>Link Landlord<\/a>/, 'other lists still link their first column');
+});
+
+test('existing properties without a code are given one, once, in the order they were added', async () => {
+  const file = path.join(tmp, 'property-codes.db');
+  let d = openDatabase(file);
+  const acct = Number(d.prepare("INSERT INTO users (username, name, agency_name, password_hash) VALUES ('pcode-mig', 'Made Up', 'Made Up Lets', 'x')").run().lastInsertRowid);
+  const add = (addr, code) => d.prepare("INSERT INTO properties (account_id, address_line1, status, code) VALUES (?, ?, 'vacant', ?)").run(acct, addr, code);
+  add('First Road', null); add('Second Road', 'P0002'); add('Third Road', ''); add('Fourth Road', 'X-9');
+  d.prepare("DELETE FROM app_settings WHERE key = 'property_codes_filled'").run();
+  d.close();
+  d = openDatabase(file);
+  const code = (a) => d.prepare('SELECT code FROM properties WHERE address_line1 = ?').get(a).code;
+  assert.equal(code('First Road'), 'P0003', 'carries on after the highest P code already used');
+  assert.equal(code('Second Road'), 'P0002', 'existing codes are kept');
+  assert.equal(code('Third Road'), 'P0004');
+  assert.equal(code('Fourth Road'), 'X-9');
+  d.prepare("UPDATE properties SET code = NULL WHERE address_line1 = 'First Road'").run();
+  d.close();
+  d = openDatabase(file);
+  assert.equal(d.prepare("SELECT code FROM properties WHERE address_line1 = 'First Road'").get().code, null, 'runs only once');
+  d.close();
 });

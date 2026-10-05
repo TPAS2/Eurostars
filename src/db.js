@@ -511,6 +511,7 @@ function openDatabase(file) {
   }
   allowSharedEmails(db);
   fourDigitLandlordCodes(db);
+  codeExistingProperties(db);
   return db;
 }
 
@@ -633,6 +634,31 @@ function fourDigitLandlordCodes(db) {
     db.prepare("INSERT INTO app_settings (key, value) VALUES (?, ?)").run(KEY, new Date().toISOString());
   });
   if (changed) console.log(`Landlord codes: ${changed} changed to the four-digit style.`);
+}
+
+// One-off (runs once, then is remembered): properties added before property codes existed are
+// given one, P0001 onwards in the order they were added, carrying on after any code already used.
+function codeExistingProperties(db) {
+  const KEY = 'property_codes_filled';
+  if (db.prepare('SELECT 1 FROM app_settings WHERE key = ?').get(KEY)) return;
+  let filled = 0;
+  transaction(db, () => {
+    const accounts = db.prepare("SELECT DISTINCT account_id FROM properties WHERE code IS NULL OR trim(code) = ''").all();
+    for (const { account_id: a } of accounts) {
+      const used = new Set(db.prepare("SELECT code FROM properties WHERE account_id = ? AND code IS NOT NULL AND trim(code) != ''").all(a).map((r) => r.code));
+      let n = 0;
+      for (const code of used) { const m = /^P(\d+)$/.exec(code); if (m) n = Math.max(n, Number(m[1])); }
+      for (const p of db.prepare("SELECT id FROM properties WHERE account_id = ? AND (code IS NULL OR trim(code) = '') ORDER BY id").all(a)) {
+        let code;
+        do { n += 1; code = `P${String(n).padStart(4, '0')}`; } while (used.has(code));
+        used.add(code);
+        db.prepare('UPDATE properties SET code = ? WHERE id = ?').run(code, p.id);
+        filled += 1;
+      }
+    }
+    db.prepare('INSERT INTO app_settings (key, value) VALUES (?, ?)').run(KEY, new Date().toISOString());
+  });
+  if (filled) console.log(`Property codes: ${filled} existing propert${filled === 1 ? 'y' : 'ies'} given a code.`);
 }
 
 module.exports = { contractorFor, openDatabase, transaction, uniqueUsername, signInNameFrom, USERNAME_RE, LOGIN_NAME_RE };
