@@ -178,6 +178,10 @@ module.exports = function adminRoutes(db, config) {
     let error = '';
     // Keeping your own username (or only changing its capitals) is always fine.
     const sameName = values.username.toLowerCase() === String(u.username).toLowerCase();
+    // Typing another agency's username moves this login (and anyone in it) into that agency.
+    const other = !sameName && !u.is_admin
+      ? db.prepare('SELECT * FROM users WHERE username = ? COLLATE NOCASE AND company_id IS NULL AND is_admin = 0 AND id != ?').get(values.username, u.id) : null;
+    if (other) return joinAgency(req, res, u, other, values);
     // The username can be changed too (e.g. to fix its capitals); it stays unique ignoring case.
     if (u.is_admin && values.username !== u.username) error = 'The admin username is set in the server settings (ADMIN_USERNAME), so it can’t be changed here.';
     else if (u.is_admin && values.login_name !== u.login_name) error = 'The admin sign-in name is set in the server settings (ADMIN_LOGIN_NAME), so it can’t be changed here.';
@@ -207,6 +211,47 @@ module.exports = function adminRoutes(db, config) {
     db.prepare("UPDATE users SET username = ? || '.' || login_name WHERE company_id = ?").run(values.username, u.id);
     res.redirect(`/admin/users/${u.id}?flash=${encodeURIComponent(password ? `Account details and password saved.${u.id !== req.user.id ? ' They have been signed out and must use the new password.' : ''}` : 'Account details saved.')}#details`);
   });
+
+  // Every table holding a company's records (anything with an account_id).
+  const accountTables = () => db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all().map(t => t.name)
+    .filter(t => db.prepare(`PRAGMA table_info(${t})`).all().some(c => c.name === 'account_id'));
+
+  // Moves company account u into agency `other`: u and its people become people of `other`,
+  // keeping their own names and passwords. Only for an account with no records of its own,
+  // since those would no longer be reachable.
+  function joinAgency(req, res, u, other, values) {
+    const back = (msg) => res.redirect(`/admin/users/${u.id}?error=${encodeURIComponent(msg)}#details`);
+    if (accountTables().some(t => db.prepare(`SELECT 1 FROM ${t} WHERE account_id = ? LIMIT 1`).get(u.id))) {
+      return back(`${u.agency_name} already has its own records (landlords, properties, settings or similar), so it can't be moved into ${other.agency_name}: they would be lost. Add this person to ${other.agency_name} with Add account instead, or delete this account first.`);
+    }
+    if (!LOGIN_NAME_RE.test(values.login_name || '')) return back('The sign-in name must be 1–30 letters, numbers, dashes or underscores.');
+    const movers = [{ ...u, login_name: values.login_name }, ...db.prepare('SELECT * FROM users WHERE company_id = ?').all(u.id)];
+    const names = movers.map(m => m.login_name.toLowerCase());
+    const clash = movers.find((m, i) => names.indexOf(names[i]) !== i
+      || db.prepare('SELECT 1 FROM users WHERE (company_id = ? OR id = ?) AND login_name = ? COLLATE NOCASE').get(other.id, other.id, m.login_name));
+    if (clash) return back(`${other.agency_name} already has someone signing in as "${clash.login_name}". Change the name first, then try again.`);
+    const password = String(req.body.password || '');
+    if (password && (password.length < MIN_PASSWORD || password.length > 200)) return back(`The new password must be at least ${MIN_PASSWORD} characters.`);
+    const weak = password && auth.weakPassword(password, [other.username, other.agency_name, values.name, values.login_name]);
+    if (weak) return back(weak);
+    if (values.email && !EMAIL_RE.test(values.email)) return back('Enter a valid email address, or leave it blank.');
+    const ids = movers.map(m => m.id);
+    db.exec('BEGIN');
+    try {
+      db.prepare('UPDATE users SET name = ?, email = ?, phone = ?, login_name = ? WHERE id = ?')
+        .run(values.name || values.login_name, values.email || null, values.phone || null, values.login_name, u.id);
+      if (password) db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(auth.hashPassword(password), u.id);
+      // People first (they point at u), then u itself.
+      for (const id of [...ids.slice(1), u.id]) {
+        db.prepare("UPDATE users SET company_id = ?, agency_name = ?, address = NULL, username = ? || '.' || login_name WHERE id = ?").run(other.id, other.agency_name, other.username, id);
+      }
+      db.prepare(`DELETE FROM sessions WHERE user_id IN (${ids.map(() => '?').join(',')})`).run(...ids);
+      db.exec('COMMIT');
+    } catch (err) { db.exec('ROLLBACK'); throw err; }
+    const who = movers.map(m => m.id === u.id ? (values.name || values.login_name) : m.name).join(', ');
+    const msg = `Moved ${who} into ${other.agency_name}. They now sign in with agency "${other.username}", their own name and their own password.`;
+    res.redirect(`/admin/users/${other.id}?flash=${encodeURIComponent(msg)}#people`);
+  }
 
   router.post('/users/:id/password', (req, res) => {
     const u = target(req, res);

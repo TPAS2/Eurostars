@@ -636,6 +636,26 @@ test('admin adds an account and resets passwords', async () => {
   assert.match(r.location, /\?created=1/);
   assert.equal((await new Client().login('Harbourlets', 'lantern-quay-208', 'Kim')).location, '/app');
   assert.doesNotMatch((await admin.get('/admin/users/new')).text, /name="agency_name"|name="email"|Company name/);
+  // Changing an empty account's Agency to an existing agency moves it in: same data afterwards.
+  r = await admin.post('/admin/users', { username: 'stray', login_name: 'Lou', password: 'orchard-mile-773' });
+  const strayId = Number(r.location.match(/users\/(\d+)/)[1]);
+  await admin.get(`/admin/users/${strayId}`);
+  r = await admin.post(`/admin/users/${strayId}/details`, { username: 'Coastal', login_name: 'Lou', name: 'Lou Penn', agency_name: 'stray' });
+  assert.match(decodeURIComponent(r.location), new RegExp(`/admin/users/${id}\\?flash=Moved Lou Penn into Coastal Homes`));
+  const lou = new Client();
+  assert.equal((await lou.login('coastal', 'orchard-mile-773', 'Lou')).location, '/app');
+  await sam.get('/app/landlords/new');
+  await sam.post('/app/landlords', { ...LANDLORD, name: 'Shared Landlord Test' });
+  assert.match((await lou.get('/app/landlords')).text, /Shared Landlord Test/, 'people in the same agency see the same records');
+  // An account that already has records can't be moved (they'd be lost).
+  const kim = new Client();
+  await kim.login('Harbourlets', 'lantern-quay-208', 'Kim');
+  await kim.get('/app/landlords/new');
+  await kim.post('/app/landlords', { ...LANDLORD, name: 'Harbour Own Landlord' });
+  const harbourId = db.prepare("SELECT id FROM users WHERE username = 'Harbourlets'").get().id;
+  await admin.get(`/admin/users/${harbourId}`);
+  r = await admin.post(`/admin/users/${harbourId}/details`, { username: 'coastal', login_name: 'Kim', name: 'Kim', agency_name: 'Harbourlets' });
+  assert.match(decodeURIComponent(r.location), /error=.*already has its own records/);
   // The admin's own username is still refused.
   r = await admin.post('/admin/users', { agency_name: 'X', name: 'X', username: 'admin', password: 'kettle-harbour-58' });
   assert.equal(r.status, 422);
@@ -1047,9 +1067,10 @@ test('admin can fix a company username\'s capitals; people follow', async () => 
   assert.equal((await new Client().post('/login', { login: 'CapitalLets', member: 'Ann', password: 'anns-pass-1' })).location, '/app');
   assert.equal((await new Client().post('/login', { login: 'capitallets', member: 'Theo', password: 'Sample-Pass-9!' })).status, 401);
 
-  // Can't take another company's username.
-  r = await admin.post(`/admin/users/${id}/details`, { username: 'eurostars', login_name: 'Theo', name: 'Theo Grey', agency_name: 'Capital Lets' });
-  assert.match(decodeURIComponent(r.location), /That username is taken/);
+  // Another agency's username moves this (empty) account and its people into that agency.
+  r = await admin.post(`/admin/users/${id}/details`, { username: 'eurostars', login_name: 'Theo2', name: 'Theo Grey', agency_name: 'Capital Lets' });
+  assert.match(decodeURIComponent(r.location), /Moved Theo Grey, Ann into Eurostars Lettings/);
+  assert.equal((await new Client().post('/login', { login: 'eurostars', member: 'Ann', password: 'anns-pass-1' })).location, '/app');
 });
 
 test('councils list shows how many properties each has, and which', async () => {
@@ -2224,7 +2245,7 @@ test('saving account details keeps your own username (including the admin accoun
   r = await admin.post(`/admin/users/${co.id}/details`, { username: 'Keep-Name', login_name: co.login_name, name: co.name, agency_name: co.agency_name, email: co.email });
   assert.match(decodeURIComponent(r.location), /Account details saved/, 'changing only the capitals is allowed');
   await registerAndLogin('other-name@example.com', 'Other Name Lets');
-  r = await admin.post(`/admin/users/${co.id}/details`, { username: 'other-name', login_name: co.login_name, name: co.name, agency_name: co.agency_name, email: co.email });
+  r = await admin.post(`/admin/users/${co.id}/details`, { username: 'admin', login_name: co.login_name, name: co.name, agency_name: co.agency_name, email: co.email });
   assert.match(decodeURIComponent(r.location), /That username is taken/);
 });
 
