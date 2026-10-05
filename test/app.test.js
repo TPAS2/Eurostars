@@ -1412,6 +1412,10 @@ test('month end: calculate rents, email landlords, Rift report (Excel) with prev
   assert.equal(ws.getCell('C6').font.bold, true, 'the sum is bold');
   assert.ok(ws.model.merges.includes('A1:D1'), 'title merged across A1 to D1');
   for (const ref of ['A1', 'A3', 'B4', 'C4', 'D4', 'C6']) assert.equal(ws.getCell(ref).alignment.horizontal, 'center', `${ref} centred`);
+  assert.equal(ws.getCell('C4').numFmt, '"£"#,##0.00', 'debits in pounds');
+  assert.equal(ws.getCell('C6').numFmt, '"£"#,##0.00');
+  for (const ref of ['A1', 'D1', 'A3', 'D3', 'A4', 'B4', 'C4', 'D4', 'B6', 'C6']) assert.equal(ws.getCell(ref).border.bottom.style, 'thin', `${ref} has a border`);
+  assert.ok(!ws.getCell('A6').border || !ws.getCell('A6').border.top, 'empty cells have no border');
 
   // 4. Preview, then email the same report with the workbook attached.
   r = await c.get('/app/monthly/report?month=2026-08&step=4');

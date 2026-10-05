@@ -216,11 +216,23 @@ async function cfpWorkbook(report) {
   // TOTAL, in bold, to the left of the sum.
   ws.getCell(`B${last + 2}`).value = 'TOTAL';
   ws.getCell(`B${last + 2}`).font = { ...font, bold: true };
+  // Debits in pounds.
+  const pounds = '"£"#,##0.00';
+  for (let r = 4; r <= last; r++) ws.getRow(r).getCell(3).numFmt = pounds;
+  totalCell.numFmt = pounds;
   // The title across A1 to D1, and every cell centred.
   ws.mergeCells('A1:D1');
   for (let r = 1; r <= last + 2; r++) {
     for (let c = 1; c <= 4; c++) ws.getRow(r).getCell(c).alignment = { horizontal: 'center', vertical: 'middle' };
   }
+  // A border all round every filled-in cell: the title, the headings, each row, TOTAL and the sum.
+  const thin = { style: 'thin', color: { argb: 'FF000000' } };
+  const box = { top: thin, left: thin, bottom: thin, right: thin };
+  const boxed = [];
+  for (const r of [1, 3]) for (let c = 1; c <= 4; c++) boxed.push([r, c]);
+  for (let r = 4; r <= last; r++) for (let c = 1; c <= 4; c++) boxed.push([r, c]);
+  boxed.push([last + 2, 2], [last + 2, 3]);
+  for (const [r, c] of boxed) ws.getRow(r).getCell(c).border = box;
   return Buffer.from(await wb.xlsx.writeBuffer());
 }
 
