@@ -169,4 +169,4 @@ function fileName(isoDate, ext) {
   return `${ORD(d)}_${LONG_MONTHS[m - 1]}_${y}.${ext}`;
 }
 
-module.exports = { bulkRows, bulkWorkbook, fileName, transferRows, transferWorkbook, transferTitle, transferFileName, HEADINGS, MAX_TEXT };
+module.exports = { byProperty, bulkRows, bulkWorkbook, fileName, transferRows, transferWorkbook, transferTitle, transferFileName, HEADINGS, MAX_TEXT };

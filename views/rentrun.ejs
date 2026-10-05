@@ -62,7 +62,7 @@
     </li>
     <li>
       <div><strong>Rift report</strong><p class="muted small">The Excel workbook of every landlord being paid for <%= monthLabel %>: date, name, amount and landlord code, with the total. Check it in the preview first.</p>
-        <% if (report.rows.length) { %><p class="small"><strong><%= report.rows.length %> landlord<%= report.rows.length === 1 ? '' : 's' %> to pay · <%= fmt.money(report.total) %></strong></p><% } %>
+        <% if (report.rows.length) { %><p class="small"><strong><%= report.landlords %> landlord<%= report.landlords === 1 ? '' : 's' %> to pay · <%= fmt.money(report.total) %></strong></p><% } %>
         <% if (!report.rows.length || gaps.noRent.length || gaps.noLandlord.length) { %>
         <div class="notice warn small pay-gaps">
           <% if (!report.rows.length) { %><p><strong>No landlords to pay for <%= monthLabel %> yet.</strong> Landlords are paid each property’s <em>Rent to landlord</em> when the rents are calculated (step 1).</p><% } %>

@@ -354,7 +354,7 @@ module.exports = function appRoutes(db) {
     stats.councilInvoiced = reconcile.reconciliation(db, a, thisMonth).totals.owed;
     const rift = require('../monthend').cfpReport(db, a, thisMonth);
     stats.paidToLandlords = rift.total;
-    stats.landlordsPaid = rift.rows.length;
+    stats.landlordsPaid = rift.landlords;
     stats.statementsReady = !!db.prepare('SELECT 1 FROM monthly_statements WHERE account_id = ? AND month = ? LIMIT 1').get(a, thisMonth);
     stats.grossProfit = stats.councilInvoiced - stats.paidToLandlords;
     // Properties at a glance: any needing maintenance, empty ones ready to rent, reservations, new and

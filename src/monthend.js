@@ -151,20 +151,38 @@ function reportEmail({ agencyName, report }) {
 
 const SHORT_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'June', 'July', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec'];
 
+// One row per property paid: the date the rents were calculated, the property, the amount to its
+// landlord and the landlord's code. A landlord whose money doesn't split exactly by property
+// (e.g. money carried over from an earlier month) gets one row naming their properties.
 function cfpReport(db, accountId, month, today = fmt.today()) {
   const agency = db.prepare('SELECT agency_name FROM users WHERE id = ?').get(accountId);
-  const instr = db.prepare('SELECT data_json FROM payment_instructions WHERE account_id = ? AND month = ?').get(accountId, month);
-  const payDate = (instr && JSON.parse(instr.data_json).payment_date) || today;
-  const rows = db.prepare(
-    `SELECT l.id AS landlord_id, l.name, l.code, s.id AS statement_id, s.closing_pence
+  const calc = db.prepare('SELECT MAX(generated_at) AS at FROM monthly_statements WHERE account_id = ? AND month = ?').get(accountId, month);
+  const payDate = (calc && calc.at && String(calc.at).slice(0, 10)) || today;
+  const { byProperty } = require('./bulkPayment');
+  const rows = [];
+  for (const s of db.prepare(
+    `SELECT l.id AS landlord_id, l.name AS landlord_name, l.code, s.id AS statement_id, s.closing_pence, s.detail_json
        FROM monthly_statements s JOIN landlords l ON l.id = s.landlord_id AND l.account_id = s.account_id
       WHERE s.account_id = ? AND s.month = ? AND s.closing_pence > 0
       ORDER BY l.code IS NULL OR l.code = '', l.code COLLATE NOCASE, l.name COLLATE NOCASE`
-  ).all(accountId, month).map((r) => ({ ...r, date: payDate, debit: r.closing_pence }));
+  ).all(accountId, month)) {
+    const split = byProperty(s.detail_json, s.closing_pence);
+    const base = { landlord_id: s.landlord_id, landlord_name: s.landlord_name, code: s.code, statement_id: s.statement_id, date: payDate };
+    if (split.exact) {
+      for (const p of split.parts) rows.push({ ...base, name: p.address, debit: p.pence });
+    } else {
+      let props = [];
+      try { props = (JSON.parse(s.detail_json || '{}').properties || []).filter((p) => p.id); } catch { props = []; }
+      const paid = props.filter((p) => (p.rent || 0) > 0);
+      const name = split.single || (paid.length ? paid : props).map((p) => p.address_line1).join(', ') || s.landlord_name;
+      rows.push({ ...base, name, debit: s.closing_pence });
+    }
+  }
   const [y, m] = month.split('-').map(Number);
   const label = `${agency.agency_name} ${SHORT_MONTHS[m - 1]} ${y} Rift Report`;
   return {
     month, monthLabel: monthLabel(month), date: payDate, rows, total: rows.reduce((t, r) => t + r.debit, 0),
+    landlords: new Set(rows.map((r) => r.landlord_id)).size,
     label, title: label.toUpperCase(),
     sheetName: label.replace(/[\\/?*[\]:]/g, ' ').slice(0, 31),
     filename: `${label.replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '_')}.xlsx`,
@@ -201,7 +219,7 @@ async function cfpWorkbook(report) {
 function cfpEmail({ agencyName, report }) {
   const subject = report.label;
   const text = [
-    `Attached is the ${report.title} (${report.rows.length} landlord${report.rows.length === 1 ? '' : 's'}, total ${fmt.money(report.total)}).`, '',
+    `Attached is the ${report.title} (${report.landlords} landlord${report.landlords === 1 ? '' : 's'}, total ${fmt.money(report.total)}).`, '',
     agencyName,
   ].join('\n');
   const html = `<!doctype html><html><body style="font-family:Arial,Helvetica,sans-serif;color:#111827;"><p>${esc(text).replace(/\n/g, '<br>')}</p></body></html>`;

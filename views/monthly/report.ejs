@@ -3,7 +3,7 @@
   <div>
     <a class="crumb" href="/app/rent-run?month=<%= report.month %>">← Rent run</a>
     <h1><%= report.label %></h1>
-    <p class="muted">Preview of the Excel workbook: every landlord being paid for <%= report.monthLabel %>, with the total.</p>
+    <p class="muted">Preview of the Excel workbook: every property whose landlord is paid for <%= report.monthLabel %> (dated the day the rents were calculated), with the total.</p>
   </div>
   <div class="actions">
     <form method="get" data-autogo class="inline-form">
@@ -51,7 +51,7 @@
         <tr><td><%= fmt.ukDate(r.date) %></td><td><a href="/app/monthly/<%= r.statement_id %>"><%= r.name %></a></td><td class="num"><%= fmt.money(r.debit) %></td><td><%= r.code || '' %></td></tr>
       <% }) %>
       </tbody>
-      <tfoot><tr class="total"><td></td><td><%= report.rows.length %> landlord<%= report.rows.length === 1 ? '' : 's' %></td><td class="num"><%= fmt.money(report.total) %></td><td></td></tr></tfoot>
+      <tfoot><tr class="total"><td></td><td><%= report.rows.length %> propert<%= report.rows.length === 1 ? 'y' : 'ies' %> · <%= report.landlords %> landlord<%= report.landlords === 1 ? '' : 's' %></td><td class="num"><%= fmt.money(report.total) %></td><td></td></tr></tfoot>
     </table></div>
   </div>
   <% } %>

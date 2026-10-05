@@ -1383,7 +1383,11 @@ test('month end: calculate rents, email landlords, Rift report (Excel) with prev
   r = await c.get('/app/monthly/report?month=2026-08');
   assert.match(r.text, /Month End Lets Aug 2026 Rift Report/);
   assert.match(r.text, /MONTH END LETS AUG 2026 RIFT REPORT/);
-  assert.match(r.text, /17\/09\/2026<\/td><td><a[^>]*>Ann Able<\/a><\/td><td class="num">£900\.00<\/td><td>AA1<\/td>/);
+  // A row per property: dated the day the rents were calculated (not the payment date), the property, the amount, the landlord's code.
+  const calcDay = db.prepare("SELECT substr(MAX(generated_at), 1, 10) AS d FROM monthly_statements WHERE month = '2026-08' AND landlord_id = ?").get(ann).d;
+  const calcUk = calcDay.split('-').reverse().join('/');
+  assert.match(r.text, new RegExp(`${calcUk.replace(/\//g, '\\/')}</td><td><a[^>]*>1 First Street</a></td><td class="num">£900\\.00</td><td>AA1</td>`));
+  assert.match(r.text, /1 property · 1 landlord/);
   assert.match(r.text, /Download Excel/);
   r = await c.get('/app/monthly/report.xlsx?month=2026-08');
   assert.equal(r.status, 200);
@@ -1396,10 +1400,10 @@ test('month end: calculate rents, email landlords, Rift report (Excel) with prev
   assert.equal(ws.name, 'Month End Lets Aug 2026 Rift Re');
   assert.equal(ws.getCell('A1').value, 'MONTH END LETS AUG 2026 RIFT REPORT');
   assert.deepEqual([1, 2, 3, 4].map((i) => ws.getRow(3).getCell(i).value), ['Date', 'Name', 'Debit', 'LCODE']);
-  assert.equal(ws.getCell('B4').value, 'Ann Able');
+  assert.equal(ws.getCell('B4').value, '1 First Street');
   assert.equal(ws.getCell('C4').value, 900);
   assert.equal(ws.getCell('D4').value, 'AA1');
-  assert.equal(new Date(ws.getCell('A4').value).toISOString().slice(0, 10), '2026-09-17');
+  assert.equal(new Date(ws.getCell('A4').value).toISOString().slice(0, 10), calcDay);
   assert.equal(ws.getCell('C6').value.formula, 'SUM(C4:C5)');
   assert.equal(ws.getCell('C6').value.result, 900);
 
@@ -1415,7 +1419,7 @@ test('month end: calculate rents, email landlords, Rift report (Excel) with prev
   assert.equal(sentMail[0].attachments[0].filename, 'Month_End_Lets_Aug_2026_Rift_Report.xlsx');
   const attached = new ExcelJS.Workbook();
   await attached.xlsx.load(sentMail[0].attachments[0].content);
-  assert.equal(attached.worksheets[0].getCell('B4').value, 'Ann Able');
+  assert.equal(attached.worksheets[0].getCell('B4').value, '1 First Street');
   r = await c.post('/app/monthly/report/email', { month: '2026-08', to: 'not-an-email' });
   assert.match(decodeURIComponent(r.location.replace(/\+/g, ' ')), /Enter the email address/);
 
@@ -2510,7 +2514,8 @@ test('rent run: landlords on a fixed monthly rent are paid it whether or not ren
   r = await c.post('/app/monthly/calculate', { month: '2026-07' });
   assert.match(decodeURIComponent(r.location.replace(/\+/g, ' ')), /credited 1 landlord rent payment[\s\S]*?The Rift report is ready/);
   const report = require('../src/monthend').cfpReport(db, a, '2026-07');
-  assert.deepEqual(report.rows.map((x) => [x.name, x.debit]), [['Fixed Rent Landlord', 90000]], '£1,000 less the 10% fee, and not the £1,200 received');
+  assert.deepEqual(report.rows.map((x) => [x.name, x.debit, x.code]), [['5 Steady Street', 90000, 'L0001']], '£1,000 less the 10% fee, and not the £1,200 received');
+  assert.equal(report.date, new Date().toISOString().slice(0, 10), 'dated the day the rents were calculated');
   // Calculating again doesn't pay twice.
   await c.get('/app/rent-run?month=2026-07');
   await c.post('/app/monthly/calculate', { month: '2026-07' });
@@ -2535,6 +2540,22 @@ test('rent run: landlords on a fixed monthly rent are paid it whether or not ren
   await c.get('/app/rent-run?month=2026-08');
   await c.post('/app/monthly/calculate', { month: '2026-08' });
   assert.equal(db.prepare("SELECT COUNT(*) n FROM transactions WHERE property_id = ? AND txn_type = 'landlord_rent'").get(prop).n, 1);
+});
+
+test('Rift report: a row per property, the amount to its landlord and the landlord code', async () => {
+  const c = await registerAndLogin('report-rows@example.com', 'Report Rows Lets');
+  const a = db.prepare("SELECT id FROM users WHERE username = 'report-rows'").get().id;
+  const ll = idFrom((await c.post('/app/landlords', { ...LANDLORD, name: 'Two Homes Landlord', code: 'L0007' })).location);
+  await c.post('/app/properties', { address_line1: '1 North Row', status: 'let', landlord_id: String(ll), landlord_rent_pence: '800' });
+  await c.post('/app/properties', { address_line1: '2 South Row', status: 'let', landlord_id: String(ll), landlord_rent_pence: '650.50' });
+  await c.get('/app/rent-run?month=2026-09');
+  await c.post('/app/monthly/calculate', { month: '2026-09' });
+  const report = require('../src/monthend').cfpReport(db, a, '2026-09');
+  assert.deepEqual(report.rows.map((x) => [x.name, x.debit, x.code]).sort(), [['1 North Row', 80000, 'L0007'], ['2 South Row', 65050, 'L0007']]);
+  assert.equal(report.total, 145050);
+  assert.equal(report.landlords, 1);
+  const r = await c.get('/app/monthly/report?month=2026-09');
+  assert.match(r.text, /2 properties · 1 landlord/);
 });
 
 test('landlords list has no Councils column, and is in landlord code order', async () => {
