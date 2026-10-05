@@ -190,7 +190,7 @@ tr.sub td { color: var(--muted); font-style: italic; }
 tr.total td { font-weight: 700; border-top: 2px solid var(--text); }
 
 .badge { display: inline-block; font-size: .75rem; padding: 2px 8px; border-radius: 99px; background: var(--surface-2); color: var(--text); text-transform: capitalize; white-space: nowrap; }
-.badge.s-active, .badge.s-let, .badge.s-completed { background: var(--ok-soft); color: var(--ok); }
+.badge.s-active, .badge.s-let, .badge.s-managed, .badge.s-completed { background: var(--ok-soft); color: var(--ok); }
 .badge.s-vacant, .badge.s-open, .badge.s-pending, .badge.warn, .badge.p-high, .badge.s-high { background: var(--warn-soft); color: var(--warn); }
 .badge.s-suspended, .badge.bad, .badge.p-emergency, .badge.s-emergency, .badge.s-ended { background: var(--bad-soft); color: var(--bad); }
 .badge.plain { text-transform: none; }

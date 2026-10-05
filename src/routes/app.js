@@ -238,7 +238,7 @@ module.exports = function appRoutes(db) {
   function afterSave(def, accountId, id, values) {
     if (def.key === 'transactions') ledger.bookManagementFee(db, accountId, id);
     if (def.key === 'tenancies' && values.status === 'active') {
-      db.prepare("UPDATE properties SET status = 'let' WHERE id = ? AND account_id = ?").run(values.property_id, accountId);
+      db.prepare("UPDATE properties SET status = 'let' WHERE id = ? AND account_id = ? AND status != 'managed'").run(values.property_id, accountId);
     }
     // A renamed contractor keeps their invoices, which show the new name.
     if (def.key === 'contractors' && values.name) {

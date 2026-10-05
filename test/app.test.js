@@ -185,6 +185,11 @@ test('full lettings workflow: landlord → property → tenant → rent → fee 
   r = await c.get('/app/properties');
   assert.match(r.text, /<th[^>]*>Rent amount<\/th>/, 'rent is a column on the properties list');
   assert.match(r.text, /<tr class="total">[\s\S]*?Total[\s\S]*?£950\.50/, 'with a total at the bottom');
+  // Managed is a property status of its own; starting a tenancy doesn't change it to let.
+  r = await c.post('/app/properties', { address_line1: '5 Managed Row', status: 'managed' });
+  const managedId = idFrom(r.location);
+  assert.match((await c.get('/app/properties')).text, /badge s-managed">managed</);
+  assert.match((await c.get(`/app/properties/${managedId}/edit`)).text, /<option value="managed" selected>/);
 
   r = await c.get(`/app/landlords/${landlordId}`);
   assert.match(r.text, /Properties owned/);

@@ -56,7 +56,7 @@ const ENTITIES = {
       { name: 'parking', label: 'Parking', type: 'select', options: ['None', 'On street', 'Permit', 'Off street', 'Driveway', 'Allocated space', 'Garage'] },
       { name: 'rent_pence', label: 'Rent amount (£)', type: 'money', help: 'The monthly rent for this property.' },
       { name: 'management_fee_pct', label: 'Management fee %', type: 'number', help: 'Deducted automatically from rent received.' },
-      { name: 'status', label: 'Status', type: 'select', options: ['vacant', 'let', 'under offer', 'unavailable', 'handed back'], required: true, default: 'vacant', startRow: true },
+      { name: 'status', label: 'Status', type: 'select', options: ['vacant', 'let', 'managed', 'under offer', 'unavailable', 'handed back'], required: true, default: 'vacant', startRow: true },
       { name: 'council_id', label: 'Council', type: 'ref', ref: 'councils', help: 'The local authority for this address.' },
       { name: 'lease_start_date', label: 'Lease start date with landlord', type: 'date', help: 'When your lease with the landlord for this property began.', startRow: true },
       { name: 'acquired_date', label: 'Date acquired', type: 'date', default: 'today', help: 'When you took the property on.' },
