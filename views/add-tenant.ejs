@@ -1,15 +1,28 @@
 <%- include('partials/header') %>
 <header class="page-head">
   <div>
+    <% if (property) { %>
     <a class="crumb" href="/app/properties/<%= property.id %>">← <%= property.address_line1 %></a>
     <h1>Add tenant</h1>
     <p class="muted"><%= property.address_line1 %><%= property.postcode ? ', ' + property.postcode : '' %></p>
+    <% } else { %>
+    <a class="crumb" href="/app/tenants">← Tenants</a>
+    <h1>Add tenant</h1>
+    <% } %>
   </div>
 </header>
 <section class="card">
   <% if (Object.keys(errors).length) { %><div class="notice err">Please fix the highlighted fields.</div><% } %>
-  <form method="post" action="/app/properties/<%= property.id %>/add-tenant" class="form-grid" data-draft="add-tenant-<%= property.id %>">
+  <form method="post" action="<%= property ? `/app/properties/${property.id}/add-tenant` : '/app/tenants/add-tenant' %>" class="form-grid" data-draft="add-tenant-<%= property ? property.id : 'new' %>">
     <%- include('partials/csrf') %>
+    <% if (!property) { %>
+    <fieldset class="wide">
+      <legend>Property</legend>
+      <div class="form-grid">
+        <%- include('partials/field', { f: { name: 'property_id', label: 'Property', type: 'ref', required: true, search: true, help: 'Type an address or property code, then pick from the list.' }, value: values.property_id, error: errors.property_id, opts: properties }) %>
+      </div>
+    </fieldset>
+    <% } %>
     <fieldset class="wide">
       <legend>Tenant</legend>
       <div class="segmented">
@@ -42,7 +55,7 @@
     </fieldset>
     <div class="form-actions wide">
       <button class="btn primary" type="submit">Add tenant</button>
-      <a class="btn" href="/app/properties/<%= property.id %>">Cancel</a>
+      <a class="btn" href="<%= property ? `/app/properties/${property.id}` : '/app/tenants' %>">Cancel</a>
       <span class="save-status" aria-live="polite"></span>
     </div>
   </form>

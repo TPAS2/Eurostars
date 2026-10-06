@@ -597,9 +597,11 @@ module.exports = function appRoutes(db) {
     return p || null;
   }
 
+  // property is null when adding from the Tenants tab: the property is then chosen on the form.
   function renderAddTenant(res, req, property, values, errors, status = 200) {
     res.status(status).render('add-tenant', {
-      title: `Add tenant to ${property.address_line1}`, section: 'properties', property, values, errors,
+      title: property ? `Add tenant to ${property.address_line1}` : 'Add tenant', section: property ? 'properties' : 'tenants', property, values, errors,
+      properties: property ? null : refOptions('properties', req.user.id),
       tenants: refOptions('tenants', req.user.id), tenantFields: TENANT_FIELDS, letFields: LET_FIELDS, fmt,
     });
   }
@@ -625,9 +627,28 @@ module.exports = function appRoutes(db) {
     renderAddTenant(res, req, property, values, {});
   });
 
+  // Adding a tenant from the Tenants tab: the same form, with the property to choose.
+  router.get('/tenants/new', (req, res) => {
+    const values = { tenant_mode: 'new', ...formDefaults(ENTITIES.tenancies, {}), property_id: req.query.property_id ? Number(req.query.property_id) : '' };
+    renderAddTenant(res, req, null, values, {});
+  });
+
+  router.post('/tenants/add-tenant', (req, res) => {
+    const id = Number(req.body.property_id);
+    const property = Number.isInteger(id) && db.prepare('SELECT * FROM properties WHERE id = ? AND account_id = ?').get(id, req.user.id);
+    if (!property) {
+      return renderAddTenant(res, req, null, { ...req.body, tenant_mode: req.body.tenant_mode === 'existing' ? 'existing' : 'new' }, { property_id: 'Choose the property they’re renting.' }, 422);
+    }
+    addTenant(req, res, property, true);
+  });
+
   router.post('/properties/:id/add-tenant', (req, res) => {
     const property = ownedProperty(req, res);
     if (!property) return;
+    addTenant(req, res, property, false);
+  });
+
+  function addTenant(req, res, property, chosen) {
     const a = req.user.id;
     const mode = req.body.tenant_mode === 'existing' ? 'existing' : 'new';
     const body = { ...req.body, property_id: String(property.id) };
@@ -637,7 +658,7 @@ module.exports = function appRoutes(db) {
     if (mode === 'new') delete letParsed.errors.tenant_id;
     const errors = { ...tenantParsed.errors, ...letParsed.errors };
     if (Object.keys(errors).length) {
-      return renderAddTenant(res, req, property, { ...req.body, tenant_mode: mode }, errors, 422);
+      return renderAddTenant(res, req, chosen ? null : property, { ...req.body, tenant_mode: mode }, errors, 422);
     }
     const tenancyId = transaction(db, () => {
       const tv = letParsed.values;
@@ -656,7 +677,7 @@ module.exports = function appRoutes(db) {
       return id;
     });
     res.redirect(`/app/tenancies/${tenancyId}`);
-  });
+  }
 
   // ---------- generic CRUD ----------
 

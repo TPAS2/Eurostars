@@ -2601,6 +2601,28 @@ test('new maintenance job: the tenant and contractor can sign on the form itself
   assert.deepEqual(sigs, [{ role: 'tenant', signer_name: 'Made-up Tenant', satisfied: 'Yes' }], 'the contractor left theirs blank, which is fine');
 });
 
+test('adding a tenant from the Tenants tab: choose the property, then the tenancy is made', async () => {
+  const c = await registerAndLogin('tenant-prop@example.com', 'Tenant Prop Lets');
+  const prop = idFrom((await c.post('/app/properties', { address_line1: '8 Choice Avenue', status: 'vacant', code: 'P0042' })).location);
+  let r = await c.get('/app/tenants/new');
+  assert.match(r.text, /<legend>Property<\/legend>[\s\S]*?name="property_id"[^>]*required[^>]*data-search[\s\S]*?data-hint="P0042">8 Choice Avenue/);
+  assert.match(r.text, /action="\/app\/tenants\/add-tenant"/);
+  // The property must be chosen.
+  r = await c.post('/app/tenants/add-tenant', { tenant_mode: 'new', name: 'Pat Renter', phone: '07000 000000', status: 'active', start_date: '2026-10-01' });
+  assert.equal(r.status, 422);
+  assert.match(r.text, /Choose the property they’re renting/);
+  // Another company's property can't be chosen.
+  const other = await registerAndLogin('tenant-prop-2@example.com', 'Other Tenant Prop');
+  r = await other.post('/app/tenants/add-tenant', { property_id: String(prop), tenant_mode: 'new', name: 'Sneaky', status: 'active', start_date: '2026-10-01' });
+  assert.equal(r.status, 422);
+  // Chosen: the tenant and their tenancy are created on that property.
+  await c.get('/app/tenants/new');
+  r = await c.post('/app/tenants/add-tenant', { property_id: String(prop), tenant_mode: 'new', name: 'Pat Renter', phone: '07000 000000', status: 'active', booking_date: '2026-09-20', start_date: '2026-10-01' });
+  assert.equal(r.status, 302, r.text && r.text.slice(0, 300));
+  const t = db.prepare("SELECT ty.property_id FROM tenancies ty JOIN tenants t ON t.id = ty.tenant_id WHERE t.name = 'Pat Renter'").get();
+  assert.equal(t.property_id, prop);
+});
+
 test('landlords list has no Councils column, and is in landlord code order', async () => {
   const c = await registerAndLogin('ll-order@example.com', 'LL Order Lets');
   const leeds = idFrom((await c.post('/app/councils', { name: 'Leeds City Council' })).location);

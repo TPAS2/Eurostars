@@ -250,7 +250,7 @@ const ENTITIES = {
 // SQL used to label rows of each entity in dropdowns and tables.
 const REF_LABELS = {
   landlords: { from: 'landlords l', label: 'l.name', alias: 'l', hint: "COALESCE(l.code, '')" },
-  properties: { from: 'properties p', label: PROPERTY_LABEL, alias: 'p' },
+  properties: { from: 'properties p', label: PROPERTY_LABEL, alias: 'p', hint: "COALESCE(p.code, '')" },
   tenants: { from: 'tenants t', label: 't.name', alias: 't' },
   councils: { from: 'councils c', label: 'c.name', alias: 'c' },
   tenancies: {
