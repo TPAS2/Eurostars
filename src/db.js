@@ -559,6 +559,17 @@ function openDatabase(file) {
     created_at  TEXT NOT NULL DEFAULT (datetime('now'))
   )`);
   db.exec('CREATE INDEX IF NOT EXISTS idx_property_notes ON property_notes(account_id, property_id, note_date)');
+  // Dated notes on a tenant, like a property's notes of tenant calls.
+  db.exec(`CREATE TABLE IF NOT EXISTS tenant_notes (
+    id          INTEGER PRIMARY KEY,
+    account_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    tenant_id   INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    note_date   TEXT NOT NULL,
+    added_by    INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    body        TEXT NOT NULL,
+    created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+  )`);
+  db.exec('CREATE INDEX IF NOT EXISTS idx_tenant_notes ON tenant_notes(account_id, tenant_id, note_date)');
   if (!hadAcquired) db.exec('UPDATE properties SET acquired_date = date(created_at) WHERE acquired_date IS NULL');
   if (!hadDateStarted) db.exec('UPDATE landlords SET date_started = date(created_at) WHERE date_started IS NULL');
   addColumnIfMissing(db, 'council_rec_notes', 'owed_pence', 'INTEGER');

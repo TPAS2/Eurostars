@@ -587,7 +587,11 @@ module.exports = function appRoutes(db) {
 
   // ---------- add a tenant to a property (tenant + tenancy in one step) ----------
 
-  const TENANT_FIELDS = ENTITIES.tenants.fields.filter((f) => f.name !== 'notes');
+  const TENANT_FIELDS = ENTITIES.tenants.fields;
+  const NOTE_KINDS = {
+    properties: { table: 'property_notes', fk: 'property_id', noun: 'property', title: 'Tenant calls', placeholder: 'Who called, what about, what was agreed…' },
+    tenants: { table: 'tenant_notes', fk: 'tenant_id', noun: 'tenant', title: 'Notes', placeholder: 'What happened, what was agreed…' },
+  };
   const LET_FIELDS = ENTITIES.tenancies.fields.filter((f) => !['property_id', 'tenant_id'].includes(f.name));
 
   function ownedProperty(req, res) {
@@ -1074,11 +1078,13 @@ module.exports = function appRoutes(db) {
       : null;
     const bankChanges = def.key === 'landlords' ? require('../bankChanges').unchecked(db, a, row.id) : [];
     // A council's page also shows its database and its invoices.
-    // A property's page has notes of tenants' calls, newest first.
-    const callNotes = def.key === 'properties' ? {
+    // A property's page has notes of tenants' calls, and a tenant's page its own notes, newest first.
+    const noteKind = NOTE_KINDS[def.key];
+    const callNotes = noteKind ? {
+      title: noteKind.title, placeholder: noteKind.placeholder,
       notes: db.prepare(
-        `SELECT n.id, n.note_date, n.body, n.created_at, u.name AS added_by_name FROM property_notes n LEFT JOIN users u ON u.id = n.added_by
-          WHERE n.account_id = ? AND n.property_id = ? ORDER BY n.note_date DESC, n.id DESC`
+        `SELECT n.id, n.note_date, n.body, n.created_at, u.name AS added_by_name FROM ${noteKind.table} n LEFT JOIN users u ON u.id = n.added_by
+          WHERE n.account_id = ? AND n.${noteKind.fk} = ? ORDER BY n.note_date DESC, n.id DESC`
       ).all(a, row.id),
       people: peopleOptions(a), me: req.user.person_id || a,
     } : null;
@@ -1103,33 +1109,35 @@ module.exports = function appRoutes(db) {
     renderForm(res, def, { row, values: row, errors: {}, accountId: req.user.id });
   });
 
-  // ---------- notes of tenants' calls about a property ----------
-  function noteProperty(req, res) {
-    const id = Number(req.params.id);
-    const p = Number.isInteger(id) && db.prepare('SELECT id FROM properties WHERE id = ? AND account_id = ?').get(id, req.user.id);
-    if (!p) res.status(404).render('error', { title: 'Not found', message: 'That property was not found.' });
-    return p;
+  // ---------- dated notes ----------
+  // Dated notes on a property (tenants' calls) or on a tenant, added by whoever is signed in.
+  for (const [entity, kind] of Object.entries(NOTE_KINDS)) {
+    const owned = (req, res) => {
+      const id = Number(req.params.id);
+      const r = Number.isInteger(id) && db.prepare(`SELECT id FROM ${entity} WHERE id = ? AND account_id = ?`).get(id, req.user.id);
+      if (!r) res.status(404).render('error', { title: 'Not found', message: `That ${kind.noun} was not found.` });
+      return r;
+    };
+    router.post(`/${entity}/:id(\\d+)/notes`, (req, res) => {
+      const p = owned(req, res);
+      if (!p) return;
+      const a = req.user.id;
+      const back = (key, msg) => res.redirect(`/app/${entity}/${p.id}?${key}=${encodeURIComponent(msg)}#call-notes`);
+      const date = String(req.body.note_date || '').trim() || fmt.today();
+      const body = String(req.body.body || '').trim().slice(0, 5000);
+      const who = req.user.person_id || a; // always the person signed in
+      if (!fmt.isIsoDate(date)) return back('error', 'Enter a valid date for the note.');
+      if (!body) return back('error', 'Write the note first.');
+      db.prepare(`INSERT INTO ${kind.table} (account_id, ${kind.fk}, note_date, added_by, body) VALUES (?, ?, ?, ?, ?)`).run(a, p.id, date, who, body);
+      back('flash', 'Note added.');
+    });
+    router.post(`/${entity}/:id(\\d+)/notes/:nid(\\d+)/delete`, (req, res) => {
+      const p = owned(req, res);
+      if (!p) return;
+      db.prepare(`DELETE FROM ${kind.table} WHERE id = ? AND ${kind.fk} = ? AND account_id = ?`).run(Number(req.params.nid), p.id, req.user.id);
+      res.redirect(`/app/${entity}/${p.id}?flash=${encodeURIComponent('Note removed.')}#call-notes`);
+    });
   }
-  router.post('/properties/:id(\\d+)/notes', (req, res) => {
-    const p = noteProperty(req, res);
-    if (!p) return;
-    const a = req.user.id;
-    const back = (key, msg) => res.redirect(`/app/properties/${p.id}?${key}=${encodeURIComponent(msg)}#call-notes`);
-    const date = String(req.body.note_date || '').trim() || fmt.today();
-    const body = String(req.body.body || '').trim().slice(0, 5000);
-    const who = req.user.person_id || a; // always the person signed in
-    if (!fmt.isIsoDate(date)) return back('error', 'Enter a valid date for the note.');
-    if (!body) return back('error', 'Write the note first.');
-    if (!db.prepare('SELECT 1 FROM users WHERE id = ? AND (id = ? OR company_id = ?)').get(who, a, a)) return back('error', 'Choose who added the note.');
-    db.prepare('INSERT INTO property_notes (account_id, property_id, note_date, added_by, body) VALUES (?, ?, ?, ?, ?)').run(a, p.id, date, who, body);
-    back('flash', 'Note added.');
-  });
-  router.post('/properties/:id(\\d+)/notes/:nid(\\d+)/delete', (req, res) => {
-    const p = noteProperty(req, res);
-    if (!p) return;
-    db.prepare('DELETE FROM property_notes WHERE id = ? AND property_id = ? AND account_id = ?').run(Number(req.params.nid), p.id, req.user.id);
-    res.redirect(`/app/properties/${p.id}?flash=${encodeURIComponent('Note removed.')}#call-notes`);
-  });
 
   router.post('/:entity/:id', (req, res) => {
     const def = getEntity(req, res);

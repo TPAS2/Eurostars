@@ -2648,6 +2648,32 @@ test('tenants list: an End button ends the current tenancy today and moves them 
   }
 });
 
+test('tenants: notes when adding, and dated notes on the tenant page', async () => {
+  const c = await registerAndLogin('tenant-notes@example.com', 'Tenant Notes Lets');
+  const prop = idFrom((await c.post('/app/properties', { address_line1: '6 Memo Mews', status: 'let' })).location);
+  let r = await c.get('/app/tenants/new');
+  assert.match(r.text, /<textarea id="f-notes" name="notes"/, 'notes box when adding a tenant');
+  await c.post('/app/tenants/add-tenant', { property_id: String(prop), tenant_mode: 'new', name: 'Nora Notes', notes: 'Prefers texts', status: 'active', booking_date: '2026-09-01', start_date: '2026-09-10' });
+  const tid = db.prepare("SELECT id, notes FROM tenants WHERE name = 'Nora Notes'").get();
+  assert.equal(tid.notes, 'Prefers texts');
+  r = await c.get(`/app/tenants/${tid.id}`);
+  assert.match(r.text, /id="call-notes"[\s\S]*?<h2>Notes <span class="count">0<\/span>[\s\S]*?action="\/app\/tenants\/\d+\/notes"[\s\S]*?No notes yet/);
+  await c.post(`/app/tenants/${tid.id}/notes`, { note_date: '2026-10-01', body: 'Asked about the boiler service' });
+  r = await c.post(`/app/tenants/${tid.id}/notes`, { note_date: '2026-10-03', body: 'Rent paid late, agreed plan' });
+  assert.match(decodeURIComponent(r.location), /flash=Note added\./);
+  r = await c.get(`/app/tenants/${tid.id}`);
+  assert.match(r.text, /<h2>Notes <span class="count">2<\/span>/);
+  assert.ok(r.text.indexOf('agreed plan') < r.text.indexOf('boiler service'), 'newest first');
+  assert.match(r.text, /Added by Test User/);
+  // Private to the company; removing works.
+  const other = await registerAndLogin('tenant-notes-2@example.com', 'Other Notes');
+  assert.equal((await other.post(`/app/tenants/${tid.id}/notes`, { body: 'sneaky' })).status, 404);
+  const nid = db.prepare("SELECT id FROM tenant_notes WHERE body LIKE '%boiler%'").get().id;
+  await c.get(`/app/tenants/${tid.id}`);
+  await c.post(`/app/tenants/${tid.id}/notes/${nid}/delete`, {});
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM tenant_notes WHERE tenant_id = ?').get(tid.id).n, 1);
+});
+
 test('landlords list has no Councils column, and is in landlord code order', async () => {
   const c = await registerAndLogin('ll-order@example.com', 'LL Order Lets');
   const leeds = idFrom((await c.post('/app/councils', { name: 'Leeds City Council' })).location);
