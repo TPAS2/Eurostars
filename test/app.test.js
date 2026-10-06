@@ -1189,13 +1189,13 @@ test('councils can have a picture, shown left of the council details and in the 
   assert.equal(db.prepare('SELECT COUNT(*) n FROM council_photos WHERE council_id = ?').get(id).n, 0);
 });
 
-test('landlords have a code, shown right of the name in the list and on their page', async () => {
+test('landlords have a code, shown left of the name in the list and on their page', async () => {
   const c = await registerAndLogin('landlord-code@example.com', 'Code Lets');
   let r = await c.post('/app/landlords', { ...LANDLORD, name: 'Olive Grant', code: 'LL001', email: 'olive@example.com' });
   const id = idFrom(r.location);
   r = await c.get('/app/landlords');
-  assert.match(r.text, /<th[^>]*>Name<\/th>\s*<th[^>]*>Landlord code<\/th>/, 'code column sits right of Name');
-  assert.match(r.text, /Olive Grant<\/a>[\s\S]*?<td[^>]*>\s*LL001\s*<\/td>/);
+  assert.match(r.text, /<th[^>]*>Landlord code<\/th>\s*<th[^>]*>Name<\/th>/, 'code column sits left of Name');
+  assert.match(r.text, /<td[^>]*>\s*LL001\s*<\/td>\s*<td[^>]*>\s*<a[^>]*>Olive Grant<\/a>/);
   r = await c.get(`/app/landlords/${id}`);
   assert.match(r.text, /<h1>Olive Grant <span class="code-chip" title="Landlord code">LL001<\/span><\/h1>/);
   assert.match(r.text, /<dt>Name<\/dt>[\s\S]*?<dt>Landlord code<\/dt>/);
@@ -2678,6 +2678,44 @@ test('tenants: notes when adding, and dated notes on the tenant page', async () 
   await c.get(`/app/tenants/${tid.id}`);
   await c.post(`/app/tenants/${tid.id}/notes/${nid}/delete`, {});
   assert.equal(db.prepare('SELECT COUNT(*) n FROM tenant_notes WHERE tenant_id = ?').get(tid.id).n, 1);
+});
+
+test('tenancy numbers: T0001 upwards per company, in the order added, shown left of the tenant name', async () => {
+  const c = await registerAndLogin('tenancy-no@example.com', 'Tenancy No Lets');
+  const a = db.prepare("SELECT id FROM users WHERE username = 'tenancy-no'").get().id;
+  const prop = idFrom((await c.post('/app/properties', { address_line1: '1 Count Close', status: 'let' })).location);
+  for (const name of ['First Tenant', 'Second Tenant']) {
+    await c.get('/app/tenants/new');
+    await c.post('/app/tenants/add-tenant', { property_id: String(prop), tenant_mode: 'new', name, status: 'active', booking_date: '2026-09-01', start_date: '2026-09-10' });
+  }
+  const nos = db.prepare('SELECT t.name, ty.tenancy_no FROM tenancies ty JOIN tenants t ON t.id = ty.tenant_id WHERE ty.account_id = ? ORDER BY ty.id').all(a).map((x) => [x.name, x.tenancy_no]);
+  assert.deepEqual(nos, [['First Tenant', 'T0001'], ['Second Tenant', 'T0002']]);
+  // Ones that were added before numbering get numbers in the order added, and new ones carry on.
+  db.prepare('UPDATE tenancies SET tenancy_no = NULL WHERE account_id = ?').run(a);
+  require('../src/db').numberTenancies(db);
+  assert.deepEqual(db.prepare('SELECT tenancy_no FROM tenancies WHERE account_id = ? ORDER BY id').all(a).map((x) => x.tenancy_no), ['T0001', 'T0002']);
+  await c.get('/app/tenants/new');
+  await c.post('/app/tenants/add-tenant', { property_id: String(prop), tenant_mode: 'new', name: 'Third Tenant', status: 'active', booking_date: '2026-09-01', start_date: '2026-09-10' });
+  assert.equal(db.prepare("SELECT ty.tenancy_no FROM tenancies ty JOIN tenants t ON t.id = ty.tenant_id WHERE t.name = 'Third Tenant'").get().tenancy_no, 'T0003');
+  // Another company starts at T0001.
+  const other = await registerAndLogin('tenancy-no-2@example.com', 'Other Tenancy No');
+  const p2 = idFrom((await other.post('/app/properties', { address_line1: '2 Count Close', status: 'let' })).location);
+  await other.get('/app/tenants/new');
+  await other.post('/app/tenants/add-tenant', { property_id: String(p2), tenant_mode: 'new', name: 'Other First', status: 'active', booking_date: '2026-09-01', start_date: '2026-09-10' });
+  assert.equal(db.prepare("SELECT ty.tenancy_no FROM tenancies ty JOIN tenants t ON t.id = ty.tenant_id WHERE t.name = 'Other First'").get().tenancy_no, 'T0001');
+  // On the Tenants tab, the number is to the left of the name; it can't be typed on the forms.
+  const r = await c.get('/app/tenants');
+  assert.match(r.text, /<th[^>]*>Tenancy no\.<\/th>\s*<th[^>]*>Name<\/th>/);
+  assert.match(r.text, /T0001\s*<\/td>\s*<td[^>]*>\s*<a[^>]*>First Tenant/);
+  assert.doesNotMatch((await c.get(`/app/properties/${prop}/add-tenant`)).text, /name="tenancy_no"/);
+});
+
+test('landlords list: landlord code to the left of the name', async () => {
+  const c = await registerAndLogin('ll-code-left@example.com', 'LL Code Left');
+  await c.post('/app/landlords', { ...LANDLORD, name: 'Lefty Landlord', code: 'L0009' });
+  const r = await c.get('/app/landlords');
+  assert.match(r.text, /<th[^>]*>Landlord code<\/th>\s*<th[^>]*>Name<\/th>/);
+  assert.match(r.text, /L0009\s*<\/td>\s*<td[^>]*>\s*<a[^>]*>Lefty Landlord/, 'the name is still the link');
 });
 
 test('landlords list has no Councils column, and is in landlord code order', async () => {
@@ -4458,7 +4496,7 @@ test('properties list: Property code column before Property address, and the add
   assert.match(list, /<th[^>]*>Property code<\/th>\s*<th[^>]*>Property address<\/th>/);
   assert.match(list, new RegExp(`<td[^>]*>\\s*P0042\\s*</td>\\s*<td[^>]*>\\s*<a href="/app/properties/${id}"[^>]*>9 Listing Lane</a>`));
   await c.post('/app/landlords', { ...LANDLORD, name: 'Link Landlord' });
-  assert.match((await c.get('/app/landlords')).text, /<tbody>\s*<tr>\s*<td[^>]*>\s*<a href="\/app\/landlords\/\d+"[^>]*>Link Landlord<\/a>/, 'other lists still link their first column');
+  assert.match((await c.get('/app/landlords')).text, /<a href="\/app\/landlords\/\d+"[^>]*>Link Landlord<\/a>/, 'the landlord name is still the link');
 });
 
 test('existing properties without a code are given one, once, in the order they were added', async () => {

@@ -603,6 +603,8 @@ function openDatabase(file) {
   allowSharedEmails(db);
   fourDigitLandlordCodes(db);
   codeExistingProperties(db);
+  addColumnIfMissing(db, 'tenancies', 'tenancy_no', 'TEXT');
+  numberTenancies(db);
   return db;
 }
 
@@ -752,4 +754,22 @@ function codeExistingProperties(db) {
   if (filled) console.log(`Property codes: ${filled} existing propert${filled === 1 ? 'y' : 'ies'} given a code.`);
 }
 
-module.exports = { contractorFor, openDatabase, transaction, uniqueUsername, signInNameFrom, USERNAME_RE, LOGIN_NAME_RE };
+// Tenancy numbers (T0001, T0002...), per company, in the order the tenancies were added. Any
+// tenancy without one gets the next number after the company's highest.
+function numberTenancies(db, accountId = null) {
+  const accounts = accountId ? [{ account_id: accountId }]
+    : db.prepare("SELECT DISTINCT account_id FROM tenancies WHERE tenancy_no IS NULL OR trim(tenancy_no) = ''").all();
+  for (const { account_id: a } of accounts) {
+    const missing = db.prepare("SELECT id FROM tenancies WHERE account_id = ? AND (tenancy_no IS NULL OR trim(tenancy_no) = '') ORDER BY id").all(a);
+    if (!missing.length) continue;
+    let n = 0;
+    for (const { tenancy_no: t } of db.prepare("SELECT tenancy_no FROM tenancies WHERE account_id = ? AND tenancy_no IS NOT NULL").all(a)) {
+      const m = /^T(\d+)$/.exec(String(t || '').trim());
+      if (m) n = Math.max(n, Number(m[1]));
+    }
+    const set = db.prepare('UPDATE tenancies SET tenancy_no = ? WHERE id = ?');
+    for (const { id } of missing) { n += 1; set.run(`T${String(n).padStart(4, '0')}`, id); }
+  }
+}
+
+module.exports = { numberTenancies, contractorFor, openDatabase, transaction, uniqueUsername, signInNameFrom, USERNAME_RE, LOGIN_NAME_RE };

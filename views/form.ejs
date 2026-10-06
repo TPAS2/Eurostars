@@ -15,7 +15,7 @@
     <% } else if (typeof sheet !== 'undefined' && sheet && def.key === 'maintenance') { %>
       <%- include('sheets/job-form') %>
     <% } else { %>
-    <% def.fields.forEach(f => { %>
+    <% def.fields.filter(f => !f.auto).forEach(f => { %>
       <%- include('partials/field', { f, value: values[f.name], error: errors[f.name], opts: options[f.name] }) %>
       <% if (typeof tenantCouncil !== 'undefined' && tenantCouncil && f.name === 'phone') { %>
       <div class="field">

@@ -2,6 +2,7 @@
 
 const express = require('express');
 const { ENTITIES, REF_LABELS } = require('../entities');
+const { numberTenancies } = require('../db');
 const { transaction } = require('../db');
 const ledger = require('../ledger');
 const reconcile = require('../reconcile');
@@ -89,6 +90,8 @@ module.exports = function appRoutes(db) {
       if (f.type === 'checklist') { values[f.name] = JSON.stringify(require('../inspectionSheet').parseChecklist(body)); continue; }
       // "Added by": set to the person signed in when the record is added (see the create route), never changed.
       if (f.locked) continue;
+      // Numbered automatically (e.g. a tenancy's T0001), never typed in.
+      if (f.auto) continue;
       let raw = body[f.name];
       // A dropdown left out of the submission entirely takes its default (e.g. Statement type: Email).
       if (raw === undefined && f.type === 'select' && f.default !== undefined) raw = f.default;
@@ -594,7 +597,7 @@ module.exports = function appRoutes(db) {
     properties: { table: 'property_notes', fk: 'property_id', noun: 'property', title: 'Tenant calls', placeholder: 'Who called, what about, what was agreed…' },
     tenants: { table: 'tenant_notes', fk: 'tenant_id', noun: 'tenant', title: 'Notes', placeholder: 'What happened, what was agreed…' },
   };
-  const LET_FIELDS = ENTITIES.tenancies.fields.filter((f) => !['property_id', 'tenant_id'].includes(f.name));
+  const LET_FIELDS = ENTITIES.tenancies.fields.filter((f) => !['property_id', 'tenant_id'].includes(f.name) && !f.auto);
 
   function ownedProperty(req, res) {
     const id = Number(req.params.id);
@@ -685,6 +688,7 @@ module.exports = function appRoutes(db) {
       afterSave(ENTITIES.tenancies, a, id, tv);
       return id;
     });
+    numberTenancies(db, a);
     res.redirect(`/app/tenancies/${tenancyId}`);
   }
 
@@ -774,7 +778,7 @@ module.exports = function appRoutes(db) {
       const lastEnded = new Map(); // each tenant's most recent ended tenancy
       const allOf = new Map(); // every tenancy of each tenant
       for (const t of db.prepare(
-        `SELECT ty.id, ty.tenant_id, ty.status, ty.start_date, ty.end_date, ty.rent_pence, ty.rent_frequency,
+        `SELECT ty.id, ty.tenancy_no, ty.tenant_id, ty.status, ty.start_date, ty.end_date, ty.rent_pence, ty.rent_frequency,
                 p.id AS property_id, p.address_line1, c.id AS council_id, c.name AS council_name
            FROM tenancies ty JOIN properties p ON p.id = ty.property_id LEFT JOIN councils c ON c.id = p.council_id
           WHERE ty.account_id = ?
@@ -792,6 +796,7 @@ module.exports = function appRoutes(db) {
         // On Past tenants, show the tenancy that ended.
         const t = tenantFilter === 'all' ? row.one_tenancy : tenantFilter === 'past' && lastEnded.has(row.id) ? lastEnded.get(row.id) : latest.get(row.id);
         row.tenancy_status = t ? t.status : null;
+        row.cur_tenancy_no = { text: t ? t.tenancy_no || '' : '' };
         row.cur_property = t ? { text: t.address_line1, href: `/app/properties/${t.property_id}` } : { text: '' };
         row.cur_council = t && t.council_id ? { text: t.council_name, href: `/app/councils/${t.council_id}` } : { text: '' };
         row.cur_term = t ? { text: `${fmt.ukDate(t.start_date)} – ${t.end_date ? fmt.ukDate(t.end_date) : 'ongoing'}`, href: `/app/tenancies/${t.id}` } : { text: 'No tenancy yet' };
@@ -923,6 +928,7 @@ module.exports = function appRoutes(db) {
       }
       return newId;
     });
+    if (def.key === 'tenancies') numberTenancies(db, a);
     // A new maintenance job signed there and then (each signature optional).
     if (def.key === 'maintenance') {
       for (const role of ['tenant', 'contractor']) {
