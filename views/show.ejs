@@ -11,6 +11,7 @@
     <% if (def.key === 'maintenance') { %><a class="btn primary" href="/app/invoices/new?maintenance_job_id=<%= row.id %>">+ Upload invoice</a><% } %>
     <% if (def.key === 'tenancies') { %><a class="btn primary" href="/app/transactions/new?txn_type=rent_received&tenancy_id=<%= row.id %>">Record rent received</a><% } %>
     <a class="btn" href="/app/<%= def.key %>/<%= row.id %>/edit">Edit</a>
+    <% if (typeof previousTenancies === 'number') { %><a class="btn" href="/app/<%= def.key %>/<%= row.id %>/previous-tenancies">Previous tenancies <span class="count"><%= previousTenancies %></span></a><% } %>
     <form method="post" action="/app/<%= def.key %>/<%= row.id %>/delete" data-confirm="Delete this <%= def.singular.toLowerCase() %>? Linked records may also be removed.">
       <%- include('partials/csrf') %>
       <button class="btn danger" type="submit">Delete</button>
@@ -213,6 +214,8 @@
         <h3>Tenancy agreement</h3>
         <dl class="mini">
           <dt>Status</dt><dd class="status-edit"><span class="badge s-<%= t.status %>"><%= t.status %></span> <a class="btn small" href="/app/tenancies/<%= t.id %>/edit">Edit</a></dd>
+          <dt>Rent paid by</dt><dd><%= t.paid_by || 'Council' %></dd>
+          <dt>Rent</dt><dd><%= t.rent_pence > 0 ? `${fmt.money(t.rent_pence)} a month` : 'The property’s rent from council' %></dd>
           <dt>Reserved</dt><dd><%= fmt.ukDate(t.booking_date) %></dd>
           <% if (t.term_booked) { %><dt>Term as booked</dt><dd><%= t.term_booked %></dd><% } %>
           <dt>Dates</dt><dd><%= fmt.ukDate(t.start_date) %> – <%= t.end_date ? fmt.ukDate(t.end_date) : 'ongoing' %></dd>

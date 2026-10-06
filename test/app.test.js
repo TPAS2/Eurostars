@@ -207,7 +207,7 @@ test('full lettings workflow: landlord → property → tenant → rent → fee 
   const tenancyId = idFrom(r.location);
   const tenancy = db.prepare('SELECT * FROM tenancies WHERE id = ?').get(tenancyId);
   assert.equal(tenancy.booking_date, '2026-08-20');
-  assert.equal(tenancy.rent_pence, 0, 'rent is no longer entered');
+  assert.equal(tenancy.rent_pence, 100000, 'the tenancy rent amount is kept');
   // Tenancies from before rent was taken off the form still have one, and still get charged.
   db.prepare('UPDATE tenancies SET rent_pence = 100000 WHERE id = ?').run(tenancyId);
   assert.equal(db.prepare('SELECT status FROM properties WHERE id = ?').get(propertyId).status, 'let');
@@ -2155,7 +2155,7 @@ test('Tenants and Tenancies are one tab', async () => {
   assert.equal((await c.get('/app/tenancies')).location, '/app/tenants');
 
   r = await c.get('/app/tenants');
-  assert.match(r.text, /<th[^>]*>Property<\/th>\s*<th[^>]*>Tenancy<\/th>\s*<th[^>]*>Status<\/th>\s*<th[^>]*>Phone<\/th>\s*<th[^>]*>Council<\/th>/);
+  assert.match(r.text, /<th[^>]*>Property<\/th>\s*<th[^>]*>Tenancy<\/th>\s*<th[^>]*>Status<\/th>\s*<th[^>]*>Council<\/th>/);
   assert.match(r.text, new RegExp(`Current Carol[\\s\\S]*?5 Joined Road[\\s\\S]*?href="/app/tenancies/${tenancy}">01/08/2026 – ongoing[\\s\\S]*?badge s-active">active[\\s\\S]*?Merge Council`));
   assert.match(r.text, /Waiting Wendy[\s\S]*?No tenancy yet/);
   assert.doesNotMatch(r.text, /Past Pete/, 'current tenants by default');
@@ -2270,7 +2270,7 @@ test('property page: listing at the top, and emailing it sends only the listing'
   assert.match(r.text, /key-facts[\s\S]*?Property type[\s\S]*?Flat[\s\S]*?Bedrooms[\s\S]*?Bathrooms[\s\S]*?Parking[\s\S]*?Permit/);
   assert.match(r.text, /Management details[\s\S]*?Private Landlord Name/);
   assert.match(r.text, /id="email-listing"[\s\S]*?name="from"[\s\S]*?name="to"/);
-  assert.match(r.text, /<div class="below-certs">[\s\S]*?Invoices[\s\S]*?Current tenancies[\s\S]*?Previous tenancies[\s\S]*?Tenant calls[\s\S]*?<\/div>/);
+  assert.match(r.text, /<div class="below-certs">[\s\S]*?Invoices[\s\S]*?Current tenancies[\s\S]*?Tenant calls[\s\S]*?<\/div>/);
   // Only filled-in details appear: no bathrooms fact on a property without one.
   const bare = idFrom((await c.post('/app/properties', { address_line1: '1 Bare Street', status: 'vacant' })).location);
   r = await c.get(`/app/properties/${bare}`);
@@ -2641,11 +2641,17 @@ test('tenants list: an End button ends the current tenancy today and moves them 
   assert.doesNotMatch(r.text, />End<\/button>/, 'no End button for an ended tenancy');
   // Kept, with all its details, as a previous tenancy on the property and on the tenant.
   const tenantId = db.prepare("SELECT id FROM tenants WHERE name = 'Les Leaver'").get().id;
+  // Kept, with all its details, under Previous tenancies (a button next to Edit) on the property and the tenant.
   for (const page of [`/app/properties/${prop}`, `/app/tenants/${tenantId}`]) {
     r = await c.get(page);
-    assert.match(r.text, new RegExp(`Previous tenancies <span class="count">1</span>[\\s\\S]*?href="/app/tenancies/${ty}"[\\s\\S]*?10/01/2026`), `${page}: under Previous tenancies`);
-    assert.match(r.text, /Current tenancies <span class="count">0<\/span>/);
+    assert.match(r.text, new RegExp(`>Edit</a>\\s*<a class="btn" href="${page}/previous-tenancies">Previous tenancies <span class="count">1</span>`), `${page}: button next to Edit`);
+    r = await c.get(`${page}/previous-tenancies`);
+    assert.match(r.text, new RegExp(`<h1>Previous tenancies</h1>[\\s\\S]*?href="/app/tenancies/${ty}"[\\s\\S]*?10/01/2026`), `${page}: listed with its details`);
   }
+  assert.doesNotMatch((await c.get(`/app/tenants/${tenantId}`)).text, /Current tenancies/, 'the tenant page has its Current tenancy box instead');
+  assert.match((await c.get(`/app/properties/${prop}`)).text, /Current tenancies <span class="count">0<\/span>/, 'the property still lists who lives there now');
+  const stranger = await registerAndLogin('end-tenant-2@example.com', 'Stranger Lets');
+  assert.equal((await stranger.get(`/app/tenants/${tenantId}/previous-tenancies`)).status, 404);
 });
 
 test('tenants: notes when adding, and dated notes on the tenant page', async () => {
@@ -3262,7 +3268,8 @@ test('tenants: All lists every tenancy including ended ones; Edit buttons for te
   const active = db.prepare("SELECT id FROM tenancies WHERE tenant_id = ? AND status = 'active'").get(mo).id;
   assert.match(r.text, new RegExp(`<dt>Status</dt><dd class="status-edit"><span class="badge s-active">active</span> <a class="btn small" href="/app/tenancies/${active}/edit">Edit</a>`));
   const ended = db.prepare("SELECT id FROM tenancies WHERE tenant_id = ? AND status = 'ended'").get(mo).id;
-  assert.match(r.text, new RegExp(`href="/app/tenancies/${ended}/edit">Edit</a>`), 'ended tenancy editable from the list');
+  r = await c.get(`/app/tenants/${mo}/previous-tenancies`);
+  assert.match(r.text, new RegExp(`href="/app/tenancies/${ended}/edit">Edit</a>`), 'ended tenancy editable from Previous tenancies');
 });
 
 test('tenant Edit form: a Council dropdown that changes the council of the property they rent', async () => {
@@ -4053,7 +4060,8 @@ test('tenants: council reference number; tenancies: reservation date, term as bo
   assert.match(form, /Council reference number/);
   assert.match(form, /Reservation date/);
   assert.match(form, /Term as booked/);
-  assert.doesNotMatch(form, /name="rent_pence"|name="rent_frequency"/, 'no rent boxes');
+  assert.match(form, /name="rent_pence"[\s\S]*?Leave blank to use the property’s Rent from council/, 'a rent amount box');
+  assert.match(form, /Rent paid by[\s\S]*?<option value="Council" selected>Council<\/option><option value="Tenant" >Tenant/, 'rent paid by, council to start with');
   const r = await c.post(`/app/properties/${prop}/add-tenant`, { tenant_mode: 'new', name: 'Rita Reserve', council_ref: 'HB-12345', booking_date: '2026-09-10', term_booked: '6 months', start_date: '2026-10-01', status: 'active' });
   assert.equal(r.status, 302);
   const t = db.prepare('SELECT * FROM tenancies WHERE id = ?').get(idFrom(r.location));
@@ -4064,7 +4072,7 @@ test('tenants: council reference number; tenancies: reservation date, term as bo
   assert.match(page, /HB-12345/);
   assert.match(page, /<dt>Reserved<\/dt><dd>10\/09\/2026/);
   assert.match(page, /<dt>Term as booked<\/dt><dd>6 months/);
-  assert.doesNotMatch(page, /<dt>Rent<\/dt>/);
+  assert.match(page, /<dt>Rent paid by<\/dt><dd>Council<\/dd>/);
   // No rent: no automatic rent charge for it.
   await c.post('/app/rent/raise', { month: '2026-10' });
   assert.equal(db.prepare("SELECT COUNT(*) n FROM transactions WHERE tenancy_id = ? AND txn_type = 'rent_charge'").get(t.id).n, 0);

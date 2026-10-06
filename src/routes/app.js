@@ -286,6 +286,8 @@ module.exports = function appRoutes(db) {
   }
 
   function prepareValues(def, accountId, values) {
+    // A tenancy's rent left blank is stored as 0: the property's Rent from council is then used.
+    if (def.key === 'tenancies' && 'rent_pence' in values && values.rent_pence === null) values.rent_pence = 0;
     if (def.key === 'transactions') ledger.resolveLinks(db, accountId, values);
     // A job saved as completed is dated today, unless a date was given.
     if (def.key === 'maintenance' && values.status === 'completed' && !values.completed_date) values.completed_date = fmt.today();
@@ -675,7 +677,7 @@ module.exports = function appRoutes(db) {
           .run(a, t.name, t.email, t.phone, t.council_ref ?? null, t.notes);
         tv.tenant_id = Number(info.lastInsertRowid);
       }
-      if (!('rent_pence' in tv)) tv.rent_pence = 0; // rent isn't entered any more
+      if (tv.rent_pence === null || tv.rent_pence === undefined) tv.rent_pence = 0; // blank: the property's Rent from council is used
       const cols = Object.keys(tv);
       const info = db.prepare(`INSERT INTO tenancies (account_id, ${cols.join(', ')}) VALUES (?, ${cols.map(() => '?').join(', ')})`)
         .run(a, ...cols.map((c) => tv[c]));
@@ -903,7 +905,7 @@ module.exports = function appRoutes(db) {
     prepareValues(def, a, values);
     // A new property counts as acquired today unless another date is given.
     if (def.key === 'properties' && !values.acquired_date) values.acquired_date = fmt.today();
-    if (def.key === 'tenancies' && !('rent_pence' in values)) values.rent_pence = 0; // rent isn't entered any more
+    if (def.key === 'tenancies' && (values.rent_pence === null || values.rent_pence === undefined)) values.rent_pence = 0; // blank: the property's Rent from council is used
     const cols = Object.keys(values);
     const refusedCerts = [];
     const id = transaction(db, () => {
@@ -967,12 +969,11 @@ module.exports = function appRoutes(db) {
       const maps = refLabelMaps(cdef, a);
       // Tenancies: current ones, then previous (ended) ones kept with all their details.
       if (c.entity === 'tenancies') {
+        // Previous (ended) tenancies have their own page (the Previous tenancies button by Edit).
+        // A property lists its current tenancies; a tenant's page shows theirs in the Current tenancy box.
+        if (def.key === 'tenants') return [];
         const current = db.prepare(`SELECT * FROM tenancies WHERE account_id = ? AND ${c.fk} = ? AND status != 'ended' ORDER BY ${cdef.order} LIMIT 100`).all(a, row.id);
-        const previous = db.prepare(`SELECT * FROM tenancies WHERE account_id = ? AND ${c.fk} = ? AND status = 'ended' ORDER BY end_date DESC, start_date DESC LIMIT 200`).all(a, row.id);
-        return [
-          { def: cdef, fk: c.fk, rows: current, maps, title: 'Current tenancies' },
-          { def: cdef, fk: c.fk, rows: previous, maps, title: 'Previous tenancies', previous: true, empty: 'No previous tenancies yet. When a tenancy ends it’s kept here with all its details.' },
-        ];
+        return [{ def: cdef, fk: c.fk, rows: current, maps, title: 'Current tenancies' }];
       }
       const crows = db.prepare(`SELECT * FROM ${cdef.table} WHERE account_id = ? AND ${c.fk} = ? ORDER BY ${cdef.order} LIMIT 100`).all(a, row.id);
       return [{ def: cdef, fk: c.fk, rows: crows, maps, title: null }];
@@ -1078,6 +1079,10 @@ module.exports = function appRoutes(db) {
       : null;
     const bankChanges = def.key === 'landlords' ? require('../bankChanges').unchecked(db, a, row.id) : [];
     // A council's page also shows its database and its invoices.
+    // How many previous tenancies, for the button by Edit.
+    const previousTenancies = def.key === 'properties' || def.key === 'tenants'
+      ? db.prepare(`SELECT COUNT(*) AS n FROM tenancies WHERE account_id = ? AND ${def.key === 'properties' ? 'property_id' : 'tenant_id'} = ? AND status = 'ended'`).get(a, row.id).n
+      : null;
     // A property's page has notes of tenants' calls, and a tenant's page its own notes, newest first.
     const noteKind = NOTE_KINDS[def.key];
     const callNotes = noteKind ? {
@@ -1098,7 +1103,7 @@ module.exports = function appRoutes(db) {
       previous: db.prepare('SELECT COUNT(*) AS n FROM council_db_entries WHERE account_id = ? AND council_id = ? AND ended = 1').get(a, row.id).n,
       invoices: [],
     } : null;
-    res.render('show', { title: rowTitle(def, row, maps), section: sectionOf(def), def, row, maps, display, rowTitle, children, extra, invoices, related: relatedLists(def, row, a), certs, photo, tenantBoxes, statementLink, jobFiles, jobSignatures, inspectionSheet, propertyPhotos, photoBox, listing, jobInvoice, contractorStats, bankChanges, councilBoxes, landlordStatements, callNotes, certFiles, error: req.query.error ? String(req.query.error).slice(0, 200) : null, flash: req.query.flash ? String(req.query.flash).slice(0, 200) : null, fmt, today: fmt.today() });
+    res.render('show', { title: rowTitle(def, row, maps), section: sectionOf(def), def, row, maps, display, rowTitle, children, extra, invoices, related: relatedLists(def, row, a), certs, photo, tenantBoxes, statementLink, jobFiles, jobSignatures, inspectionSheet, propertyPhotos, photoBox, listing, jobInvoice, contractorStats, bankChanges, councilBoxes, landlordStatements, callNotes, previousTenancies, certFiles, error: req.query.error ? String(req.query.error).slice(0, 200) : null, flash: req.query.flash ? String(req.query.flash).slice(0, 200) : null, fmt, today: fmt.today() });
   });
 
   router.get('/:entity/:id/edit', (req, res) => {
@@ -1108,6 +1113,22 @@ module.exports = function appRoutes(db) {
     if (!row) return;
     renderForm(res, def, { row, values: row, errors: {}, accountId: req.user.id });
   });
+
+  // ---------- previous tenancies of a property or a tenant ----------
+  for (const [entity, fk] of [['properties', 'property_id'], ['tenants', 'tenant_id']]) {
+    router.get(`/${entity}/:id(\\d+)/previous-tenancies`, (req, res) => {
+      const def = ENTITIES[entity];
+      const a = req.user.id;
+      const row = db.prepare(`SELECT * FROM ${def.table} WHERE id = ? AND account_id = ?`).get(Number(req.params.id), a);
+      if (!row) return res.status(404).render('error', { title: 'Not found', message: `That ${def.singular.toLowerCase()} was not found.` });
+      const tdef = ENTITIES.tenancies;
+      const rows = db.prepare(`SELECT * FROM tenancies WHERE account_id = ? AND ${fk} = ? AND status = 'ended' ORDER BY end_date DESC, start_date DESC`).all(a, row.id);
+      res.render('previous-tenancies', {
+        title: `Previous tenancies · ${rowTitle(def, row, refLabelMaps(def, a))}`, section: sectionOf(def), def, row, name: rowTitle(def, row, refLabelMaps(def, a)),
+        tdef, rows, maps: refLabelMaps(tdef, a), display, rowTitle, hideField: fk, fmt, today: fmt.today(),
+      });
+    });
+  }
 
   // ---------- dated notes ----------
   // Dated notes on a property (tenants' calls) or on a tenant, added by whoever is signed in.

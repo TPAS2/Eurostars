@@ -19,7 +19,7 @@ function councilTenancies(db, accountId, month, councilId = null) {
        JOIN properties p ON p.id = ty.property_id
        JOIN tenants t ON t.id = ty.tenant_id
        LEFT JOIN transactions tx ON tx.tenancy_id = ty.id AND tx.account_id = ty.account_id AND tx.txn_date BETWEEN ? AND ?
-      WHERE ty.account_id = ? AND p.council_id IS NOT NULL ${councilId ? 'AND p.council_id = ?' : ''}
+      WHERE ty.account_id = ? AND p.council_id IS NOT NULL AND COALESCE(ty.paid_by, 'Council') = 'Council' ${councilId ? 'AND p.council_id = ?' : ''}
       GROUP BY ty.id
      HAVING charged > 0 OR received > 0 OR (ty.status = 'active' AND ty.start_date <= ? AND (ty.end_date IS NULL OR ty.end_date >= ?))
       ORDER BY p.address_line1 COLLATE NOCASE, t.name COLLATE NOCASE`

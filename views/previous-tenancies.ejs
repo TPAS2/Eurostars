@@ -1,0 +1,14 @@
+<%- include('partials/header') %>
+<header class="page-head">
+  <div>
+    <a class="crumb" href="/app/<%= def.key %>/<%= row.id %>">← <%= name %></a>
+    <h1>Previous tenancies</h1>
+    <p class="muted"><%= def.key === 'properties' ? 'Every tenancy at this property that has ended' : 'Every tenancy of this tenant that has ended' %>, newest first, kept with all its details. Click one to open it.</p>
+  </div>
+</header>
+<section class="card">
+  <% if (!rows.length) { %><p class="muted">No previous tenancies yet. When a tenancy ends it’s kept here.</p><% } else { %>
+    <%- include('partials/table', { def: tdef, rows, maps, hideField, editRows: true }) %>
+  <% } %>
+</section>
+<%- include('partials/footer') %>

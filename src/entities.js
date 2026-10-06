@@ -110,7 +110,7 @@ const ENTITIES = {
       { name: 'council_ref', label: 'Council reference number', type: 'text', help: 'The council’s own reference for this tenant.' },
       { name: 'notes', label: 'Notes', type: 'textarea' },
     ],
-    columns: ['name', 'cur_property', 'cur_term', 'cur_status', 'phone', 'cur_council', 'council_ref'],
+    columns: ['name', 'cur_property', 'cur_term', 'cur_status', 'cur_council', 'council_ref'],
     computed: {
       cur_property: { label: 'Property' }, cur_council: { label: 'Council' },
       cur_term: { label: 'Tenancy' }, cur_status: { label: 'Status' },
@@ -131,8 +131,10 @@ const ENTITIES = {
       { name: 'start_date', label: 'Start date', type: 'date', required: true },
       { name: 'end_date', label: 'End date', type: 'date', help: 'Once this date comes, the tenancy is marked Ended.' },
       { name: 'status', label: 'Status', type: 'select', options: ['active', 'pending', 'ended'], required: true, default: 'active' },
+      { name: 'paid_by', label: 'Rent paid by', type: 'select', options: ['Council', 'Tenant'], required: true, default: 'Council', help: 'Who pays the rent. Only council-paid tenancies count in Council Reconciliation.' },
+      { name: 'rent_pence', label: 'Rent amount (£ per month)', type: 'money', help: 'Leave blank to use the property’s Rent from council.' },
     ],
-    columns: ['property_id', 'tenant_id', 'booking_date', 'term_booked', 'start_date', 'end_date', 'status'],
+    columns: ['property_id', 'tenant_id', 'booking_date', 'term_booked', 'start_date', 'end_date', 'status', 'paid_by', 'rent_pence'],
     children: [{ entity: 'transactions', fk: 'tenancy_id' }],
   },
 
