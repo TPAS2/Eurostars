@@ -3651,7 +3651,8 @@ test('rent run steps 4 and 5: Bank Transfer sheet (.xlsx) and Metro bulk file (.
   assert.match(r.text, /href="\/app\/rent-run\/bulk\.xlsm\?month=2026-09"/);
   r = await c.get('/app/rent-run/transfer?month=2026-09');
   assert.match(r.text, /Bank Files Lets SEPTEMBER 2026 Bank Transfer/);
-  assert.match(r.text, /4 Fourth Road[\s\S]*?No payment[\s\S]*?yellow-note">QUARTERLY/);
+  assert.match(r.text, /4 Fourth Road[\s\S]*?No payment/);
+  assert.doesNotMatch(r.text, /yellow-note|QUARTERLY/, 'no payment-note column any more');
   r = await c.get('/app/rent-run/bulk?month=2026-09');
   assert.match(r.text, /Mr No Bank<\/a>: no sort code, no account number/);
   assert.doesNotMatch(r.text, /Mrs Cheque<\/td>/);
@@ -3663,15 +3664,14 @@ test('rent run steps 4 and 5: Bank Transfer sheet (.xlsx) and Metro bulk file (.
   await wb.xlsx.load(r.buf);
   const ws = wb.worksheets[0];
   assert.equal(ws.getCell('A1').value, 'Bank Files Lets SEPTEMBER 2026 Bank Transfer');
-  assert.ok(ws.model.merges.includes('A1:H1'), 'title merged across A1 to H1');
-  for (const ref of ['A1', 'A3', 'C3', 'A4', 'C4', 'E5', 'G4', 'G7', 'H7', 'F9', 'G9']) assert.equal(ws.getCell(ref).alignment && ws.getCell(ref).alignment.horizontal, 'center', `${ref} centred`);
-  assert.ok(ws.getColumn(8).width < 20, `column H fits its notes (${ws.getColumn(8).width})`);
+  assert.ok(ws.model.merges.includes('A1:G1'), 'title merged across A1 to G1');
+  for (const ref of ['A1', 'A3', 'C3', 'A4', 'C4', 'E5', 'G4', 'G7', 'F9', 'G9']) assert.equal(ws.getCell(ref).alignment && ws.getCell(ref).alignment.horizontal, 'center', `${ref} centred`);
+  for (let r = 1; r <= 9; r++) assert.ok(!ws.getRow(r).getCell(8).value, `no column H (row ${r})`);
   assert.equal(ws.getCell('G4').numFmt, '"£"#,##0.00', 'amounts in plain pounds so they centre');
   assert.deepEqual(ws.getRow(3).values.slice(1, 8), ['Landlord', 'LCODE', 'Property Address / Reference', 'Sort Code', 'Account Number', 'Bank Name', 'Amount']);
   assert.deepEqual(ws.getRow(4).values.slice(1, 8), ['Ms One Prop', 'L101', '3 Third Road', '30-93-84', 12345678, 'HSBC', 900]);
   assert.equal(ws.getCell('E5').value, '01234567', 'an account number starting with 0 keeps it');
   assert.equal(ws.getCell('G7').value, 'No payment');
-  assert.equal(ws.getCell('H7').value, 'QUARTERLY');
   assert.equal(ws.getCell('F9').value, 'Total');
   assert.equal(ws.getCell('G9').value.formula, 'SUM(G4:G8)');
 

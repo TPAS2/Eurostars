@@ -141,28 +141,26 @@ async function transferWorkbook(file, agencyName) {
   const sheetPath = 'xl/worksheets/sheet1.xml';
   let sheet = await zip.file(sheetPath).async('string');
   const out = [];
-  const row = (r, cells, extra = '') => out.push(`<row r="${r}" spans="1:8"${extra} x14ac:dyDescent="0.35">${cells}</row>`);
-  // The title across A1 to H1.
-  row(1, str('A1', 71, transferTitle(agencyName, file.month)) + ['B', 'C', 'D', 'E', 'F', 'G', 'H'].map((c) => `<c r="${c}1" s="71"/>`).join(''));
+  const row = (r, cells, extra = '') => out.push(`<row r="${r}" spans="1:7"${extra} x14ac:dyDescent="0.35">${cells}</row>`);
+  // The title across A1 to G1.
+  row(1, str('A1', 71, transferTitle(agencyName, file.month)) + ['B', 'C', 'D', 'E', 'F', 'G'].map((c) => `<c r="${c}1" s="71"/>`).join(''));
   row(2, '', ' ht="15" thickBot="1"');
   row(3, str('A3', 5, 'Landlord') + str('B3', 55, 'LCODE') + str('C3', 6, 'Property Address / Reference') + str('D3', 6, 'Sort Code')
-    + str('E3', 7, 'Account Number') + str('F3', 8, 'Bank Name') + str('G3', 9, 'Amount') + '<c r="H3" s="1"/>', ' ht="15" thickBot="1"');
+    + str('E3', 7, 'Account Number') + str('F3', 8, 'Bank Name') + str('G3', 9, 'Amount'), ' ht="15" thickBot="1"');
   file.rows.forEach((p, i) => {
     const r = i + 4;
     const acc = !p.account ? `<c r="E${r}" s="30"/>` : /^0/.test(p.account) ? str(`E${r}`, 30, p.account) : num(`E${r}`, 30, Number(p.account));
     const amount = p.pence ? num(`G${r}`, 15, (p.pence / 100).toFixed(2)) : str(`G${r}`, 21, 'No payment');
-    const note = p.note ? str(`H${r}`, 65, p.note) : `<c r="H${r}" s="1"/>`;
     row(r, str(`A${r}`, 35, p.landlordName) + str(`B${r}`, 35, p.code) + str(`C${r}`, 35, p.reference) + str(`D${r}`, 30, p.sortCode)
-      + acc + str(`F${r}`, 30, p.bankName) + amount + note);
+      + acc + str(`F${r}`, 30, p.bankName) + amount);
   });
   const last = file.rows.length + 3;
   const t = last + 1;
   row(t, str(`F${t}`, 67, 'Total') + `<c r="G${t}" s="68">${file.rows.length ? `<f>SUM(G4:G${last})</f>` : ''}<v>${(file.total / 100).toFixed(2)}</v></c>`, ' ht="15" thickBot="1"');
-  sheet = sheet.replace('{{ROWS}}', out.join('')).replace('{{DIM}}', `A1:H${t}`)
-    .replace('<mergeCell ref="B1:D1"/>', '<mergeCell ref="A1:H1"/>');
-  // Column H (the payment note) only as wide as its longest note.
-  const longest = Math.max(0, ...file.rows.map((p) => String(p.note || '').length));
-  sheet = sheet.replace(/<col min="8" max="8" width="[\d.]+"/, `<col min="8" max="8" width="${Math.max(10, Math.min(60, longest * 1.15 + 3)).toFixed(2)}"`);
+  sheet = sheet.replace('{{ROWS}}', out.join('')).replace('{{DIM}}', `A1:G${t}`)
+    .replace('<mergeCell ref="B1:D1"/>', '<mergeCell ref="A1:G1"/>')
+    // No column H (the payment note) any more: it goes back to an ordinary empty column.
+    .replace(/<col min="8" max="8" [^>]*\/>/, '<col min="8" max="8" width="9.1796875" style="1"/>');
   zip.file(sheetPath, sheet);
   // Every cell centred.
   const stylesPath = 'xl/styles.xml';

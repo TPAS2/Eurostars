@@ -31,7 +31,7 @@
       <thead>
         <tr class="title"><td></td><td colspan="3"><%= heading %></td><td colspan="4"></td></tr>
         <tr class="gap"><td colspan="8"></td></tr>
-        <tr class="head"><th>Landlord</th><th>LCODE</th><th>Property Address / Reference</th><th>Sort Code</th><th>Account Number</th><th>Bank Name</th><th>Amount</th><th class="note-col"></th></tr>
+        <tr class="head"><th>Landlord</th><th>LCODE</th><th>Property Address / Reference</th><th>Sort Code</th><th>Account Number</th><th>Bank Name</th><th>Amount</th></tr>
       </thead>
       <tbody>
       <% file.rows.forEach(r => { %>
@@ -39,14 +39,13 @@
           <td><%= r.landlordName %></td><td><%= r.code %></td><td><%= r.reference %></td>
           <td class="c"><% if (r.bankUnchecked) { %><span class="bank-flag" title="Bank details changed, not yet checked">⚠ </span><% } %><%= r.sortCode %></td><td class="c"><%= r.account %></td><td class="c"><%= r.bankName %></td>
           <% if (r.pence) { %><td class="money"><span>£</span><%= pounds(r.pence) %></td><% } else { %><td class="c">No payment</td><% } %>
-          <td class="note-col"><% if (r.note) { %><span class="yellow-note"><%= r.note %></span><% } %></td>
         </tr>
       <% }) %>
       <% if (!file.rows.length) { %><tr><td colspan="7" class="muted">No landlords paid by bank have a statement for <%= file.monthLabel %>. Calculate the rents on the Rent run first.</td><td></td></tr><% } %>
-        <tr class="total"><td colspan="5" class="blank"></td><td class="c strong">Total</td><td class="money strong"><span>£</span><%= pounds(file.total) %></td><td class="note-col"></td></tr>
+        <tr class="total"><td colspan="5" class="blank"></td><td class="c strong">Total</td><td class="money strong"><span>£</span><%= pounds(file.total) %></td></tr>
       </tbody>
     </table>
   </div>
-  <p class="muted small"><%= file.rows.filter(r => r.pence).length %> payment<%= file.rows.filter(r => r.pence).length === 1 ? '' : 's' %>, total <%= fmt.money(file.total) %>. Bank name and the yellow note come from each landlord's page (Bank name, Bank transfer note).<% if (file.cheques.length) { %> Paid by cheque, so not listed: <%= file.cheques.map(c => c.name).join(', ') %>.<% } %></p>
+  <p class="muted small"><%= file.rows.filter(r => r.pence).length %> payment<%= file.rows.filter(r => r.pence).length === 1 ? '' : 's' %>, total <%= fmt.money(file.total) %>. Bank name comes from each landlord's page.<% if (file.cheques.length) { %> Paid by cheque, so not listed: <%= file.cheques.map(c => c.name).join(', ') %>.<% } %></p>
 </section>
 <%- include('../partials/footer') %>
