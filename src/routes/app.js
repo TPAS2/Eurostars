@@ -611,13 +611,16 @@ module.exports = function appRoutes(db) {
     const a = req.user.id;
     const t = db.prepare('SELECT * FROM tenancies WHERE id = ? AND account_id = ?').get(Number(req.params.id), a);
     if (!t) return res.status(404).render('error', { title: 'Not found', message: 'That tenancy was not found.' });
-    const back = (key, msg) => res.redirect(`/app/properties/${t.property_id}?${key}=${encodeURIComponent(msg)}`);
+    // From the Tenants tab, go back there; otherwise to the property.
+    const fromTenants = String(req.body.back || '') === 'tenants';
+    const back = (key, msg) => res.redirect(fromTenants ? `/app/tenants?show=current&${key}=${encodeURIComponent(msg)}` : `/app/properties/${t.property_id}?${key}=${encodeURIComponent(msg)}`);
     const end = String(req.body.end_date || '').trim() || fmt.today();
     if (!fmt.isIsoDate(end)) return back('error', 'Enter a valid end date.');
     if (t.start_date && end < t.start_date) return back('error', `The end date can’t be before the start date (${fmt.ukDate(t.start_date)}).`);
     if (t.booking_date && end < t.booking_date) return back('error', `The end date can’t be before the reservation date (${fmt.ukDate(t.booking_date)}).`);
     db.prepare("UPDATE tenancies SET end_date = ?, status = 'ended' WHERE id = ? AND account_id = ?").run(end, t.id, a);
-    back('flash', `Tenancy ended on ${fmt.ukDate(end)}.`);
+    const who = fromTenants ? db.prepare('SELECT name FROM tenants WHERE id = ? AND account_id = ?').get(t.tenant_id, a) : null;
+    back('flash', who ? `${who.name}’s tenancy ended on ${fmt.ukDate(end)}. They’re now under Past.` : `Tenancy ended on ${fmt.ukDate(end)}.`);
   });
 
   router.get('/properties/:id/add-tenant', (req, res) => {
@@ -787,6 +790,8 @@ module.exports = function appRoutes(db) {
         row.cur_council = t && t.council_id ? { text: t.council_name, href: `/app/councils/${t.council_id}` } : { text: '' };
         row.cur_term = t ? { text: `${fmt.ukDate(t.start_date)} – ${t.end_date ? fmt.ukDate(t.end_date) : 'ongoing'}`, href: `/app/tenancies/${t.id}` } : { text: 'No tenancy yet' };
         row.cur_status = t ? { text: fmt.humanize(t.status), cls: `badge s-${t.status}` } : { text: '' };
+        // The tenancy the End button ends (not one that's already ended).
+        row.end_tenancy_id = t && t.status !== 'ended' ? t.id : null;
       }
       if (tenantFilter === 'current') rows = rows.filter((r) => r.tenancy_status !== 'ended');
       // Past tenants: anyone with an ended tenancy (even if they now rent somewhere else too).
@@ -831,7 +836,7 @@ module.exports = function appRoutes(db) {
         row.database = { text: 'Database', href: `/app/councils/${row.id}/database`, cls: 'btn small' };
       }
     }
-    res.render('list', { title: def.plural, section: sectionOf(def), def, rows, maps, display, rowTitle, q, searchable: textFields.length > 0, truncated, totalsRow, tenantFilter, monthView });
+    res.render('list', { title: def.plural, section: sectionOf(def), def, rows, maps, display, rowTitle, q, searchable: textFields.length > 0, truncated, totalsRow, tenantFilter, monthView, today: fmt.today(), fmt, flash: String(req.query.flash || '').slice(0, 300), error: String(req.query.error || '').slice(0, 300) });
   });
 
   router.get('/:entity/new', (req, res) => {
@@ -953,10 +958,20 @@ module.exports = function appRoutes(db) {
     if (!row) return;
     const a = req.user.id;
     const maps = refLabelMaps(def, a);
-    const children = (def.children || []).map((c) => {
+    const children = (def.children || []).flatMap((c) => {
       const cdef = ENTITIES[c.entity];
+      const maps = refLabelMaps(cdef, a);
+      // Tenancies: current ones, then previous (ended) ones kept with all their details.
+      if (c.entity === 'tenancies') {
+        const current = db.prepare(`SELECT * FROM tenancies WHERE account_id = ? AND ${c.fk} = ? AND status != 'ended' ORDER BY ${cdef.order} LIMIT 100`).all(a, row.id);
+        const previous = db.prepare(`SELECT * FROM tenancies WHERE account_id = ? AND ${c.fk} = ? AND status = 'ended' ORDER BY end_date DESC, start_date DESC LIMIT 200`).all(a, row.id);
+        return [
+          { def: cdef, fk: c.fk, rows: current, maps, title: 'Current tenancies' },
+          { def: cdef, fk: c.fk, rows: previous, maps, title: 'Previous tenancies', previous: true, empty: 'No previous tenancies yet. When a tenancy ends it’s kept here with all its details.' },
+        ];
+      }
       const crows = db.prepare(`SELECT * FROM ${cdef.table} WHERE account_id = ? AND ${c.fk} = ? ORDER BY ${cdef.order} LIMIT 100`).all(a, row.id);
-      return { def: cdef, fk: c.fk, rows: crows, maps: refLabelMaps(cdef, a), title: null };
+      return [{ def: cdef, fk: c.fk, rows: crows, maps, title: null }];
     });
     const certs = def.key === 'properties' ? keyCertificates(a, row.id) : null;
     let extra = null;

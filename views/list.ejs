@@ -18,6 +18,8 @@
 </form>
 <% if (q) { %><p class="muted small search-count"><%= rows.length %><%= truncated ? '+' : '' %> result<%= rows.length === 1 ? '' : 's' %> for “<%= q %>”</p><% } %>
 <% } %>
+<% if (typeof flash !== 'undefined' && flash) { %><div class="notice ok"><%= flash %></div><% } %>
+<% if (typeof error !== 'undefined' && error) { %><div class="notice err"><%= error %></div><% } %>
 <% if (typeof tenantFilter !== 'undefined' && tenantFilter) { %>
 <nav class="tabs page-tabs">
   <% [['current', 'Current'], ['past', 'Past'], ['all', 'All']].forEach(([k, label]) => { %><a href="/app/tenants?show=<%= k %><%= q ? '&q=' + encodeURIComponent(q) : '' %>" class="<%= tenantFilter === k ? 'active' : '' %>"><%= label %></a><% }) %>

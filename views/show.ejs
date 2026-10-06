@@ -520,13 +520,14 @@
 <% if (fold) { %><details class="card fold" id="council-properties"><summary><h2><%= heading %> <span class="count"><%= c.rows.length %></span></h2></summary><% } else { %><section class="card"><% } %>
   <div class="card-head">
     <% if (!fold) { %><h2><%= heading %> <span class="count"><%= c.rows.length %></span></h2><% } else { %><span></span><% } %>
-    <% if (def.key === 'properties' && c.def.key === 'tenancies') { %>
+    <% if (c.previous) { %>
+    <% } else if (def.key === 'properties' && c.def.key === 'tenancies') { %>
       <a class="btn small" href="/app/properties/<%= row.id %>/add-tenant">+ Add tenant</a>
     <% } else { %>
       <a class="btn small" href="/app/<%= c.def.key %>/new?<%= c.fk %>=<%= row.id %>">+ Add <%= c.def.singular.toLowerCase() %></a>
     <% } %>
   </div>
-  <% if (!c.rows.length) { %><p class="muted">None yet.</p><% } else { %>
+  <% if (!c.rows.length) { %><p class="muted"><%= c.empty || 'None yet.' %></p><% } else { %>
     <%- include('partials/table', { def: c.def, rows: c.rows, maps: c.maps, hideField: c.fk, endTenancy: def.key === 'properties' && c.def.key === 'tenancies', editRows: def.key === 'tenants' && c.def.key === 'tenancies' }) %>
   <% } %>
 <% if (fold) { %></details><% } else { %></section><% } %>

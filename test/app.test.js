@@ -2270,7 +2270,7 @@ test('property page: listing at the top, and emailing it sends only the listing'
   assert.match(r.text, /key-facts[\s\S]*?Property type[\s\S]*?Flat[\s\S]*?Bedrooms[\s\S]*?Bathrooms[\s\S]*?Parking[\s\S]*?Permit/);
   assert.match(r.text, /Management details[\s\S]*?Private Landlord Name/);
   assert.match(r.text, /id="email-listing"[\s\S]*?name="from"[\s\S]*?name="to"/);
-  assert.match(r.text, /<div class="below-certs">[\s\S]*?Invoices[\s\S]*?Tenancies[\s\S]*?Tenant calls[\s\S]*?<\/div>/);
+  assert.match(r.text, /<div class="below-certs">[\s\S]*?Invoices[\s\S]*?Current tenancies[\s\S]*?Previous tenancies[\s\S]*?Tenant calls[\s\S]*?<\/div>/);
   // Only filled-in details appear: no bathrooms fact on a property without one.
   const bare = idFrom((await c.post('/app/properties', { address_line1: '1 Bare Street', status: 'vacant' })).location);
   r = await c.get(`/app/properties/${bare}`);
@@ -2621,6 +2621,31 @@ test('adding a tenant from the Tenants tab: choose the property, then the tenanc
   assert.equal(r.status, 302, r.text && r.text.slice(0, 300));
   const t = db.prepare("SELECT ty.property_id FROM tenancies ty JOIN tenants t ON t.id = ty.tenant_id WHERE t.name = 'Pat Renter'").get();
   assert.equal(t.property_id, prop);
+});
+
+test('tenants list: an End button ends the current tenancy today and moves them to Past', async () => {
+  const c = await registerAndLogin('end-tenant@example.com', 'End Tenant Lets');
+  const prop = idFrom((await c.post('/app/properties', { address_line1: '2 Leaving Lane', status: 'let' })).location);
+  await c.get('/app/tenants/new');
+  await c.post('/app/tenants/add-tenant', { property_id: String(prop), tenant_mode: 'new', name: 'Les Leaver', status: 'active', booking_date: '2026-01-01', start_date: '2026-01-10' });
+  const ty = db.prepare("SELECT ty.id FROM tenancies ty JOIN tenants t ON t.id = ty.tenant_id WHERE t.name = 'Les Leaver'").get().id;
+  let r = await c.get('/app/tenants');
+  assert.match(r.text, new RegExp(`Les Leaver[\\s\\S]*?action="/app/tenancies/${ty}/end"[\\s\\S]*?name="back" value="tenants"[\\s\\S]*?>End</button>`));
+  r = await c.post(`/app/tenancies/${ty}/end`, { back: 'tenants' });
+  assert.match(decodeURIComponent(r.location), /^\/app\/tenants\?show=current&flash=Les Leaver’s tenancy ended on \d{2}\/\d{2}\/\d{4}\. They’re now under Past\./);
+  const after = db.prepare('SELECT status, end_date FROM tenancies WHERE id = ?').get(ty);
+  assert.deepEqual({ ...after }, { status: 'ended', end_date: new Date().toISOString().slice(0, 10) }, 'ended today');
+  assert.doesNotMatch((await c.get('/app/tenants?show=current')).text, /Les Leaver/, 'gone from Current');
+  r = await c.get('/app/tenants?show=past');
+  assert.match(r.text, /Les Leaver/);
+  assert.doesNotMatch(r.text, />End<\/button>/, 'no End button for an ended tenancy');
+  // Kept, with all its details, as a previous tenancy on the property and on the tenant.
+  const tenantId = db.prepare("SELECT id FROM tenants WHERE name = 'Les Leaver'").get().id;
+  for (const page of [`/app/properties/${prop}`, `/app/tenants/${tenantId}`]) {
+    r = await c.get(page);
+    assert.match(r.text, new RegExp(`Previous tenancies <span class="count">1</span>[\\s\\S]*?href="/app/tenancies/${ty}"[\\s\\S]*?10/01/2026`), `${page}: under Previous tenancies`);
+    assert.match(r.text, /Current tenancies <span class="count">0<\/span>/);
+  }
 });
 
 test('landlords list has no Councils column, and is in landlord code order', async () => {

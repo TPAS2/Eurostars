@@ -1,5 +1,7 @@
 <%# locals: def, rows, maps, display, rowTitle, hideField, endTenancy (show an End tenancy button on tenancy rows) %>
 <% const withEnd = typeof endTenancy !== 'undefined' && endTenancy; const withEdit = typeof editRows !== 'undefined' && editRows; %>
+<%# Tenants list: an End button for each tenant's current tenancy. %>
+<% const withTenantEnd = def.key === 'tenants' && rows.some((r) => r.end_tenancy_id); %>
 <%# The record's name (its title column, or else the first column) is the link to it. %>
 <% const shown = def.columns.filter(c => c !== hideField); const linkCol = shown.includes(def.titleField) ? def.titleField : shown[0]; %>
 <div class="table-wrap">
@@ -8,7 +10,7 @@
   <% def.columns.filter(c => c !== hideField).forEach(c => { const f = def.fieldMap[c]; %>
     <th class="<%= ['money','number','integer'].includes(f.type) || f.num ? 'num' : '' %>"><%= f.label.replace(/ \(£[^)]*\)/, '') %></th>
   <% }) %>
-  <% if (withEnd || withEdit) { %><th></th><% } %>
+  <% if (withEnd || withEdit || withTenantEnd) { %><th></th><% } %>
   </tr></thead>
   <tbody>
   <% rows.forEach(row => { %>
@@ -23,6 +25,12 @@
         <% } else { %><%= d.text %><% } %>
       </td>
     <% }) %>
+    <% if (withTenantEnd) { %><td class="end-cell"><% if (row.end_tenancy_id) { %>
+      <form method="post" action="/app/tenancies/<%= row.end_tenancy_id %>/end" class="inline" data-confirm="End <%= row.name %>’s tenancy today (<%= fmt.ukDate(today) %>)? It will be marked ended and move to Past.">
+        <%- include('csrf') %><input type="hidden" name="back" value="tenants">
+        <button class="btn small danger" type="submit">End</button>
+      </form>
+    <% } %></td><% } %>
     <% if (withEdit && !withEnd) { %><td class="num"><a class="btn small" href="/app/<%= def.key %>/<%= row.id %>/edit">Edit</a></td><% } %>
     <% if (withEnd) { %>
       <td class="end-cell"><% if (row.status !== 'ended') { %>

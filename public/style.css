@@ -1077,7 +1077,7 @@ input, select, textarea { max-width: 100%; }
 .below-certs .table-wrap { overflow-x: auto; }
 .below-certs th, .below-certs td { padding: 5px 6px; font-size: .78rem; }
 .below-certs .call-note-form { grid-template-columns: 1fr; }
-@media (min-width: 1100px) { .below-certs { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
+@media (min-width: 1100px) { .below-certs { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); } }
 .gallery-tools { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 8px; }
 .listing-pdf { display: flex; justify-content: center; align-items: center; gap: 8px; width: 100%; margin-top: 12px; }
 .listing-pdf svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
@@ -1306,3 +1306,4 @@ input, select, textarea { max-width: 100%; }
 .paper-kv dd input { width: 100%; max-width: 200px; text-align: right; }
 .paper-kv-left dd input { text-align: left; }
 .paper-sat { grid-column: 1 / -1; }
+.below-certs .btn.small { white-space: normal; text-align: center; }
