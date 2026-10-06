@@ -1303,3 +1303,6 @@ input, select, textarea { max-width: 100%; }
   .paper-jobno { gap: 8px; }
   .paper-box { min-width: 72px; }
 }
+.paper-kv dd input { width: 100%; max-width: 200px; text-align: right; }
+.paper-kv-left dd input { text-align: left; }
+.paper-sat { grid-column: 1 / -1; }

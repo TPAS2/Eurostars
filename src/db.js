@@ -540,6 +540,8 @@ function openDatabase(file) {
   addColumnIfMissing(db, 'maintenance_jobs', 'estimate_required', 'TEXT');
   addColumnIfMissing(db, 'maintenance_jobs', 'preferred_start_date', 'TEXT');
   addColumnIfMissing(db, 'maintenance_jobs', 'go_ahead', 'TEXT');
+  // As typed on the job sheet (filled in from the contractor and landlord, but can be changed).
+  for (const col of ['contractor_code', 'contractor_phone', 'contractor_mobile', 'contractor_fax', 'contractor_email', 'billing_name']) addColumnIfMissing(db, 'maintenance_jobs', col, 'TEXT');
   // An inspection's safety tick sheet (JSON of each requirement's Yes / No / N/A).
   addColumnIfMissing(db, 'inspections', 'checklist', 'TEXT');
   // On street and Off street became one parking option, Street.

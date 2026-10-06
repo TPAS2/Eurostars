@@ -476,7 +476,14 @@ const DRAFT_DAYS = 7;
       let props = {};
       let cons = [];
       try { props = JSON.parse(sheet.dataset.properties || '{}'); cons = JSON.parse(sheet.dataset.contractors || '[]'); } catch { /* leave blank */ }
-      const fill = (name, text) => { const el = sheet.querySelector(`[data-fill="${name}"]`); if (el) el.textContent = text || ''; };
+      // Shown text fills in; typing boxes fill in too, unless someone has typed their own value.
+      const fill = (name, text) => {
+        const el = sheet.querySelector(`[data-fill="${name}"]`);
+        if (el) el.textContent = text || '';
+        const box = sheet.querySelector(`input[data-auto="${name}"]`);
+        if (box && (box.dataset.wasAuto === '1' || !box.value)) { box.value = text || ''; box.dataset.wasAuto = '1'; }
+      };
+      sheet.querySelectorAll('input[data-auto]').forEach((box) => box.addEventListener('input', () => { box.dataset.wasAuto = '0'; }));
       const propSelect = sheet.querySelector('select[name=property_id]');
       const conInput = sheet.querySelector('input[name=contractor]');
       const showProperty = () => {

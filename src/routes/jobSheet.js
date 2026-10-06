@@ -52,10 +52,15 @@ module.exports = function jobSheetRoutes(db) {
     return {
       number: job.id,
       date: fmt.ukDate(String(job.created_at || fmt.today()).slice(0, 10)),
-      contractor,
+      // What was typed on the job sheet, else the contractor's own record.
+      contractor: {
+        ...contractor,
+        code: job.contractor_code || contractor.code, phone: job.contractor_phone || contractor.phone, mobile: job.contractor_mobile || contractor.mobile,
+        fax: job.contractor_fax || contractor.fax, email: job.contractor_email || contractor.email,
+      },
       propertyCode: p.code || '',
       propertyAddress: [p.address_line1, p.town, p.postcode].filter(Boolean).join(' '),
-      billingName: landlord ? landlord.name : '',
+      billingName: job.billing_name || (landlord ? landlord.name : ''),
       dateReported: job.reported_date ? fmt.ukDate(job.reported_date) : '',
       estimateRequired: job.estimate_required || 'No',
       ourEstimate: fmt.money(job.cost_pence || 0),

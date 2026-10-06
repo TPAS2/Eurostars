@@ -21,11 +21,9 @@
       <%- err('contractor') %>
     </div>
     <dl class="paper-kv">
-      <div><dt>Contractor Code:</dt><dd data-fill="con-code"><%= con ? con.code : '' %></dd></div>
-      <div><dt>Phone:</dt><dd data-fill="con-phone"><%= con ? con.phone : '' %></dd></div>
-      <div><dt>Mobile:</dt><dd data-fill="con-mobile"><%= con ? con.mobile : '' %></dd></div>
-      <div><dt>Fax:</dt><dd data-fill="con-fax"><%= con ? con.fax : '' %></dd></div>
-      <div><dt>E-mail:</dt><dd data-fill="con-email"><%= con ? con.email : '' %></dd></div>
+      <% [['code', 'Contractor Code:', 'text'], ['phone', 'Phone:', 'tel'], ['mobile', 'Mobile:', 'tel'], ['fax', 'Fax:', 'tel'], ['email', 'E-mail:', 'email']].forEach(([k, label, type]) => { const v = values[`contractor_${k}`] || (con ? con[k] : ''); %>
+      <div><dt><label for="f-contractor_<%= k %>"><%= label %></label></dt><dd><input id="f-contractor_<%= k %>" type="<%= type %>" name="contractor_<%= k %>" value="<%= v %>" data-auto="con-<%= k %>" data-was-auto="<%= values[`contractor_${k}`] ? '0' : '1' %>" autocomplete="off"><%- err(`contractor_${k}`) %></dd></div>
+      <% }) %>
       <div><dt>Date:</dt><dd><%= sheet.date %></dd></div>
     </dl>
   </div>
@@ -48,7 +46,7 @@
 
   <div class="paper-details">
     <dl class="paper-kv paper-kv-left">
-      <div><dt>Billing Name:</dt><dd data-fill="prop-landlord"><%= prop ? prop.landlord : '' %></dd></div>
+      <div><dt><label for="f-billing_name">Billing Name:</label></dt><dd><input id="f-billing_name" name="billing_name" value="<%= values.billing_name || (prop ? prop.landlord : '') %>" data-auto="prop-landlord" data-was-auto="<%= values.billing_name ? '0' : '1' %>" autocomplete="off"></dd></div>
       <div><dt><label for="f-reported_date">Date Reported:</label></dt><dd><input id="f-reported_date" type="date" name="reported_date" value="<%= values.reported_date || '' %>"><%- err('reported_date') %></dd></div>
       <div><dt><label for="f-estimate_required">Estimate Required:</label></dt><dd><select id="f-estimate_required" name="estimate_required"><%- sel('estimate_required', def.fieldMap.estimate_required.options) %></select></dd></div>
       <div><dt><label for="f-cost_pence">Our Estimate:</label></dt><dd><input id="f-cost_pence" name="cost_pence" inputmode="decimal" placeholder="0.00" value="<%= typeof values.cost_pence === 'number' ? fmt.penceToInput(values.cost_pence) : (values.cost_pence || '') %>"><%- err('cost_pence') %></dd></div>
@@ -75,12 +73,13 @@
 
       <% if (!row) { %>
       <div class="paper-signs">
+        <div class="paper-sat">
+          <span>Works Carried out to the Satisfaction of the Tenant/SU:</span>
+          <label class="check small"><input type="radio" name="satisfied" value="Yes"> Yes</label>
+          <label class="check small"><input type="radio" name="satisfied" value="No"> No</label>
+          <span class="muted small">(choose one)</span>
+        </div>
         <div class="new-sign" data-signature-optional>
-          <div class="paper-sat">
-            <span>Works Carried out to the Satisfaction of the Tenant/SU:</span>
-            <label class="check small"><input type="radio" name="satisfied" value="Yes"> Yes</label>
-            <label class="check small"><input type="radio" name="satisfied" value="No"> No</label>
-          </div>
           <div class="paper-sign-label">Signed By Tenant/SU:</div>
           <input type="hidden" name="signature_tenant">
           <canvas class="sign-pad" width="600" height="200" aria-label="Tenant signs here"></canvas>

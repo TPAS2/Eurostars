@@ -2433,7 +2433,15 @@ test('maintenance job sheet: blank template, each job filled-in sheet, signed on
   await c.get('/app/contractors/new');
   const con = idFrom((await c.post('/app/contractors', { name: 'Fixit Maintenance', phone: '0100 000000' })).location);
   assert.equal(db.prepare('SELECT code FROM contractors WHERE id = ?').get(con).code, 'C0001', 'contractors get codes');
-  const job = idFrom((await c.post('/app/maintenance', { property_id: String(prop), title: 'Door lock not catching', contractor: 'Fixit Maintenance', priority: 'high', status: 'open', estimate_required: 'No', go_ahead: 'Yes' })).location);
+  const job = idFrom((await c.post('/app/maintenance', { property_id: String(prop), title: 'Door lock not catching', contractor: 'Fixit Maintenance', priority: 'high', status: 'open', estimate_required: 'No', go_ahead: 'Yes',
+    contractor_code: 'C0001', contractor_phone: '0100 000000', contractor_mobile: '07000 000000', billing_name: 'Sheet Landlord (c/o agent)' })).location);
+  // What's typed on the sheet is kept on the job (it fills in from the records, but can be changed).
+  assert.deepEqual({ ...db.prepare('SELECT contractor_code, contractor_mobile, billing_name FROM maintenance_jobs WHERE id = ?').get(job) },
+    { contractor_code: 'C0001', contractor_mobile: '07000 000000', billing_name: 'Sheet Landlord (c/o agent)' });
+  r = await c.get(`/app/maintenance/${job}/edit`);
+  assert.match(r.text, /name="contractor_mobile" value="07000 000000"[^>]*data-was-auto="0"/);
+  assert.match(r.text, /name="billing_name" value="Sheet Landlord \(c\/o agent\)"/);
+  assert.match(r.text, /name="contractor_fax" value=""[^>]*data-was-auto="1"/, 'blank ones fill in from the contractor');
   r = await c.get(`/app/maintenance/${job}`);
   assert.match(r.text, /id="job-sheet"[\s\S]*?job-sheet\.pdf" download>Download job sheet[\s\S]*?data-signature[\s\S]*?name="satisfied"[\s\S]*?<canvas class="sign-pad"/);
   r = await c.get(`/app/maintenance/${job}/job-sheet.pdf`);
