@@ -142,7 +142,8 @@ async function transferWorkbook(file, agencyName) {
   let sheet = await zip.file(sheetPath).async('string');
   const out = [];
   const row = (r, cells, extra = '') => out.push(`<row r="${r}" spans="1:8"${extra} x14ac:dyDescent="0.35">${cells}</row>`);
-  row(1, str('B1', 71, transferTitle(agencyName, file.month)) + '<c r="C1" s="71"/><c r="D1" s="71"/>');
+  // The title across A1 to H1.
+  row(1, str('A1', 71, transferTitle(agencyName, file.month)) + ['B', 'C', 'D', 'E', 'F', 'G', 'H'].map((c) => `<c r="${c}1" s="71"/>`).join(''));
   row(2, '', ' ht="15" thickBot="1"');
   row(3, str('A3', 5, 'Landlord') + str('B3', 55, 'LCODE') + str('C3', 6, 'Property Address / Reference') + str('D3', 6, 'Sort Code')
     + str('E3', 7, 'Account Number') + str('F3', 8, 'Bank Name') + str('G3', 9, 'Amount') + '<c r="H3" s="1"/>', ' ht="15" thickBot="1"');
@@ -157,9 +158,41 @@ async function transferWorkbook(file, agencyName) {
   const last = file.rows.length + 3;
   const t = last + 1;
   row(t, str(`F${t}`, 67, 'Total') + `<c r="G${t}" s="68">${file.rows.length ? `<f>SUM(G4:G${last})</f>` : ''}<v>${(file.total / 100).toFixed(2)}</v></c>`, ' ht="15" thickBot="1"');
-  sheet = sheet.replace('{{ROWS}}', out.join('')).replace('{{DIM}}', `A1:H${t}`);
+  sheet = sheet.replace('{{ROWS}}', out.join('')).replace('{{DIM}}', `A1:H${t}`)
+    .replace('<mergeCell ref="B1:D1"/>', '<mergeCell ref="A1:H1"/>');
+  // Column H (the payment note) only as wide as its longest note.
+  const longest = Math.max(0, ...file.rows.map((p) => String(p.note || '').length));
+  sheet = sheet.replace(/<col min="8" max="8" width="[\d.]+"/, `<col min="8" max="8" width="${Math.max(10, Math.min(60, longest * 1.15 + 3)).toFixed(2)}"`);
   zip.file(sheetPath, sheet);
+  // Every cell centred.
+  const stylesPath = 'xl/styles.xml';
+  const styles = await zip.file(stylesPath).async('string');
+  zip.file(stylesPath, centrePounds(styles).replace(/<cellXfs[\s\S]*?<\/cellXfs>/, (xfs) => centreAll(xfs)));
   return zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
+}
+
+// Amounts in plain pounds (£950.00) rather than Excel's Accounting format, which pins the £ to the
+// left edge and can't be centred.
+function centrePounds(styles) {
+  const id = 190;
+  const fmt = `<numFmt numFmtId="${id}" formatCode="&quot;£&quot;#,##0.00"/>`;
+  let out = /<numFmts\b/.test(styles)
+    ? styles.replace(/<numFmts count="(\d+)">/, (m, n) => `<numFmts count="${Number(n) + 1}">${fmt}`)
+    : styles.replace(/<fonts\b/, `<numFmts count="1">${fmt}</numFmts><fonts`);
+  out = out.replace(/<cellXfs[\s\S]*?<\/cellXfs>/, (xfs) => xfs.replace(/numFmtId="44"/g, `numFmtId="${id}"`));
+  return out;
+}
+
+// Sets every cell style to centred (keeping wrap and the rest of its alignment).
+function centreAll(cellXfs) {
+  return cellXfs.replace(/<xf\b([^>]*?)(\/>|>([\s\S]*?)<\/xf>)/g, (all, attrs, end, inner) => {
+    const a = /applyAlignment=/.test(attrs) ? attrs.replace(/applyAlignment="\d"/, 'applyAlignment="1"') : `${attrs} applyAlignment="1"`;
+    let body = inner || '';
+    if (/<alignment\b/.test(body)) {
+      body = body.replace(/<alignment\b([^>]*?)\/?>/, (m, al) => `<alignment${al.replace(/\s*horizontal="[^"]*"/, '').replace(/\s*vertical="[^"]*"/, '')} horizontal="center" vertical="center"/>`);
+    } else body = `<alignment horizontal="center" vertical="center"/>${body}`;
+    return `<xf${a}>${body}</xf>`;
+  });
 }
 
 // e.g. "24th_SEPTEMBER_2026.xlsm", like Metro's file, dated with the payment date (or today).

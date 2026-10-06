@@ -1057,7 +1057,7 @@ test('encrypted backups: unreadable without the password, restorable with it', a
   assert.match(b.name, /\.tar\.gz\.enc$/);
   assert.ok(isEncrypted(b.file));
   const head = fs.readFileSync(b.file).subarray(0, 64);
-  assert.ok(!head.includes(Buffer.from([0x1f, 0x8b])), 'not a readable gzip');
+  assert.ok(!(head[0] === 0x1f && head[1] === 0x8b), 'not a readable gzip (it doesn\'t start like one)');
   assert.ok(!fs.readFileSync(b.file).includes(Buffer.from('SQLite format 3')), 'database not visible inside');
 
   await assert.rejects(decryptFile(b.file, path.join(tmp, 'nope.tar.gz'), 'wrong password'), /Wrong backup password/);
@@ -3662,7 +3662,11 @@ test('rent run steps 4 and 5: Bank Transfer sheet (.xlsx) and Metro bulk file (.
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.load(r.buf);
   const ws = wb.worksheets[0];
-  assert.equal(ws.getCell('B1').value, 'Bank Files Lets SEPTEMBER 2026 Bank Transfer');
+  assert.equal(ws.getCell('A1').value, 'Bank Files Lets SEPTEMBER 2026 Bank Transfer');
+  assert.ok(ws.model.merges.includes('A1:H1'), 'title merged across A1 to H1');
+  for (const ref of ['A1', 'A3', 'C3', 'A4', 'C4', 'E5', 'G4', 'G7', 'H7', 'F9', 'G9']) assert.equal(ws.getCell(ref).alignment && ws.getCell(ref).alignment.horizontal, 'center', `${ref} centred`);
+  assert.ok(ws.getColumn(8).width < 20, `column H fits its notes (${ws.getColumn(8).width})`);
+  assert.equal(ws.getCell('G4').numFmt, '"£"#,##0.00', 'amounts in plain pounds so they centre');
   assert.deepEqual(ws.getRow(3).values.slice(1, 8), ['Landlord', 'LCODE', 'Property Address / Reference', 'Sort Code', 'Account Number', 'Bank Name', 'Amount']);
   assert.deepEqual(ws.getRow(4).values.slice(1, 8), ['Ms One Prop', 'L101', '3 Third Road', '30-93-84', 12345678, 'HSBC', 900]);
   assert.equal(ws.getCell('E5').value, '01234567', 'an account number starting with 0 keeps it');
