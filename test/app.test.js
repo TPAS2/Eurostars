@@ -2710,6 +2710,23 @@ test('tenancy numbers: T0001 upwards per company, in the order added, shown left
   assert.doesNotMatch((await c.get(`/app/properties/${prop}/add-tenant`)).text, /name="tenancy_no"/);
 });
 
+test('tenants list is in tenancy number order, not name order', async () => {
+  const c = await registerAndLogin('tenancy-order@example.com', 'Tenancy Order Lets');
+  const prop = idFrom((await c.post('/app/properties', { address_line1: '3 Order Row', status: 'let' })).location);
+  for (const name of ['Zara Early', 'Adam Middle', 'Mia Late']) {
+    await c.get('/app/tenants/new');
+    await c.post('/app/tenants/add-tenant', { property_id: String(prop), tenant_mode: 'new', name, status: 'active', booking_date: '2026-09-01', start_date: '2026-09-10' });
+  }
+  await c.post('/app/tenants', { name: 'Bea Notenancy' });
+  for (const show of ['current', 'all']) {
+    const text = (await c.get(`/app/tenants?show=${show}`)).text;
+    const at = ['Zara Early', 'Adam Middle', 'Mia Late'].map((n) => text.indexOf(n));
+    assert.ok(at[0] > 0 && at[0] < at[1] && at[1] < at[2], `T0001, T0002, T0003 in order (${show})`);
+  }
+  const all = (await c.get('/app/tenants?show=all')).text;
+  assert.ok(all.indexOf('Bea Notenancy') > all.indexOf('Mia Late'), 'tenants with no tenancy go last');
+});
+
 test('landlords list: landlord code to the left of the name', async () => {
   const c = await registerAndLogin('ll-code-left@example.com', 'LL Code Left');
   await c.post('/app/landlords', { ...LANDLORD, name: 'Lefty Landlord', code: 'L0009' });

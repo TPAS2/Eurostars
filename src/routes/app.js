@@ -807,6 +807,9 @@ module.exports = function appRoutes(db) {
       if (tenantFilter === 'current') rows = rows.filter((r) => r.tenancy_status !== 'ended');
       // Past tenants: anyone with an ended tenancy (even if they now rent somewhere else too).
       if (tenantFilter === 'past') rows = rows.filter((r) => lastEnded.has(r.id));
+      // In tenancy number order (T0001 first); tenants with no tenancy go last, by name.
+      const noOf = (r) => { const m = /^T(\d+)$/.exec(r.cur_tenancy_no.text); return m ? Number(m[1]) : Infinity; };
+      rows.sort((x, y) => noOf(x) - noOf(y) || (noOf(x) === Infinity ? String(x.name).localeCompare(String(y.name)) : 0));
     }
     if (def.key === 'contractors') {
       // Invoices and money paid to each contractor, all time.
