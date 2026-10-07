@@ -423,6 +423,51 @@ async function monthlySetup(email) {
   return { c, landlordId };
 }
 
+test('landlord statements: statement of account PDF, numbered per company, preview and download icons, search by number', async () => {
+  const { c, landlordId } = await monthlySetup('stmt-pdf@example.com');
+  const a = db.prepare("SELECT id FROM users WHERE username = 'stmt-pdf'").get().id;
+  await c.get('/app/monthly?month=2026-08');
+  await c.post('/app/monthly/generate', { month: '2026-08', landlord_id: String(landlordId) });
+  await c.post('/app/monthly/generate', { month: '2026-07', landlord_id: String(landlordId) });
+  const nos = () => db.prepare('SELECT month, statement_no FROM monthly_statements WHERE account_id = ? ORDER BY id').all(a).map((x) => [x.month, x.statement_no]);
+  assert.deepEqual(nos(), [['2026-08', 1], ['2026-07', 2]]);
+  await c.post('/app/monthly/generate', { month: '2026-08', landlord_id: String(landlordId) });
+  assert.deepEqual(nos(), [['2026-08', 1], ['2026-07', 2]], 'regenerating keeps the number');
+  const s = db.prepare("SELECT * FROM monthly_statements WHERE account_id = ? AND month = '2026-08'").get(a);
+
+  // The list: number column, preview then download icon to the left of Regenerate, month buttons and search centred.
+  let r = await c.get('/app/monthly?month=2026-08');
+  assert.match(r.text, /<th>Statement no\.<\/th>\s*<th>Landlord<\/th>/);
+  assert.match(r.text, new RegExp(`statement\\.pdf\\?view=1"[^>]*title="Preview statement[\\s\\S]*?/app/monthly/${s.id}/statement\\.pdf" download[\\s\\S]*?Regenerate`));
+  assert.match(r.text, /class="month-bar"[\s\S]*?This month[\s\S]*?name="no"/);
+  // Searching a number opens that statement; an unknown one says so.
+  r = await c.get('/app/monthly?no=1');
+  assert.equal(r.location, `/app/monthly/${s.id}`);
+  r = await c.get('/app/monthly?no=99&month=2026-08');
+  assert.match(decodeURIComponent(r.location), /No statement number 99 was found/);
+
+  // The statement itself, on screen and as a PDF.
+  const doc = require('../src/statementPdf').statementDoc(db, a, s);
+  assert.deepEqual(doc.details.map((d) => d[0]), ['Landlord:', 'Statement No:', 'Ref/Chq No:', 'Date:']);
+  assert.equal(doc.details[1][1], '1');
+  assert.equal(doc.income, 90000);
+  assert.equal(doc.spent, 10800 + 6000);
+  assert.equal(doc.due, 90000 - 16800);
+  assert.deepEqual(doc.blocks[0].expenditure.map((e) => e.title), ['Management fee', 'Repairs & other costs']);
+  r = await c.get(`/app/monthly/${s.id}`);
+  assert.match(r.text, /STATEMENT OF ACCOUNT AND PAYMENT ADVICE[\s\S]*?Re: 5 Oak Road[\s\S]*?INCOME[\s\S]*?900\.00[\s\S]*?EXPENDITURE[\s\S]*?NET AMOUNT DUE[\s\S]*?732\.00/);
+  r = await c.get(`/app/monthly/${s.id}/statement.pdf`);
+  assert.equal(r.headers.get('content-type'), 'application/pdf');
+  assert.match(r.headers.get('content-disposition'), /^attachment/);
+  assert.equal(r.buf.subarray(0, 5).toString(), '%PDF-');
+  const pdf = await require('pdf-lib').PDFDocument.load(r.buf);
+  assert.equal(pdf.getPageCount(), 1);
+  assert.match((await c.get(`/app/monthly/${s.id}/statement.pdf?view=1`)).headers.get('content-disposition'), /^inline/, 'the preview opens in the browser');
+  // Another company can't open it.
+  const other = await registerAndLogin('stmt-pdf-other@example.com', 'Other Stmt Lets');
+  assert.equal((await other.get(`/app/monthly/${s.id}/statement.pdf`)).status, 404);
+});
+
 test('monthly statements: figures, AI summary, fabricated-number guard, fallback', async () => {
   const { c, landlordId } = await monthlySetup('monthly@example.com');
   await c.get('/app/monthly?month=2026-08');
@@ -1369,8 +1414,8 @@ test('month end: calculate rents, email landlords, Rift report (Excel) with prev
   assert.match(mail.html, /1 First Street/);
   assert.ok(db.prepare('SELECT emailed_at FROM monthly_statements WHERE landlord_id = ?').get(ann).emailed_at, 'marked as emailed');
   r = await c.get('/app/rent-run?month=2026-08');
-  assert.match(r.text, /Ann Able[\s\S]*?badge s-active">sent/);
   assert.match(r.text, /Skip those already emailed/);
+  assert.match((await c.get('/app/monthly?month=2026-08')).text, /Ann Able[\s\S]*?badge s-active">sent/);
   // Sending again skips anyone already emailed; a single landlord can be emailed again.
   sentMail.length = 0;
   await c.post('/app/monthly/email', { month: '2026-08', skip_sent: '1' });
@@ -1488,9 +1533,17 @@ test('landlords have a statement type (Email or Cheque); cheque landlords are le
   assert.deepEqual(sentMail.map((m) => m.to), ['eve@example.com'], 'only Email landlords are emailed');
   assert.match(decodeURIComponent(r.location.replace(/\+/g, ' ')), /Left out 1 landlord paid by cheque \(print their statements\): Chad Cheque/);
   r = await c.get('/app/rent-run?month=2026-08');
-  assert.match(r.text, /<th>Statement type<\/th>/);
-  assert.match(r.text, /Chad Cheque[\s\S]*?badge warn">Cheque[\s\S]*?Print statement/);
   assert.match(r.text, /1 paid by cheque is left out/);
+  assert.doesNotMatch(r.text, /<h2>Landlords<\/h2>/, 'the landlords list is on the Landlord statements tab, not the Rent run');
+  // On the Landlord statements tab, Email landlords get their own Email button; cheque ones don't.
+  r = await c.get('/app/monthly?month=2026-08');
+  const rowOf = (name) => r.text.slice(r.text.indexOf(name), r.text.indexOf('</tr>', r.text.indexOf(name)));
+  assert.match(rowOf('Chad Cheque'), /Regenerate/);
+  assert.doesNotMatch(rowOf('Chad Cheque'), /Email again|>Email</);
+  sentMail.length = 0;
+  r = await c.post('/app/monthly/email', { month: '2026-08', landlord_id: String(db.prepare("SELECT id FROM landlords WHERE email = 'eve@example.com'").get().id), back: 'monthly' });
+  assert.match(r.location, /^\/app\/monthly\?/, 'back to the Landlord statements tab');
+  assert.equal(sentMail[0].attachments[0].contentType, 'application/pdf', 'the statement goes as a PDF');
 });
 
 
@@ -1728,7 +1781,6 @@ test('rent run step 5: payment instruction template and a filled-in instruction 
   assert.match(r.text, /name="count" value="1"/);
   assert.doesNotMatch(r.text, /name="store"/, 'no Store box');
   assert.match(r.text, /name="contact_name" value="Test User"/, 'contact name suggested');
-  assert.match(r.text, /<table class="centered">/, 'landlords table is centred');
 
   // Save the blank template, then download / print it.
   const pdf = new File([Buffer.from('%PDF-1.4\n%metro form\n')], 'Metro payment instruction.pdf');

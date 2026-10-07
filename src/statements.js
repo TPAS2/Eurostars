@@ -188,6 +188,7 @@ async function generateStatement(db, { accountId, agencyName, landlordId, month,
        note = excluded.note, generated_at = excluded.generated_at`
   ).run(accountId, landlordId, month, s.opening, s.totals.rent, s.totals.fees, s.totals.expenses, s.totals.net,
     s.totals.payments, s.closing, s.totals.outstanding, snapshot, summary, source, model, note);
+  require('./db').numberStatements(db, accountId);
   return db.prepare('SELECT id FROM monthly_statements WHERE account_id = ? AND landlord_id = ? AND month = ?').get(accountId, landlordId, month).id;
 }
 

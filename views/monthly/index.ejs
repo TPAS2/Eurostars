@@ -5,14 +5,19 @@
     <p class="muted">To calculate rents, email landlords and get the CSV report, use <a href="/app/rent-run?month=<%= month %>">Rent run</a>.</p>
     <p class="muted">A statement for each landlord every month: rent received, fees and costs deducted, and what's held for them. <%= aiEnabled ? 'Summaries are written by AI from the figures.' : 'Set ANTHROPIC_API_KEY to have AI write the summaries.' %></p>
   </div>
-  <div class="rentrun-month">
-    <form method="get" data-autogo class="inline-form">
-      <input type="month" name="month" value="<%= month %>" aria-label="Month">
-      <noscript><button class="btn" type="submit">Show</button></noscript>
-    </form>
-    <% if (month === thisMonth) { %><span class="btn disabled" aria-disabled="true">This month</span><% } else { %><a class="btn primary" href="/app/monthly?month=<%= thisMonth %>">This month</a><% } %>
-  </div>
 </header>
+<div class="month-bar">
+  <form method="get" data-autogo class="inline-form">
+    <input type="month" name="month" value="<%= month %>" aria-label="Month">
+    <noscript><button class="btn" type="submit">Show</button></noscript>
+  </form>
+  <% if (month === thisMonth) { %><span class="btn disabled" aria-disabled="true">This month</span><% } else { %><a class="btn primary" href="/app/monthly?month=<%= thisMonth %>">This month</a><% } %>
+  <form method="get" class="inline-form statement-search" role="search">
+    <input type="hidden" name="month" value="<%= month %>">
+    <input type="search" name="no" inputmode="numeric" placeholder="Statement no." aria-label="Search by statement number" maxlength="12">
+    <button class="btn" type="submit">Find</button>
+  </form>
+</div>
 <% if (flash) { %><div class="notice ok"><%= flash %></div><% } %>
 <% if (error) { %><div class="notice err"><%= error %></div><% } %>
 
@@ -27,10 +32,11 @@
   </div>
   <% if (!rows.length) { %><p class="muted">Add landlords to start producing statements.</p><% } else { %>
   <div class="table-wrap"><table class="equal centered">
-    <thead><tr><th>Landlord</th><th class="num">Rent</th><th class="num">Fees</th><th class="num">Costs</th><th class="num">Net</th><th class="num">Held</th><th>Status</th><th>Emailed</th><th></th></tr></thead>
+    <thead><tr><th>Statement no.</th><th>Landlord</th><th class="num">Rent</th><th class="num">Fees</th><th class="num">Costs</th><th class="num">Net</th><th class="num">Held</th><th>Status</th><th>Emailed</th><th class="stmt-actions"></th></tr></thead>
     <tbody>
     <% rows.forEach(r => { %>
       <tr>
+        <td><%= r.statement_no || '' %></td>
         <td><% if (r.id) { %><a href="/app/monthly/<%= r.id %>"><strong><%= r.name %></strong></a><% } else { %><%= r.name %><% } %></td>
         <% if (r.id) { %>
           <td class="num"><%= fmt.money(r.rent_pence) %></td>
@@ -44,12 +50,22 @@
         <% } %>
         <td class="small"><% if (r.emailed_at) { %><span class="badge s-active">sent</span> <span class="muted"><%= fmt.ukDateTime(r.emailed_at) %></span><% } else if (!r.email) { %><span class="muted">No email address</span><% } else { %><span class="muted">Not yet</span><% } %></td>
         <td class="num row-actions">
+          <% if (r.id) { %><a class="btn small icon-btn" href="/app/monthly/<%= r.id %>/statement.pdf?view=1" target="_blank" rel="noopener" title="Preview statement (PDF)" aria-label="Preview statement (PDF)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></a> <a class="btn small icon-btn" href="/app/monthly/<%= r.id %>/statement.pdf" download title="Download statement (PDF)" aria-label="Download statement (PDF)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11"/><path d="M7 10l5 5 5-5"/><path d="M5 20h14"/></svg></a><% } %>
           <form method="post" action="/app/monthly/generate" data-busy="Generating statement…">
             <%- include('../partials/csrf') %>
             <input type="hidden" name="month" value="<%= month %>">
             <input type="hidden" name="landlord_id" value="<%= r.landlord_id %>">
             <button class="btn small" type="submit"><%= r.id ? 'Regenerate' : 'Generate' %></button>
           </form>
+          <% if (emailEnabled && r.email && r.statement_type !== 'Cheque') { %>
+          <form method="post" action="/app/monthly/email" data-busy="Sending…" data-confirm="Email the <%= monthLabel %> statement to <%= r.name %> (<%= r.email %>)?">
+            <%- include('../partials/csrf') %>
+            <input type="hidden" name="month" value="<%= month %>">
+            <input type="hidden" name="landlord_id" value="<%= r.landlord_id %>">
+            <input type="hidden" name="back" value="monthly">
+            <button class="btn small" type="submit"><%= r.emailed_at ? 'Email again' : 'Email' %></button>
+          </form>
+          <% } %>
         </td>
       </tr>
     <% }) %>

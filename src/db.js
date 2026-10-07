@@ -606,6 +606,8 @@ function openDatabase(file) {
   codeExistingProperties(db);
   addColumnIfMissing(db, 'tenancies', 'tenancy_no', 'TEXT');
   numberTenancies(db);
+  addColumnIfMissing(db, 'monthly_statements', 'statement_no', 'INTEGER');
+  numberStatements(db);
   return db;
 }
 
@@ -757,6 +759,18 @@ function codeExistingProperties(db) {
 
 // Tenancy numbers (T0001, T0002...), per company, in the order the tenancies were added. Any
 // tenancy without one gets the next number after the company's highest.
+// Statement numbers 1, 2, 3… per company, in the order statements were first made. A
+// regenerated statement keeps its number.
+function numberStatements(db, accountId = null) {
+  const accounts = accountId ? [{ account_id: accountId }]
+    : db.prepare('SELECT DISTINCT account_id FROM monthly_statements WHERE statement_no IS NULL').all();
+  for (const { account_id: a } of accounts) {
+    let n = db.prepare('SELECT COALESCE(MAX(statement_no), 0) AS n FROM monthly_statements WHERE account_id = ?').get(a).n;
+    const set = db.prepare('UPDATE monthly_statements SET statement_no = ? WHERE id = ?');
+    for (const { id } of db.prepare('SELECT id FROM monthly_statements WHERE account_id = ? AND statement_no IS NULL ORDER BY id').all(a)) set.run(++n, id);
+  }
+}
+
 function numberTenancies(db, accountId = null) {
   const accounts = accountId ? [{ account_id: accountId }]
     : db.prepare("SELECT DISTINCT account_id FROM tenancies WHERE tenancy_no IS NULL OR trim(tenancy_no) = ''").all();
@@ -773,4 +787,4 @@ function numberTenancies(db, accountId = null) {
   }
 }
 
-module.exports = { numberTenancies, contractorFor, openDatabase, transaction, uniqueUsername, signInNameFrom, USERNAME_RE, LOGIN_NAME_RE };
+module.exports = { numberStatements, numberTenancies, contractorFor, openDatabase, transaction, uniqueUsername, signInNameFrom, USERNAME_RE, LOGIN_NAME_RE };

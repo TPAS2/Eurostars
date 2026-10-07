@@ -7,6 +7,7 @@ const ledger = require('../ledger');
 const { transaction } = require('../db');
 const monthend = require('../monthend');
 const { isEmail } = require('../mailer');
+const { statementDoc, buildStatementPdf, amount } = require('../statementPdf');
 
 // Monthly landlord statements with AI-written summaries, and the month-end run:
 // calculate rents, email every landlord their statement, and the CSV report.
@@ -16,9 +17,16 @@ module.exports = function monthlyRoutes(db, writer, mailer = { enabled: false })
 
   router.get('/', (req, res) => {
     const a = req.user.id;
+    // Searching for a statement number opens that statement.
+    const wanted = String(req.query.no || '').trim().replace(/^no\.?\s*/i, '');
+    if (wanted) {
+      const found = /^\d{1,9}$/.test(wanted) && db.prepare('SELECT id FROM monthly_statements WHERE account_id = ? AND statement_no = ?').get(a, Number(wanted));
+      if (found) return res.redirect(`/app/monthly/${found.id}`);
+      return res.redirect(`/app/monthly?month=${st.isMonth(req.query.month) ? req.query.month : st.previousMonth()}&error=${encodeURIComponent(`No statement number ${wanted.slice(0, 20)} was found.`)}`);
+    }
     const month = st.isMonth(req.query.month) ? req.query.month : st.previousMonth();
     const rows = db.prepare(
-      `SELECT l.id AS landlord_id, l.name, l.email, s.id, s.rent_pence, s.fees_pence, s.expenses_pence, s.net_pence,
+      `SELECT l.id AS landlord_id, l.name, l.email, l.statement_type, s.id, s.statement_no, s.rent_pence, s.fees_pence, s.expenses_pence, s.net_pence,
               s.closing_pence, s.summary_source, s.generated_at, s.emailed_at, s.emailed_to
          FROM landlords l
          LEFT JOIN monthly_statements s ON s.landlord_id = l.id AND s.account_id = l.account_id AND s.month = ?
@@ -27,7 +35,7 @@ module.exports = function monthlyRoutes(db, writer, mailer = { enabled: false })
     const months = db.prepare('SELECT DISTINCT month FROM monthly_statements WHERE account_id = ? ORDER BY month DESC LIMIT 24').all(a).map((r) => r.month);
     res.render('monthly/index', {
       title: 'Landlord statements', section: 'monthly', month, thisMonth: fmt.today().slice(0, 7), monthLabel: st.monthLabel(month), rows, months,
-      aiEnabled: !!writer, fmt,
+      aiEnabled: !!writer, emailEnabled: mailer.enabled, fmt,
       flash: String(req.query.flash || '').slice(0, 1000), error: String(req.query.error || '').slice(0, 1000),
     });
   });
@@ -94,11 +102,11 @@ module.exports = function monthlyRoutes(db, writer, mailer = { enabled: false })
   };
 
   const monthFrom = (req) => (st.isMonth(req.body.month) ? String(req.body.month) : null);
-  const backTo = (res, month, { flash, error } = {}) => {
+  const backTo = (res, month, { flash, error } = {}, page = 'rent-run') => {
     const q = new URLSearchParams({ month });
     if (flash) q.set('flash', flash);
     if (error) q.set('error', error);
-    res.redirect(`/app/rent-run?${q}`);
+    res.redirect(`/app/${page === 'monthly' ? 'monthly' : 'rent-run'}?${q}`);
   };
   const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
   const listNames = (names) => (names.length > 6 ? `${names.slice(0, 6).join(', ')} and ${names.length - 6} more` : names.join(', '));
@@ -116,14 +124,15 @@ module.exports = function monthlyRoutes(db, writer, mailer = { enabled: false })
   // Step 2: email each landlord their statement (or one landlord, from their row).
   router.post('/email', wrap(async (req, res) => {
     const a = req.user.id;
+    const page = req.body.back === 'monthly' ? 'monthly' : 'rent-run';
     const month = monthFrom(req);
-    if (!month) return backTo(res, st.previousMonth(), { error: 'Choose a valid month.' });
-    if (!mailer.enabled) return backTo(res, month, { error: 'Email isn’t set up yet, so nothing was sent. Ask your administrator to add the email settings.' });
+    if (!month) return backTo(res, st.previousMonth(), { error: 'Choose a valid month.' }, page);
+    if (!mailer.enabled) return backTo(res, month, { error: 'Email isn’t set up yet, so nothing was sent. Ask your administrator to add the email settings.' }, page);
     const one = req.body.landlord_id ? Number(req.body.landlord_id) : null;
     const skipSent = !one && req.body.skip_sent === '1';
     const landlords = db.prepare(`SELECT id, name, email, statement_type FROM landlords WHERE account_id = ?${one ? ' AND id = ?' : ''} ORDER BY name COLLATE NOCASE`)
       .all(...(one ? [a, one] : [a]));
-    if (one && !landlords.length) return backTo(res, month, { error: 'Landlord not found.' });
+    if (one && !landlords.length) return backTo(res, month, { error: 'Landlord not found.' }, page);
     const agency = db.prepare('SELECT agency_name, email FROM users WHERE id = ?').get(a);
     const sender = senderFor(a);
 
@@ -144,7 +153,9 @@ module.exports = function monthlyRoutes(db, writer, mailer = { enabled: false })
       }
       const email = monthend.statementEmail({ agencyName: agency.agency_name, statement: s, landlordName: l.name });
       try {
-        await mailer.send({ to: l.email, ...email, from: sender.from, fromName: sender.fromName, replyTo: sender.replyTo });
+        const doc = statementDoc(db, a, s);
+        const attachments = [{ filename: doc.filename, content: Buffer.from(await buildStatementPdf(doc)), contentType: 'application/pdf' }];
+        await mailer.send({ to: l.email, ...email, attachments, from: sender.from, fromName: sender.fromName, replyTo: sender.replyTo });
         db.prepare("UPDATE monthly_statements SET emailed_at = datetime('now'), emailed_to = ? WHERE id = ?").run(l.email, s.id);
         sent.push(l.name);
       } catch (err) {
@@ -157,7 +168,7 @@ module.exports = function monthlyRoutes(db, writer, mailer = { enabled: false })
     if (byCheque.length) parts.push(`Left out ${plural(byCheque.length, 'landlord')} paid by cheque (print their statements): ${listNames(byCheque)}.`);
     if (noEmail.length) parts.push(`No email address for: ${listNames(noEmail)}.`);
     const error = failed.length ? `Couldn’t email: ${listNames(failed)}.` : null;
-    backTo(res, month, { flash: parts.join(' '), error });
+    backTo(res, month, { flash: parts.join(' '), error }, page);
   }));
 
   // Steps 3 and 4: the Rift report (an Excel workbook), as a page to check, a download and an email.
@@ -217,18 +228,36 @@ module.exports = function monthlyRoutes(db, writer, mailer = { enabled: false })
     back({ flash: `Emailed the ${report.label} to ${to}.` });
   }));
 
-  router.get('/:id', (req, res) => {
+  function ownStatement(req, res) {
     const id = Number(req.params.id);
     const s = Number.isInteger(id) && db.prepare(
       `SELECT s.*, l.name AS landlord_name, l.address AS landlord_address, l.email AS landlord_email
          FROM monthly_statements s JOIN landlords l ON l.id = s.landlord_id
         WHERE s.id = ? AND s.account_id = ?`
     ).get(id, req.user.id);
-    if (!s) return res.status(404).render('error', { title: 'Not found', message: "That statement doesn't exist." });
+    if (!s) res.status(404).render('error', { title: 'Not found', message: "That statement doesn't exist." });
+    return s;
+  }
+
+  // The statement as a PDF, laid out like the agency's printed statement of account.
+  router.get('/:id(\\d+)/statement.pdf', wrap(async (req, res) => {
+    const s = ownStatement(req, res);
+    if (!s) return;
+    const doc = statementDoc(db, req.user.id, s);
+    res.setHeader('Content-Type', 'application/pdf');
+    // ?view=1 opens it in the browser to look at; otherwise it downloads.
+    res.setHeader('Content-Disposition', `${req.query.view === '1' ? 'inline' : 'attachment'}; filename="${doc.filename.replace(/["\\\r\n]/g, '')}"`);
+    res.setHeader('Cache-Control', 'private, no-store');
+    res.end(Buffer.from(await buildStatementPdf(doc)));
+  }));
+
+  router.get('/:id', (req, res) => {
+    const s = ownStatement(req, res);
+    if (!s) return;
     const detail = JSON.parse(s.detail_json);
     res.render('monthly/show', {
-      title: `${s.landlord_name} · ${st.monthLabel(s.month)}`, section: 'monthly', s, detail,
-      monthLabel: st.monthLabel(s.month), fmt,
+      title: `${s.landlord_name} · ${st.monthLabel(s.month)}`, section: 'monthly', s, detail, doc: statementDoc(db, req.user.id, s),
+      monthLabel: st.monthLabel(s.month), fmt, amount,
     });
   });
 

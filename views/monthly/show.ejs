@@ -6,7 +6,8 @@
     <p class="muted"><%= monthLabel %></p>
   </div>
   <div class="actions">
-    <button class="btn" type="button" data-print>Print / save as PDF</button>
+    <button class="btn" type="button" data-print>Print</button>
+    <a class="btn icon-btn" href="/app/monthly/<%= s.id %>/statement.pdf?view=1" target="_blank" rel="noopener" title="Preview statement (PDF)" aria-label="Preview statement (PDF)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></a> <a class="btn icon-btn" href="/app/monthly/<%= s.id %>/statement.pdf" download title="Download statement (PDF)" aria-label="Download statement (PDF)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11"/><path d="M7 10l5 5 5-5"/><path d="M5 20h14"/></svg></a>
     <form method="post" action="/app/monthly/generate" data-busy="Regenerating…">
       <%- include('../partials/csrf') %>
       <input type="hidden" name="month" value="<%= s.month %>">
@@ -19,49 +20,47 @@
   </div>
 </header>
 
-<section class="card statement-doc">
-  <div class="doc-head">
-    <div>
-      <div class="doc-agency"><%= user.agency_name %></div>
-      <h2>Landlord statement · <%= monthLabel %></h2>
-      <div class="muted small">Period <%= fmt.ukDate(detail.from) %> to <%= fmt.ukDate(detail.to) %> · Generated <%= fmt.ukDateTime(s.generated_at) %></div>
+<section class="card statement-paper">
+  <header class="sp-band">
+    <div class="sp-agency"><%= doc.company.name %></div>
+    <% if (doc.company.address) { %><div class="sp-sub"><%= doc.company.address %></div><% } %>
+    <% if (doc.company.contact) { %><div class="sp-sub"><%= doc.company.contact %></div><% } %>
+  </header>
+  <div class="sp-body">
+    <div class="sp-top">
+      <div class="sp-to"><% doc.to.forEach(l => { %><div><%= l %></div><% }) %></div>
+      <dl class="sp-details"><% doc.details.forEach(([k, v]) => { %><dt><%= k %></dt><dd><%= v %></dd><% }) %></dl>
     </div>
-    <div class="doc-to">
-      <strong><%= s.landlord_name %></strong>
-      <% if (s.landlord_address) { %><div class="pre small"><%= s.landlord_address %></div><% } %>
-    </div>
+    <h2 class="sp-title">STATEMENT OF ACCOUNT AND PAYMENT ADVICE<br>AS AT <%= doc.date %><br>For Account: Default Client Cash Account</h2>
+    <table class="sp-table">
+      <thead><tr><th></th><th>Net<br>£</th><th>Vat<br>£</th><th>Gross<br>£</th></tr></thead>
+      <tbody>
+      <% doc.blocks.forEach(b => { %>
+        <tr><td colspan="4" class="sp-re">Re: <%= b.re %></td></tr>
+        <% [['INCOME', b.income], ['EXPENDITURE', b.expenditure]].forEach(([h, rows]) => { if (!rows.length) return; %>
+          <tr><td colspan="4" class="sp-head"><%= h %></td></tr>
+          <% rows.forEach(r => { %>
+            <tr><td class="sp-item"><strong><%= r.title %></strong><% if (r.sub) { %><div><%= r.sub %></div><% } %></td>
+              <td class="num"><%= amount(r.net) %></td><td class="num">0.00</td><td class="num"><%= amount(r.net) %></td></tr>
+          <% }) %>
+        <% }) %>
+      <% }) %>
+      <% if (!doc.blocks.length) { %><tr><td colspan="4" class="muted">Nothing in or out this month.</td></tr><% } %>
+        <tr class="sp-total"><td>TOTAL INCOME</td><td class="num"><%= amount(doc.income) %></td><td class="num">0.00</td><td class="num"><strong><%= amount(doc.income) %></strong></td></tr>
+        <% if (doc.spent) { %><tr class="sp-total2"><td>TOTAL EXPENDITURE</td><td class="num"><%= amount(doc.spent) %></td><td class="num">0.00</td><td class="num"><strong><%= amount(doc.spent) %></strong></td></tr><% } %>
+        <tr class="sp-due"><td>NET AMOUNT DUE</td><td></td><td></td><td class="num"><span><%= amount(doc.due) %></span></td></tr>
+      </tbody>
+    </table>
+    <p class="sp-closing"><%= doc.closing %></p>
   </div>
+</section>
 
+<section class="card no-print">
   <div class="ai-summary">
     <div class="ai-label"><%= s.summary_source === 'ai' ? '✨ Summary' : 'Summary' %></div>
     <p class="pre"><%= s.summary %></p>
-    <% if (s.note) { %><p class="muted small no-print"><%= s.note %></p><% } %>
+    <% if (s.note) { %><p class="muted small"><%= s.note %></p><% } %>
   </div>
-
-  <div class="summary big">
-    <div><span>Rent received</span><strong><%= fmt.money(s.rent_pence) %></strong></div>
-    <div><span>Management fees</span><strong><%= s.fees_pence ? '−' : '' %><%= fmt.money(s.fees_pence) %></strong></div>
-    <div><span>Repairs &amp; other costs</span><strong><%= s.expenses_pence ? '−' : '' %><%= fmt.money(s.expenses_pence) %></strong></div>
-    <div class="hl"><span>Net for the month</span><strong><%= fmt.money(s.net_pence) %></strong></div>
-  </div>
-
-  <h3>By property</h3>
-  <div class="table-wrap"><table>
-    <thead><tr><th>Property</th><th class="num">Rent due</th><th class="num">Rent received</th><th class="num">Fees</th><th class="num">Costs</th><th class="num">Net</th></tr></thead>
-    <tbody>
-    <% detail.properties.forEach(p => { %>
-      <tr>
-        <td><%= p.address_line1 %><% if (p.outstanding) { %> <span class="badge bad"><%= fmt.money(p.outstanding) %> outstanding</span><% } %></td>
-        <td class="num"><%= fmt.money(p.charged) %></td>
-        <td class="num"><%= fmt.money(p.rent) %></td>
-        <td class="num"><%= p.fees ? '−' + fmt.money(p.fees) : '—' %></td>
-        <td class="num"><%= p.expenses ? '−' + fmt.money(p.expenses) : '—' %></td>
-        <td class="num"><strong><%= fmt.money(p.net) %></strong></td>
-      </tr>
-    <% }) %>
-    </tbody>
-  </table></div>
-
   <h3>Transactions</h3>
   <div class="table-wrap"><table>
     <thead><tr><th>Date</th><th>Property</th><th>Description</th><th class="num">In</th><th class="num">Out</th><th class="num">Balance</th></tr></thead>
