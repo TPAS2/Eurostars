@@ -2794,6 +2794,14 @@ test('council invoices tab: under Council Reconciliation, lists each council wit
   assert.ok(require('../src/tabs').TABS.some((t) => t.key === 'councilinvoices'));
 });
 
+test('sign-in page fits on small, sideways and short screens', () => {
+  const css = fs.readFileSync(path.join(__dirname, '..', 'public', 'style.css'), 'utf8');
+  assert.match(css, /\.auth-main \{[^}]*grid-template-columns: minmax\(0, 1fr\)/, 'never wider than a small phone');
+  assert.match(css, /\.auth-main \{[^}]*min-height: 100dvh/, 'uses the visible screen height on phones');
+  assert.match(css, /@media \(max-height: 760px\)/, 'compact on short screens');
+  assert.match(css, /@media \(max-height: 520px\)[\s\S]*?grid-template-columns: 92px minmax\(0, 1fr\)/, 'labels beside the boxes on phones held sideways');
+});
+
 test('tenants list is in tenancy number order, not name order', async () => {
   const c = await registerAndLogin('tenancy-order@example.com', 'Tenancy Order Lets');
   const prop = idFrom((await c.post('/app/properties', { address_line1: '3 Order Row', status: 'let' })).location);

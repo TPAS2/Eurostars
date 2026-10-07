@@ -914,7 +914,7 @@ input, select, textarea { max-width: 100%; }
 .auth .public { display: block; max-width: none; padding: 0; min-height: 100vh; }
 .auth-split { position: relative; width: 100%; margin: 0; min-height: 100vh; background: #03040f; }
 .auth-art { position: fixed; inset: 0; background: linear-gradient(rgba(3, 4, 16, .25), rgba(3, 4, 16, .45)), url(/static/login-art.jpg) 50% center / cover no-repeat; }
-.auth-main { position: relative; z-index: 1; min-height: 100vh; display: grid; grid-template-rows: auto 1fr auto; padding: 28px 36px 24px; }
+.auth-main { position: relative; z-index: 1; min-height: 100vh; min-height: 100dvh; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr auto; padding: 28px 36px 24px; }
 .auth-brand { justify-self: start; display: inline-flex; align-items: center; gap: 12px; font-size: 1.3rem; font-weight: 800; letter-spacing: .02em; color: #fff; text-decoration: none; }
 .auth-brand:hover { text-decoration: none; }
 .auth-logo { width: 40px; height: 40px; border-radius: 11px; box-shadow: 0 0 22px rgba(94, 225, 255, .4), 0 0 40px rgba(150, 90, 255, .3); }
@@ -940,6 +940,44 @@ input, select, textarea { max-width: 100%; }
 @media (max-width: 600px) {
   .auth-main { padding: 20px 16px 18px; }
   .auth .auth-card { padding: 28px 20px; }
+}
+/* Short screens (small phones, phones on their side, short laptop windows): everything on the
+   sign-in pages fits on the screen without scrolling. */
+@media (max-height: 760px) {
+  .auth-main { padding-top: 16px; padding-bottom: 12px; }
+  .auth-content { padding: 10px 0; }
+  .auth .auth-card { padding: 22px 24px; }
+  .auth .auth-card h1 { font-size: 1.45rem; }
+  .auth .auth-card .auth-sub { margin-bottom: 12px; }
+  .auth .auth-card .stack { gap: 9px; }
+  .auth .auth-card input { height: 40px; margin-top: 4px; }
+  .auth .auth-submit { height: 42px; margin-top: 4px; }
+  .auth .auth-card .pw-eye { height: 40px; width: 40px; }
+  .auth-logo { width: 32px; height: 32px; }
+  .auth-brand { font-size: 1.1rem; }
+}
+@media (max-width: 360px) {
+  .auth-main { padding-left: 12px; padding-right: 12px; }
+  .auth .auth-card { padding: 18px 14px; }
+}
+@media (max-height: 520px) {
+  .auth-main { padding: 8px 16px 6px; grid-template-rows: 1fr auto; }
+  .auth-brand { position: absolute; top: 10px; left: 14px; }
+  .auth-brand span { display: none; }
+  .auth-content { padding: 0; max-width: 460px; }
+  .auth .auth-card { padding: 12px 18px; }
+  .auth .auth-card h1 { font-size: 1.15rem; margin-bottom: 0; }
+  .auth .auth-card .auth-sub { display: none; }
+  .auth .auth-card .notice { margin: 6px 0; padding: 6px 10px; font-size: .85rem; }
+  .auth .auth-card .stack { gap: 6px; margin-top: 6px; }
+  /* Labels beside the boxes rather than above them. */
+  .auth .auth-card .stack label { display: grid; grid-template-columns: 92px minmax(0, 1fr); align-items: center; column-gap: 10px; text-align: left; }
+  .auth .auth-card .stack label > input, .auth .auth-card .stack label > .pw-wrap { margin-top: 0; }
+  .auth .auth-card input { height: 36px; margin-top: 0; }
+  .auth .auth-card .pw-eye { height: 36px; width: 36px; }
+  .auth .auth-submit { height: 38px; margin-top: 2px; }
+  .auth .auth-card > .small { margin: 6px 0 0; }
+  .auth-footer { font-size: .72rem; gap: 2px 14px; }
 }
 .logo-img { display: block; object-fit: cover; background: none; }
 
