@@ -2710,6 +2710,23 @@ test('tenancy numbers: T0001 upwards per company, in the order added, shown left
   assert.doesNotMatch((await c.get(`/app/properties/${prop}/add-tenant`)).text, /name="tenancy_no"/);
 });
 
+test('properties: a Rent from tenant box, charged on the rent run when the tenant pays the rent', async () => {
+  const c = await registerAndLogin('tenant-rent@example.com', 'Tenant Rent Lets');
+  const a = db.prepare("SELECT id FROM users WHERE username = 'tenant-rent'").get().id;
+  assert.match((await c.get('/app/properties/new')).text, /Rent from council \(£ per month\)[\s\S]*?Rent from tenant \(£ per month\)[\s\S]*?Only if the person staying pays rent/);
+  const prop = idFrom((await c.post('/app/properties', { address_line1: '4 Self Pay Lane', status: 'let', rent_pence: '900', tenant_rent_pence: '450' })).location);
+  assert.equal(db.prepare('SELECT tenant_rent_pence FROM properties WHERE id = ?').get(prop).tenant_rent_pence, 45000);
+  assert.match((await c.get(`/app/properties/${prop}`)).text, /Rent from tenant[\s\S]*?£450\.00/);
+  for (const [name, paidBy] of [['Pays Direct', 'Tenant'], ['Council Paid', 'Council']]) {
+    await c.get('/app/tenants/new');
+    await c.post('/app/tenants/add-tenant', { property_id: String(prop), tenant_mode: 'new', name, status: 'active', paid_by: paidBy, booking_date: '2026-08-01', start_date: '2026-08-01' });
+  }
+  require('../src/ledger').raiseMonthlyRent(db, a, '2026-08');
+  const charged = db.prepare(`SELECT t.name, tx.amount_pence FROM transactions tx JOIN tenancies ty ON ty.id = tx.tenancy_id JOIN tenants t ON t.id = ty.tenant_id
+    WHERE tx.account_id = ? AND tx.txn_type = 'rent_charge' ORDER BY t.name`).all(a).map((x) => [x.name, x.amount_pence]);
+  assert.deepEqual(charged, [['Council Paid', 90000], ['Pays Direct', 45000]]);
+});
+
 test('tenants list is in tenancy number order, not name order', async () => {
   const c = await registerAndLogin('tenancy-order@example.com', 'Tenancy Order Lets');
   const prop = idFrom((await c.post('/app/properties', { address_line1: '3 Order Row', status: 'let' })).location);

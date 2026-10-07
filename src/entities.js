@@ -55,6 +55,7 @@ const ENTITIES = {
       { name: 'bathrooms', label: 'Bathrooms', type: 'integer' },
       { name: 'parking', label: 'Parking', type: 'select', options: ['None', 'Street', 'Permit', 'Driveway', 'Allocated space', 'Garage'] },
       { name: 'rent_pence', label: 'Rent from council (£ per month)', type: 'money', help: 'Charged on the Rent run.' },
+      { name: 'tenant_rent_pence', label: 'Rent from tenant (£ per month)', type: 'money', help: 'Only if the person staying pays rent.' },
       { name: 'price_per_night_pence', label: 'Price per night (£)', type: 'money', help: 'For short stays.' },
       { name: 'landlord_rent_pence', label: 'Rent to landlord (£ per month)', type: 'money', help: 'Paid monthly, even if rent hasn’t come in.' },
       { name: 'management_fee_pct', label: 'Management fee %', type: 'number', help: 'Taken from the rent.' },
@@ -66,7 +67,7 @@ const ENTITIES = {
       { name: 'notes', label: 'Notes', type: 'textarea' },
     ],
     // The property page's info box keeps Council near the top (the form has it beside Status).
-    detailsOrder: ['council_id', 'code', 'address_line1', 'town', 'postcode', 'landlord_id', 'property_type', 'bedrooms', 'bathrooms', 'parking', 'rent_pence', 'price_per_night_pence', 'landlord_rent_pence', 'management_fee_pct', 'status', 'lease_start_date', 'acquired_date', 'handed_back_date', 'notes'],
+    detailsOrder: ['council_id', 'code', 'address_line1', 'town', 'postcode', 'landlord_id', 'property_type', 'bedrooms', 'bathrooms', 'parking', 'rent_pence', 'tenant_rent_pence', 'price_per_night_pence', 'landlord_rent_pence', 'management_fee_pct', 'status', 'lease_start_date', 'acquired_date', 'handed_back_date', 'notes'],
     columns: ['code', 'address_line1', 'council_id', 'landlord_id', 'cur_tenant', 'rent_pence', 'landlord_rent_pence', 'status'],
     computed: { cur_tenant: { label: 'Tenant' } },
     children: [
@@ -133,7 +134,7 @@ const ENTITIES = {
       { name: 'end_date', label: 'End date', type: 'date', help: 'Once this date comes, the tenancy is marked Ended.' },
       { name: 'status', label: 'Status', type: 'select', options: ['active', 'pending', 'ended'], required: true, default: 'active' },
       { name: 'paid_by', label: 'Rent paid by', type: 'select', options: ['Council', 'Tenant'], required: true, default: 'Council', help: 'Who pays the rent. Only council-paid tenancies count in Council Reconciliation.' },
-      { name: 'rent_pence', label: 'Rent amount (£ per month)', type: 'money', help: 'Leave blank to use the property’s Rent from council.' },
+      { name: 'rent_pence', label: 'Rent amount (£ per month)', type: 'money', help: 'Leave blank to use the property’s Rent from council (or Rent from tenant if the tenant pays).' },
     ],
     columns: ['tenancy_no', 'property_id', 'tenant_id', 'booking_date', 'term_booked', 'start_date', 'end_date', 'status', 'paid_by', 'rent_pence'],
     children: [{ entity: 'transactions', fk: 'tenancy_id' }],

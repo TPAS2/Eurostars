@@ -215,7 +215,7 @@
         <dl class="mini">
           <dt>Status</dt><dd class="status-edit"><span class="badge s-<%= t.status %>"><%= t.status %></span> <a class="btn small" href="/app/tenancies/<%= t.id %>/edit">Edit</a></dd>
           <dt>Rent paid by</dt><dd><%= t.paid_by || 'Council' %></dd>
-          <dt>Rent</dt><dd><%= t.rent_pence > 0 ? `${fmt.money(t.rent_pence)} a month` : 'The property’s rent from council' %></dd>
+          <dt>Rent</dt><dd><%= t.rent_pence > 0 ? `${fmt.money(t.rent_pence)} a month` : (t.paid_by === 'Tenant' ? 'The property’s rent from tenant' : 'The property’s rent from council') %></dd>
           <dt>Reserved</dt><dd><%= fmt.ukDate(t.booking_date) %></dd>
           <% if (t.term_booked) { %><dt>Term as booked</dt><dd><%= t.term_booked %></dd><% } %>
           <dt>Dates</dt><dd><%= fmt.ukDate(t.start_date) %> – <%= t.end_date ? fmt.ukDate(t.end_date) : 'ongoing' %></dd>

@@ -83,9 +83,13 @@ function creditLandlordRent(db, accountId, month) {
 }
 
 // Monthly-equivalent rent for a tenancy: its own rent if it has one, otherwise the property's
-// Rent from council (property_rent_pence, when the caller selects it).
+// Rent from tenant when the tenant pays it (property_tenant_rent_pence), else its Rent from council
+// (property_rent_pence), when the caller selects them.
 function monthlyRent(tenancy) {
-  if (!(tenancy.rent_pence > 0)) return tenancy.property_rent_pence || 0;
+  if (!(tenancy.rent_pence > 0)) {
+    if (tenancy.paid_by === 'Tenant' && tenancy.property_tenant_rent_pence > 0) return tenancy.property_tenant_rent_pence;
+    return tenancy.property_rent_pence || 0;
+  }
   return tenancy.rent_frequency === 'weekly' ? Math.round((tenancy.rent_pence * 52) / 12) : tenancy.rent_pence;
 }
 
@@ -97,8 +101,9 @@ function raiseMonthlyRent(db, accountId, month) {
   const monthStart = `${month}-01`;
   const monthEnd = `${month}-${String(daysInMonth).padStart(2, '0')}`;
   const tenancies = db.prepare(
-    `SELECT ty.*, p.landlord_id, p.rent_pence AS property_rent_pence FROM tenancies ty JOIN properties p ON p.id = ty.property_id
-      WHERE ty.account_id = ? AND ty.status = 'active' AND (ty.rent_pence > 0 OR p.rent_pence > 0)
+    `SELECT ty.*, p.landlord_id, p.rent_pence AS property_rent_pence, p.tenant_rent_pence AS property_tenant_rent_pence
+       FROM tenancies ty JOIN properties p ON p.id = ty.property_id
+      WHERE ty.account_id = ? AND ty.status = 'active' AND (ty.rent_pence > 0 OR p.rent_pence > 0 OR (ty.paid_by = 'Tenant' AND p.tenant_rent_pence > 0))
         AND ty.start_date <= ? AND (ty.end_date IS NULL OR ty.end_date >= ?)`
   ).all(accountId, monthEnd, monthStart);
   const alreadyCharged = db.prepare(
