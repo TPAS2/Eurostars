@@ -439,6 +439,8 @@ test('landlord statements: statement of account PDF, numbered per company, previ
   let r = await c.get('/app/monthly?month=2026-08');
   assert.match(r.text, /<th>Statement no\.<\/th>\s*<th>Landlord<\/th>/);
   assert.match(r.text, new RegExp(`statement\\.pdf\\?view=1"[^>]*title="Preview statement[\\s\\S]*?/app/monthly/${s.id}/statement\\.pdf" download[\\s\\S]*?Regenerate`));
+  assert.match(r.text, /<th>Generated<\/th><th>Emailed<\/th>/, 'Generated date and time, no Status');
+  assert.doesNotMatch(r.text, />standard<|AI summary<\/span>/);
   assert.match(r.text, /class="month-bar"[\s\S]*?This month[\s\S]*?name="no"/);
   // Searching a number opens that statement; an unknown one says so.
   r = await c.get('/app/monthly?no=1');

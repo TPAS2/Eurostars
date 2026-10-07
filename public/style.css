@@ -1098,6 +1098,7 @@ input, select, textarea { max-width: 100%; }
 .month-bar .statement-search { display: flex; gap: 6px; margin-left: 12px; }
 .month-bar .statement-search input { width: 150px; }
 table.equal th.stmt-actions { width: 290px; }
+td.nowrap-lines span { display: block; white-space: nowrap; }
 
 /* A maintenance job's sheet: two signature boxes, signed on screen. */
 .sign-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-top: 10px; }

@@ -32,7 +32,7 @@
   </div>
   <% if (!rows.length) { %><p class="muted">Add landlords to start producing statements.</p><% } else { %>
   <div class="table-wrap"><table class="equal centered">
-    <thead><tr><th>Statement no.</th><th>Landlord</th><th class="num">Rent</th><th class="num">Fees</th><th class="num">Costs</th><th class="num">Net</th><th class="num">Held</th><th>Status</th><th>Emailed</th><th class="stmt-actions"></th></tr></thead>
+    <thead><tr><th>Statement no.</th><th>Landlord</th><th class="num">Rent</th><th class="num">Fees</th><th class="num">Costs</th><th class="num">Net</th><th class="num">Held</th><th>Generated</th><th>Emailed</th><th class="stmt-actions"></th></tr></thead>
     <tbody>
     <% rows.forEach(r => { %>
       <tr>
@@ -44,7 +44,7 @@
           <td class="num"><%= r.expenses_pence ? '−' + fmt.money(r.expenses_pence) : '—' %></td>
           <td class="num"><strong><%= fmt.money(r.net_pence) %></strong></td>
           <td class="num"><%= fmt.money(r.closing_pence) %></td>
-          <td><span class="badge <%= r.summary_source === 'ai' ? 's-admin' : '' %>"><%= r.summary_source === 'ai' ? 'AI summary' : 'standard' %></span> <span class="muted small"><%= fmt.ukDateTime(r.generated_at) %></span></td>
+          <td class="nowrap-lines"><% const [gd, gt] = fmt.ukDateTime(r.generated_at).split(' '); %><span><%= gd %></span> <span class="muted small"><%= gt %></span></td>
         <% } else { %>
           <td colspan="6" class="muted">Not generated yet</td>
         <% } %>
