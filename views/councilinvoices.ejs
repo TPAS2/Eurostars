@@ -1,0 +1,30 @@
+<%- include('partials/header') %>
+<header class="page-head">
+  <div>
+    <h1>Council Invoices</h1>
+    <p class="muted">An invoice for each council every month, made from its tenancies. Each council has its own invoice layout; they’re being added one council at a time.</p>
+  </div>
+</header>
+
+<%- include('partials/month-nav', { base: '/app/council-invoices' }) %>
+
+<section class="card">
+  <div class="card-head"><h2><%= monthLabel %></h2></div>
+  <% if (!rows.length) { %><p class="muted">Add councils to start making their invoices.</p><% } else { %>
+  <div class="table-wrap"><table class="centered">
+    <thead><tr><th>Council</th><th>Properties</th><th>Tenancies</th><th class="num">To invoice</th><th>Invoice</th></tr></thead>
+    <tbody>
+    <% rows.forEach(c => { %>
+      <tr>
+        <td><a href="/app/councils/<%= c.id %>"><strong><%= c.name %></strong></a></td>
+        <td><%= c.properties %></td>
+        <td><%= c.tenancies %></td>
+        <td class="num"><%= fmt.money(c.owed) %></td>
+        <td><span class="muted small">Layout not set up yet</span></td>
+      </tr>
+    <% }) %>
+    </tbody>
+  </table></div>
+  <% } %>
+</section>
+<%- include('partials/footer') %>

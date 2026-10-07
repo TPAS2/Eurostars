@@ -473,6 +473,17 @@ module.exports = function appRoutes(db) {
     });
   });
 
+  // ---------- council invoices: one invoice per council per month, each council in its own layout ----------
+  router.get('/council-invoices', (req, res) => {
+    const a = req.user.id;
+    const month = statements.isMonth(req.query.month) ? String(req.query.month) : fmt.today().slice(0, 7);
+    const rec = reconcile.reconciliation(db, a, month);
+    res.render('councilinvoices', {
+      title: 'Council Invoices', section: 'councilinvoices', month, monthLabel: statements.monthLabel(month),
+      prev: shiftMonth(month, -1), next: shiftMonth(month, 1), thisMonth: fmt.today().slice(0, 7), rows: rec.rows, fmt,
+    });
+  });
+
   // The month's reconciliation as an Excel workbook, and as a page to print.
   router.get('/council-reconciliation.xlsx', async (req, res, next) => {
     try {

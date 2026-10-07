@@ -7,6 +7,7 @@
 const TABS = [
   { key: 'councils', label: 'Councils', paths: ['/app/councils'] },
   { key: 'councilrec', label: 'Council Reconciliation', paths: ['/app/council-reconciliation'] },
+  { key: 'councilinvoices', label: 'Council Invoices', paths: ['/app/council-invoices'] },
   { key: 'landlords', label: 'Landlords', paths: ['/app/landlords'] },
   { key: 'properties', label: 'Properties', paths: ['/app/properties'] },
   // Tenancies are part of the Tenants tab.

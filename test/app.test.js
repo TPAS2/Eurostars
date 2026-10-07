@@ -1561,8 +1561,8 @@ test('the admin chooses which tabs each person sees; hidden tabs are blocked', a
   assert.match(r.text, new RegExp(`action="/admin/users/${companyId}/tabs/${ada}"`));
   // Ada only gets Properties, Tenants and Repairs.
   r = await admin.post(`/admin/users/${companyId}/tabs/${ada}`, { tabs: ['properties', 'tenants', 'maintenance'] });
-  assert.match(decodeURIComponent(r.location), /Ada Assistant now sees 3 of 12 tabs/);
-  assert.match((await admin.get(`/admin/users/${companyId}`)).text, /3 of 12 tabs/);
+  assert.match(decodeURIComponent(r.location), /Ada Assistant now sees 3 of 13 tabs/);
+  assert.match((await admin.get(`/admin/users/${companyId}`)).text, /3 of 13 tabs/);
 
   const c = new Client();
   await c.login('tabs-co', 'adas-pass-123', 'ada');
@@ -1582,7 +1582,7 @@ test('the admin chooses which tabs each person sees; hidden tabs are blocked', a
   // The main login still sees everything; ticking all tabs gives Ada everything back.
   assert.equal((await boss.get('/app/landlords')).status, 200);
   await admin.get(`/admin/users/${companyId}`);
-  await admin.post(`/admin/users/${companyId}/tabs/${ada}`, { tabs: ['councils', 'councilrec', 'properties', 'inspections', 'landlords', 'tenants', 'maintenance', 'contractors', 'invoices', 'landlordinvoices', 'rentrun', 'monthly'] });
+  await admin.post(`/admin/users/${companyId}/tabs/${ada}`, { tabs: ['councils', 'councilrec', 'councilinvoices', 'properties', 'inspections', 'landlords', 'tenants', 'maintenance', 'contractors', 'invoices', 'landlordinvoices', 'rentrun', 'monthly'] });
   assert.equal(db.prepare('SELECT hidden_tabs FROM users WHERE id = ?').get(ada).hidden_tabs, null);
   assert.equal((await c.get('/app/landlords')).status, 200);
 
@@ -1682,11 +1682,11 @@ test('admin Tab access page: every person against every tab, saved in one go', a
   assert.match(r.text, /Grid Lets[\s\S]*?Test User[\s\S]*?main login[\s\S]*?Bea Clerk/);
   assert.match(r.text, new RegExp(`name="t_${bea}" value="councilrec" checked`));
   // Bea: only Rent run and Monthly statements. The main login (companyId) keeps everything.
-  const all = ['councils', 'councilrec', 'properties', 'inspections', 'landlords', 'tenants', 'maintenance', 'contractors', 'invoices', 'landlordinvoices', 'rentrun', 'monthly'];
+  const all = ['councils', 'councilrec', 'councilinvoices', 'properties', 'inspections', 'landlords', 'tenants', 'maintenance', 'contractors', 'invoices', 'landlordinvoices', 'rentrun', 'monthly'];
   r = await admin.post('/admin/access', { company: String(companyId), people: [String(companyId), String(bea)], [`t_${companyId}`]: all, [`t_${bea}`]: ['rentrun', 'monthly'] });
   assert.match(decodeURIComponent(r.location), /Saved tab access for 2 people/);
   assert.equal(db.prepare('SELECT hidden_tabs FROM users WHERE id = ?').get(companyId).hidden_tabs, null);
-  assert.deepEqual(JSON.parse(db.prepare('SELECT hidden_tabs FROM users WHERE id = ?').get(bea).hidden_tabs).length, 10);
+  assert.deepEqual(JSON.parse(db.prepare('SELECT hidden_tabs FROM users WHERE id = ?').get(bea).hidden_tabs).length, 11);
 
   const c = new Client();
   await c.login('grid-co', 'beas-pass-123', 'bea');
@@ -2777,6 +2777,19 @@ test('properties: a Rent from tenant box, charged on the rent run when the tenan
   const charged = db.prepare(`SELECT t.name, tx.amount_pence FROM transactions tx JOIN tenancies ty ON ty.id = tx.tenancy_id JOIN tenants t ON t.id = ty.tenant_id
     WHERE tx.account_id = ? AND tx.txn_type = 'rent_charge' ORDER BY t.name`).all(a).map((x) => [x.name, x.amount_pence]);
   assert.deepEqual(charged, [['Council Paid', 90000], ['Pays Direct', 45000]]);
+});
+
+test('council invoices tab: under Council Reconciliation, lists each council with the month to invoice', async () => {
+  const c = await registerAndLogin('council-inv@example.com', 'Council Inv Lets');
+  const council = idFrom((await c.post('/app/councils', { name: 'Made-up Borough Council' })).location);
+  const prop = idFrom((await c.post('/app/properties', { address_line1: '9 Invoice Way', status: 'let', council_id: String(council), rent_pence: '700' })).location);
+  await c.post(`/app/properties/${prop}/add-tenant`, { tenant_mode: 'new', name: 'Ivy Placed', booking_date: '2026-08-01', start_date: '2026-08-01', status: 'active' });
+  const r = await c.get('/app/council-invoices?month=2026-09');
+  assert.equal(r.status, 200);
+  assert.match(r.text, /Council Reconciliation<\/span><\/a>\s*<a[^>]*href="\/app\/council-invoices"/, 'the tab sits under Council Reconciliation');
+  assert.match(r.text, /Made-up Borough Council[\s\S]*?£700\.00[\s\S]*?Layout not set up yet/);
+  // It can be hidden like any other tab.
+  assert.ok(require('../src/tabs').TABS.some((t) => t.key === 'councilinvoices'));
 });
 
 test('tenants list is in tenancy number order, not name order', async () => {
