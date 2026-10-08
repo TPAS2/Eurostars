@@ -59,7 +59,8 @@
         <td class="small"><% if (r.emailed_at) { %><span class="badge s-active">sent</span> <span class="muted"><%= fmt.ukDateTime(r.emailed_at) %></span><% } else if (!r.email) { %><span class="muted">No email address</span><% } else { %><span class="muted">Not yet</span><% } %></td>
         <td class="num row-actions">
           <% if (r.id) { %><a class="btn small icon-btn" href="/app/monthly/<%= r.id %>/statement.pdf?view=1" target="_blank" rel="noopener" title="Preview statement (PDF)" aria-label="Preview statement (PDF)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></a> <a class="btn small icon-btn" href="/app/monthly/<%= r.id %>/statement.pdf" download title="Download statement (PDF)" aria-label="Download statement (PDF)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11"/><path d="M7 10l5 5 5-5"/><path d="M5 20h14"/></svg></a><% } %>
-          <% if (emailEnabled && r.email && r.statement_type !== 'Cheque') { %>
+          <% if (r.id && r.statement_type !== 'Cheque') { %>
+            <% if (emailEnabled && r.email) { %>
           <form method="post" action="/app/monthly/email" data-busy="Sending…" data-confirm="Email the <%= monthLabel %> statement to <%= r.name %> (<%= r.email %>)?">
             <%- include('../partials/csrf') %>
             <input type="hidden" name="month" value="<%= month %>">
@@ -67,6 +68,9 @@
             <input type="hidden" name="back" value="monthly">
             <button class="btn small icon-btn" type="submit" title="<%= r.emailed_at ? 'Email again' : 'Email statement' %>" aria-label="<%= r.emailed_at ? 'Email again' : 'Email statement' %>"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg></button>
           </form>
+            <% } else { const why = !emailEnabled ? 'Email isn’t set up yet' : 'No email address for this landlord'; %>
+          <span class="btn small icon-btn" role="button" aria-disabled="true" title="<%= why %>" aria-label="Email statement (<%= why %>)"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg></span>
+            <% } %>
           <% } %>
           <form method="post" action="/app/monthly/generate" data-busy="Generating statement…">
             <%- include('../partials/csrf') %>

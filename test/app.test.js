@@ -508,6 +508,8 @@ test('landlord statements: only landlords with a current tenancy (or a fixed ren
   assert.match(r.text, /Delete all for August 2026/);
   assert.match(r.text, /class="btn small icon-btn" type="submit" title="Regenerate"/, 'Regenerate is an icon button');
   assert.match(r.text, /class="btn small danger icon-btn" type="submit" title="Delete"/, 'Delete is an icon button');
+  // There's always an email icon: greyed out (with the reason) when it can't be used.
+  assert.match(r.text, /<span class="btn small icon-btn" role="button" aria-disabled="true" title="No email address for this landlord"|title="Email statement" aria-label="Email statement"/);
   const mary = db.prepare("SELECT id, statement_no FROM monthly_statements WHERE landlord_id = ? AND month = '2026-08'").get(landlordId);
   assert.match(r.text, new RegExp(`action="/app/monthly/${mary.id}/delete"`));
   r = await c.post(`/app/monthly/${mary.id}/delete`, {});
