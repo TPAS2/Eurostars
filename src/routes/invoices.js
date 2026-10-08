@@ -234,6 +234,7 @@ module.exports = function invoiceRoutes(db, config) {
     const deduction = db.prepare(`${INVOICE_LIST_SQL} WHERE i.id = ? AND i.account_id = ?`).get(inv.id, a);
     res.render('invoices/show', {
       title: `Invoice ${inv.invoice_number || '#' + inv.id}`, section: 'invoices', inv, property, landlord, job, deduction, statementLink,
+      landlordInvoices: db.prepare('SELECT id, invoice_number, amount_pence FROM landlord_invoices WHERE account_id = ? AND contractor_invoice_id = ? ORDER BY id').all(a, inv.id),
       addedBy: inv.added_by ? db.prepare('SELECT name FROM users WHERE id = ? AND (id = ? OR company_id = ?)').get(inv.added_by, a, a) : null,
       methods: PAYMENT_METHODS, today: fmt.today(), fmt, error: req.query.error || '', flash: req.query.flash || '',
     });

@@ -26,6 +26,14 @@
 <% if (flash) { %><div class="notice ok no-print"><%= flash %></div><% } %>
 <% if (error) { %><div class="notice err no-print"><%= error %></div><% } %>
 
+<% if (contractorInvoice) { const ci = contractorInvoice; %>
+<section class="card no-print linked-invoice">
+  <strong>Contractor invoice:</strong> <a href="/app/invoices/<%= ci.id %>"><%= ci.supplier %><%= ci.invoice_number ? ` · ${ci.invoice_number}` : '' %></a>
+  · <%= fmt.money(ci.amount_pence) %><%= ci.invoice_date ? ` · ${fmt.ukDate(ci.invoice_date)}` : '' %>
+  <span class="badge plain <%= ci.status === 'paid' ? 's-active' : 'warn' %>"><%= ci.status === 'paid' ? 'Paid' : 'Unpaid' %></span>
+</section>
+<% } %>
+
 <% if (schedule) { %>
 <section class="card no-print" id="schedule">
   <h2>Paid over <%= schedule.length %> months</h2>

@@ -51,6 +51,15 @@
       <% if (errors.invoice_date) { %><div class="field-err"><%= errors.invoice_date %></div><% } %>
     </div>
     <div class="field wide">
+      <label for="f-contractor-invoice">Contractor invoice</label>
+      <select id="f-contractor-invoice" name="contractor_invoice_id">
+        <option value="">None</option>
+        <% contractorInvoices.forEach(ci => { %><option value="<%= ci.id %>" <%= String(values.contractor_invoice_id) === String(ci.id) ? 'selected' : '' %>><%= ci.supplier %><%= ci.invoice_number ? ` · ${ci.invoice_number}` : '' %> · <%= fmt.money(ci.amount_pence) %><%= ci.invoice_date ? ` · ${fmt.ukDate(ci.invoice_date)}` : '' %><%= ci.address_line1 ? ` · ${ci.address_line1}` : '' %></option><% }) %>
+      </select>
+      <div class="help">Optional. The contractor's invoice this bills the landlord for.</div>
+      <% if (errors.contractor_invoice_id) { %><div class="field-err"><%= errors.contractor_invoice_id %></div><% } %>
+    </div>
+    <div class="field wide">
       <label for="f-desc">Reason for invoice <span class="req">*</span></label>
       <input id="f-desc" name="description" value="<%= values.description || '' %>" placeholder="e.g. Tenant find fee, inventory check, annual inspection" required>
       <% if (errors.description) { %><div class="field-err"><%= errors.description %></div><% } %>

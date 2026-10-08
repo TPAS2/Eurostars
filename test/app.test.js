@@ -3030,6 +3030,37 @@ test('statement PDF: long names wrap and three properties with fees and costs fi
   assert.match(css, /table\.fit-phone tr \{ display: grid;/);
 });
 
+test('landlord invoices: link a contractor invoice (both pages show the link)', async () => {
+  const c = await registerAndLogin('li-link@example.com', 'LI Link Lets');
+  const ll = idFrom((await c.post('/app/landlords', { ...LANDLORD, name: 'Lina Link' })).location);
+  const prop = idFrom((await c.post('/app/properties', { address_line1: '5 Link Lane', landlord_id: String(ll), status: 'let' })).location);
+  await c.get('/app/invoices/new');
+  const ci = idFrom((await c.post('/app/invoices', { supplier: 'Made-up Glazing', amount: '200', landlord_amount: '240', charge_landlord: 'yes', invoice_date: '2026-09-04', property_id: String(prop), maintenance_job_id: 'none', work_required: 'Replace cracked window' }, { multipart: true })).location);
+  // The contractor invoice offers to bill the landlord; that form comes filled in and linked.
+  let r = await c.get(`/app/invoices/${ci}`);
+  assert.match(r.text, new RegExp(`href="/app/landlord-invoices/new\\?contractor_invoice_id=${ci}">\\+ Bill the landlord`));
+  r = await c.get(`/app/landlord-invoices/new?contractor_invoice_id=${ci}`);
+  assert.match(r.text, new RegExp(`<option value="${ci}" selected>Made-up Glazing · £200\\.00 · 04/09/2026 · 5 Link Lane`));
+  assert.match(r.text, /name="amount"[^>]*value="240\.00"/);
+  assert.match(r.text, /Replace cracked window/);
+  const li = idFrom((await c.post('/app/landlord-invoices', { landlord_id: String(ll), property_id: String(prop), invoice_number: '', invoice_date: '2026-09-05', description: 'Window', amount: '240', contractor_invoice_id: String(ci) })).location);
+  assert.equal(db.prepare('SELECT contractor_invoice_id FROM landlord_invoices WHERE id = ?').get(li).contractor_invoice_id, ci);
+  assert.match((await c.get(`/app/landlord-invoices/${li}`)).text, new RegExp(`Contractor invoice:</strong> <a href="/app/invoices/${ci}">Made-up Glazing`));
+  assert.match((await c.get(`/app/invoices/${ci}`)).text, new RegExp(`Landlord invoice</dt><dd><a href="/app/landlord-invoices/${li}">LI-0001</a> \\(£240\\.00\\)`));
+  // It can be changed or removed on the edit page; another company's invoice is refused.
+  assert.match((await c.get(`/app/landlord-invoices/${li}/edit`)).text, new RegExp(`<option value="${ci}" selected>`));
+  await c.post(`/app/landlord-invoices/${li}`, { landlord_id: String(ll), property_id: String(prop), invoice_number: 'LI-0001', invoice_date: '2026-09-05', description: 'Window', amount: '240', contractor_invoice_id: '' });
+  assert.equal(db.prepare('SELECT contractor_invoice_id FROM landlord_invoices WHERE id = ?').get(li).contractor_invoice_id, null);
+  const other = await registerAndLogin('li-link-2@example.com', 'Other Link Lets');
+  const oll = idFrom((await other.post('/app/landlords', { ...LANDLORD, name: 'Other Owner' })).location);
+  const oprop = idFrom((await other.post('/app/properties', { address_line1: '6 Other Way', landlord_id: String(oll), status: 'let' })).location);
+  await other.get('/app/landlord-invoices/new');
+  r = await other.post('/app/landlord-invoices', { landlord_id: String(oll), property_id: String(oprop), invoice_number: '', invoice_date: '2026-09-05', description: 'Sneaky', amount: '1', contractor_invoice_id: String(ci) });
+  assert.equal(r.status, 422);
+  assert.match(r.text, /Choose a valid contractor invoice/);
+  assert.doesNotMatch((await other.get(`/app/landlord-invoices/new?contractor_invoice_id=${ci}`)).text, /Made-up Glazing/);
+});
+
 test('tenants list is in tenancy number order, not name order', async () => {
   const c = await registerAndLogin('tenancy-order@example.com', 'Tenancy Order Lets');
   const prop = idFrom((await c.post('/app/properties', { address_line1: '3 Order Row', status: 'let' })).location);

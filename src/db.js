@@ -590,6 +590,7 @@ function openDatabase(file) {
   // Landlord invoices paid over several months: how many, and the deductions after the first.
   addColumnIfMissing(db, 'landlord_invoices', 'months', 'INTEGER NOT NULL DEFAULT 1');
   addColumnIfMissing(db, 'landlord_invoices', 'instalment_txn_ids', 'TEXT');
+  addColumnIfMissing(db, 'landlord_invoices', 'contractor_invoice_id', 'INTEGER REFERENCES invoices(id) ON DELETE SET NULL');
   addColumnIfMissing(db, 'invoices', 'charge_landlord', 'INTEGER NOT NULL DEFAULT 1');
   // The landlord it's charged to (blank: the property's landlord) and what the work is.
   addColumnIfMissing(db, 'invoices', 'landlord_id', 'INTEGER REFERENCES landlords(id) ON DELETE SET NULL');

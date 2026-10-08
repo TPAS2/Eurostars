@@ -50,6 +50,12 @@ module.exports = function landlordInvoiceRoutes(db, mailer = { enabled: false })
   const options = (accountId) => ({
     landlords: db.prepare('SELECT id, name, code FROM landlords WHERE account_id = ? ORDER BY name COLLATE NOCASE').all(accountId),
     properties: db.prepare('SELECT id, address_line1, landlord_id FROM properties WHERE account_id = ? ORDER BY address_line1 COLLATE NOCASE').all(accountId),
+    // Contractor invoices one can be linked to, newest first.
+    contractorInvoices: db.prepare(
+      `SELECT i.id, i.supplier, i.invoice_number, i.invoice_date, i.amount_pence, i.property_id, p.address_line1
+         FROM invoices i LEFT JOIN properties p ON p.id = i.property_id
+        WHERE i.account_id = ? ORDER BY i.invoice_date DESC, i.id DESC LIMIT 500`
+    ).all(accountId),
   });
 
   function parse(body, accountId) {
@@ -60,6 +66,7 @@ module.exports = function landlordInvoiceRoutes(db, mailer = { enabled: false })
       due_date: clip(body.due_date, 10) || null,
       description: clip(body.description, 500),
       notes: clip(body.notes, 2000) || null,
+      contractor_invoice_id: Number(body.contractor_invoice_id) || null,
     };
     const errors = {};
     if (!v.landlord_id || !db.prepare('SELECT 1 FROM landlords WHERE id = ? AND account_id = ?').get(v.landlord_id, accountId)) errors.landlord_id = 'Choose the landlord to bill.';
@@ -69,6 +76,7 @@ module.exports = function landlordInvoiceRoutes(db, mailer = { enabled: false })
     if (!fmt.isIsoDate(v.invoice_date)) errors.invoice_date = 'Enter the invoice date.';
     if (v.due_date && !fmt.isIsoDate(v.due_date)) errors.due_date = 'Enter a valid due date.';
     if (!v.description) errors.description = 'Say what the invoice is for.';
+    if (v.contractor_invoice_id && !db.prepare('SELECT 1 FROM invoices WHERE id = ? AND account_id = ?').get(v.contractor_invoice_id, accountId)) errors.contractor_invoice_id = 'Choose a valid contractor invoice.';
     v.amount_pence = fmt.parseMoney(body.amount);
     if (Number.isNaN(v.amount_pence) || v.amount_pence <= 0) errors.amount = 'Enter the amount, like 120 or 120.00.';
     // Paid over how many months (the rent deduction is split across them).
@@ -132,6 +140,16 @@ module.exports = function landlordInvoiceRoutes(db, mailer = { enabled: false })
     if (ll) values.landlord_id = ll;
     const prop = Number(req.query.property_id) && db.prepare('SELECT id, landlord_id FROM properties WHERE id = ? AND account_id = ?').get(Number(req.query.property_id), req.user.id);
     if (prop) { values.property_id = prop.id; values.landlord_id = values.landlord_id || prop.landlord_id; }
+    // Started from a contractor invoice: linked to it, with its property, landlord, price to landlord and work.
+    const ci = Number(req.query.contractor_invoice_id) && db.prepare('SELECT * FROM invoices WHERE id = ? AND account_id = ?').get(Number(req.query.contractor_invoice_id), req.user.id);
+    if (ci) {
+      const p = ci.property_id ? db.prepare('SELECT landlord_id FROM properties WHERE id = ? AND account_id = ?').get(ci.property_id, req.user.id) : null;
+      Object.assign(values, {
+        contractor_invoice_id: ci.id, property_id: values.property_id || ci.property_id,
+        landlord_id: values.landlord_id || ci.landlord_id || (p && p.landlord_id),
+        amount: fmt.penceToInput(ci.landlord_price_pence ?? ci.amount_pence), notes: ci.work_required || null,
+      });
+    }
     renderForm(req, res, { inv: null, values, errors: {} });
   });
 
@@ -165,6 +183,7 @@ module.exports = function landlordInvoiceRoutes(db, mailer = { enabled: false })
       title: `Landlord invoice ${inv.invoice_number}`, section: 'landlordinvoices', inv, agency, statementLink, emailEnabled: mailer.enabled,
       doc: invoiceDoc(req.user.id, inv).data, longDate: require('../jobInvoice').longDate,
       schedule: schedule(inv),
+      contractorInvoice: inv.contractor_invoice_id ? db.prepare('SELECT id, supplier, invoice_number, invoice_date, amount_pence, status FROM invoices WHERE id = ? AND account_id = ?').get(inv.contractor_invoice_id, req.user.id) : null,
       today: fmt.today(), fmt, flash: clip(req.query.flash, 300), error: clip(req.query.error, 300),
     });
   });
