@@ -3103,6 +3103,15 @@ test('landlord statements list: one Fees & costs column, no Held column', async 
   assert.match(r.text, /£900\.00<\/td>\s*<td class="num">−£168\.00<\/td>\s*<td class="num"><strong>£732\.00/);
 });
 
+test('landlord statements tab opens on the current month', async () => {
+  const c = await registerAndLogin('stmt-default-month@example.com', 'Default Month Lets');
+  const now = new Date().toISOString().slice(0, 7);
+  const r = await c.get('/app/monthly');
+  assert.match(r.text, new RegExp(`name="month" value="${now}"`));
+  assert.match(r.text, /<span class="btn disabled" aria-disabled="true">This month<\/span>/, 'already on this month');
+  assert.match(decodeURIComponent((await c.get('/app/monthly?no=999')).location), new RegExp(`month=${now}&error=No statement number 999`));
+});
+
 test('tenants list is in tenancy number order, not name order', async () => {
   const c = await registerAndLogin('tenancy-order@example.com', 'Tenancy Order Lets');
   const prop = idFrom((await c.post('/app/properties', { address_line1: '3 Order Row', status: 'let' })).location);

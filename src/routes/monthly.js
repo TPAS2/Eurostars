@@ -22,9 +22,9 @@ module.exports = function monthlyRoutes(db, writer, mailer = { enabled: false })
     if (wanted) {
       const found = /^\d{1,9}$/.test(wanted) && db.prepare('SELECT id FROM monthly_statements WHERE account_id = ? AND statement_no = ?').get(a, Number(wanted));
       if (found) return res.redirect(`/app/monthly/${found.id}`);
-      return res.redirect(`/app/monthly?month=${st.isMonth(req.query.month) ? req.query.month : st.previousMonth()}&error=${encodeURIComponent(`No statement number ${wanted.slice(0, 20)} was found.`)}`);
+      return res.redirect(`/app/monthly?month=${st.isMonth(req.query.month) ? req.query.month : fmt.today().slice(0, 7)}&error=${encodeURIComponent(`No statement number ${wanted.slice(0, 20)} was found.`)}`);
     }
-    const month = st.isMonth(req.query.month) ? req.query.month : st.previousMonth();
+    const month = st.isMonth(req.query.month) ? req.query.month : fmt.today().slice(0, 7);
     const current = st.landlordsWithTenancies(db, a, month);
     const rows = db.prepare(
       `SELECT l.id AS landlord_id, l.name, l.email, l.statement_type, s.id, s.statement_no, s.rent_pence, s.fees_pence, s.expenses_pence, s.net_pence,
