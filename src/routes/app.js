@@ -846,10 +846,20 @@ module.exports = function appRoutes(db) {
     let rentTotals = null;
     if (def.key === 'properties') {
       const sum = (k) => fmt.money(rows.reduce((t, r) => t + (Number(r[k]) || 0), 0));
+      // Profit: rents in (council and tenant) less rent to landlords and this month's expenses on these properties.
+      const total = (k) => rows.reduce((t, r) => t + (Number(r[k]) || 0), 0);
+      const ids = rows.map((r) => r.id);
+      const month = fmt.today().slice(0, 7);
+      const expenses = ids.length ? db.prepare(
+        `SELECT COALESCE(SUM(amount_pence), 0) AS n FROM transactions
+          WHERE account_id = ? AND txn_type = 'expense' AND substr(txn_date, 1, 7) = ? AND property_id IN (${ids.map(() => '?').join(',')})`
+      ).get(a, month, ...ids).n : 0;
+      const profit = total('rent_pence') + total('tenant_rent_pence') - total('landlord_rent_pence') - expenses;
       rentTotals = [
         ['Rent from council (£ per month)', sum('rent_pence')],
         ['Rent from tenant (£ per month)', sum('tenant_rent_pence')],
         ['Rent to landlord (£ per month)', sum('landlord_rent_pence')],
+        ['Profit (£ per month)', fmt.money(profit), `After ${fmt.money(expenses)} expenses in ${statements.monthLabel(month)}`, profit < 0 ? 'bad' : 'good'],
       ];
     }
     if (def.key === 'councils') {

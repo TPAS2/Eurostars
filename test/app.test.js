@@ -2803,6 +2803,19 @@ test('sign-in page fits on small, sideways and short screens', () => {
   assert.match(css, /@media \(max-height: 520px\)[\s\S]*?grid-template-columns: 92px minmax\(0, 1fr\)/, 'labels beside the boxes on phones held sideways');
 });
 
+test('properties tab: a Profit box beside the rent totals (council + tenant rent - rent to landlord - this month\u2019s expenses)', async () => {
+  const c = await registerAndLogin('profit-box@example.com', 'Profit Box Lets');
+  const a = db.prepare("SELECT id FROM users WHERE username = 'profit-box'").get().id;
+  const p1 = idFrom((await c.post('/app/properties', { address_line1: '1 Gain Street', status: 'let', rent_pence: '1000', tenant_rent_pence: '100', landlord_rent_pence: '700' })).location);
+  await c.post('/app/properties', { address_line1: '2 Gain Street', status: 'let', rent_pence: '500', landlord_rent_pence: '400' });
+  const month = new Date().toISOString().slice(0, 7);
+  db.prepare("INSERT INTO transactions (account_id, txn_date, txn_type, property_id, amount_pence) VALUES (?, ?, 'expense', ?, 5000)").run(a, `${month}-01`, p1);
+  db.prepare("INSERT INTO transactions (account_id, txn_date, txn_type, property_id, amount_pence) VALUES (?, '2020-01-05', 'expense', ?, 9999)").run(a, p1);
+  const r = await c.get('/app/properties');
+  // 1500 + 100 - 1100 - 50 = £450
+  assert.match(r.text, /Rent to landlord \(£ per month\)<\/span><strong>£1,100\.00<\/strong>[\s\S]*?class="rt-good"><span>Profit \(£ per month\)<\/span><strong>£450\.00<\/strong><small>After £50\.00 expenses in /);
+});
+
 test('tenants list is in tenancy number order, not name order', async () => {
   const c = await registerAndLogin('tenancy-order@example.com', 'Tenancy Order Lets');
   const prop = idFrom((await c.post('/app/properties', { address_line1: '3 Order Row', status: 'let' })).location);

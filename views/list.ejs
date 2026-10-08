@@ -20,7 +20,7 @@
 <% } %>
 <% if (typeof rentTotals !== 'undefined' && rentTotals) { %>
 <div class="rent-totals" aria-label="Rent totals">
-  <% rentTotals.forEach(([label, value]) => { %><div><span><%= label %></span><strong><%= value %></strong></div><% }) %>
+  <% rentTotals.forEach(([label, value, note, tone]) => { %><div class="<%= tone ? 'rt-' + tone : '' %>"><span><%= label %></span><strong><%= value %></strong><% if (note) { %><small><%= note %></small><% } %></div><% }) %>
 </div>
 <% } %>
 <% if (typeof flash !== 'undefined' && flash) { %><div class="notice ok"><%= flash %></div><% } %>

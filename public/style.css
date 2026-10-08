@@ -280,12 +280,17 @@ img.thumb { width: 52px; height: 52px; border-radius: 6px; object-fit: contain; 
 .summary div { background: var(--surface-2); border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; }
 .summary span { font-size: .8rem; color: var(--muted); }
 /* One box split into three, under the properties list. */
-.rent-totals { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0 0 16px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); overflow: hidden; }
+.rent-totals { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 0 0 16px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); overflow: hidden; }
 .rent-totals div { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 12px 10px; text-align: center; }
 .rent-totals div + div { border-left: 1px solid var(--border); }
 .rent-totals span { font-size: .8rem; color: var(--muted); }
 .rent-totals strong { font-size: 1.25rem; }
-@media (max-width: 560px) { .rent-totals strong { font-size: 1rem; } .rent-totals span { font-size: .72rem; } .rent-totals div { padding: 10px 6px; } }
+.rent-totals small { font-size: .72rem; color: var(--muted); }
+.rent-totals .rt-good { background: var(--ok-soft, rgba(16, 150, 90, .1)); }
+.rent-totals .rt-good strong { color: var(--ok, #0a7a4a); }
+.rent-totals .rt-bad { background: var(--bad-soft); }
+.rent-totals .rt-bad strong { color: var(--bad); }
+@media (max-width: 560px) { .rent-totals { grid-template-columns: repeat(2, minmax(0, 1fr)); } .rent-totals div:nth-child(3) { border-left: 0; } .rent-totals div:nth-child(n+3) { border-top: 1px solid var(--border); } .rent-totals strong { font-size: 1rem; } .rent-totals span { font-size: .72rem; } .rent-totals div { padding: 10px 6px; } }
 
 /* ---------- admin chart ---------- */
 .bars { display: flex; align-items: flex-end; gap: 10px; height: 160px; padding-top: 10px; }
