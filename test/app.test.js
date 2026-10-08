@@ -2816,15 +2816,15 @@ test('properties tab: a Profit box beside the rent totals (council + tenant rent
   assert.match(r.text, /Rent to landlord \(£ per month\)<\/span><strong>£1,100\.00<\/strong>[\s\S]*?class="rt-good"><span>Profit \(£ per month\)<\/span><strong>£450\.00<\/strong><small>After £50\.00 expenses in /);
 });
 
-test('contractors: no Fax or Mobile box; Name, Trade, Code / Phone, Email / Address beside Notes', async () => {
+test('contractors: no Fax, Mobile or Address box; Name, Trade, Code / Phone, Email, Notes', async () => {
   const c = await registerAndLogin('no-fax@example.com', 'No Fax Lets');
   const form = (await c.get('/app/contractors/new')).text;
-  assert.doesNotMatch(form, /name="fax"|>Fax<|name="mobile"|>Mobile</, 'no Fax or Mobile');
-  // Name, Trade, Contractor code; then Phone, Email; then Address beside Notes.
-  const order = ['name', 'trade', 'code', 'phone', 'email', 'address', 'notes'].map((n) => form.indexOf(`name="${n}"`));
+  assert.doesNotMatch(form, /name="fax"|>Fax<|name="mobile"|>Mobile<|name="address"|>Address</, 'no Fax, Mobile or Address');
+  // Name, Trade, Contractor code; then Phone, Email, Notes.
+  const order = ['name', 'trade', 'code', 'phone', 'email', 'notes'].map((n) => form.indexOf(`name="${n}"`));
   assert.ok(order.every((x, i) => x > 0 && (i === 0 || x > order[i - 1])), `fields in order: ${order}`);
   assert.match(form, /class="form-grid form-contractors"/);
-  assert.match(form, /field\s+row-start"[^>]*>\s*<label[^>]*>Address/);
+  assert.doesNotMatch(form, /class="field wide[^"]*"[^>]*>\s*<label[^>]*>Notes/, 'Notes sits in the row, not across the page');
   const id = idFrom((await c.post('/app/contractors', { name: 'Made-up Plumbing', fax: '0100 000000' })).location);
   assert.equal(db.prepare('SELECT fax FROM contractors WHERE id = ?').get(id).fax, null, 'a fax sent anyway is ignored');
   assert.doesNotMatch((await c.get(`/app/contractors/${id}/edit`)).text, /name="fax"/);
