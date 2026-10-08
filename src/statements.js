@@ -50,7 +50,9 @@ function computeStatement(db, accountId, landlordId, month) {
     else if (r.txn_type === 'expense') bucket.expenses += r.amount_pence;
     else if (r.txn_type === 'landlord_payment') payments += r.amount_pence;
     lines.push({
-      date: r.txn_date, type: r.txn_type, property: r.address_line1 || '',
+      date: r.txn_date, type: r.txn_type, property: r.address_line1 || '', property_id: r.property_id || null,
+      // A management fee is worked out from rent; other fees are invoices taken off the rent.
+      management: r.txn_type === 'fee' && r.source_txn_id != null,
       description: r.description || fmt.humanize(r.txn_type), amount: r.amount_pence,
       direction: r.txn_type === 'rent_received' || r.txn_type === 'landlord_rent' ? 'in' : 'out', balance: r.balance,
     });

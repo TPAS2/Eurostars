@@ -20,13 +20,26 @@ function statementDoc(db, accountId, s) {
   const date = fmt.ukDate(String(s.generated_at || fmt.today()).slice(0, 10));
   const period = `${fmt.ukDate(detail.from)} - ${fmt.ukDate(detail.to)}`;
   const contact = [c.phone && `tel: ${c.phone}`, c.email && `email: ${c.email}`].filter(Boolean).join('  ');
+  // Expenditure item by item: the management fee (added up), then each invoice or cost under its own
+  // description. (Statements made before lines carried this fall back to the two totals.)
+  const lines = detail.lines || [];
+  const onProperty = (p) => (l) => (l.property_id !== undefined ? (l.property_id || null) === (p.id || null) : (l.property || '') === (p.id ? p.address_line1 : ''));
+  const isManagement = (l) => l.type === 'fee' && (l.management || /^Management fee/i.test(l.description || ''));
+  const expenditureOf = (p) => {
+    const mine = lines.filter((l) => (l.type === 'fee' || l.type === 'expense') && onProperty(p)(l));
+    if (mine.reduce((t, l) => t + l.amount, 0) !== p.fees + p.expenses) {
+      return [p.fees ? { title: 'Management fee', net: p.fees } : null, p.expenses ? { title: 'Repairs & other costs', net: p.expenses } : null].filter(Boolean);
+    }
+    const mgmt = mine.filter(isManagement).reduce((t, l) => t + l.amount, 0);
+    return [
+      mgmt ? { title: 'Management fee', net: mgmt } : null,
+      ...mine.filter((l) => !isManagement(l)).map((l) => ({ title: String(l.description || 'Other costs').replace(/\s*—\s*/g, ' - '), net: l.amount })),
+    ].filter(Boolean);
+  };
   const blocks = detail.properties.filter((p) => p.rent || p.fees || p.expenses).map((p) => ({
     re: p.address_line1,
     income: p.rent ? [{ title: p.address_line1, sub: period, net: p.rent }] : [],
-    expenditure: [
-      p.fees ? { title: 'Management fee', net: p.fees } : null,
-      p.expenses ? { title: 'Repairs & other costs', net: p.expenses } : null,
-    ].filter(Boolean),
+    expenditure: expenditureOf(p),
   }));
   const income = s.rent_pence;
   const spent = s.fees_pence + s.expenses_pence;

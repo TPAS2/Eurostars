@@ -453,7 +453,7 @@ test('landlord statements: statement of account PDF, numbered per company, previ
   assert.equal(doc.income, 90000);
   assert.equal(doc.spent, 10800 + 6000);
   assert.equal(doc.due, 90000 - 16800);
-  assert.deepEqual(doc.blocks[0].expenditure.map((e) => e.title), ['Management fee', 'Repairs & other costs']);
+  assert.deepEqual(doc.blocks[0].expenditure.map((e) => e.title), ['Management fee', 'Locksmith'], 'each cost under its own name');
   r = await c.get(`/app/monthly/${s.id}`);
   assert.match(r.text, /STATEMENT OF ACCOUNT AND PAYMENT ADVICE[\s\S]*?Re: 5 Oak Road[\s\S]*?INCOME[\s\S]*?900\.00[\s\S]*?EXPENDITURE[\s\S]*?NET AMOUNT DUE[\s\S]*?732\.00/);
   r = await c.get(`/app/monthly/${s.id}/statement.pdf`);
@@ -3165,6 +3165,23 @@ test('landlord statements: a box to see and change the next statement number', a
   await c.post('/app/monthly/statement-number', { month: '2026-08', next_no: '300' });
   await c.post('/app/monthly/generate', { month: '2026-09', landlord_id: String(landlordId) });
   assert.equal(db.prepare("SELECT statement_no FROM monthly_statements WHERE landlord_id = ? AND month = '2026-09'").get(landlordId).statement_no, 300);
+});
+
+test('statement expenditure: a deducted landlord invoice shows as itself, not as the management fee', async () => {
+  const c = await registerAndLogin('stmt-items@example.com', 'Stmt Items Lets');
+  const a = db.prepare("SELECT id FROM users WHERE username = 'stmt-items'").get().id;
+  const ll = idFrom((await c.post('/app/landlords', { ...LANDLORD, name: 'Ivy Items' })).location);
+  const prop = idFrom((await c.post('/app/properties', { address_line1: '3 Item Street', landlord_id: String(ll), status: 'let', landlord_rent_pence: '1000', management_fee_pct: '10' })).location);
+  await currentTenancy(c, ll, prop);
+  await c.get('/app/landlord-invoices/new');
+  await c.post('/app/landlord-invoices', { landlord_id: String(ll), property_id: String(prop), invoice_number: '', invoice_date: '2026-09-04', description: 'Boiler repair', amount: '250', then: 'deduct' });
+  await c.get('/app/monthly?month=2026-09');
+  await c.post('/app/monthly/generate', { month: '2026-09', landlord_id: String(ll) });
+  const s = db.prepare("SELECT s.*, l.name AS landlord_name FROM monthly_statements s JOIN landlords l ON l.id = s.landlord_id WHERE s.landlord_id = ? AND s.month = '2026-09'").get(ll);
+  const doc = require('../src/statementPdf').statementDoc(db, a, s);
+  assert.deepEqual(doc.blocks[0].expenditure.map((e) => [e.title, e.net]), [['Management fee', 10000], ['Invoice LI-0001 - Boiler repair', 25000]]);
+  assert.equal(doc.due, 100000 - 10000 - 25000);
+  assert.match((await c.get(`/app/monthly/${s.id}`)).text, /EXPENDITURE[\s\S]*?Management fee[\s\S]*?100\.00[\s\S]*?Invoice LI-0001 - Boiler repair[\s\S]*?250\.00/);
 });
 
 test('tenants list is in tenancy number order, not name order', async () => {
