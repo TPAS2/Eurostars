@@ -1929,7 +1929,7 @@ test('invoices have a month switcher', async () => {
   assert.match((await c.get('/app/invoices?status=overdue')).text, /July Plumbing/, 'overdue with no month shows every month');
 });
 
-test('invoices link to their property and show whether they were deducted, with the statement', async () => {
+test('contractor invoices link to their property; no Deducted column (old deductions show on the invoice page)', async () => {
   const c = await registerAndLogin('inv-deduct@example.com', 'Deduct Lets');
   let r = await c.post('/app/landlords', { ...LANDLORD, name: 'Dora Deduct' });
   const dora = idFrom(r.location);
@@ -1947,21 +1947,19 @@ test('invoices link to their property and show whether they were deducted, with 
   const oldCharge = Number(db.prepare("INSERT INTO transactions (account_id, txn_date, txn_type, landlord_id, property_id, description, amount_pence) SELECT account_id, '2026-08-10', 'expense', ?, ?, 'Invoice — Drain Co', 12000 FROM invoices WHERE id = ?").run(dora, prop, charged).lastInsertRowid);
   db.prepare('UPDATE invoices SET payment_txn_id = ? WHERE id = ?').run(oldCharge, charged);
 
+  // The contractor invoices list has no Deducted column, but still links each to its property.
   r = await c.get('/app/invoices?month=2026-08');
-  assert.match(r.text, /<th>Deducted<\/th>/);
-  assert.match(r.text, new RegExp(`Drain Co[\\s\\S]*?<a href="/app/properties/${prop}">4 Drain Lane</a>[\\s\\S]*?yes-no yes">Yes[\\s\\S]*?href="/app/monthly\\?month=2026-08"[^>]*>View statement`));
-  assert.match(r.text, /Paint Co[\s\S]*?yes-no no">No/);
-  // Once the month's statement is made, the link goes to it, and it shows the deduction.
+  assert.doesNotMatch(r.text, /<th>Deducted<\/th>/);
+  assert.doesNotMatch(r.text, /yes-no/);
+  assert.match(r.text, new RegExp(`Drain Co[\\s\\S]*?<a href="/app/properties/${prop}">4 Drain Lane</a>`));
+  assert.doesNotMatch((await c.get(`/app/properties/${prop}`)).text, /<th>Deducted<\/th>/);
+  // An old deduction still shows on the statement and on that invoice's own page (and nothing on the others).
   await c.get('/app/monthly?month=2026-08');
   await c.post('/app/monthly/generate', { month: '2026-08', landlord_id: String(dora) });
   const statementId = db.prepare('SELECT id FROM monthly_statements WHERE landlord_id = ?').get(dora).id;
-  r = await c.get('/app/invoices?month=2026-08');
-  assert.match(r.text, new RegExp(`href="/app/monthly/${statementId}"[^>]*>View statement`));
   assert.match((await c.get(`/app/monthly/${statementId}`)).text, /Drain Co[\s\S]*?£120\.00/);
-  // Also on the property's page and the invoice's own page.
-  assert.match((await c.get(`/app/properties/${prop}`)).text, /Drain Co[\s\S]*?yes-no yes">Yes/);
-  assert.match((await c.get(`/app/invoices/${charged}`)).text, /Deducted from landlord[\s\S]*?yes-no yes">Yes<\/span> Dora Deduct/);
-  assert.match((await c.get(`/app/invoices/${notCharged}`)).text, /Deducted from landlord[\s\S]*?yes-no no">No/);
+  assert.match((await c.get(`/app/invoices/${charged}`)).text, new RegExp(`Deducted from landlord[\\s\\S]*?yes-no yes">Yes</span> Dora Deduct[\\s\\S]*?href="/app/monthly/${statementId}"`));
+  assert.doesNotMatch((await c.get(`/app/invoices/${notCharged}`)).text, /Deducted from landlord/);
 });
 
 test('Transactions is not in the menu, but recording payments still works', async () => {
