@@ -172,7 +172,12 @@ module.exports = function landlordInvoiceRoutes(db, mailer = { enabled: false })
   router.get('/:id(\\d+)/edit', (req, res) => {
     const inv = load(req, res);
     if (!inv) return;
-    renderForm(req, res, { inv, values: { ...inv, amount: fmt.penceToInput(inv.amount_pence) }, errors: {} });
+    const first = inv.txn_id ? db.prepare('SELECT txn_date FROM transactions WHERE id = ? AND account_id = ?').get(inv.txn_id, req.user.id) : null;
+    renderForm(req, res, { inv, values: {
+      ...inv, amount: fmt.penceToInput(inv.amount_pence),
+      settle: inv.txn_id ? 'deduct' : inv.status === 'paid' ? 'paid' : 'unpaid',
+      settle_date: (first && first.txn_date) || inv.paid_date || fmt.today(),
+    }, errors: {} });
   });
 
   router.post('/:id(\\d+)', (req, res) => {
@@ -180,6 +185,10 @@ module.exports = function landlordInvoiceRoutes(db, mailer = { enabled: false })
     if (!inv) return;
     const a = req.user.id;
     const { v, errors } = parse(req.body, a);
+    // How it's settled (from the edit form): not yet, deducted from their rent, or paid by them.
+    const settle = ['unpaid', 'deduct', 'paid'].includes(req.body.settle) ? req.body.settle : null;
+    const settleDate = String(req.body.settle_date || '').trim();
+    if (settle && settle !== 'unpaid' && !fmt.isIsoDate(settleDate)) errors.settle_date = 'Enter the date.';
     if (Object.keys(errors).length) return renderForm(req, res, { inv, values: { ...req.body, invoice_number: inv.invoice_number }, errors, status: 422 });
     const wanted = clip(req.body.invoice_number, 30);
     if (wanted && wanted !== inv.invoice_number && db.prepare('SELECT 1 FROM landlord_invoices WHERE account_id = ? AND invoice_number = ? AND id != ?').get(a, wanted, inv.id)) {
@@ -190,8 +199,14 @@ module.exports = function landlordInvoiceRoutes(db, mailer = { enabled: false })
     transaction(db, () => {
       db.prepare(`UPDATE landlord_invoices SET ${cols.map((c) => `${c} = ?`).join(', ')} WHERE id = ? AND account_id = ?`).run(...cols.map((c) => v[c]), inv.id, a);
     });
-    // Already deducted: redo the deductions so they match the invoice (amount, months).
-    if (inv.txn_id) {
+    if (settle) {
+      // Start again from unsettled, then settle as chosen (deductions match the saved amount and months).
+      removeDeductions(a, inv);
+      db.prepare("UPDATE landlord_invoices SET status = 'unpaid', paid_date = NULL, paid_how = NULL, txn_id = NULL, instalment_txn_ids = NULL WHERE id = ? AND account_id = ?").run(inv.id, a);
+      if (settle === 'deduct') deduct(a, { ...inv, ...v }, settleDate);
+      if (settle === 'paid') db.prepare("UPDATE landlord_invoices SET status = 'paid', paid_date = ?, paid_how = 'Paid by landlord' WHERE id = ? AND account_id = ?").run(settleDate, inv.id, a);
+    } else if (inv.txn_id) {
+      // Already deducted: redo the deductions so they match the invoice (amount, months).
       removeDeductions(a, inv);
       deduct(a, { ...inv, ...v }, inv.paid_date);
     }

@@ -60,6 +60,16 @@
       <textarea id="f-notes" name="notes" rows="3"><%= values.notes || '' %></textarea>
       <% if (errors.notes) { %><div class="field-err"><%= errors.notes %></div><% } %>
     </div>
+    <% if (inv) { const ln = (landlords.find(l => String(l.id) === String(values.landlord_id)) || {}).name || 'the landlord'; %>
+    <fieldset class="field wide settle-edit">
+      <legend>Deduct from landlord’s rent</legend>
+      <label class="check"><input type="radio" name="settle" value="deduct" <%= values.settle === 'deduct' ? 'checked' : '' %>> <span><strong>Deduct from <%= ln %>’s rent</strong> <span class="muted small">— on their statement for the month of the date below<%= Number(values.months) > 1 ? ', split over the months chosen above' : '' %>.</span></span></label>
+      <label class="check"><input type="radio" name="settle" value="paid" <%= values.settle === 'paid' ? 'checked' : '' %>> <span><strong>Paid by the landlord</strong> <span class="muted small">— nothing is taken from their rent.</span></span></label>
+      <label class="check"><input type="radio" name="settle" value="unpaid" <%= values.settle === 'unpaid' ? 'checked' : '' %>> <span><strong>Not settled yet</strong></span></label>
+      <label class="settle-date">Date <input type="date" name="settle_date" value="<%= values.settle_date || '' %>"></label>
+      <% if (errors.settle_date) { %><div class="field-err"><%= errors.settle_date %></div><% } %>
+    </fieldset>
+    <% } %>
     <div class="form-actions wide">
       <button class="btn primary" type="submit" name="then" value="save"><%= inv ? 'Save' : 'Create invoice' %></button>
       <% if (!inv) { %><button class="btn primary deduct-btn" type="submit" name="then" value="deduct" title="Takes it off the landlord's rent for the month of the invoice date">Create &amp; deduct from rent</button><% } %>

@@ -2960,6 +2960,37 @@ test('landlord invoices: edit a deduction from the landlord\u2019s rent (date, a
   assert.deepEqual(fees(), [['2026-10-01', 9000]]);
 });
 
+test('landlord invoices: the Edit page has the deduct-from-rent choice', async () => {
+  const c = await registerAndLogin('li-edit-form@example.com', 'LI Edit Form Lets');
+  const a = db.prepare("SELECT id FROM users WHERE username = 'li-edit-form'").get().id;
+  const ll = idFrom((await c.post('/app/landlords', { ...LANDLORD, name: 'Fran Form' })).location);
+  const prop = idFrom((await c.post('/app/properties', { address_line1: '4 Form Street', landlord_id: String(ll), status: 'let' })).location);
+  await c.get('/app/landlord-invoices/new');
+  const base = { landlord_id: String(ll), property_id: String(prop), invoice_number: '', invoice_date: '2026-08-01', description: 'Smoke alarm', amount: '45' };
+  const inv = idFrom((await c.post('/app/landlord-invoices', base)).location);
+  let r = await c.get(`/app/landlord-invoices/${inv}/edit`);
+  assert.match(r.text, /Deduct from landlord’s rent[\s\S]*?name="settle" value="deduct"[^>]*>[\s\S]*?Deduct from Fran Form’s rent[\s\S]*?name="settle" value="paid"[\s\S]*?name="settle" value="unpaid" checked/);
+  const fees = () => db.prepare("SELECT txn_date, amount_pence FROM transactions WHERE account_id = ? AND txn_type = 'fee' ORDER BY id").all(a).map((x) => [x.txn_date, x.amount_pence]);
+  // Deduct from the edit page.
+  r = await c.post(`/app/landlord-invoices/${inv}`, { ...base, invoice_number: 'LI-0001', settle: 'deduct', settle_date: '2026-08-15' });
+  assert.equal(r.status, 302);
+  assert.deepEqual(fees(), [['2026-08-15', 4500]]);
+  assert.match((await c.get(`/app/landlord-invoices/${inv}/edit`)).text, /name="settle" value="deduct" checked[\s\S]*?name="settle_date" value="2026-08-15"/);
+  // Change the amount and the month in one save.
+  await c.post(`/app/landlord-invoices/${inv}`, { ...base, invoice_number: 'LI-0001', amount: '55', settle: 'deduct', settle_date: '2026-09-02' });
+  assert.deepEqual(fees(), [['2026-09-02', 5500]]);
+  // Switch to paid by the landlord, then back to not settled.
+  await c.post(`/app/landlord-invoices/${inv}`, { ...base, invoice_number: 'LI-0001', settle: 'paid', settle_date: '2026-09-03' });
+  assert.deepEqual(fees(), []);
+  assert.equal(db.prepare('SELECT paid_how FROM landlord_invoices WHERE id = ?').get(inv).paid_how, 'Paid by landlord');
+  await c.post(`/app/landlord-invoices/${inv}`, { ...base, invoice_number: 'LI-0001', settle: 'unpaid' });
+  assert.equal(db.prepare('SELECT status FROM landlord_invoices WHERE id = ?').get(inv).status, 'unpaid');
+  // A deduction needs a date.
+  r = await c.post(`/app/landlord-invoices/${inv}`, { ...base, invoice_number: 'LI-0001', settle: 'deduct', settle_date: '' });
+  assert.equal(r.status, 422);
+  assert.deepEqual(fees(), []);
+});
+
 test('tenants list is in tenancy number order, not name order', async () => {
   const c = await registerAndLogin('tenancy-order@example.com', 'Tenancy Order Lets');
   const prop = idFrom((await c.post('/app/properties', { address_line1: '3 Order Row', status: 'let' })).location);
