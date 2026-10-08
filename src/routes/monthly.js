@@ -35,9 +35,29 @@ module.exports = function monthlyRoutes(db, writer, mailer = { enabled: false })
     ).all(month, a).filter((r) => current.has(r.landlord_id) || r.id); // current tenancies only (plus any statement already made)
     res.render('monthly/index', {
       title: 'Landlord statements', section: 'monthly', month, thisMonth: fmt.today().slice(0, 7), monthLabel: st.monthLabel(month), rows,
-      aiEnabled: !!writer, emailEnabled: mailer.enabled, fmt,
+      aiEnabled: !!writer, emailEnabled: mailer.enabled, fmt, numbers: statementNumbers(a),
       flash: String(req.query.flash || '').slice(0, 1000), error: String(req.query.error || '').slice(0, 1000),
     });
+  });
+
+  // The statement numbers: the highest one used and the next one to be given.
+  function statementNumbers(a) {
+    const used = db.prepare('SELECT COALESCE(MAX(statement_no), 0) AS n FROM monthly_statements WHERE account_id = ?').get(a).n;
+    const last = (db.prepare('SELECT last_statement_no AS n FROM users WHERE id = ?').get(a) || {}).n || 0;
+    return { used, next: Math.max(used, last) + 1 };
+  }
+
+  // Change the number the next new statement gets (e.g. to carry on from the paper statements).
+  router.post('/statement-number', (req, res) => {
+    const a = req.user.id;
+    const month = st.isMonth(req.body.month) ? String(req.body.month) : fmt.today().slice(0, 7);
+    const back = (key, msg) => res.redirect(`/app/monthly?month=${month}&${key}=${encodeURIComponent(msg)}`);
+    const n = Number(String(req.body.next_no || '').trim());
+    if (!Number.isInteger(n) || n < 1 || n > 999999999) return back('error', 'Enter the next statement number, like 181.');
+    const { used } = statementNumbers(a);
+    if (n <= used) return back('error', `The next statement number must be higher than ${used}, the highest already on a statement.`);
+    db.prepare('UPDATE users SET last_statement_no = ? WHERE id = ?').run(n - 1, a);
+    back('flash', `The next new statement will be number ${n}.`);
   });
 
   router.post('/generate', wrap(async (req, res) => {

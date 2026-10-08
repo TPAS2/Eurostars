@@ -3144,6 +3144,29 @@ test('generating a statement includes the month\u2019s fixed rent to the landlor
   assert.ok(a);
 });
 
+test('landlord statements: a box to see and change the next statement number', async () => {
+  const { c, landlordId } = await monthlySetup('stmt-next-no@example.com');
+  let r = await c.get('/app/monthly?month=2026-08');
+  assert.match(r.text, /Next statement no\.[\s\S]*?name="next_no"[^>]*value="1"[\s\S]*?None used yet/);
+  // Carry on from the paper statements: the next one made is 181.
+  r = await c.post('/app/monthly/statement-number', { month: '2026-08', next_no: '181' });
+  assert.match(decodeURIComponent(r.location), /next new statement will be number 181/);
+  await c.get('/app/monthly?month=2026-08');
+  await c.post('/app/monthly/generate', { month: '2026-08', landlord_id: String(landlordId) });
+  assert.equal(db.prepare("SELECT statement_no FROM monthly_statements WHERE landlord_id = ? AND month = '2026-08'").get(landlordId).statement_no, 181);
+  r = await c.get('/app/monthly?month=2026-08');
+  assert.match(r.text, /name="next_no"[^>]*value="182"[\s\S]*?Last used: 181/);
+  // Can't go back to a number already used, or enter nonsense.
+  r = await c.post('/app/monthly/statement-number', { month: '2026-08', next_no: '150' });
+  assert.match(decodeURIComponent(r.location), /must be higher than 181/);
+  r = await c.post('/app/monthly/statement-number', { month: '2026-08', next_no: 'abc' });
+  assert.match(decodeURIComponent(r.location), /Enter the next statement number/);
+  // Jump ahead.
+  await c.post('/app/monthly/statement-number', { month: '2026-08', next_no: '300' });
+  await c.post('/app/monthly/generate', { month: '2026-09', landlord_id: String(landlordId) });
+  assert.equal(db.prepare("SELECT statement_no FROM monthly_statements WHERE landlord_id = ? AND month = '2026-09'").get(landlordId).statement_no, 300);
+});
+
 test('tenants list is in tenancy number order, not name order', async () => {
   const c = await registerAndLogin('tenancy-order@example.com', 'Tenancy Order Lets');
   const prop = idFrom((await c.post('/app/properties', { address_line1: '3 Order Row', status: 'let' })).location);

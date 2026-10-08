@@ -1433,3 +1433,12 @@ td.nowrap-lines span { display: block; white-space: nowrap; }
   table.fit-phone tr.sub td:first-child, table.fit-phone tr.total td:first-child { grid-area: s; color: inherit; font-size: inherit; }
   table.fit-phone tr.sub td:last-child, table.fit-phone tr.total td:last-child { grid-area: b; }
 }
+
+/* Landlord statements: the next statement number, top right. */
+.stmt-head { flex-wrap: nowrap; align-items: flex-start; }
+.stmt-head > div { flex: 1 1 auto; min-width: 0; }
+@media (max-width: 700px) { .stmt-head { flex-wrap: wrap; } }
+.stmt-no-box { flex: none; display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); min-width: 190px; }
+.stmt-no-box label { font-size: .8rem; font-weight: 700; color: var(--muted); }
+.stmt-no-row { display: flex; gap: 6px; }
+.stmt-no-row input { width: 100px; }

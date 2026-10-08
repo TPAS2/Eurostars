@@ -1,10 +1,20 @@
 <%- include('../partials/header') %>
-<header class="page-head">
+<header class="page-head stmt-head">
   <div>
     <h1>Landlord statements</h1>
     <p class="muted">To calculate rents, email landlords and get the CSV report, use <a href="/app/rent-run?month=<%= month %>">Rent run</a>.</p>
     <p class="muted">A statement for each landlord every month: rent received, fees and costs deducted, and the net amount. <%= aiEnabled ? 'Summaries are written by AI from the figures.' : 'Set ANTHROPIC_API_KEY to have AI write the summaries.' %></p>
   </div>
+  <form method="post" action="/app/monthly/statement-number" class="stmt-no-box" data-no-keep>
+    <%- include('../partials/csrf') %>
+    <input type="hidden" name="month" value="<%= month %>">
+    <label for="next-no">Next statement no.</label>
+    <div class="stmt-no-row">
+      <input id="next-no" name="next_no" type="number" min="<%= numbers.used + 1 %>" step="1" value="<%= numbers.next %>" required>
+      <button class="btn small" type="submit">Save</button>
+    </div>
+    <span class="muted small"><%= numbers.used ? `Last used: ${numbers.used}` : 'None used yet' %></span>
+  </form>
 </header>
 <div class="month-bar">
   <form method="get" data-autogo class="inline-form">
