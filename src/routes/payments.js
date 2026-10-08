@@ -29,7 +29,7 @@ const shortMonth = (month) => {
 module.exports = function paymentRoutes(db) {
   const router = express.Router();
   const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_BYTES, files: 1, fields: 5 } }).single('template');
-  const monthOf = (v) => (st.isMonth(v) ? String(v) : st.previousMonth());
+  const monthOf = (v) => (st.isMonth(v) ? String(v) : fmt.today().slice(0, 7));
   const backToRun = (res, month, { flash, error } = {}) => {
     const q = new URLSearchParams({ month });
     if (flash) q.set('flash', flash);

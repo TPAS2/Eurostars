@@ -3103,6 +3103,14 @@ test('landlord statements list: one Fees & costs column, no Held column', async 
   assert.match(r.text, /£900\.00<\/td>\s*<td class="num">−£168\.00<\/td>\s*<td class="num"><strong>£732\.00/);
 });
 
+test('rent run tab opens on the current month', async () => {
+  const c = await registerAndLogin('rentrun-default-month@example.com', 'Rentrun Month Lets');
+  const now = new Date().toISOString().slice(0, 7);
+  const r = await c.get('/app/rent-run');
+  assert.match(r.text, new RegExp(`name="month" value="${now}"`));
+  assert.match(r.text, new RegExp(`/app/rent-run/transfer\\.xlsx\\?month=${now}`));
+});
+
 test('landlord statements tab opens on the current month', async () => {
   const c = await registerAndLogin('stmt-default-month@example.com', 'Default Month Lets');
   const now = new Date().toISOString().slice(0, 7);
