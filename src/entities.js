@@ -153,7 +153,6 @@ const ENTITIES = {
       { name: 'trade', label: 'Trade', type: 'text', help: 'e.g. Plumber, Electrician, Roofer.' },
       { name: 'phone', label: 'Phone', type: 'tel' },
       { name: 'mobile', label: 'Mobile', type: 'tel' },
-      { name: 'fax', label: 'Fax', type: 'tel' },
       { name: 'email', label: 'Email', type: 'email' },
       { name: 'address', label: 'Address', type: 'textarea', inline: true },
       { name: 'notes', label: 'Notes', type: 'textarea' },

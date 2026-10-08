@@ -2816,6 +2816,16 @@ test('properties tab: a Profit box beside the rent totals (council + tenant rent
   assert.match(r.text, /Rent to landlord \(£ per month\)<\/span><strong>£1,100\.00<\/strong>[\s\S]*?class="rt-good"><span>Profit \(£ per month\)<\/span><strong>£450\.00<\/strong><small>After £50\.00 expenses in /);
 });
 
+test('contractors: no Fax box when adding or editing a contractor', async () => {
+  const c = await registerAndLogin('no-fax@example.com', 'No Fax Lets');
+  const form = (await c.get('/app/contractors/new')).text;
+  assert.match(form, /name="mobile"/);
+  assert.doesNotMatch(form, /name="fax"|>Fax</);
+  const id = idFrom((await c.post('/app/contractors', { name: 'Made-up Plumbing', fax: '0100 000000' })).location);
+  assert.equal(db.prepare('SELECT fax FROM contractors WHERE id = ?').get(id).fax, null, 'a fax sent anyway is ignored');
+  assert.doesNotMatch((await c.get(`/app/contractors/${id}/edit`)).text, /name="fax"/);
+});
+
 test('tenants list is in tenancy number order, not name order', async () => {
   const c = await registerAndLogin('tenancy-order@example.com', 'Tenancy Order Lets');
   const prop = idFrom((await c.post('/app/properties', { address_line1: '3 Order Row', status: 'let' })).location);
