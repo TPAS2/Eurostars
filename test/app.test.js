@@ -2095,7 +2095,8 @@ test('landlord invoices: bill a landlord, deduct from rent or mark paid, print a
   const statement = db.prepare("SELECT * FROM monthly_statements WHERE landlord_id = ? AND month = '2026-08'").get(larry);
   assert.equal(statement.fees_pence, 30000, 'on their statement as a deduction');
   r = await c.get('/app/landlord-invoices?month=2026-08');
-  assert.match(r.text, new RegExp(`LI-0001[\\s\\S]*?Larry Landlord[\\s\\S]*?8 Bill Street[\\s\\S]*?Deducted 20/08/2026[\\s\\S]*?yes-no yes">Yes[\\s\\S]*?href="/app/monthly/${statement.id}"`));
+  assert.doesNotMatch(r.text, /<th>Status<\/th>/, 'no Status column');
+  assert.match(r.text, new RegExp(`LI-0001[\\s\\S]*?Larry Landlord[\\s\\S]*?8 Bill Street[\\s\\S]*?yes-no yes">Yes[\\s\\S]*?href="/app/monthly/${statement.id}"`));
 
   // Undo removes the deduction.
   await c.post(`/app/landlord-invoices/${inv1}/unsettle`, {});

@@ -27,9 +27,9 @@
   </nav>
   <% if (!invoices.length) { %><p class="muted">No landlord invoices <%= month === 'all' ? 'here' : 'for ' + monthLabel %>.</p><% } else { %>
   <div class="table-wrap"><table class="clickable">
-    <thead><tr><th>Invoice</th><th>Landlord</th><th>Property</th><th>Date</th><th>For</th><th class="num">Amount</th><th>Status</th><th>Deducted</th><th></th></tr></thead>
+    <thead><tr><th>Invoice</th><th>Landlord</th><th>Property</th><th>Date</th><th>For</th><th class="num">Amount</th><th>Deducted</th><th></th></tr></thead>
     <tbody>
-    <% invoices.forEach(i => { const overdue = i.status === 'unpaid' && i.due_date && i.due_date < today; const link = statementLink(i); %>
+    <% invoices.forEach(i => { const link = statementLink(i); %>
       <tr data-href="/app/landlord-invoices/<%= i.id %>">
         <td><a href="/app/landlord-invoices/<%= i.id %>"><strong><%= i.invoice_number %></strong></a></td>
         <td><a href="/app/landlords/<%= i.landlord_id %>"><%= i.landlord_name %></a></td>
@@ -37,7 +37,6 @@
         <td><%= fmt.ukDate(i.invoice_date) %></td>
         <td><%= i.description %></td>
         <td class="num"><%= fmt.money(i.amount_pence) %></td>
-        <td><% if (i.status === 'paid') { %><span class="badge s-active plain"><%= i.paid_how === 'Deducted from rent' ? 'Deducted' : i.paid_how === 'Paid by us' ? 'Paid by us' : 'Paid' %> <%= fmt.ukDate(i.paid_date) %></span><% } else if (overdue) { %><span class="badge bad plain">Overdue</span><% } else { %><span class="badge warn plain">Unpaid</span><% } %></td>
         <td><% if (i.txn_id) { %><span class="yes-no yes">Yes</span><% if (link) { %> <a class="small" href="<%= link %>">View statement</a><% } %><% } else { %><span class="yes-no no">No</span><% } %></td>
         <td class="num"><a class="btn small" href="/app/landlord-invoices/<%= i.id %>/edit">Edit</a></td>
       </tr>
