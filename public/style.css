@@ -1150,7 +1150,10 @@ input, select, textarea { max-width: 100%; }
 .month-bar { display: flex; justify-content: center; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 0 16px; }
 .month-bar .statement-search { display: flex; gap: 6px; margin-left: 12px; }
 .month-bar .statement-search input { width: 150px; }
-table.equal th.stmt-actions { width: 290px; }
+table.stmt-table td.row-actions { white-space: normal; }
+table.stmt-table td.row-actions > a, table.stmt-table .row-actions form { display: inline-block; margin: 2px 1px; }
+@media (min-width: 1200px) { table.stmt-table td.row-actions { white-space: nowrap; } }
+.btn.small.icon-btn { padding: 5px 8px; }
 td.nowrap-lines span { display: block; white-space: nowrap; }
 
 /* A maintenance job's sheet: two signature boxes, signed on screen. */

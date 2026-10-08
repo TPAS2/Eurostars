@@ -506,6 +506,8 @@ test('landlord statements: only landlords with a current tenancy (or a fixed ren
   // Delete one statement.
   r = await c.get('/app/monthly?month=2026-08');
   assert.match(r.text, /Delete all for August 2026/);
+  assert.match(r.text, /class="btn small icon-btn" type="submit" title="Regenerate"/, 'Regenerate is an icon button');
+  assert.match(r.text, /class="btn small danger icon-btn" type="submit" title="Delete"/, 'Delete is an icon button');
   const mary = db.prepare("SELECT id, statement_no FROM monthly_statements WHERE landlord_id = ? AND month = '2026-08'").get(landlordId);
   assert.match(r.text, new RegExp(`action="/app/monthly/${mary.id}/delete"`));
   r = await c.post(`/app/monthly/${mary.id}/delete`, {});
