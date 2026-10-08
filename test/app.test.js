@@ -498,10 +498,10 @@ test('landlord statements: only landlords with a current tenancy (or a fixed ren
   await c.post('/app/monthly/calculate', { month: '2026-08' });
   const who = () => db.prepare("SELECT l.name FROM monthly_statements s JOIN landlords l ON l.id = s.landlord_id WHERE s.account_id = ? AND s.month = '2026-08' ORDER BY l.name").all(a).map((x) => x.name);
   assert.deepEqual(who(), ['Fixed Owner', 'Mary Owner', 'Second Owner']);
-  // July: Mary's tenancy hadn't started, so no statement for her.
+  // July: Mary's tenancy hadn't started, so no statement for her (Fixed is paid July's rent, so gets one).
   await c.get('/app/monthly?month=2026-07');
   await c.post('/app/monthly/generate', { month: '2026-07' });
-  assert.deepEqual(db.prepare("SELECT l.name FROM monthly_statements s JOIN landlords l ON l.id = s.landlord_id WHERE s.account_id = ? AND s.month = '2026-07'").all(a).map((x) => x.name), ['Second Owner']);
+  assert.deepEqual(db.prepare("SELECT l.name FROM monthly_statements s JOIN landlords l ON l.id = s.landlord_id WHERE s.account_id = ? AND s.month = '2026-07' ORDER BY l.name").all(a).map((x) => x.name), ['Fixed Owner', 'Second Owner']);
 
   // Delete one statement.
   r = await c.get('/app/monthly?month=2026-08');
@@ -529,7 +529,7 @@ test('landlord statements: only landlords with a current tenancy (or a fixed ren
   r = await c.post('/app/monthly/delete-month', { month: '2026-08' });
   assert.match(decodeURIComponent(r.location), /Deleted 3 statements for August 2026/);
   assert.deepEqual(who(), []);
-  assert.equal(db.prepare("SELECT COUNT(*) n FROM monthly_statements WHERE account_id = ? AND month = '2026-07'").get(a).n, 1);
+  assert.equal(db.prepare("SELECT COUNT(*) n FROM monthly_statements WHERE account_id = ? AND month = '2026-07'").get(a).n, 2);
 });
 
 test('monthly statements: figures, AI summary, fabricated-number guard, fallback', async () => {
@@ -3120,6 +3120,28 @@ test('landlord statements tab opens on the current month', async () => {
   assert.match(r.text, new RegExp(`name="month" value="${now}"`));
   assert.match(r.text, /<span class="btn disabled" aria-disabled="true">This month<\/span>/, 'already on this month');
   assert.match(decodeURIComponent((await c.get('/app/monthly?no=999')).location), new RegExp(`month=${now}&error=No statement number 999`));
+});
+
+test('generating a statement includes the month\u2019s fixed rent to the landlord without running Calculate first', async () => {
+  const c = await registerAndLogin('stmt-rent@example.com', 'Stmt Rent Lets');
+  const a = db.prepare("SELECT id FROM users WHERE username = 'stmt-rent'").get().id;
+  const ll = idFrom((await c.post('/app/landlords', { ...LANDLORD, name: 'Rena Rent' })).location);
+  const prop = idFrom((await c.post('/app/properties', { address_line1: '8 Fixed Row', landlord_id: String(ll), status: 'let', rent_pence: '1100', landlord_rent_pence: '900', management_fee_pct: '10' })).location);
+  await currentTenancy(c, ll, prop);
+  // One landlord, generated straight from the Landlord statements tab.
+  await c.get('/app/monthly?month=2026-09');
+  await c.post('/app/monthly/generate', { month: '2026-09', landlord_id: String(ll) });
+  let s = db.prepare("SELECT rent_pence, fees_pence, net_pence FROM monthly_statements WHERE landlord_id = ? AND month = '2026-09'").get(ll);
+  assert.deepEqual({ ...s }, { rent_pence: 90000, fees_pence: 9000, net_pence: 81000 });
+  // Generating again doesn't pay the rent twice.
+  await c.post('/app/monthly/generate', { month: '2026-09', landlord_id: String(ll) });
+  assert.equal(db.prepare("SELECT COUNT(*) n FROM transactions WHERE property_id = ? AND txn_type = 'landlord_rent' AND substr(txn_date, 1, 7) = '2026-09'").get(prop).n, 1);
+  // "Generate all statements" does it too.
+  await c.get('/app/monthly?month=2026-10');
+  await c.post('/app/monthly/generate', { month: '2026-10' });
+  s = db.prepare("SELECT rent_pence FROM monthly_statements WHERE landlord_id = ? AND month = '2026-10'").get(ll);
+  assert.equal(s.rent_pence, 90000);
+  assert.ok(a);
 });
 
 test('tenants list is in tenancy number order, not name order', async () => {

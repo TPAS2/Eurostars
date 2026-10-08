@@ -48,6 +48,7 @@ module.exports = function monthlyRoutes(db, writer, mailer = { enabled: false })
     if (req.body.landlord_id) {
       const landlord = db.prepare('SELECT id FROM landlords WHERE id = ? AND account_id = ?').get(Number(req.body.landlord_id), a);
       if (!landlord) return back('Landlord not found.');
+      st.prepareMonth(db, a, month); // the month's rent first, so it's on the statement
       if (!st.landlordsWithTenancies(db, a, month).has(landlord.id)) return back(`No statement made: that landlord has no current tenancy in ${st.monthLabel(month)}.`);
       const id = await st.generateStatement(db, { accountId: a, agencyName: req.user.agency_name, landlordId: landlord.id, month, writer });
       return res.redirect(`/app/monthly/${id}`);
@@ -160,6 +161,7 @@ module.exports = function monthlyRoutes(db, writer, mailer = { enabled: false })
     const already = [];
     const failed = [];
     const byCheque = [];
+    st.prepareMonth(db, a, month); // any statement made here includes the month's rent
     const current = st.landlordsWithTenancies(db, a, month);
     const noTenancy = [];
     for (const l of landlords) {

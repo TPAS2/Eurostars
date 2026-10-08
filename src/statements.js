@@ -208,7 +208,19 @@ function landlordsWithTenancies(db, accountId, month) {
   ).all(accountId, to, from, accountId, from, to).map((r) => r.landlord_id));
 }
 
+// The month's rent, as on the Rent run's "Calculate": tenancies' rent charges, and each landlord's fixed
+// monthly rent (with its management fee). Both skip anything already done for the month.
+function prepareMonth(db, accountId, month) {
+  db.exec('BEGIN');
+  try {
+    ledger.raiseMonthlyRent(db, accountId, month);
+    ledger.creditLandlordRent(db, accountId, month);
+    db.exec('COMMIT');
+  } catch (err) { db.exec('ROLLBACK'); throw err; }
+}
+
 async function generateForAccount(db, { accountId, agencyName, month, writer, onlyMissing = false, log }) {
+  prepareMonth(db, accountId, month);
   const current = landlordsWithTenancies(db, accountId, month);
   const landlords = db.prepare('SELECT id FROM landlords WHERE account_id = ? ORDER BY name').all(accountId).filter((l) => current.has(l.id));
   const existing = new Set(db.prepare('SELECT landlord_id FROM monthly_statements WHERE account_id = ? AND month = ?').all(accountId, month).map((r) => r.landlord_id));
@@ -240,6 +252,6 @@ async function runMonthlyJob(db, writer, { today = fmt.today(), log = console.lo
 }
 
 module.exports = {
-  computeStatement, factsForAi, unknownAmounts, templateSummary, generateStatement, generateForAccount, landlordsWithTenancies,
+  computeStatement, factsForAi, unknownAmounts, templateSummary, generateStatement, generateForAccount, landlordsWithTenancies, prepareMonth,
   runMonthlyJob, monthLabel, previousMonth, isMonth, monthBounds,
 };
