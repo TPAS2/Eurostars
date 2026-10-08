@@ -4604,12 +4604,15 @@ test('dashboard heading: the date beside Dashboard, and just "Welcome back, name
   assert.doesNotMatch(page, /Here's where things stand/);
 });
 
-test('property form: Property code top left (filled in automatically), Council beside Status', async () => {
+test('property form: rows of address/code, council/landlord/details, rents, status/fee, dates, notes; code filled in automatically', async () => {
   const c = await registerAndLogin('prop-code@example.com', 'Prop Code Lets');
   let page = (await c.get('/app/properties/new')).text;
   const order = [...page.matchAll(/<label for="f-([a-z_0-9]+)">/g)].map((m) => m[1]);
-  assert.equal(order[0], 'code', 'Property code is the first box');
-  assert.equal(order[order.indexOf('status') + 1], 'council_id', 'Council comes straight after Status');
+  assert.deepEqual(order.filter((n) => !/^cert/.test(n)), ['address_line1', 'town', 'postcode', 'code', 'council_id', 'landlord_id', 'property_type', 'bedrooms', 'bathrooms', 'parking',
+    'rent_pence', 'tenant_rent_pence', 'landlord_rent_pence', 'price_per_night_pence', 'status', 'management_fee_pct', 'acquired_date', 'lease_start_date', 'handed_back_date', 'notes'],
+    'address, town, postcode, code / council, landlord, type, beds, baths, parking / the rents / status, fee / dates / notes');
+  for (const n of ['council_id', 'rent_pence', 'status', 'acquired_date']) assert.match(page, new RegExp(`class="field\\s+row-start span-\\d"[^>]*>\\s*<label for="f-${n}"`), `${n} starts a row`);
+  assert.ok(page.indexOf('name="notes"') < page.indexOf('Certificates'), 'certificates under the notes');
   assert.match(page, /name="code" value="P0001"/);
   let r = await c.post('/app/properties', { address_line1: '1 Code Street', status: 'vacant' }); // code left blank
   const first = idFrom(r.location);

@@ -1211,8 +1211,13 @@ td.nowrap-lines span { display: block; white-space: nowrap; }
   .form-contractors .span-2 { grid-column: span 2; }
 }
 @media (min-width: 900px) {
-  .form-grid.form-properties { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px 14px; }
+  .form-grid.form-properties { grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 10px 14px; }
   .form-properties .span-2 { grid-column: span 2; }
+  .form-properties .span-3 { grid-column: span 3; }
+  .form-properties .span-4 { grid-column: span 4; }
+  .form-properties .field.row-start.span-2 { grid-column: 1 / span 2; }
+  .form-properties .field.row-start.span-3 { grid-column: 1 / span 3; }
+  .form-properties .field.row-start.span-4 { grid-column: 1 / span 4; }
 }
 .form-properties .field { margin: 0; }
 .form-properties label { font-size: .82rem; margin-bottom: 3px; }
