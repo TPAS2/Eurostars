@@ -2842,6 +2842,22 @@ test('contractors list is in contractor code order; any without a code go last',
   assert.ok(at[0] > 0 && at[0] < at[1] && at[1] < at[2] && at[2] < at[3], `C0001, C0002, C0003, then no code: ${at}`);
 });
 
+test('contractors list: Invoices, Total paid and Total unpaid are all time', async () => {
+  const c = await registerAndLogin('contractor-alltime@example.com', 'Contractor Alltime Lets');
+  const a = db.prepare("SELECT id FROM users WHERE username = 'contractor-alltime'").get().id;
+  const id = idFrom((await c.post('/app/contractors', { name: 'Made-up Roofing', code: 'C0001' })).location);
+  const add = db.prepare("INSERT INTO invoices (account_id, contractor_id, supplier, invoice_date, due_date, amount_pence, status) VALUES (?, ?, 'Made-up Roofing', ?, ?, ?, ?)");
+  add.run(a, id, '2019-03-01', '2019-03-31', 10000, 'paid'); // years ago still counts
+  add.run(a, id, '2026-09-01', '2026-09-30', 2500, 'paid');
+  add.run(a, id, '2026-10-01', '2026-10-31', 4000, 'unpaid');
+  const r = await c.get('/app/contractors');
+  const heads = [...r.text.slice(r.text.indexOf('<thead'), r.text.indexOf('</thead>')).matchAll(/<th[^>]*>([^<]+)</g)].map((m) => m[1].trim()).filter(Boolean);
+  assert.deepEqual(heads.slice(-3), ['Invoices (all time)', 'Total paid', 'Total unpaid'], 'the last two headings are Total paid and Total unpaid');
+  assert.deepEqual(heads.slice(0, 2), ['Contractor code', 'Name'], 'code to the left of the name');
+  assert.match(r.text, /C0001\s*<\/td>\s*<td[^>]*>\s*<a[^>]*>Made-up Roofing/, 'the name is still the link');
+  assert.match(r.text, /Made-up Roofing[\s\S]*?>\s*3\s*<\/td>[\s\S]*?£125\.00[\s\S]*?£40\.00/);
+});
+
 test('tenants list is in tenancy number order, not name order', async () => {
   const c = await registerAndLogin('tenancy-order@example.com', 'Tenancy Order Lets');
   const prop = idFrom((await c.post('/app/properties', { address_line1: '3 Order Row', status: 'let' })).location);

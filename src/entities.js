@@ -158,8 +158,9 @@ const ENTITIES = {
       { name: 'email', label: 'Email', type: 'email' },
       { name: 'notes', label: 'Notes', type: 'textarea', inline: true },
     ],
-    columns: ['name', 'code', 'trade', 'phone', 'invoice_count', 'total_paid', 'unpaid'],
-    computed: { invoice_count: { label: 'Invoices' }, total_paid: { label: 'Total paid' }, unpaid: { label: 'Unpaid' } },
+    columns: ['code', 'name', 'trade', 'phone', 'invoice_count', 'total_paid', 'unpaid'],
+    // All time: every invoice from the contractor, what's been paid and what's still unpaid.
+    computed: { invoice_count: { label: 'Invoices (all time)' }, total_paid: { label: 'Total paid' }, unpaid: { label: 'Total unpaid' } },
   },
 
   maintenance: {

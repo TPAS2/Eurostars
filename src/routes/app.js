@@ -823,7 +823,7 @@ module.exports = function appRoutes(db) {
       rows.sort((x, y) => noOf(x) - noOf(y) || (noOf(x) === Infinity ? String(x.name).localeCompare(String(y.name)) : 0));
     }
     if (def.key === 'contractors') {
-      // Invoices and money paid to each contractor, all time.
+      // Invoices, money paid and money still unpaid for each contractor, all time (no date limit).
       const stats = new Map(db.prepare(
         `SELECT contractor_id, COUNT(*) AS n,
                 COALESCE(SUM(CASE WHEN status = 'paid' THEN amount_pence END), 0) AS paid,
@@ -834,7 +834,7 @@ module.exports = function appRoutes(db) {
         const s = stats.get(row.id) || { n: 0, paid: 0, unpaid: 0 };
         row.invoice_count = { text: String(s.n) };
         row.total_paid = { text: fmt.money(s.paid) };
-        row.unpaid = { text: s.unpaid ? fmt.money(s.unpaid) : '—' };
+        row.unpaid = { text: fmt.money(s.unpaid) };
       }
       totalsRow = { label: 'Total', cells: {
         invoice_count: String([...stats.values()].reduce((t, s) => t + s.n, 0)),
