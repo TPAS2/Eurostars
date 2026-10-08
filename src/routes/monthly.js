@@ -25,16 +25,16 @@ module.exports = function monthlyRoutes(db, writer, mailer = { enabled: false })
       return res.redirect(`/app/monthly?month=${st.isMonth(req.query.month) ? req.query.month : st.previousMonth()}&error=${encodeURIComponent(`No statement number ${wanted.slice(0, 20)} was found.`)}`);
     }
     const month = st.isMonth(req.query.month) ? req.query.month : st.previousMonth();
+    const current = st.landlordsWithTenancies(db, a, month);
     const rows = db.prepare(
       `SELECT l.id AS landlord_id, l.name, l.email, l.statement_type, s.id, s.statement_no, s.rent_pence, s.fees_pence, s.expenses_pence, s.net_pence,
               s.closing_pence, s.summary_source, s.generated_at, s.emailed_at, s.emailed_to
          FROM landlords l
          LEFT JOIN monthly_statements s ON s.landlord_id = l.id AND s.account_id = l.account_id AND s.month = ?
         WHERE l.account_id = ? ORDER BY l.name COLLATE NOCASE`
-    ).all(month, a);
-    const months = db.prepare('SELECT DISTINCT month FROM monthly_statements WHERE account_id = ? ORDER BY month DESC LIMIT 24').all(a).map((r) => r.month);
+    ).all(month, a).filter((r) => current.has(r.landlord_id) || r.id); // current tenancies only (plus any statement already made)
     res.render('monthly/index', {
-      title: 'Landlord statements', section: 'monthly', month, thisMonth: fmt.today().slice(0, 7), monthLabel: st.monthLabel(month), rows, months,
+      title: 'Landlord statements', section: 'monthly', month, thisMonth: fmt.today().slice(0, 7), monthLabel: st.monthLabel(month), rows,
       aiEnabled: !!writer, emailEnabled: mailer.enabled, fmt,
       flash: String(req.query.flash || '').slice(0, 1000), error: String(req.query.error || '').slice(0, 1000),
     });
@@ -48,12 +48,28 @@ module.exports = function monthlyRoutes(db, writer, mailer = { enabled: false })
     if (req.body.landlord_id) {
       const landlord = db.prepare('SELECT id FROM landlords WHERE id = ? AND account_id = ?').get(Number(req.body.landlord_id), a);
       if (!landlord) return back('Landlord not found.');
+      if (!st.landlordsWithTenancies(db, a, month).has(landlord.id)) return back(`No statement made: that landlord has no current tenancy in ${st.monthLabel(month)}.`);
       const id = await st.generateStatement(db, { accountId: a, agencyName: req.user.agency_name, landlordId: landlord.id, month, writer });
       return res.redirect(`/app/monthly/${id}`);
     }
     const n = await st.generateForAccount(db, { accountId: a, agencyName: req.user.agency_name, month, writer });
     back(`Generated ${n} statement${n === 1 ? '' : 's'} for ${st.monthLabel(month)}.`);
   }));
+
+  // Deleting one statement, or every statement for a month.
+  router.post('/:id(\\d+)/delete', (req, res) => {
+    const s = db.prepare('SELECT id, month, statement_no FROM monthly_statements WHERE id = ? AND account_id = ?').get(Number(req.params.id), req.user.id);
+    if (!s) return res.redirect('/app/monthly?error=' + encodeURIComponent('That statement was not found.'));
+    db.prepare('DELETE FROM monthly_statements WHERE id = ? AND account_id = ?').run(s.id, req.user.id);
+    res.redirect(`/app/monthly?month=${s.month}&flash=${encodeURIComponent(`Deleted statement ${s.statement_no || ''}.`.replace('  ', ' '))}`);
+  });
+
+  router.post('/delete-month', (req, res) => {
+    const month = String(req.body.month || '');
+    if (!st.isMonth(month)) return res.redirect('/app/monthly?error=' + encodeURIComponent('Choose a valid month.'));
+    const n = db.prepare('DELETE FROM monthly_statements WHERE account_id = ? AND month = ?').run(req.user.id, month).changes;
+    res.redirect(`/app/monthly?month=${month}&flash=${encodeURIComponent(`Deleted ${n} statement${n === 1 ? '' : 's'} for ${st.monthLabel(month)}.`)}`);
+  });
 
   // ---------- month end ----------
 
@@ -141,7 +157,11 @@ module.exports = function monthlyRoutes(db, writer, mailer = { enabled: false })
     const already = [];
     const failed = [];
     const byCheque = [];
+    const current = st.landlordsWithTenancies(db, a, month);
+    const noTenancy = [];
     for (const l of landlords) {
+      // Only landlords with a current tenancy get a statement.
+      if (!current.has(l.id) && !db.prepare('SELECT 1 FROM monthly_statements WHERE account_id = ? AND landlord_id = ? AND month = ?').get(a, l.id, month)) { noTenancy.push(l.name); continue; }
       // Cheque landlords get a printed statement, so they're left out of the email run.
       if (!one && l.statement_type === 'Cheque') { byCheque.push(l.name); continue; }
       if (!isEmail(l.email)) { noEmail.push(l.name); continue; }
@@ -167,6 +187,8 @@ module.exports = function monthlyRoutes(db, writer, mailer = { enabled: false })
     if (already.length) parts.push(`Skipped ${plural(already.length, 'landlord')} already emailed.`);
     if (byCheque.length) parts.push(`Left out ${plural(byCheque.length, 'landlord')} paid by cheque (print their statements): ${listNames(byCheque)}.`);
     if (noEmail.length) parts.push(`No email address for: ${listNames(noEmail)}.`);
+    if (!one && noTenancy.length) parts.push(`Left out ${plural(noTenancy.length, 'landlord')} with no current tenancy.`);
+    if (one && noTenancy.length) parts.push(`${listNames(noTenancy)} has no current tenancy in ${st.monthLabel(month)}, so no statement was sent.`);
     const error = failed.length ? `Couldn’t email: ${listNames(failed)}.` : null;
     backTo(res, month, { flash: parts.join(' '), error }, page);
   }));

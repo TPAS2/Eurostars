@@ -14,6 +14,10 @@
       <input type="hidden" name="landlord_id" value="<%= s.landlord_id %>">
       <button class="btn" type="submit">Regenerate</button>
     </form>
+    <form method="post" action="/app/monthly/<%= s.id %>/delete" data-confirm="Delete statement <%= s.statement_no %>? This can’t be undone.">
+      <%- include('../partials/csrf') %>
+      <button class="btn danger" type="submit">Delete</button>
+    </form>
     <% if (s.closing_pence > 0) { %>
       <a class="btn primary" href="/app/transactions/new?txn_type=landlord_payment&landlord_id=<%= s.landlord_id %>&amount_pence=<%= fmt.penceToInput(s.closing_pence) %>&description=<%= encodeURIComponent('Payment for ' + monthLabel + ' statement') %>">Pay landlord <%= fmt.money(s.closing_pence) %></a>
     <% } %>

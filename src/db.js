@@ -607,6 +607,7 @@ function openDatabase(file) {
   addColumnIfMissing(db, 'tenancies', 'tenancy_no', 'TEXT');
   numberTenancies(db);
   addColumnIfMissing(db, 'monthly_statements', 'statement_no', 'INTEGER');
+  addColumnIfMissing(db, 'users', 'last_statement_no', 'INTEGER');
   numberStatements(db);
   return db;
 }
@@ -765,9 +766,12 @@ function numberStatements(db, accountId = null) {
   const accounts = accountId ? [{ account_id: accountId }]
     : db.prepare('SELECT DISTINCT account_id FROM monthly_statements WHERE statement_no IS NULL').all();
   for (const { account_id: a } of accounts) {
-    let n = db.prepare('SELECT COALESCE(MAX(statement_no), 0) AS n FROM monthly_statements WHERE account_id = ?').get(a).n;
+    // Carries on from the highest number ever given, so a deleted statement's number isn't reused.
+    let n = Math.max(db.prepare('SELECT COALESCE(MAX(statement_no), 0) AS n FROM monthly_statements WHERE account_id = ?').get(a).n,
+      (db.prepare('SELECT last_statement_no AS n FROM users WHERE id = ?').get(a) || {}).n || 0);
     const set = db.prepare('UPDATE monthly_statements SET statement_no = ? WHERE id = ?');
     for (const { id } of db.prepare('SELECT id FROM monthly_statements WHERE account_id = ? AND statement_no IS NULL ORDER BY id').all(a)) set.run(++n, id);
+    db.prepare('UPDATE users SET last_statement_no = ? WHERE id = ?').run(n, a);
   }
 }
 

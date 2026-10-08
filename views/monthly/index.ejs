@@ -24,13 +24,22 @@
 <section class="card">
   <div class="card-head">
     <h2><%= monthLabel %></h2>
+    <div class="actions">
     <form method="post" action="/app/monthly/generate" data-busy="Generating statements… this can take a minute.">
       <%- include('../partials/csrf') %>
       <input type="hidden" name="month" value="<%= month %>">
       <button class="btn primary" type="submit" <%= rows.length ? '' : 'disabled' %>><%= aiEnabled ? '✨ ' : '' %>Generate all statements</button>
     </form>
+    <% const made = rows.filter(r => r.id).length; if (made) { %>
+    <form method="post" action="/app/monthly/delete-month" data-confirm="Delete all <%= made %> statement<%= made === 1 ? '' : 's' %> for <%= monthLabel %>? This can’t be undone.">
+      <%- include('../partials/csrf') %>
+      <input type="hidden" name="month" value="<%= month %>">
+      <button class="btn danger" type="submit">Delete all for <%= monthLabel %></button>
+    </form>
+    <% } %>
+    </div>
   </div>
-  <% if (!rows.length) { %><p class="muted">Add landlords to start producing statements.</p><% } else { %>
+  <% if (!rows.length) { %><p class="muted">No landlords with a current tenancy in <%= monthLabel %>. Statements are only made for landlords whose properties have a current tenancy.</p><% } else { %>
   <div class="table-wrap"><table class="equal centered">
     <thead><tr><th>Statement no.</th><th>Landlord</th><th class="num">Rent</th><th class="num">Fees</th><th class="num">Costs</th><th class="num">Net</th><th class="num">Held</th><th>Generated</th><th>Emailed</th><th class="stmt-actions"></th></tr></thead>
     <tbody>
@@ -57,6 +66,12 @@
             <input type="hidden" name="landlord_id" value="<%= r.landlord_id %>">
             <button class="btn small" type="submit"><%= r.id ? 'Regenerate' : 'Generate' %></button>
           </form>
+          <% if (r.id) { %>
+          <form method="post" action="/app/monthly/<%= r.id %>/delete" data-confirm="Delete statement <%= r.statement_no %> for <%= r.name %>? This can’t be undone.">
+            <%- include('../partials/csrf') %>
+            <button class="btn small danger" type="submit">Delete</button>
+          </form>
+          <% } %>
           <% if (emailEnabled && r.email && r.statement_type !== 'Cheque') { %>
           <form method="post" action="/app/monthly/email" data-busy="Sending…" data-confirm="Email the <%= monthLabel %> statement to <%= r.name %> (<%= r.email %>)?">
             <%- include('../partials/csrf') %>
@@ -74,12 +89,4 @@
   <% } %>
 </section>
 
-<% if (months.length) { %>
-<section class="card">
-  <h2>Previous months</h2>
-  <nav class="tabs">
-    <% months.forEach(m => { %><a href="/app/monthly?month=<%= m %>" class="<%= m === month ? 'active' : '' %>"><%= m %></a><% }) %>
-  </nav>
-</section>
-<% } %>
 <%- include('../partials/footer') %>

@@ -192,8 +192,25 @@ async function generateStatement(db, { accountId, agencyName, landlordId, month,
   return db.prepare('SELECT id FROM monthly_statements WHERE account_id = ? AND landlord_id = ? AND month = ?').get(accountId, landlordId, month).id;
 }
 
+// Landlords with a current tenancy in the month: one of their properties has a tenancy that ran
+// during it (not one only booked for later). Only they get a statement. Landlords being paid their
+// fixed monthly rent for the month count too (even with the property empty), since the Rift report
+// and the payment files are made from the statements.
+function landlordsWithTenancies(db, accountId, month) {
+  const { from, to } = monthBounds(month);
+  return new Set(db.prepare(
+    `SELECT p.landlord_id FROM tenancies ty JOIN properties p ON p.id = ty.property_id AND p.account_id = ty.account_id
+      WHERE ty.account_id = ? AND p.landlord_id IS NOT NULL AND ty.status IN ('active', 'ended')
+        AND ty.start_date <= ? AND (ty.end_date IS NULL OR ty.end_date >= ?)
+     UNION
+     SELECT landlord_id FROM transactions
+      WHERE account_id = ? AND txn_type = 'landlord_rent' AND landlord_id IS NOT NULL AND txn_date BETWEEN ? AND ?`
+  ).all(accountId, to, from, accountId, from, to).map((r) => r.landlord_id));
+}
+
 async function generateForAccount(db, { accountId, agencyName, month, writer, onlyMissing = false, log }) {
-  const landlords = db.prepare('SELECT id FROM landlords WHERE account_id = ? ORDER BY name').all(accountId);
+  const current = landlordsWithTenancies(db, accountId, month);
+  const landlords = db.prepare('SELECT id FROM landlords WHERE account_id = ? ORDER BY name').all(accountId).filter((l) => current.has(l.id));
   const existing = new Set(db.prepare('SELECT landlord_id FROM monthly_statements WHERE account_id = ? AND month = ?').all(accountId, month).map((r) => r.landlord_id));
   const todo = landlords.filter((l) => !(onlyMissing && existing.has(l.id)));
   // A few AI calls at a time keeps a big portfolio quick without hammering rate limits.
@@ -218,6 +235,6 @@ async function runMonthlyJob(db, writer, { today = fmt.today(), log = console.lo
 }
 
 module.exports = {
-  computeStatement, factsForAi, unknownAmounts, templateSummary, generateStatement, generateForAccount,
+  computeStatement, factsForAi, unknownAmounts, templateSummary, generateStatement, generateForAccount, landlordsWithTenancies,
   runMonthlyJob, monthLabel, previousMonth, isMonth, monthBounds,
 };

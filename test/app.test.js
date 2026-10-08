@@ -429,11 +429,11 @@ test('landlord statements: statement of account PDF, numbered per company, previ
   const a = db.prepare("SELECT id FROM users WHERE username = 'stmt-pdf'").get().id;
   await c.get('/app/monthly?month=2026-08');
   await c.post('/app/monthly/generate', { month: '2026-08', landlord_id: String(landlordId) });
-  await c.post('/app/monthly/generate', { month: '2026-07', landlord_id: String(landlordId) });
+  await c.post('/app/monthly/generate', { month: '2026-09', landlord_id: String(landlordId) });
   const nos = () => db.prepare('SELECT month, statement_no FROM monthly_statements WHERE account_id = ? ORDER BY id').all(a).map((x) => [x.month, x.statement_no]);
-  assert.deepEqual(nos(), [['2026-08', 1], ['2026-07', 2]]);
+  assert.deepEqual(nos(), [['2026-08', 1], ['2026-09', 2]]);
   await c.post('/app/monthly/generate', { month: '2026-08', landlord_id: String(landlordId) });
-  assert.deepEqual(nos(), [['2026-08', 1], ['2026-07', 2]], 'regenerating keeps the number');
+  assert.deepEqual(nos(), [['2026-08', 1], ['2026-09', 2]], 'regenerating keeps the number');
   const s = db.prepare("SELECT * FROM monthly_statements WHERE account_id = ? AND month = '2026-08'").get(a);
 
   // The list: number column, preview then download icon to the left of Regenerate, month buttons and search centred.
@@ -469,6 +469,66 @@ test('landlord statements: statement of account PDF, numbered per company, previ
   // Another company can't open it.
   const other = await registerAndLogin('stmt-pdf-other@example.com', 'Other Stmt Lets');
   assert.equal((await other.get(`/app/monthly/${s.id}/statement.pdf`)).status, 404);
+});
+
+// Statements are only made for landlords with a current tenancy: give a landlord one (on a new
+// property, or on the property given), running from the start of 2026 with no rent of its own.
+async function currentTenancy(c, landlordId, propertyId = null) {
+  const prop = propertyId || idFrom((await c.post('/app/properties', { address_line1: `Tenanted ${landlordId}`, landlord_id: String(landlordId), status: 'let' })).location);
+  await c.post(`/app/properties/${prop}/add-tenant`, { tenant_mode: 'new', name: `Tenant ${landlordId}`, booking_date: '2026-01-01', start_date: '2026-01-01', status: 'active' });
+  return prop;
+}
+
+test('landlord statements: only landlords with a current tenancy (or a fixed rent); delete one or the whole month', async () => {
+  const { c, landlordId } = await monthlySetup('stmt-current@example.com'); // Mary Owner: tenancy from 1 Aug 2026
+  const a = db.prepare("SELECT id FROM users WHERE username = 'stmt-current'").get().id;
+  const idle = idFrom((await c.post('/app/landlords', { ...LANDLORD, name: 'Idle Owner' })).location); // no tenancy
+  await c.post('/app/properties', { address_line1: '6 Empty Road', landlord_id: String(idle), status: 'vacant' });
+  const fixed = idFrom((await c.post('/app/landlords', { ...LANDLORD, name: 'Fixed Owner' })).location); // empty, but paid a fixed rent
+  await c.post('/app/properties', { address_line1: '7 Lease Road', landlord_id: String(fixed), status: 'let', landlord_rent_pence: '500' });
+  const second = idFrom((await c.post('/app/landlords', { ...LANDLORD, name: 'Second Owner' })).location);
+  await currentTenancy(c, second);
+
+  let r = await c.get('/app/monthly?month=2026-08');
+  assert.match(r.text, /Mary Owner/);
+  assert.match(r.text, /Second Owner/);
+  assert.doesNotMatch(r.text, /Idle Owner/, 'no current tenancy: not listed');
+  assert.doesNotMatch(r.text, /Previous months/, 'no Previous months box');
+  r = await c.post('/app/monthly/generate', { month: '2026-08', landlord_id: String(idle) });
+  assert.match(decodeURIComponent(r.location), /has no current tenancy in August 2026/);
+  // Calculate on the Rent run: Mary, Second and Fixed (paid a fixed rent) get statements; Idle doesn't.
+  await c.get('/app/rent-run?month=2026-08');
+  await c.post('/app/monthly/calculate', { month: '2026-08' });
+  const who = () => db.prepare("SELECT l.name FROM monthly_statements s JOIN landlords l ON l.id = s.landlord_id WHERE s.account_id = ? AND s.month = '2026-08' ORDER BY l.name").all(a).map((x) => x.name);
+  assert.deepEqual(who(), ['Fixed Owner', 'Mary Owner', 'Second Owner']);
+  // July: Mary's tenancy hadn't started, so no statement for her.
+  await c.get('/app/monthly?month=2026-07');
+  await c.post('/app/monthly/generate', { month: '2026-07' });
+  assert.deepEqual(db.prepare("SELECT l.name FROM monthly_statements s JOIN landlords l ON l.id = s.landlord_id WHERE s.account_id = ? AND s.month = '2026-07'").all(a).map((x) => x.name), ['Second Owner']);
+
+  // Delete one statement.
+  r = await c.get('/app/monthly?month=2026-08');
+  assert.match(r.text, /Delete all for August 2026/);
+  const mary = db.prepare("SELECT id, statement_no FROM monthly_statements WHERE landlord_id = ? AND month = '2026-08'").get(landlordId);
+  assert.match(r.text, new RegExp(`action="/app/monthly/${mary.id}/delete"`));
+  r = await c.post(`/app/monthly/${mary.id}/delete`, {});
+  assert.match(decodeURIComponent(r.location), /Deleted statement \d+/);
+  assert.deepEqual(who(), ['Fixed Owner', 'Second Owner']);
+  // Remade, it gets a new number rather than reusing an old one.
+  const top = db.prepare('SELECT MAX(statement_no) AS n FROM monthly_statements WHERE account_id = ?').get(a).n;
+  await c.get('/app/monthly?month=2026-08');
+  await c.post('/app/monthly/generate', { month: '2026-08', landlord_id: String(landlordId) });
+  assert.equal(db.prepare("SELECT statement_no FROM monthly_statements WHERE landlord_id = ? AND month = '2026-08'").get(landlordId).statement_no, Math.max(top, mary.statement_no) + 1);
+  // Delete the whole month; July is untouched; another company can't delete ours.
+  const other = await registerAndLogin('stmt-current-other@example.com', 'Other Current Lets');
+  await other.get('/app/monthly');
+  await other.post('/app/monthly/delete-month', { month: '2026-08' });
+  assert.equal(who().length, 3);
+  await c.get('/app/monthly?month=2026-08');
+  r = await c.post('/app/monthly/delete-month', { month: '2026-08' });
+  assert.match(decodeURIComponent(r.location), /Deleted 3 statements for August 2026/);
+  assert.deepEqual(who(), []);
+  assert.equal(db.prepare("SELECT COUNT(*) n FROM monthly_statements WHERE account_id = ? AND month = '2026-07'").get(a).n, 1);
 });
 
 test('monthly statements: figures, AI summary, fabricated-number guard, fallback', async () => {
@@ -1374,6 +1434,7 @@ test('month end: calculate rents, email landlords, Rift report (Excel) with prev
   r = await c.post('/app/landlords', { ...LANDLORD, name: 'Cy NoEmail' });
   // Landlords added before email was required may have none.
   db.prepare("UPDATE landlords SET email = NULL WHERE name = 'Cy NoEmail'").run();
+  for (const n of ['=Bad Formula', 'Cy NoEmail']) await currentTenancy(c, db.prepare('SELECT id FROM landlords WHERE account_id = ? AND name = ?').get(accountId, n).id);
   r = await c.post('/app/properties', { address_line1: '1 First Street', landlord_id: ann, status: 'vacant', management_fee_pct: '10' });
   const prop = idFrom(r.location);
   r = await c.post(`/app/properties/${prop}/add-tenant`, { tenant_mode: 'new', name: 'Tess', booking_date: '2026-07-01', start_date: '2026-08-01', rent_pence: '1000', rent_frequency: 'monthly', status: 'active' });
@@ -1518,6 +1579,8 @@ test('landlords have a statement type (Email or Cheque); cheque landlords are le
   assert.equal(db.prepare('SELECT statement_type FROM landlords WHERE id = ?').get(eve).statement_type, 'Email');
   r = await c.post('/app/landlords', { ...LANDLORD, name: 'Chad Cheque', email: 'chad@example.com', statement_type: 'Cheque' });
   const chad = idFrom(r.location);
+  await currentTenancy(c, eve);
+  await currentTenancy(c, chad);
   r = await c.post('/app/landlords', { ...LANDLORD, name: 'X', statement_type: 'Carrier pigeon' });
   assert.equal(r.status, 422);
   assert.match(r.text, /Choose a valid statement type/);
@@ -1872,6 +1935,7 @@ test('invoices link to their property and show whether they were deducted, with 
   const dora = idFrom(r.location);
   r = await c.post('/app/properties', { address_line1: '4 Drain Lane', landlord_id: String(dora), status: 'let' });
   const prop = idFrom(r.location);
+  await currentTenancy(c, dora, prop);
   const pdf = () => new File([Buffer.from('%PDF-1.4\n%x\n')], 'i.pdf');
   await c.get('/app/invoices/new');
   const charged = idFrom((await c.post('/app/invoices', await invoiceBody(c, { supplier: 'Drain Co', amount: '120', invoice_date: '2026-08-02', property_id: String(prop), file: pdf() }), { multipart: true })).location);
@@ -1962,6 +2026,7 @@ test('landlord invoices: bill a landlord, deduct from rent or mark paid, print a
   const larry = idFrom(r.location);
   r = await c.post('/app/properties', { address_line1: '8 Bill Street', landlord_id: String(larry), status: 'let' });
   const prop = idFrom(r.location);
+  await currentTenancy(c, larry, prop);
 
   const rail = (await c.get('/app')).text.match(/<nav class="rail"[\s\S]*?<\/nav>/)[0];
   const labels = [...rail.matchAll(/aria-label="([^"]+)"/g)].map((m) => m[1]);
@@ -2066,6 +2131,7 @@ test('"Deduct from landlord" straight from adding a contractor or landlord invoi
   const nora = idFrom(r.location);
   r = await c.post('/app/properties', { address_line1: '3 Quick Street', landlord_id: String(nora), status: 'let' });
   const prop = idFrom(r.location);
+  await currentTenancy(c, nora, prop);
   r = await c.post('/app/properties', { address_line1: 'No Landlord House', status: 'vacant' });
   const lonely = idFrom(r.location);
   const pdf = () => new File([Buffer.from('%PDF-1.4\n%x\n')], 'i.pdf');
