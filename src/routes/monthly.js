@@ -61,6 +61,8 @@ module.exports = function monthlyRoutes(db, writer, mailer = { enabled: false })
     const s = db.prepare('SELECT id, month, statement_no FROM monthly_statements WHERE id = ? AND account_id = ?').get(Number(req.params.id), req.user.id);
     if (!s) return res.redirect('/app/monthly?error=' + encodeURIComponent('That statement was not found.'));
     db.prepare('DELETE FROM monthly_statements WHERE id = ? AND account_id = ?').run(s.id, req.user.id);
+    // So the automatic monthly job doesn't make it again.
+    db.prepare('INSERT OR IGNORE INTO statement_auto_runs (account_id, month) VALUES (?, ?)').run(req.user.id, s.month);
     res.redirect(`/app/monthly?month=${s.month}&flash=${encodeURIComponent(`Deleted statement ${s.statement_no || ''}.`.replace('  ', ' '))}`);
   });
 
@@ -68,6 +70,7 @@ module.exports = function monthlyRoutes(db, writer, mailer = { enabled: false })
     const month = String(req.body.month || '');
     if (!st.isMonth(month)) return res.redirect('/app/monthly?error=' + encodeURIComponent('Choose a valid month.'));
     const n = db.prepare('DELETE FROM monthly_statements WHERE account_id = ? AND month = ?').run(req.user.id, month).changes;
+    db.prepare('INSERT OR IGNORE INTO statement_auto_runs (account_id, month) VALUES (?, ?)').run(req.user.id, month);
     res.redirect(`/app/monthly?month=${month}&flash=${encodeURIComponent(`Deleted ${n} statement${n === 1 ? '' : 's'} for ${st.monthLabel(month)}.`)}`);
   });
 

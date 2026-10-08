@@ -220,15 +220,20 @@ async function generateForAccount(db, { accountId, agencyName, month, writer, on
   return todo.length;
 }
 
-// Once a month has ended, make sure every active agency has last month's statements.
+// Once a month has ended, make every active agency last month's statements (once; see statement_auto_runs).
 async function runMonthlyJob(db, writer, { today = fmt.today(), log = console.log } = {}) {
   const month = previousMonth(today);
   const accounts = db.prepare(
     "SELECT id, agency_name FROM users WHERE status = 'active' AND EXISTS (SELECT 1 FROM landlords l WHERE l.account_id = users.id)"
   ).all();
   let total = 0;
+  const done = db.prepare('SELECT 1 FROM statement_auto_runs WHERE account_id = ? AND month = ?');
+  const mark = db.prepare('INSERT OR IGNORE INTO statement_auto_runs (account_id, month) VALUES (?, ?)');
   for (const a of accounts) {
+    // Once per company per month: anything deleted afterwards stays deleted.
+    if (done.get(a.id, month)) continue;
     total += await generateForAccount(db, { accountId: a.id, agencyName: a.agency_name, month, writer, onlyMissing: true, log: console.error });
+    mark.run(a.id, month);
   }
   if (total) log(`Generated ${total} monthly statement${total === 1 ? '' : 's'} for ${month}.`);
   return total;

@@ -609,6 +609,19 @@ function openDatabase(file) {
   numberTenancies(db);
   addColumnIfMissing(db, 'monthly_statements', 'statement_no', 'INTEGER');
   addColumnIfMissing(db, 'users', 'last_statement_no', 'INTEGER');
+  // Months the automatic statement job has already done for each company, so statements deleted
+  // afterwards aren't made again. Companies already using statements count last month as done.
+  db.exec(`CREATE TABLE IF NOT EXISTS statement_auto_runs (
+    account_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    month      TEXT NOT NULL,
+    ran_at     TEXT NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY (account_id, month)
+  )`);
+  if (!db.prepare('SELECT 1 FROM statement_auto_runs LIMIT 1').get()) {
+    const now = new Date();
+    const last = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1)).toISOString().slice(0, 7);
+    db.prepare('INSERT OR IGNORE INTO statement_auto_runs (account_id, month) SELECT DISTINCT account_id, ? FROM monthly_statements').run(last);
+  }
   numberStatements(db);
   return db;
 }

@@ -572,6 +572,37 @@ test('monthly job fills in last month only where missing', async () => {
   assert.equal(await runMonthlyJob(db, null, { today: '2026-09-02', log: () => {} }), 0, 'second run has nothing to do');
 });
 
+test('monthly job: statements you delete are not made again', async () => {
+  const { runMonthlyJob } = require('../src/statements');
+  const { c, landlordId } = await monthlySetup('monthly-job-delete@example.com');
+  const a = db.prepare("SELECT id FROM users WHERE username = 'monthly-job-delete'").get().id;
+  const ll2 = idFrom((await c.post('/app/landlords', { ...LANDLORD, name: 'Second Job Owner' })).location);
+  await currentTenancy(c, ll2);
+  const job = () => runMonthlyJob(db, null, { today: '2026-09-02', log: () => {} });
+  const count = () => db.prepare("SELECT COUNT(*) n FROM monthly_statements WHERE account_id = ? AND month = '2026-08'").get(a).n;
+  await job();
+  assert.equal(count(), 2);
+  // Delete one: the job runs again (every 6 hours) but doesn't bring it back.
+  const one = db.prepare("SELECT id FROM monthly_statements WHERE landlord_id = ? AND month = '2026-08'").get(landlordId).id;
+  await c.get('/app/monthly?month=2026-08');
+  await c.post(`/app/monthly/${one}/delete`, {});
+  await job();
+  assert.equal(count(), 1);
+  // Delete the whole month: still gone after the job.
+  await c.get('/app/monthly?month=2026-08');
+  await c.post('/app/monthly/delete-month', { month: '2026-08' });
+  await job();
+  assert.equal(count(), 0);
+  // Deleting a month before the job has got to it also stops it making that month.
+  await c.get('/app/monthly?month=2026-09');
+  await c.post('/app/monthly/delete-month', { month: '2026-09' });
+  await runMonthlyJob(db, null, { today: '2026-10-02', log: () => {} });
+  assert.equal(db.prepare("SELECT COUNT(*) n FROM monthly_statements WHERE account_id = ? AND month = '2026-09'").get(a).n, 0);
+  // Generating by hand still works.
+  await c.post('/app/monthly/generate', { month: '2026-08', landlord_id: String(landlordId) });
+  assert.equal(count(), 1);
+});
+
 test('agency data export: only the admin can download it', async () => {
   const c = await registerAndLogin('export@example.com', 'Export Lets');
   await c.post('/app/landlords', { ...LANDLORD, name: 'Exported Landlord' });
