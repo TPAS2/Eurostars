@@ -277,6 +277,51 @@ module.exports = function landlordInvoiceRoutes(db, mailer = { enabled: false })
     for (const id of ids) db.prepare('DELETE FROM transactions WHERE id = ? AND account_id = ?').run(id, a);
   }
 
+  // Change how a settled invoice was settled: deduct from the landlord's rent (from another date,
+  // or a different amount if it's taken in one go) or switch to paid by the landlord.
+  const settlementForm = (res, inv, values, errors, status = 200) => res.status(status).render('landlordinvoices/settlement', {
+    title: `Edit settlement · ${inv.invoice_number}`, section: 'landlordinvoices', inv, values, errors, fmt,
+  });
+  router.get('/:id(\\d+)/settlement/edit', (req, res) => {
+    const inv = load(req, res);
+    if (!inv) return;
+    if (inv.status !== 'paid') return res.redirect(`/app/landlord-invoices/${inv.id}`);
+    const first = inv.txn_id ? db.prepare('SELECT txn_date, amount_pence FROM transactions WHERE id = ? AND account_id = ?').get(inv.txn_id, req.user.id) : null;
+    settlementForm(res, inv, {
+      how: inv.txn_id ? 'deduct' : 'paid',
+      date: (first && first.txn_date) || inv.paid_date || fmt.today(),
+      amount: fmt.penceToInput(first && inv.months <= 1 ? first.amount_pence : inv.amount_pence),
+    }, {});
+  });
+  router.post('/:id(\\d+)/settlement', (req, res) => {
+    const inv = load(req, res);
+    if (!inv) return;
+    const a = req.user.id;
+    const how = req.body.how === 'paid' ? 'paid' : 'deduct';
+    const date = String(req.body.date || '').trim();
+    const single = inv.months <= 1;
+    const pence = single && how === 'deduct' ? fmt.parseMoney(String(req.body.amount || '').trim()) : inv.amount_pence;
+    const errors = {};
+    if (!fmt.isIsoDate(date)) errors.date = 'Enter a valid date.';
+    if (Number.isNaN(pence) || pence <= 0) errors.amount = 'Enter the amount, like 120 or 120.00.';
+    if (Object.keys(errors).length) return settlementForm(res, inv, { ...req.body, how }, errors, 422);
+    // (deduct() runs in its own transaction, so this isn't wrapped in another.)
+    removeDeductions(a, inv);
+    if (how === 'deduct') {
+      deduct(a, inv, date);
+      if (single && pence !== inv.amount_pence) {
+        const txn = db.prepare('SELECT txn_id FROM landlord_invoices WHERE id = ?').get(inv.id).txn_id;
+        db.prepare('UPDATE transactions SET amount_pence = ? WHERE id = ? AND account_id = ?').run(pence, txn, a);
+      }
+    } else {
+      db.prepare("UPDATE landlord_invoices SET status = 'paid', paid_date = ?, paid_how = 'Paid by landlord', txn_id = NULL, instalment_txn_ids = NULL WHERE id = ? AND account_id = ?").run(date, inv.id, a);
+    }
+    const msg = how === 'paid' ? `Changed to paid by ${inv.landlord_name} on ${fmt.ukDate(date)}; nothing is taken from their rent.`
+      : single ? `Changed: ${fmt.money(pence)} deducted from ${inv.landlord_name}'s rent for ${st.monthLabel(date.slice(0, 7))}.`
+      : `Changed: deducting from ${inv.landlord_name}'s rent over ${inv.months} months, from ${st.monthLabel(date.slice(0, 7))}.`;
+    res.redirect(`/app/landlord-invoices/${inv.id}?flash=${encodeURIComponent(msg)}`);
+  });
+
   router.post('/:id(\\d+)/settle', (req, res) => {
     const inv = load(req, res);
     if (!inv) return;

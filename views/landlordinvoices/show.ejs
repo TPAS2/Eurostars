@@ -57,9 +57,12 @@
     <div><strong><%= inv.paid_how %></strong> on <%= fmt.ukDate(inv.paid_date) %>.
       <% if (inv.txn_id) { %>Deducted: <span class="yes-no yes">Yes</span><% if (link) { %> · <a href="<%= link %>">View statement</a><% } %><% } else { %>Deducted: <span class="yes-no no">No</span><% } %>
     </div>
-    <form method="post" action="/app/landlord-invoices/<%= inv.id %>/unsettle" data-confirm="Undo? <%= inv.txn_id ? 'The deduction from their rent will be removed.' : '' %>">
-      <%- include('../partials/csrf') %><button class="btn small" type="submit">Undo</button>
-    </form>
+    <div class="actions">
+      <a class="btn small" href="/app/landlord-invoices/<%= inv.id %>/settlement/edit">Edit</a>
+      <form method="post" action="/app/landlord-invoices/<%= inv.id %>/unsettle" data-confirm="Undo? <%= inv.txn_id ? 'The deduction from their rent will be removed.' : '' %>">
+        <%- include('../partials/csrf') %><button class="btn small" type="submit">Undo</button>
+      </form>
+    </div>
   </div>
 </section>
 <% } %>

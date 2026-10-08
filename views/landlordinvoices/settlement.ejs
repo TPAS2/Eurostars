@@ -1,0 +1,27 @@
+<%- include('../partials/header') %>
+<header class="page-head">
+  <div>
+    <a class="crumb" href="/app/landlord-invoices/<%= inv.id %>">← <%= inv.invoice_number %></a>
+    <h1>Edit settlement</h1>
+    <p class="muted"><%= inv.landlord_name %> · <%= inv.description %> · <%= fmt.money(inv.amount_pence) %><%= inv.months > 1 ? ` over ${inv.months} months` : '' %></p>
+  </div>
+</header>
+<section class="card">
+  <form method="post" action="/app/landlord-invoices/<%= inv.id %>/settlement" class="settle-form" data-no-keep>
+    <%- include('../partials/csrf') %>
+    <label class="check"><input type="radio" name="how" value="deduct" <%= values.how !== 'paid' ? 'checked' : '' %>> <span><strong>Deduct from <%= inv.landlord_name %>'s rent</strong><br><span class="muted small"><%= inv.months > 1 ? `Split over ${inv.months} months, starting from the month of this date. Each month's payment can then be changed on the invoice.` : 'Shows as a deduction on their statement for the month of this date.' %></span></span></label>
+    <label class="check"><input type="radio" name="how" value="paid" <%= values.how === 'paid' ? 'checked' : '' %>> <span><strong>Paid by the landlord</strong><br><span class="muted small">They paid you directly; nothing is taken from their rent.</span></span></label>
+    <label>Date <input type="date" name="date" value="<%= values.date || '' %>" required></label>
+    <% if (errors.date) { %><div class="field-err"><%= errors.date %></div><% } %>
+    <% if (inv.months <= 1) { %>
+    <label>Amount to deduct (£) <input name="amount" inputmode="decimal" value="<%= values.amount || '' %>"></label>
+    <div class="help">Only used when deducting from their rent.</div>
+    <% if (errors.amount) { %><div class="field-err"><%= errors.amount %></div><% } %>
+    <% } %>
+    <div class="form-actions">
+      <button class="btn primary" type="submit">Save</button>
+      <a class="btn" href="/app/landlord-invoices/<%= inv.id %>">Cancel</a>
+    </div>
+  </form>
+</section>
+<%- include('../partials/footer') %>

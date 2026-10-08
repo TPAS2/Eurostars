@@ -2925,6 +2925,44 @@ test('contractors list: Invoices, Total paid and Total unpaid are all time', asy
   assert.match(r.text, /Made-up Roofing[\s\S]*?>\s*3\s*<\/td>[\s\S]*?£125\.00[\s\S]*?£40\.00/);
 });
 
+test('landlord invoices: edit a deduction from the landlord\u2019s rent (date, amount, or switch to paid by landlord)', async () => {
+  const c = await registerAndLogin('li-edit-deduct@example.com', 'LI Edit Lets');
+  const a = db.prepare("SELECT id FROM users WHERE username = 'li-edit-deduct'").get().id;
+  const ll = idFrom((await c.post('/app/landlords', { ...LANDLORD, name: 'Edna Edit' })).location);
+  const prop = idFrom((await c.post('/app/properties', { address_line1: '2 Change Close', landlord_id: String(ll), status: 'let' })).location);
+  await c.get('/app/landlord-invoices/new');
+  const inv = idFrom((await c.post('/app/landlord-invoices', { landlord_id: String(ll), property_id: String(prop), invoice_number: '', invoice_date: '2026-08-01', description: 'Lock change', amount: '90' })).location);
+  await c.get(`/app/landlord-invoices/${inv}`);
+  await c.post(`/app/landlord-invoices/${inv}/settle`, { how: 'deduct', date: '2026-08-20' });
+  let r = await c.get(`/app/landlord-invoices/${inv}`);
+  assert.match(r.text, new RegExp(`href="/app/landlord-invoices/${inv}/settlement/edit">Edit</a>`), 'an Edit button beside Undo');
+  // Move it to September and take £60 instead.
+  r = await c.get(`/app/landlord-invoices/${inv}/settlement/edit`);
+  assert.match(r.text, /name="date" value="2026-08-20"/);
+  assert.match(r.text, /name="amount"[^>]*value="90\.00"/);
+  r = await c.post(`/app/landlord-invoices/${inv}/settlement`, { how: 'deduct', date: '2026-09-05', amount: '60' });
+  assert.match(decodeURIComponent(r.location), /£60\.00 deducted from Edna Edit's rent for September 2026/);
+  const fees = () => db.prepare("SELECT txn_date, amount_pence FROM transactions WHERE account_id = ? AND txn_type = 'fee' ORDER BY id").all(a).map((x) => [x.txn_date, x.amount_pence]);
+  assert.deepEqual(fees(), [['2026-09-05', 6000]], 'the old August deduction is replaced, not added to');
+  // A bad amount is refused and nothing changes.
+  r = await c.post(`/app/landlord-invoices/${inv}/settlement`, { how: 'deduct', date: '2026-09-05', amount: 'lots' });
+  assert.equal(r.status, 422);
+  assert.deepEqual(fees(), [['2026-09-05', 6000]]);
+  // Switch to paid by the landlord: nothing comes off their rent.
+  r = await c.post(`/app/landlord-invoices/${inv}/settlement`, { how: 'paid', date: '2026-09-10' });
+  assert.deepEqual(fees(), []);
+  const row = db.prepare('SELECT status, paid_how, paid_date, txn_id FROM landlord_invoices WHERE id = ?').get(inv);
+  assert.deepEqual({ ...row }, { status: 'paid', paid_how: 'Paid by landlord', paid_date: '2026-09-10', txn_id: null });
+  // And back to a deduction.
+  await c.post(`/app/landlord-invoices/${inv}/settlement`, { how: 'deduct', date: '2026-10-01', amount: '90' });
+  assert.deepEqual(fees(), [['2026-10-01', 9000]]);
+  // Another company can't touch it.
+  const other = await registerAndLogin('li-edit-deduct-2@example.com', 'Other LI Lets');
+  await other.get('/app/landlord-invoices');
+  assert.equal((await other.post(`/app/landlord-invoices/${inv}/settlement`, { how: 'paid', date: '2026-10-02' })).status, 404);
+  assert.deepEqual(fees(), [['2026-10-01', 9000]]);
+});
+
 test('tenants list is in tenancy number order, not name order', async () => {
   const c = await registerAndLogin('tenancy-order@example.com', 'Tenancy Order Lets');
   const prop = idFrom((await c.post('/app/properties', { address_line1: '3 Order Row', status: 'let' })).location);
