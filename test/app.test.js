@@ -2830,6 +2830,18 @@ test('contractors: no Fax or Mobile box; Name, Trade, Code / Phone, Email / Addr
   assert.doesNotMatch((await c.get(`/app/contractors/${id}/edit`)).text, /name="fax"/);
 });
 
+test('contractors list is in contractor code order; any without a code go last', async () => {
+  const c = await registerAndLogin('contractor-order@example.com', 'Contractor Order Lets');
+  await c.post('/app/contractors', { name: 'Aaron Last Code', code: 'C0003' });
+  await c.post('/app/contractors', { name: 'Zed First Code', code: 'C0001' });
+  await c.post('/app/contractors', { name: 'Mid Code Ltd', code: 'C0002' });
+  const id = idFrom((await c.post('/app/contractors', { name: 'Abe No Code' })).location);
+  db.prepare("UPDATE contractors SET code = NULL WHERE id = ?").run(id);
+  const text = (await c.get('/app/contractors')).text;
+  const at = ['Zed First Code', 'Mid Code Ltd', 'Aaron Last Code', 'Abe No Code'].map((n) => text.indexOf(n));
+  assert.ok(at[0] > 0 && at[0] < at[1] && at[1] < at[2] && at[2] < at[3], `C0001, C0002, C0003, then no code: ${at}`);
+});
+
 test('tenants list is in tenancy number order, not name order', async () => {
   const c = await registerAndLogin('tenancy-order@example.com', 'Tenancy Order Lets');
   const prop = idFrom((await c.post('/app/properties', { address_line1: '3 Order Row', status: 'let' })).location);

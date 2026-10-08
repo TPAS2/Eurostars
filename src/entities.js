@@ -147,7 +147,7 @@ const ENTITIES = {
     singular: 'Contractor',
     plural: 'Contractors',
     titleField: 'name',
-    order: 'name COLLATE NOCASE',
+    order: "CASE WHEN code IS NULL OR code = '' THEN 1 ELSE 0 END, code COLLATE NOCASE, name COLLATE NOCASE",
     searchBar: true,
     fields: [
       // Laid out three to a row: Name, Trade, Contractor code; Phone, Email; Address beside Notes.
