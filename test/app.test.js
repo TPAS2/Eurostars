@@ -289,27 +289,24 @@ test('maintenance invoices: upload, list unpaid, pay, undo', async () => {
   assert.equal(r.headers.get('content-type'), 'application/pdf');
   assert.match(r.headers.get('content-security-policy'), /sandbox/);
 
-  // Pay it: marked paid, expense charged to landlord, job cost filled in.
+  // Pay it: marked paid and the job cost filled in; nothing is taken from the landlord (even if asked).
   await c.get(`/app/invoices/${invoiceId}`);
+  assert.doesNotMatch((await c.get(`/app/invoices/${invoiceId}`)).text, /name="charge_landlord" value="1"/, 'no deduct box when paying');
   r = await c.post(`/app/invoices/${invoiceId}/pay`, { paid_date: '2026-09-10', payment_method: 'Bank transfer', payment_reference: 'REF1', charge_landlord: '1' });
   assert.equal(r.status, 302);
   const paid = db.prepare('SELECT * FROM invoices WHERE id = ?').get(invoiceId);
   assert.equal(paid.status, 'paid');
-  const txn = db.prepare('SELECT * FROM transactions WHERE id = ?').get(paid.payment_txn_id);
-  assert.equal(txn.txn_type, 'expense');
-  assert.equal(txn.landlord_id, landlordId);
-  assert.equal(txn.amount_pence, 24000);
+  assert.equal(paid.payment_txn_id, null);
+  assert.equal(db.prepare("SELECT COUNT(*) n FROM transactions WHERE txn_type = 'expense' AND account_id = ?").get(inv.account_id).n, 0);
   assert.equal(db.prepare('SELECT cost_pence FROM maintenance_jobs WHERE id = ?').get(jobId).cost_pence, 24000);
 
-  // Can't pay twice or delete a paid invoice.
+  // Can't pay twice.
   r = await c.post(`/app/invoices/${invoiceId}/pay`, { paid_date: '2026-09-10', payment_method: 'Card' });
   assert.match(decodeURIComponent(r.location), /already paid/);
-  assert.equal(db.prepare("SELECT COUNT(*) n FROM transactions WHERE txn_type = 'expense' AND account_id = ?").get(inv.account_id).n, 1);
 
-  // Undo payment removes the charge.
+  // Undo payment.
   r = await c.post(`/app/invoices/${invoiceId}/unpay`, {});
   assert.equal(db.prepare('SELECT status FROM invoices WHERE id = ?').get(invoiceId).status, 'unpaid');
-  assert.equal(db.prepare('SELECT COUNT(*) n FROM transactions WHERE id = ?').get(txn.id).n, 0);
 });
 
 test('agencies cannot see or touch each other\'s data', async () => {
@@ -1324,7 +1321,10 @@ test('any invoice can be deleted, from its page or from a list', async () => {
 
   // A paid invoice: deleting it also removes the charge to the landlord and the stored file.
   const paidId = await upload('Paid Plumbing');
-  await c.post(`/app/invoices/${paidId}/pay`, { paid_date: '2026-09-10', payment_method: 'Card', charge_landlord: '1' });
+  await c.post(`/app/invoices/${paidId}/pay`, { paid_date: '2026-09-10', payment_method: 'Card' });
+  // (An invoice charged to the landlord before deducting was taken off contractor invoices.)
+  const oldCharge = Number(db.prepare("INSERT INTO transactions (account_id, txn_date, txn_type, landlord_id, property_id, amount_pence) SELECT account_id, '2026-09-10', 'expense', ?, property_id, 5000 FROM invoices WHERE id = ?").run(landlordId, paidId).lastInsertRowid);
+  db.prepare('UPDATE invoices SET payment_txn_id = ? WHERE id = ?').run(oldCharge, paidId);
   const paid = db.prepare('SELECT * FROM invoices WHERE id = ?').get(paidId);
   assert.ok(paid.payment_txn_id);
   const file = path.join(config.uploadDir, String(paid.account_id), paid.file_name);
@@ -1941,8 +1941,11 @@ test('invoices link to their property and show whether they were deducted, with 
   const charged = idFrom((await c.post('/app/invoices', await invoiceBody(c, { supplier: 'Drain Co', amount: '120', invoice_date: '2026-08-02', property_id: String(prop), file: pdf() }), { multipart: true })).location);
   const notCharged = idFrom((await c.post('/app/invoices', await invoiceBody(c, { supplier: 'Paint Co', amount: '40', invoice_date: '2026-08-03', property_id: String(prop), file: pdf() }), { multipart: true })).location);
   await c.get(`/app/invoices/${charged}`);
-  await c.post(`/app/invoices/${charged}/pay`, { paid_date: '2026-08-10', payment_method: 'Bank transfer', charge_landlord: '1' });
+  await c.post(`/app/invoices/${charged}/pay`, { paid_date: '2026-08-10', payment_method: 'Bank transfer' });
   await c.post(`/app/invoices/${notCharged}/pay`, { paid_date: '2026-08-11', payment_method: 'Card' });
+  // Contractor invoices can no longer be deducted, but ones deducted before that still show it.
+  const oldCharge = Number(db.prepare("INSERT INTO transactions (account_id, txn_date, txn_type, landlord_id, property_id, description, amount_pence) SELECT account_id, '2026-08-10', 'expense', ?, ?, 'Invoice — Drain Co', 12000 FROM invoices WHERE id = ?").run(dora, prop, charged).lastInsertRowid);
+  db.prepare('UPDATE invoices SET payment_txn_id = ? WHERE id = ?').run(oldCharge, charged);
 
   r = await c.get('/app/invoices?month=2026-08');
   assert.match(r.text, /<th>Deducted<\/th>/);
@@ -2125,7 +2128,7 @@ test('contractor invoice form offers the saved contractors as a type-to-narrow l
   assert.match(r.text, /<h1>Upload contractor invoice<\/h1>/);
 });
 
-test('"Deduct from landlord" straight from adding a contractor or landlord invoice', async () => {
+test('"Deduct from landlord" straight from adding a landlord invoice; contractor invoices are only uploaded', async () => {
   const c = await registerAndLogin('deduct-now@example.com', 'Deduct Now Lets');
   let r = await c.post('/app/landlords', { ...LANDLORD, name: 'Nora Now' });
   const nora = idFrom(r.location);
@@ -2136,22 +2139,16 @@ test('"Deduct from landlord" straight from adding a contractor or landlord invoi
   const lonely = idFrom(r.location);
   const pdf = () => new File([Buffer.from('%PDF-1.4\n%x\n')], 'i.pdf');
 
-  // Contractor invoice.
+  // Contractor invoices are only uploaded: no "deduct from landlord" button, and asking for it anyway
+  // just uploads the invoice, unpaid, with nothing taken from the landlord.
   r = await c.get('/app/invoices/new');
-  assert.match(r.text, /name="then" value="deduct"[^>]*>Upload &amp; deduct from landlord/);
+  assert.doesNotMatch(r.text, /value="deduct"|deduct from landlord/i);
   r = await c.post('/app/invoices', await invoiceBody(c, { supplier: 'Quick Fix', amount: '90', invoice_date: '2026-08-12', property_id: String(prop), then: 'deduct', file: pdf() }), { multipart: true });
-  const inv = idFrom(r.location.split('?')[0]);
-  assert.match(decodeURIComponent(r.location), /Deducted £90\.00 from Nora Now for August 2026/);
-  const row = db.prepare('SELECT * FROM invoices WHERE id = ?').get(inv);
-  assert.equal(row.status, 'paid');
-  assert.equal(row.paid_date, '2026-08-12');
-  const exp = db.prepare('SELECT * FROM transactions WHERE id = ?').get(row.payment_txn_id);
-  assert.deepEqual([exp.txn_type, exp.landlord_id, exp.amount_pence], ['expense', nora, 9000]);
-  // Without a landlord to charge, it says so and nothing is saved.
-  r = await c.post('/app/invoices', await invoiceBody(c, { supplier: 'Quick Fix', amount: '10', property_id: String(lonely), then: 'deduct', file: pdf() }), { multipart: true });
-  assert.equal(r.status, 422);
-  assert.match(r.text, /To deduct from a landlord, choose the landlord/);
-  assert.equal(db.prepare('SELECT COUNT(*) n FROM invoices WHERE property_id = ?').get(lonely).n, 0);
+  const row = db.prepare('SELECT * FROM invoices WHERE id = ?').get(idFrom(r.location.split('?')[0]));
+  assert.equal(row.status, 'unpaid');
+  assert.equal(row.payment_txn_id, null);
+  assert.equal(db.prepare("SELECT COUNT(*) n FROM transactions WHERE landlord_id = ? AND txn_type = 'expense'").get(nora).n, 0);
+  assert.ok(lonely);
   // Plain upload still leaves it unpaid.
   r = await c.post('/app/invoices', await invoiceBody(c, { supplier: 'Quick Fix', amount: '20', property_id: String(prop), then: 'save', file: pdf() }), { multipart: true });
   assert.equal(db.prepare('SELECT status FROM invoices WHERE id = ?').get(idFrom(r.location)).status, 'unpaid');
@@ -2165,11 +2162,11 @@ test('"Deduct from landlord" straight from adding a contractor or landlord invoi
   assert.equal(li.paid_how, 'Deducted from rent');
   assert.equal(db.prepare('SELECT txn_type FROM transactions WHERE id = ?').get(li.txn_id).txn_type, 'fee');
 
-  // Both come off Nora's August statement.
+  // Only the landlord invoice comes off Nora's August statement.
   await c.get('/app/monthly?month=2026-08');
   await c.post('/app/monthly/generate', { month: '2026-08', landlord_id: String(nora) });
   const s = db.prepare("SELECT fees_pence, expenses_pence FROM monthly_statements WHERE landlord_id = ? AND month = '2026-08'").get(nora);
-  assert.deepEqual({ ...s }, { fees_pence: 6000, expenses_pence: 9000 });
+  assert.deepEqual({ ...s }, { fees_pence: 6000, expenses_pence: 0 });
 });
 
 test('every section must be filled in when adding a contractor or landlord invoice', async () => {
@@ -3316,20 +3313,18 @@ test('contractor invoices: choose the landlord to charge and say what is require
   assert.match(form.text, /What(’|'|&#39;)s required/);
   assert.match(form.text, /data-landlord="\d+"[^>]*>3 Chosen Road/);
 
-  // Left blank: the property's landlord. Deducted from them.
-  let r = await c.post('/app/invoices', { supplier: 'Tap Co', amount: '50', landlord_amount: '60', charge_landlord: 'yes', invoice_date: '2026-09-02', property_id: pid, maintenance_job_id: 'none', work_required: 'Fix the kitchen tap', then: 'deduct' }, { multipart: true });
+  // Left blank: the property's landlord.
+  let r = await c.post('/app/invoices', { supplier: 'Tap Co', amount: '50', landlord_amount: '60', charge_landlord: 'yes', invoice_date: '2026-09-02', property_id: pid, maintenance_job_id: 'none', work_required: 'Fix the kitchen tap' }, { multipart: true });
   assert.equal(r.status, 302, r.text);
   let inv = db.prepare("SELECT * FROM invoices WHERE supplier = 'Tap Co'").get();
   assert.equal(inv.landlord_id, owner);
   assert.equal(inv.work_required, 'Fix the kitchen tap');
-  assert.equal(db.prepare('SELECT landlord_id FROM transactions WHERE id = ?').get(inv.payment_txn_id).landlord_id, owner);
   assert.match((await c.get(`/app/invoices/${inv.id}`)).text, /What(’|'|&#39;)s required<\/dt><dd class="pre">Fix the kitchen tap/);
 
-  // Chosen by hand: charged to that landlord instead.
-  r = await c.post('/app/invoices', { supplier: 'Roof Co', amount: '100', landlord_amount: '120', charge_landlord: 'yes', invoice_date: '2026-09-03', property_id: pid, maintenance_job_id: 'none', landlord_id: String(other), then: 'deduct' }, { multipart: true });
+  // Chosen by hand: that landlord instead.
+  r = await c.post('/app/invoices', { supplier: 'Roof Co', amount: '100', landlord_amount: '120', charge_landlord: 'yes', invoice_date: '2026-09-03', property_id: pid, maintenance_job_id: 'none', landlord_id: String(other) }, { multipart: true });
   inv = db.prepare("SELECT * FROM invoices WHERE supplier = 'Roof Co'").get();
   assert.equal(inv.landlord_id, other);
-  assert.equal(db.prepare('SELECT landlord_id FROM transactions WHERE id = ?').get(inv.payment_txn_id).landlord_id, other);
   assert.match((await c.get(`/app/invoices/${inv.id}`)).text, /Other Oscar/);
 
   // Another company's landlord is refused.
@@ -3428,13 +3423,12 @@ test('contractor invoice: price to us, price to landlord, profit, and charge to 
   let r = await c.get('/app/invoices/new');
   assert.match(r.text, /Charge to landlord <span class="req">\*<\/span>[\s\S]*?<option value="" selected>Choose…[\s\S]*?Price to us \(£\)[\s\S]*?Price to landlord \(£\)[\s\S]*?Profit \(£\)/);
 
-  // Deducted at the price to the landlord; the profit shows on the invoice.
-  r = await c.post('/app/invoices', { supplier: 'Gas Safe Co', amount: '120', landlord_amount: '150', charge_landlord: 'yes', invoice_date: '2026-09-10', property_id: String(prop), then: 'deduct' }, { multipart: true });
+  // Both prices are kept and the profit shows on the invoice.
+  r = await c.post('/app/invoices', { supplier: 'Gas Safe Co', amount: '120', landlord_amount: '150', charge_landlord: 'yes', invoice_date: '2026-09-10', property_id: String(prop) }, { multipart: true });
   assert.equal(r.status, 302, r.text);
   const id = idFrom(r.location.split('?')[0]);
-  const inv = db.prepare('SELECT amount_pence, landlord_price_pence, charge_landlord, status, payment_txn_id FROM invoices WHERE id = ?').get(id);
-  assert.deepEqual({ amount: inv.amount_pence, landlord: inv.landlord_price_pence, charge: inv.charge_landlord, status: inv.status }, { amount: 12000, landlord: 15000, charge: 1, status: 'paid' });
-  assert.equal(db.prepare('SELECT amount_pence FROM transactions WHERE id = ?').get(inv.payment_txn_id).amount_pence, 15000, 'landlord charged the price to landlord');
+  const inv = db.prepare('SELECT amount_pence, landlord_price_pence, charge_landlord, status FROM invoices WHERE id = ?').get(id);
+  assert.deepEqual({ amount: inv.amount_pence, landlord: inv.landlord_price_pence, charge: inv.charge_landlord, status: inv.status }, { amount: 12000, landlord: 15000, charge: 1, status: 'unpaid' });
   r = await c.get(`/app/invoices/${id}`);
   assert.match(r.text, /Price to us<\/dt><dd><strong>£120\.00[\s\S]*?Price to landlord<\/dt><dd><strong>£150\.00[\s\S]*?Profit<\/dt><dd><strong class="ok-text">£30\.00/);
 
@@ -3455,14 +3449,14 @@ test('contractor invoice: price to us, price to landlord, profit, and charge to 
   r = await c.post('/app/invoices', { supplier: 'Unsure', amount: '10', landlord_amount: '10', invoice_date: '2026-09-11', property_id: String(prop) }, { multipart: true });
   assert.match(r.text, /Choose whether to charge the landlord/);
 
-  // Charge to landlord: No — saved, shown, and the pay box starts unticked.
+  // Charge to landlord: No — saved and shown; paying has no deduct box at all.
   await c.get('/app/invoices/new');
   r = await c.post('/app/invoices', { supplier: 'Office Repairs', amount: '60', charge_landlord: 'no', invoice_date: '2026-09-12', property_id: String(prop) }, { multipart: true });
   const noCharge = idFrom(r.location);
   assert.equal(db.prepare('SELECT charge_landlord FROM invoices WHERE id = ?').get(noCharge).charge_landlord, 0);
   r = await c.get(`/app/invoices/${noCharge}`);
   assert.match(r.text, /Charge to landlord<\/dt><dd><span class="badge plain ">No/);
-  assert.match(r.text, /<input type="checkbox" name="charge_landlord" value="1" >/);
+  assert.doesNotMatch(r.text, /name="charge_landlord" value="1"/);
   assert.match((await c.get(`/app/invoices/${noCharge}/edit`)).text, /<option value="no" selected>No/);
 
   // A bad price to landlord is refused.
@@ -4221,8 +4215,9 @@ test('landlord invoices tab: profit from contractor invoices this month and all 
   const ll = String(idFrom((await c.post('/app/landlords', { ...LANDLORD, name: 'Profit Owner', statement_type: 'Email' })).location));
   const prop = String(idFrom((await c.post('/app/properties', { address_line1: '7 Margin Road', status: 'let', landlord_id: ll })).location));
   const add = async (fields) => { await c.get('/app/invoices/new'); return c.post('/app/invoices', { maintenance_job_id: 'none', property_id: prop, charge_landlord: 'yes', ...fields }, { multipart: true }); };
-  await add({ supplier: 'Sept Co', amount: '100', landlord_amount: '150', invoice_date: '2026-09-05', then: 'deduct' }); // +50 in September
-  await add({ supplier: 'Aug Co', amount: '80', landlord_amount: '100', invoice_date: '2026-08-10', then: 'deduct' }); // +20 in August
+  const pay = async (r, date) => { const id = idFrom(r.location); await c.get(`/app/invoices/${id}`); await c.post(`/app/invoices/${id}/pay`, { paid_date: date, payment_method: 'Card' }); };
+  await pay(await add({ supplier: 'Sept Co', amount: '100', landlord_amount: '150', invoice_date: '2026-09-05' }), '2026-09-05'); // +50 in September
+  await pay(await add({ supplier: 'Aug Co', amount: '80', landlord_amount: '100', invoice_date: '2026-08-10' }), '2026-08-10'); // +20 in August
   await add({ supplier: 'Unpaid Co', amount: '10', landlord_amount: '500', invoice_date: '2026-09-06' }); // not paid: not counted
   await add({ supplier: 'Ours Co', amount: '40', charge_landlord: 'no', invoice_date: '2026-09-07' }); // not charged: not counted
   const r = (await c.get('/app/landlord-invoices?month=2026-09')).text;

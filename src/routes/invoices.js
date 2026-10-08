@@ -89,7 +89,7 @@ module.exports = function invoiceRoutes(db, config) {
     if (Number.isNaN(v.amount_pence)) errors.amount = 'Enter the price to us like 180.00, or leave it blank.';
     // Charge it to the landlord (Yes/No).
     if (body.charge_landlord === 'yes' || body.charge_landlord === 'no') v.charge_landlord = body.charge_landlord === 'no' ? 0 : 1;
-    else if (body.then !== 'deduct') errors.charge_landlord = 'Choose whether to charge the landlord.';
+    else errors.charge_landlord = 'Choose whether to charge the landlord.';
     // The price to the landlord: blank means the same as the price to us (no profit).
     if (body.landlord_amount !== undefined) {
       const raw = String(body.landlord_amount || '').trim();
@@ -209,14 +209,8 @@ module.exports = function invoiceRoutes(db, config) {
       stored = saveFile(a, req.file);
       if (stored.error) { errors.file = stored.error; stored = null; }
     }
-    // "Upload & deduct from landlord": needs a property with a landlord to charge.
-    const deduct = req.body.then === 'deduct';
-    if (deduct) v.charge_landlord = 1;
-    let landlord = null;
-    if (deduct) {
-      landlord = v.landlord_id && db.prepare('SELECT id, name FROM landlords WHERE id = ? AND account_id = ?').get(v.landlord_id, a);
-      if (!landlord && !errors.landlord_id) errors.landlord_id = 'To deduct from a landlord, choose the landlord.';
-    }
+    // Contractor invoices are only uploaded: nothing is taken from a landlord's rent here (bill the
+    // landlord with a landlord invoice instead).
     if (Object.keys(errors).length) {
       if (stored) removeFile(a, stored.file_name);
       return renderForm(req, res, { invoice: null, values: req.body, errors, status: 422 });
@@ -226,12 +220,6 @@ module.exports = function invoiceRoutes(db, config) {
     const info = db.prepare(`INSERT INTO invoices (account_id, ${cols.join(', ')}) VALUES (?, ${cols.map(() => '?').join(', ')})`)
       .run(a, ...cols.map((c) => row[c]));
     const id = Number(info.lastInsertRowid);
-    if (deduct) {
-      const inv = db.prepare('SELECT * FROM invoices WHERE id = ?').get(id);
-      const paidDate = v.invoice_date || fmt.today();
-      payInvoice(a, inv, { paidDate, method: 'Other', reference: 'Deducted from landlord', chargeLandlord: true });
-      return res.redirect(`/app/invoices/${id}?flash=` + encodeURIComponent(`Deducted ${fmt.money(v.amount_pence)} from ${landlord.name} for ${require('../statements').monthLabel(paidDate.slice(0, 7))}.`));
-    }
     res.redirect(`/app/invoices/${id}`);
   });
 
@@ -323,7 +311,7 @@ module.exports = function invoiceRoutes(db, config) {
     const reference = String(req.body.payment_reference || '').trim().slice(0, 100) || null;
     if (!fmt.isIsoDate(paidDate)) return back('Enter the payment date.');
     if (!PAYMENT_METHODS.includes(method)) return back('Choose how it was paid.');
-    payInvoice(a, inv, { paidDate, method, reference, chargeLandlord: req.body.charge_landlord === '1' });
+    payInvoice(a, inv, { paidDate, method, reference, chargeLandlord: false }); // never deducted from a landlord
     res.redirect(`/app/invoices/${inv.id}?flash=` + encodeURIComponent(`Paid ${fmt.money(inv.amount_pence)} to ${inv.supplier}.`));
   });
 

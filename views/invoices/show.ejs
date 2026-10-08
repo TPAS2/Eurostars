@@ -63,7 +63,7 @@
       </form>
     <% } else { %>
       <h2>Pay this invoice</h2>
-      <p class="muted small">Record the payment to <%= inv.supplier %>. It's marked as paid and, if you tick the box, charged to the landlord as an expense so it appears on their statement.</p>
+      <p class="muted small">Record the payment to <%= inv.supplier %>. To bill the landlord, add a landlord invoice.</p>
       <form method="post" action="/app/invoices/<%= inv.id %>/pay" class="stack" data-confirm="Mark <%= fmt.money(inv.amount_pence) %> to <%= inv.supplier %> as paid?">
         <%- include('../partials/csrf') %>
         <label>Payment date <input type="date" name="paid_date" value="<%= today %>" required></label>
@@ -73,8 +73,6 @@
           </select>
         </label>
         <label>Payment reference <input name="payment_reference" placeholder="e.g. bank transfer reference"></label>
-        <label class="check"><input type="checkbox" name="charge_landlord" value="1" <%= landlord && inv.charge_landlord ? 'checked' : '' %>>
-          Charge <%= fmt.money(inv.landlord_price_pence ?? inv.amount_pence) %> to <%= landlord ? landlord.name + "'s" : "the landlord's" %> client account<% if (!landlord) { %> <span class="muted small">(no landlord linked)</span><% } %></label>
         <button class="btn primary" type="submit">Pay <%= fmt.money(inv.amount_pence) %></button>
       </form>
     <% } %>
