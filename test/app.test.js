@@ -2991,6 +2991,45 @@ test('landlord invoices: the Edit page has the deduct-from-rent choice', async (
   assert.deepEqual(fees(), []);
 });
 
+test('rent: a blank Rent from council falls back to Rent from tenant, and the other way round', async () => {
+  const c = await registerAndLogin('rent-fallback@example.com', 'Rent Fallback Lets');
+  const a = db.prepare("SELECT id FROM users WHERE username = 'rent-fallback'").get().id;
+  const add = async (addr, rents, name, paidBy) => {
+    const p = idFrom((await c.post('/app/properties', { address_line1: addr, status: 'let', ...rents })).location);
+    await c.get('/app/tenants/new');
+    await c.post('/app/tenants/add-tenant', { property_id: String(p), tenant_mode: 'new', name, status: 'active', paid_by: paidBy, booking_date: '2026-08-01', start_date: '2026-08-01' });
+  };
+  await add('1 Only Tenant Rent', { tenant_rent_pence: '300' }, 'Council Pays', 'Council'); // council rent blank: tenant rent used
+  await add('2 Only Council Rent', { rent_pence: '700' }, 'Tenant Pays', 'Tenant'); // tenant rent blank: council rent used
+  await add('3 Both Rents', { rent_pence: '900', tenant_rent_pence: '100' }, 'Both Council', 'Council');
+  await add('4 Both Rents', { rent_pence: '900', tenant_rent_pence: '100' }, 'Both Tenant', 'Tenant');
+  require('../src/ledger').raiseMonthlyRent(db, a, '2026-08');
+  const charged = db.prepare(`SELECT t.name, tx.amount_pence FROM transactions tx JOIN tenancies ty ON ty.id = tx.tenancy_id JOIN tenants t ON t.id = ty.tenant_id
+    WHERE tx.account_id = ? AND tx.txn_type = 'rent_charge' ORDER BY t.name`).all(a).map((x) => [x.name, x.amount_pence]);
+  assert.deepEqual(charged, [['Both Council', 90000], ['Both Tenant', 10000], ['Council Pays', 30000], ['Tenant Pays', 70000]]);
+});
+
+test('statement PDF: long names wrap and three properties with fees and costs fit on one page', async () => {
+  const { buildStatementPdf } = require('../src/statementPdf');
+  const long = 'Flat 14, The Example Mansions, 221 Longest Possible Road Name Street';
+  const block = (re) => ({ re, income: [{ title: re, sub: '01/09/2026 - 30/09/2026', net: 123456 }], expenditure: [{ title: 'Management fee', net: 14815 }, { title: 'Repairs & other costs', net: 45000 }] });
+  const d = {
+    company: { name: 'Made-up Lets', address: '1 Example Road, Exampletown, EX1 1EX', contact: 'tel: 0100 000000' },
+    to: ['Made-up Long Name Landlord Holdings Limited C/O Example Agents', '12 Very Long Example Avenue', 'Exampletown', 'EX1 2MP'],
+    details: [['Landlord:', 'L0099'], ['Statement No:', '7'], ['Ref/Chq No:', 'Autobank'], ['Date:', '08/10/2026']],
+    date: '08/10/2026', blocks: [block('2 Short Rd'), block('33 Middle Lane'), block(long)],
+    income: 370368, spent: 179445, due: 190923, closing: 'Paid direct into your account as agreed.', filename: 'x.pdf',
+  };
+  const pdf = await require('pdf-lib').PDFDocument.load(await buildStatementPdf(d));
+  assert.equal(pdf.getPageCount(), 1);
+  // Lots of properties still work: they carry on over more pages.
+  const many = await require('pdf-lib').PDFDocument.load(await buildStatementPdf({ ...d, blocks: Array.from({ length: 12 }, (_, i) => block(`${i + 1} ${long}`)) }));
+  assert.ok(many.getPageCount() >= 2);
+  // On a phone, the statement page's transactions show as blocks rather than a wide table.
+  const css = fs.readFileSync(path.join(__dirname, '..', 'public', 'style.css'), 'utf8');
+  assert.match(css, /table\.fit-phone tr \{ display: grid;/);
+});
+
 test('tenants list is in tenancy number order, not name order', async () => {
   const c = await registerAndLogin('tenancy-order@example.com', 'Tenancy Order Lets');
   const prop = idFrom((await c.post('/app/properties', { address_line1: '3 Order Row', status: 'let' })).location);

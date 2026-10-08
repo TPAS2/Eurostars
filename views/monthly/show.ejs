@@ -66,16 +66,16 @@
     <% if (s.note) { %><p class="muted small"><%= s.note %></p><% } %>
   </div>
   <h3>Transactions</h3>
-  <div class="table-wrap"><table>
+  <div class="table-wrap"><table class="fit-phone">
     <thead><tr><th>Date</th><th>Property</th><th>Description</th><th class="num">In</th><th class="num">Out</th><th class="num">Balance</th></tr></thead>
     <tbody>
       <tr class="sub"><td colspan="5">Balance held at start of month</td><td class="num"><%= fmt.money(s.opening_pence) %></td></tr>
       <% detail.lines.forEach(l => { %>
       <tr>
         <td><%= fmt.ukDate(l.date) %></td><td><%= l.property %></td><td><%= l.description %></td>
-        <td class="num"><%= l.direction === 'in' ? fmt.money(l.amount) : '' %></td>
-        <td class="num"><%= l.direction === 'out' ? fmt.money(l.amount) : '' %></td>
-        <td class="num"><%= fmt.money(l.balance) %></td>
+        <td class="num"<%- l.direction === 'in' ? ' data-label="In"' : '' %>><%= l.direction === 'in' ? fmt.money(l.amount) : '' %></td>
+        <td class="num"<%- l.direction === 'out' ? ' data-label="Out"' : '' %>><%= l.direction === 'out' ? fmt.money(l.amount) : '' %></td>
+        <td class="num" data-label="Balance"><%= fmt.money(l.balance) %></td>
       </tr>
       <% }) %>
       <% if (!detail.lines.length) { %><tr><td colspan="6" class="muted">No transactions this month.</td></tr><% } %>

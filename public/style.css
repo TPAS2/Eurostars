@@ -1408,3 +1408,21 @@ td.nowrap-lines span { display: block; white-space: nowrap; }
 .sp-due td.num span { display: inline-block; min-width: 100%; border-top: 1px solid #000; border-bottom: 3px double #000; padding: 2px 0; }
 .sp-closing { font-weight: 700; font-size: 16px; padding-left: 18px; margin-top: 14px; }
 @media (max-width: 640px) { .sp-body { padding: 20px 10px; } .sp-agency { font-size: 20px; } .sp-title { font-size: 15px; } .sp-table { font-size: 13px; } .sp-head { font-size: 15px; } }
+/* A statement's transactions on a phone: each one a small block (date and amounts, then the
+   property and what it was) instead of a wide table to scroll sideways. */
+@media (max-width: 700px) {
+  .table-wrap > table.fit-phone, table.fit-phone tbody { display: block; width: 100%; min-width: 0; }
+  table.fit-phone thead { display: none; }
+  table.fit-phone tr { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "d m" "p b" "s s"; gap: 2px 10px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+  table.fit-phone td { display: block; border: 0; padding: 0; white-space: normal; text-align: left; }
+  table.fit-phone td:nth-child(1) { grid-area: d; font-weight: 600; }
+  table.fit-phone td:nth-child(2) { grid-area: p; }
+  table.fit-phone td:nth-child(3) { grid-area: s; color: var(--muted); font-size: .85rem; }
+  table.fit-phone td:nth-child(4), table.fit-phone td:nth-child(5) { grid-area: m; text-align: right; }
+  table.fit-phone td:nth-child(6) { grid-area: b; text-align: right; }
+  table.fit-phone td:nth-child(4), table.fit-phone td:nth-child(5), table.fit-phone td:nth-child(6) { white-space: nowrap; }
+  table.fit-phone td[data-label]::before { content: attr(data-label) " "; color: var(--muted); font-size: .75rem; font-weight: 400; }
+  table.fit-phone tr.sub, table.fit-phone tr.total { grid-template-columns: 1fr auto; grid-template-areas: "s b"; }
+  table.fit-phone tr.sub td:first-child, table.fit-phone tr.total td:first-child { grid-area: s; color: inherit; font-size: inherit; }
+  table.fit-phone tr.sub td:last-child, table.fit-phone tr.total td:last-child { grid-area: b; }
+}

@@ -7,7 +7,7 @@
 
 const { PDFDocument, StandardFonts, rgb } = require('pdf-lib');
 const fmt = require('./format');
-const { safe } = require('./jobInvoice');
+const { safe, wrap } = require('./jobInvoice');
 
 // Plain amounts, as on the original: 1468.50, -12.00.
 const amount = (p) => (Number(p || 0) / 100).toFixed(2);
@@ -46,7 +46,7 @@ const H = 841.89;
 const BLACK = rgb(0, 0, 0);
 const GREY = rgb(0.753, 0.753, 0.753);
 const COLS = { net: 365.5, vat: 445, gross: 529 }; // right edges of the money columns
-const BOTTOM = 760; // start a new page below this
+const BOTTOM = 782; // start a new page below this (the page number sits at 793)
 
 async function buildStatementPdf(d) {
   const doc = await PDFDocument.create();
@@ -82,7 +82,8 @@ async function buildStatementPdf(d) {
 
   newPage();
   // Landlord's name and address; statement details beside them.
-  d.to.slice(0, 7).forEach((l, i) => text(l, 69.2, 161 + i * 13.7, 12));
+  // (Long lines wrap so they never run into the details on the right.)
+  d.to.flatMap((l) => wrap(font, 12, l, 305)).slice(0, 8).forEach((l, i) => text(l, 69.2, 161 + i * 13.7, 12));
   d.details.forEach(([label, value], i) => { text(label, 389, 158.5 + i * 14.1, 10, bold); right(value, 530, 158.5 + i * 14.1, 10); });
   centre('STATEMENT OF ACCOUNT AND PAYMENT ADVICE', 267, 14.5, bold);
   centre(`AS AT ${d.date}`, 284.5, 14.5, bold);
@@ -96,27 +97,31 @@ async function buildStatementPdf(d) {
   heads();
   const room = (needed) => { if (y + needed > BOTTOM) { newPage(); y = 110; heads(); } };
 
+  // Each property: Re: line, then its income and expenditure. The amounts sit on the row's last line
+  // (the period, or the title when there's no period), and long names wrap before the money columns.
   for (const b of d.blocks) {
-    room(70);
-    y += 17; text(`Re: ${b.re}`, 57.8, y, 12, bold);
+    const re = wrap(bold, 12, `Re: ${b.re}`, 470);
+    room(45 + re.length * 14);
+    re.forEach((l, i) => { y += i ? 14 : 16; text(l, 57.8, y, 12, bold); });
     for (const [heading, rows] of [['INCOME', b.income], ['EXPENDITURE', b.expenditure]]) {
       if (!rows.length) continue;
-      room(50);
-      y += 18; text(heading, 66.3, y, 14.5, bold);
+      room(40);
+      y += 17; text(heading, 66.3, y, 14.5, bold);
       for (const r of rows) {
-        room(34);
-        y += 19; text(r.title, 74.8, y, 12, bold);
-        if (r.sub) { y += 14.5; text(r.sub, 77.7, y, 11.5); }
-        y += 16.5; money(r, y);
+        const title = wrap(bold, 12, r.title, 220);
+        room(16 + title.length * 14 + (r.sub ? 14 : 0));
+        title.forEach((l, i) => { y += i ? 14 : 16; text(l, 74.8, y, 12, bold); });
+        if (r.sub) { y += 14; text(r.sub, 77.7, y, 11.5); }
+        money(r, y);
       }
     }
   }
   // Totals.
-  room(90);
+  room(d.spent ? 84 : 68);
   y += 5.8; line(287.5, 535, y);
   y += 13.7; text('TOTAL INCOME', 66.3, y, 12, bold); money({ net: d.income }, y, bold);
   if (d.spent) { y += 16; text('TOTAL EXPENDITURE', 66.3, y, 12, bold); money({ net: d.spent }, y, bold); }
-  y += 19.8; line(451, 538, y);
+  y += 14; line(451, 538, y);
   y += 10.7; text('NET AMOUNT DUE', 66.3, y, 12, bold); right(amount(d.due), COLS.gross, y, 12, bold);
   y += 6.3; line(451, 538, y); line(451, 538, y + 2.8);
   y += 18.9; text(d.closing, 66.3, y, 12, bold);

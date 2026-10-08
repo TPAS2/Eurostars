@@ -82,13 +82,15 @@ function creditLandlordRent(db, accountId, month) {
   return credited;
 }
 
-// Monthly-equivalent rent for a tenancy: its own rent if it has one, otherwise the property's
-// Rent from tenant when the tenant pays it (property_tenant_rent_pence), else its Rent from council
-// (property_rent_pence), when the caller selects them.
+// Monthly-equivalent rent for a tenancy: its own rent if it has one, otherwise the property's rent
+// from whoever pays it (Rent from tenant, property_tenant_rent_pence, or Rent from council,
+// property_rent_pence, when the caller selects them), falling back to the other if that one is blank.
 function monthlyRent(tenancy) {
   if (!(tenancy.rent_pence > 0)) {
-    if (tenancy.paid_by === 'Tenant' && tenancy.property_tenant_rent_pence > 0) return tenancy.property_tenant_rent_pence;
-    return tenancy.property_rent_pence || 0;
+    // The property's rent from whoever pays it; if that one is blank, the other one.
+    const council = tenancy.property_rent_pence > 0 ? tenancy.property_rent_pence : 0;
+    const tenant = tenancy.property_tenant_rent_pence > 0 ? tenancy.property_tenant_rent_pence : 0;
+    return tenancy.paid_by === 'Tenant' ? (tenant || council) : (council || tenant);
   }
   return tenancy.rent_frequency === 'weekly' ? Math.round((tenancy.rent_pence * 52) / 12) : tenancy.rent_pence;
 }
@@ -103,7 +105,7 @@ function raiseMonthlyRent(db, accountId, month) {
   const tenancies = db.prepare(
     `SELECT ty.*, p.landlord_id, p.rent_pence AS property_rent_pence, p.tenant_rent_pence AS property_tenant_rent_pence
        FROM tenancies ty JOIN properties p ON p.id = ty.property_id
-      WHERE ty.account_id = ? AND ty.status = 'active' AND (ty.rent_pence > 0 OR p.rent_pence > 0 OR (ty.paid_by = 'Tenant' AND p.tenant_rent_pence > 0))
+      WHERE ty.account_id = ? AND ty.status = 'active' AND (ty.rent_pence > 0 OR p.rent_pence > 0 OR p.tenant_rent_pence > 0)
         AND ty.start_date <= ? AND (ty.end_date IS NULL OR ty.end_date >= ?)`
   ).all(accountId, monthEnd, monthStart);
   const alreadyCharged = db.prepare(
