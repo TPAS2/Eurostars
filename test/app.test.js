@@ -3059,6 +3059,16 @@ test('landlord invoices: link a contractor invoice (both pages show the link)', 
   assert.doesNotMatch((await other.get(`/app/landlord-invoices/new?contractor_invoice_id=${ci}`)).text, /Made-up Glazing/);
 });
 
+test('landlord statements list: one Fees & costs column, no Held column', async () => {
+  const { c, landlordId } = await monthlySetup('stmt-cols@example.com'); // £900 rent, 12% fee (£108), £60 locksmith
+  await c.get('/app/monthly?month=2026-08');
+  await c.post('/app/monthly/generate', { month: '2026-08', landlord_id: String(landlordId) });
+  const r = await c.get('/app/monthly?month=2026-08');
+  const heads = [...r.text.slice(r.text.indexOf('<thead'), r.text.indexOf('</thead>')).matchAll(/<th[^>]*>([^<]*)</g)].map((m) => m[1].trim()).filter(Boolean);
+  assert.deepEqual(heads, ['Statement no.', 'Landlord', 'Rent', 'Fees &amp; costs', 'Net', 'Generated', 'Emailed']);
+  assert.match(r.text, /£900\.00<\/td>\s*<td class="num">−£168\.00<\/td>\s*<td class="num"><strong>£732\.00/);
+});
+
 test('tenants list is in tenancy number order, not name order', async () => {
   const c = await registerAndLogin('tenancy-order@example.com', 'Tenancy Order Lets');
   const prop = idFrom((await c.post('/app/properties', { address_line1: '3 Order Row', status: 'let' })).location);

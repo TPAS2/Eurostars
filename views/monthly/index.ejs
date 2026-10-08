@@ -3,7 +3,7 @@
   <div>
     <h1>Landlord statements</h1>
     <p class="muted">To calculate rents, email landlords and get the CSV report, use <a href="/app/rent-run?month=<%= month %>">Rent run</a>.</p>
-    <p class="muted">A statement for each landlord every month: rent received, fees and costs deducted, and what's held for them. <%= aiEnabled ? 'Summaries are written by AI from the figures.' : 'Set ANTHROPIC_API_KEY to have AI write the summaries.' %></p>
+    <p class="muted">A statement for each landlord every month: rent received, fees and costs deducted, and the net amount. <%= aiEnabled ? 'Summaries are written by AI from the figures.' : 'Set ANTHROPIC_API_KEY to have AI write the summaries.' %></p>
   </div>
 </header>
 <div class="month-bar">
@@ -41,7 +41,7 @@
   </div>
   <% if (!rows.length) { %><p class="muted">No landlords with a current tenancy in <%= monthLabel %>. Statements are only made for landlords whose properties have a current tenancy.</p><% } else { %>
   <div class="table-wrap"><table class="equal centered">
-    <thead><tr><th>Statement no.</th><th>Landlord</th><th class="num">Rent</th><th class="num">Fees</th><th class="num">Costs</th><th class="num">Net</th><th class="num">Held</th><th>Generated</th><th>Emailed</th><th class="stmt-actions"></th></tr></thead>
+    <thead><tr><th>Statement no.</th><th>Landlord</th><th class="num">Rent</th><th class="num">Fees &amp; costs</th><th class="num">Net</th><th>Generated</th><th>Emailed</th><th class="stmt-actions"></th></tr></thead>
     <tbody>
     <% rows.forEach(r => { %>
       <tr>
@@ -49,13 +49,12 @@
         <td><% if (r.id) { %><a href="/app/monthly/<%= r.id %>"><strong><%= r.name %></strong></a><% } else { %><%= r.name %><% } %></td>
         <% if (r.id) { %>
           <td class="num"><%= fmt.money(r.rent_pence) %></td>
-          <td class="num"><%= r.fees_pence ? '−' + fmt.money(r.fees_pence) : '—' %></td>
-          <td class="num"><%= r.expenses_pence ? '−' + fmt.money(r.expenses_pence) : '—' %></td>
+          <% const deductions = (r.fees_pence || 0) + (r.expenses_pence || 0); %>
+          <td class="num"><%= deductions ? '−' + fmt.money(deductions) : '—' %></td>
           <td class="num"><strong><%= fmt.money(r.net_pence) %></strong></td>
-          <td class="num"><%= fmt.money(r.closing_pence) %></td>
           <td class="nowrap-lines"><% const [gd, gt] = fmt.ukDateTime(r.generated_at).split(' '); %><span><%= gd %></span> <span class="muted small"><%= gt %></span></td>
         <% } else { %>
-          <td colspan="6" class="muted">Not generated yet</td>
+          <td colspan="4" class="muted">Not generated yet</td>
         <% } %>
         <td class="small"><% if (r.emailed_at) { %><span class="badge s-active">sent</span> <span class="muted"><%= fmt.ukDateTime(r.emailed_at) %></span><% } else if (!r.email) { %><span class="muted">No email address</span><% } else { %><span class="muted">Not yet</span><% } %></td>
         <td class="num row-actions">
