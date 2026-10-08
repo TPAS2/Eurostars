@@ -842,9 +842,15 @@ module.exports = function appRoutes(db) {
         unpaid: fmt.money([...stats.values()].reduce((t, s) => t + s.unpaid, 0)),
       } };
     }
+    // The properties list ends with the three monthly rent totals, side by side.
+    let rentTotals = null;
     if (def.key === 'properties') {
       const sum = (k) => fmt.money(rows.reduce((t, r) => t + (Number(r[k]) || 0), 0));
-      totalsRow = { label: 'Total', cells: { rent_pence: sum('rent_pence'), landlord_rent_pence: sum('landlord_rent_pence') } };
+      rentTotals = [
+        ['Rent from council (£ per month)', sum('rent_pence')],
+        ['Rent from tenant (£ per month)', sum('tenant_rent_pence')],
+        ['Rent to landlord (£ per month)', sum('landlord_rent_pence')],
+      ];
     }
     if (def.key === 'councils') {
       // How many properties are in each council, and which ones.
@@ -861,7 +867,7 @@ module.exports = function appRoutes(db) {
         row.database = { text: 'Database', href: `/app/councils/${row.id}/database`, cls: 'btn small' };
       }
     }
-    res.render('list', { title: def.plural, section: sectionOf(def), def, rows, maps, display, rowTitle, q, searchable: textFields.length > 0, truncated, totalsRow, tenantFilter, monthView, today: fmt.today(), fmt, flash: String(req.query.flash || '').slice(0, 300), error: String(req.query.error || '').slice(0, 300) });
+    res.render('list', { title: def.plural, section: sectionOf(def), def, rows, maps, display, rowTitle, q, searchable: textFields.length > 0, truncated, totalsRow, rentTotals, tenantFilter, monthView, today: fmt.today(), fmt, flash: String(req.query.flash || '').slice(0, 300), error: String(req.query.error || '').slice(0, 300) });
   });
 
   router.get('/:entity/new', (req, res) => {

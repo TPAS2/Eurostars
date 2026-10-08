@@ -68,7 +68,7 @@ const ENTITIES = {
     ],
     // The property page's info box keeps Council near the top (the form has it beside Status).
     detailsOrder: ['council_id', 'code', 'address_line1', 'town', 'postcode', 'landlord_id', 'property_type', 'bedrooms', 'bathrooms', 'parking', 'rent_pence', 'tenant_rent_pence', 'price_per_night_pence', 'landlord_rent_pence', 'management_fee_pct', 'status', 'lease_start_date', 'acquired_date', 'handed_back_date', 'notes'],
-    columns: ['code', 'address_line1', 'council_id', 'landlord_id', 'cur_tenant', 'rent_pence', 'landlord_rent_pence', 'status'],
+    columns: ['code', 'address_line1', 'council_id', 'landlord_id', 'cur_tenant', 'status'],
     computed: { cur_tenant: { label: 'Tenant' } },
     children: [
       { entity: 'tenancies', fk: 'property_id' },

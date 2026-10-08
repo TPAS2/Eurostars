@@ -18,6 +18,11 @@
 </form>
 <% if (q) { %><p class="muted small search-count"><%= rows.length %><%= truncated ? '+' : '' %> result<%= rows.length === 1 ? '' : 's' %> for “<%= q %>”</p><% } %>
 <% } %>
+<% if (typeof rentTotals !== 'undefined' && rentTotals) { %>
+<div class="rent-totals" aria-label="Rent totals">
+  <% rentTotals.forEach(([label, value]) => { %><div><span><%= label %></span><strong><%= value %></strong></div><% }) %>
+</div>
+<% } %>
 <% if (typeof flash !== 'undefined' && flash) { %><div class="notice ok"><%= flash %></div><% } %>
 <% if (typeof error !== 'undefined' && error) { %><div class="notice err"><%= error %></div><% } %>
 <% if (typeof tenantFilter !== 'undefined' && tenantFilter) { %>

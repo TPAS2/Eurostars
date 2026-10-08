@@ -183,8 +183,9 @@ test('full lettings workflow: landlord → property → tenant → rent → fee 
   assert.deepEqual({ ...db.prepare('SELECT bathrooms, parking, rent_pence FROM properties WHERE id = ?').get(propertyId) }, { bathrooms: 2, parking: 'Driveway', rent_pence: 95050 });
   assert.match((await c.get(`/app/properties/${propertyId}`)).text, /£950\.50/);
   r = await c.get('/app/properties');
-  assert.match(r.text, /<th[^>]*>Rent from council<\/th>\s*<th[^>]*>Rent to landlord<\/th>/, 'both rents are columns on the properties list');
-  assert.match(r.text, /<tr class="total">[\s\S]*?Total[\s\S]*?£950\.50/, 'with a total at the bottom');
+  // No rent columns; the three monthly totals sit in one box at the top, above the list.
+  assert.doesNotMatch(r.text, /<th[^>]*>Rent from council<\/th>|<th[^>]*>Rent to landlord<\/th>/);
+  assert.match(r.text, /class="rent-totals"[\s\S]*?Rent from council \(£ per month\)<\/span><strong>£950\.50<\/strong>[\s\S]*?Rent from tenant \(£ per month\)<\/span><strong>£0\.00<\/strong>[\s\S]*?Rent to landlord \(£ per month\)<\/span><strong>£0\.00<\/strong>[\s\S]*?<table/);
   // Managed is a property status of its own; starting a tenancy doesn't change it to let.
   r = await c.post('/app/properties', { address_line1: '5 Managed Row', status: 'managed' });
   const managedId = idFrom(r.location);
@@ -3064,7 +3065,7 @@ test('properties list columns: Property name, Council, Landlord, Tenant, Status'
   await c.post(`/app/properties/${prop}/add-tenant`, { tenant_mode: 'new', name: 'Cora Tenant', booking_date: '2026-07-10', start_date: '2026-08-01', rent_pence: '850', rent_frequency: 'monthly', status: 'active' });
   r = await c.get('/app/properties');
   const heads = [...r.text.slice(r.text.indexOf('<thead'), r.text.indexOf('</thead>')).matchAll(/<th[^>]*>([^<]+)</g)].map((m) => m[1].trim()).filter(Boolean);
-  assert.deepEqual(heads.slice(0, 8), ['Property code', 'Property address', 'Council', 'Landlord', 'Tenant', 'Rent from council', 'Rent to landlord', 'Status']);
+  assert.deepEqual(heads.slice(0, 6), ['Property code', 'Property address', 'Council', 'Landlord', 'Tenant', 'Status']);
   assert.match(r.text, /3 Column Close[\s\S]*Col Council[\s\S]*Col Landlord[\s\S]*Cora Tenant/);
 });
 
