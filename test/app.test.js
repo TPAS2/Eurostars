@@ -2790,6 +2790,7 @@ test('council invoices tab: under Council Reconciliation, lists each council wit
   const r = await c.get('/app/council-invoices?month=2026-09');
   assert.equal(r.status, 200);
   assert.match(r.text, /Council Reconciliation<\/span><\/a>\s*<a[^>]*href="\/app\/council-invoices"/, 'the tab sits under Council Reconciliation');
+  assert.match(r.text, /<a class="rail-btn [^"]*rail-red"[^>]*href="\/app\/council-invoices"/, 'red like Council Reconciliation');
   assert.match(r.text, /Made-up Borough Council[\s\S]*?£700\.00[\s\S]*?Layout not set up yet/);
   // It can be hidden like any other tab.
   assert.ok(require('../src/tabs').TABS.some((t) => t.key === 'councilinvoices'));

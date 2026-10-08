@@ -46,7 +46,7 @@
       <% groups.filter(g => g.some(([key]) => !(user.hidden_tabs || []).includes(key))).forEach((g, gi) => { %>
         <% if (gi) { %><span class="rail-sep" aria-hidden="true"></span><% } %>
         <% g.filter(([key]) => !(user.hidden_tabs || []).includes(key)).forEach(([key, href, label]) => { %>
-          <a class="rail-btn <%= s === key ? 'active' : '' %> <%= key === 'councilrec' || key === 'rentrun' ? 'rail-red' : '' %>" href="<%= href %>" aria-label="<%= label %>" <%- s === key ? 'aria-current="page"' : '' %>><%- include('icon', { name: key }) %><span class="rail-label"><%= label %></span></a>
+          <a class="rail-btn <%= s === key ? 'active' : '' %> <%= key === 'councilrec' || key === 'councilinvoices' || key === 'rentrun' ? 'rail-red' : '' %>" href="<%= href %>" aria-label="<%= label %>" <%- s === key ? 'aria-current="page"' : '' %>><%- include('icon', { name: key }) %><span class="rail-label"><%= label %></span></a>
         <% }) %>
       <% }) %>
     </nav>
