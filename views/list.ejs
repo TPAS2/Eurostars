@@ -7,10 +7,10 @@
     <% } %>
     <% if (def.key === 'maintenance') { %><a class="btn" href="/app/maintenance/job-sheet.pdf" download>Blank job sheet (PDF)</a><% } %>
     <% if (def.key === 'inspections') { %><a class="btn" href="/app/inspections/sheet.pdf" download>Blank inspection sheet (PDF)</a><% } %>
-    <% if (def.key === 'contractors') { %>
-    <div class="transfer-box" title="Use the same contractors in another agency: export here, then import there. Import also takes a Word (.docx) or Excel (.xlsx) table with a Company column.">
-      <a class="btn small" href="/app/contractors/export.csv" download>Export</a>
-      <form method="post" action="/app/contractors/import" enctype="multipart/form-data" class="inline-form" data-busy="Importing">
+    <% if (['contractors', 'landlords', 'properties', 'tenants'].includes(def.key)) { const keyCol = { contractors: 'Company', landlords: 'Name', properties: 'Property address', tenants: 'Name' }[def.key]; %>
+    <div class="transfer-box" title="Use the same <%= def.plural.toLowerCase() %> in another agency: export here, then import there. Import also takes a Word (.docx) or Excel (.xlsx) table with a <%= keyCol %> column.">
+      <a class="btn small" href="/app/<%= def.key %>/export.csv" download>Export</a>
+      <form method="post" action="/app/<%= def.key %>/import" enctype="multipart/form-data" class="inline-form" data-busy="Importing">
         <%- include('partials/csrf') %>
         <label class="btn small">Import<input type="file" name="file" accept=".csv,.docx,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" data-autosubmit hidden></label>
       </form>

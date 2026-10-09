@@ -3268,6 +3268,67 @@ test('contractors import: a table in a Word document (.docx) or an Excel file (.
   assert.match(decodeURIComponent(r.location), /no Company column/);
 });
 
+test('landlords, properties and tenants: export to CSV and import into another agency', async () => {
+  const one = await registerAndLogin('llt-export@example.com', 'Export Three Lets');
+  const a1 = db.prepare("SELECT id FROM users WHERE username = 'llt-export'").get().id;
+  let r = await one.get('/app/landlords');
+  assert.match(r.text, /href="\/app\/landlords\/export\.csv" download>Export<\/a>[\s\S]*?action="\/app\/landlords\/import"/);
+  // Landlords from a spreadsheet-style file with UK dates and other headings.
+  r = await one.post('/app/landlords/import', { file: new File(['Landlord list\nLandlord,Telephone,Lease date,Overseas,Sort code\nMade-up Landlord One,0100 000020,05/03/2024,yes,00-00-01\nMade-up Landlord Two,,,,\n'], 'l.csv') }, { multipart: true });
+  assert.match(decodeURIComponent(r.location), /Imported landlords: 2 new/);
+  const l1 = db.prepare("SELECT * FROM landlords WHERE account_id = ? AND name = 'Made-up Landlord One'").get(a1);
+  assert.equal(l1.code, 'L0001');
+  assert.equal(l1.date_started, '2024-03-05');
+  assert.equal(l1.overseas, 'Yes');
+  assert.equal(l1.statement_type, 'Email');
+  // Properties: landlord by code, council by name (added), rents in pounds.
+  await one.get('/app/properties');
+  r = await one.post('/app/properties/import', { file: new File(['Property address,Postcode,Landlord code,Council,Rent from council (£ per month),Bedrooms,Status\n1 Made-up Road,ZZ1 1ZZ,L0001,Made-up Council,"£1,250.50",2,let\n'], 'p.csv') }, { multipart: true });
+  assert.match(decodeURIComponent(r.location), /Imported properties: 1 new/);
+  const p1 = db.prepare("SELECT * FROM properties WHERE account_id = ?").get(a1);
+  assert.equal(p1.landlord_id, l1.id);
+  assert.equal(p1.rent_pence, 125050);
+  assert.equal(p1.bedrooms, 2);
+  assert.equal(p1.status, 'let');
+  assert.equal(p1.code, 'P0001');
+  assert.ok(db.prepare("SELECT 1 FROM councils WHERE id = ? AND account_id = ? AND name = 'Made-up Council'").get(p1.council_id, a1));
+  await one.get('/app/tenants');
+  r = await one.post('/app/tenants/import', { file: new File(['Name,Council ref\nMade-up Tenant,REF-1\n'], 't.csv') }, { multipart: true });
+  assert.match(decodeURIComponent(r.location), /Imported tenants: 1 new/);
+
+  const csvL = (await one.get('/app/landlords/export.csv')).buf;
+  assert.match(csvL.toString(), /L0001,Made-up Landlord One,,Email,0100 000020,2024-03-05,,Yes/);
+  const csvP = (await one.get('/app/properties/export.csv')).buf;
+  assert.match(csvP.toString(), /P0001,1 Made-up Road,,ZZ1 1ZZ,Made-up Landlord One,Made-up Council,,2,,,1250\.50/);
+  const csvT = (await one.get('/app/tenants/export.csv')).buf;
+
+  // Another agency: landlords first, then properties link to them; blanks filled, nothing overwritten.
+  const two = await registerAndLogin('llt-import@example.com', 'Import Three Lets');
+  const a2 = db.prepare("SELECT id FROM users WHERE username = 'llt-import'").get().id;
+  db.prepare("INSERT INTO landlords (account_id, name, code, phone, statement_type, payment_note) VALUES (?, 'made-up landlord one', 'L0009', '0100 999999', 'Cheque', 'Weekly')").run(a2);
+  await two.get('/app/landlords');
+  r = await two.post('/app/landlords/import', { file: new File([csvL], 'landlords.csv') }, { multipart: true });
+  assert.match(decodeURIComponent(r.location), /1 new, 1 updated with missing details/);
+  const kept = db.prepare("SELECT * FROM landlords WHERE account_id = ? AND code = 'L0009'").get(a2);
+  assert.equal(kept.phone, '0100 999999');
+  assert.equal(kept.statement_type, 'Cheque');
+  assert.equal(kept.date_started, '2024-03-05');
+  await two.get('/app/properties');
+  r = await two.post('/app/properties/import', { file: new File([csvP], 'properties.csv') }, { multipart: true });
+  assert.match(decodeURIComponent(r.location), /1 new/);
+  // The landlord is matched by name, so it links to this agency's own L0009.
+  const p2 = db.prepare('SELECT * FROM properties WHERE account_id = ?').get(a2);
+  assert.equal(p2.landlord_id, kept.id);
+  assert.equal(p2.rent_pence, 125050);
+  assert.ok(db.prepare("SELECT 1 FROM councils WHERE id = ? AND account_id = ?").get(p2.council_id, a2));
+  await two.get('/app/tenants');
+  r = await two.post('/app/tenants/import', { file: new File([csvT], 'tenants.csv') }, { multipart: true });
+  assert.match(decodeURIComponent(r.location), /1 new/);
+  assert.equal(db.prepare('SELECT council_ref FROM tenants WHERE account_id = ?').get(a2).council_ref, 'REF-1');
+  // The first agency's records are untouched.
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM landlords WHERE account_id = ?').get(a1).n, 2);
+});
+
 test('menu: a divider under Dashboard like between the other groups; contractors show a dash for nothing paid or unpaid', async () => {
   const c = await registerAndLogin('rail-split@example.com', 'Rail Split Lets');
   const page = (await c.get('/app')).text;
