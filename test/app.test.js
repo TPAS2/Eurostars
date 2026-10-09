@@ -3396,6 +3396,19 @@ test('email box presets (Rent run 5.2 and Council Invoices): save, fill in, repl
   await c.post('/app/council-invoices/email-presets', { month: '2026-09', preset_name: 'Made-up Council', to: 'council@example.com', subject: 'Invoices' }, { multipart: true });
   assert.match((await c.get('/app/council-invoices?month=2026-09')).text, />Made-up Council<\/option>/);
   assert.doesNotMatch((await c.get('/app/council-invoices?month=2026-09')).text, />Metro Bank<\/option>/);
+  // Edit a preset: its name and every box.
+  const mid = db.prepare("SELECT id FROM email_presets WHERE account_id = ? AND name = 'Metro Bank'").get(a).id;
+  r = await c.get('/app/rent-run?month=2026-09');
+  assert.match(r.text, new RegExp(`href="/app/rent-run/email-presets/${mid}/edit\\?month=2026-09">Edit</a>`));
+  r = await c.get(`/app/rent-run/email-presets/${mid}/edit?month=2026-09`);
+  assert.match(r.text, /name="name" value="Metro Bank"[\s\S]*?name="to" value="payments@example\.com"[\s\S]*?name="subject" value="Bulk payment v2"/);
+  r = await c.post(`/app/rent-run/email-presets/${mid}`, { month: '2026-09', name: 'Metro Bank', to: 'payments@example.com', cc: 'a@example.com, b@example.com', subject: 'Edited', message: 'New text' });
+  assert.match(decodeURIComponent(r.location), /Saved the email preset “Metro Bank”/);
+  assert.deepEqual(JSON.parse(db.prepare('SELECT data_json FROM email_presets WHERE id = ?').get(mid).data_json), { from: '', to: 'payments@example.com', cc: 'a@example.com, b@example.com', bcc: '', subject: 'Edited', message: 'New text' });
+  r = await c.post(`/app/rent-run/email-presets/${mid}`, { month: '2026-09', name: 'Metro Bank', to: 'nope' });
+  assert.equal(r.status, 422);
+  assert.match(r.text, /“nope” isn’t a valid email address/);
+  assert.equal((await c.get(`/app/council-invoices/email-presets/${mid}/edit`)).status, 404, 'a Rent run preset isn’t edited from Council Invoices');
   // A name is needed; remove works; another company can't remove ours.
   r = await c.post('/app/rent-run/email-presets', { month: '2026-09', preset_name: '' }, { multipart: true });
   assert.match(decodeURIComponent(r.location), /Give the email preset a name/);

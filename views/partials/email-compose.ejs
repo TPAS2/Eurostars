@@ -21,7 +21,7 @@
       <tbody>
       <% emailOut.presets.forEach(p => { %><tr>
         <td><strong><%= p.name %></strong></td><td><%= p.data.to %></td><td><%= p.data.subject %></td>
-        <td class="num nowrap"><form method="post" action="<%= presetBase %>/email-presets/<%= p.id %>/delete" class="inline" data-confirm="Remove the email preset <%= p.name %>?"><%- include('csrf') %><input type="hidden" name="month" value="<%= month %>"><button class="btn small link" type="submit">Remove</button></form></td>
+        <td class="num nowrap"><a class="btn small" href="<%= presetBase %>/email-presets/<%= p.id %>/edit?month=<%= month %>">Edit</a> <form method="post" action="<%= presetBase %>/email-presets/<%= p.id %>/delete" class="inline" data-confirm="Remove the email preset <%= p.name %>?"><%- include('csrf') %><input type="hidden" name="month" value="<%= month %>"><button class="btn small link" type="submit">Remove</button></form></td>
       </tr><% }) %>
       </tbody>
     </table></div>

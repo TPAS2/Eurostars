@@ -1,0 +1,31 @@
+<%- include('partials/header') %>
+<header class="page-head">
+  <div>
+    <a class="crumb" href="<%= back %>">← Back to the email</a>
+    <h1>Edit email preset</h1>
+    <p class="muted">Change its name or anything in it. Separate several addresses with commas.</p>
+  </div>
+</header>
+<% if (error) { %><div class="notice err"><%= error %></div><% } %>
+<section class="card">
+  <form method="post" action="<%= action %>" data-no-keep>
+    <%- include('partials/csrf') %>
+    <input type="hidden" name="month" value="<%= month %>">
+    <div class="field preset-name"><label for="ep-name">Preset name <span class="req">*</span></label><input id="ep-name" name="name" value="<%= values.name || '' %>" required maxlength="60"></div>
+    <div class="mail-compose">
+      <div class="mail-head">
+        <label class="mail-row"><span>From</span><input type="email" name="from" value="<%= values.from || '' %>" maxlength="254"></label>
+        <label class="mail-row"><span>To</span><input name="to" value="<%= values.to || '' %>" maxlength="2000"></label>
+        <label class="mail-row"><span>Cc</span><input name="cc" value="<%= values.cc || '' %>" maxlength="2000"></label>
+        <label class="mail-row"><span>Bcc</span><input name="bcc" value="<%= values.bcc || '' %>" maxlength="2000"></label>
+        <label class="mail-row"><span>Subject</span><input name="subject" value="<%= values.subject || '' %>" maxlength="300"></label>
+      </div>
+      <textarea name="message" rows="10" class="mail-body" maxlength="20000"><%= values.message || '' %></textarea>
+      <div class="mail-foot">
+        <button class="btn primary" type="submit">Save preset</button>
+        <a class="btn" href="<%= back %>">Cancel</a>
+      </div>
+    </div>
+  </form>
+</section>
+<%- include('partials/footer') %>

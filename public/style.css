@@ -1474,3 +1474,4 @@ td.nowrap-lines span { display: block; white-space: nowrap; }
 .paid-date-form { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 10px 0 6px; }
 .paid-date-form label { font-weight: 600; }
 .paid-date-form input { width: auto; }
+.preset-name { max-width: 420px; margin-bottom: 12px; }

@@ -42,6 +42,38 @@ module.exports = function rentRunEmailRoutes(db, mailer, { page = 'rent-run' } =
       ON CONFLICT (account_id, page, name) DO UPDATE SET data_json = excluded.data_json`).run(req.user.id, page, name, JSON.stringify(data));
     back('flash', `Saved the email preset “${name}”.`);
   });
+  // Edit a preset: its name and every box.
+  const ownPreset = (req, res) => {
+    const p = db.prepare('SELECT * FROM email_presets WHERE id = ? AND account_id = ? AND page = ?').get(Number(req.params.pid), req.user.id, page);
+    if (!p) res.status(404).render('error', { title: 'Not found', message: 'That email preset was not found.' });
+    return p;
+  };
+  const presetForm = (res, p, values, month, error = '', status = 200) => res.status(status).render('email-preset', {
+    title: `Edit email preset · ${p.name}`, section: page === 'rent-run' ? 'rentrun' : 'councilinvoices', p, values, month, error,
+    back: `/app/${page}?month=${month}#send-email`, action: `/app/${page}/email-presets/${p.id}`,
+  });
+  router.get('/email-presets/:pid(\\d+)/edit', (req, res) => {
+    const p = ownPreset(req, res);
+    if (!p) return;
+    const month = st.isMonth(req.query.month) ? String(req.query.month) : fmt.today().slice(0, 7);
+    presetForm(res, p, { name: p.name, ...JSON.parse(p.data_json) }, month);
+  });
+  router.post('/email-presets/:pid(\\d+)', (req, res) => {
+    const p = ownPreset(req, res);
+    if (!p) return;
+    const month = st.isMonth(req.body.month) ? String(req.body.month) : fmt.today().slice(0, 7);
+    const name = String(req.body.name || '').replace(/[\r\n]+/g, ' ').trim().slice(0, 60);
+    const data = Object.fromEntries(Object.entries(PRESET_FIELDS).map(([k, max]) => [k, String(req.body[k] || '').slice(0, max)]));
+    if (!name) return presetForm(res, p, { name, ...data }, month, 'Give the email preset a name.', 422);
+    if (db.prepare('SELECT 1 FROM email_presets WHERE account_id = ? AND page = ? AND name = ? AND id != ?').get(req.user.id, page, name, p.id)) {
+      return presetForm(res, p, { name, ...data }, month, `There's already an email preset called “${name}”.`, 422);
+    }
+    const bad = ['from', 'to', 'cc', 'bcc'].flatMap((k) => addresses(data[k])).find((x) => !isEmail(x));
+    if (bad) return presetForm(res, p, { name, ...data }, month, `“${bad.slice(0, 80)}” isn’t a valid email address.`, 422);
+    db.prepare('UPDATE email_presets SET name = ?, data_json = ? WHERE id = ? AND account_id = ?').run(name, JSON.stringify(data), p.id, req.user.id);
+    res.redirect(`/app/${page}?month=${month}&flash=${encodeURIComponent(`Saved the email preset “${name}”.`)}#send-email`);
+  });
+
   router.post('/email-presets/:pid(\\d+)/delete', (req, res) => {
     const month = st.isMonth(req.body.month) ? String(req.body.month) : fmt.today().slice(0, 7);
     const p = db.prepare('SELECT id, name FROM email_presets WHERE id = ? AND account_id = ? AND page = ?').get(Number(req.params.pid), req.user.id, page);
