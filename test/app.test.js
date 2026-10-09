@@ -3653,6 +3653,19 @@ test('property page: Email this property fills the height beside the photos and 
   assert.match(fs.readFileSync(path.join(__dirname, '..', 'views', 'show.ejs'), 'utf8'), /<label class="grow"><span>Message/);
 });
 
+test('properties: an AST Date box, saved, shown on the property page and in the export', async () => {
+  const c = await registerAndLogin('ast-date@example.com', 'AST Date Lets');
+  let r = await c.get('/app/properties/new');
+  assert.match(r.text, /<label for="f-ast_date">AST Date<\/label>[\s\S]{0,300}?<input id="f-ast_date"[^>]*type="date"[^>]*name="ast_date"|<label for="f-ast_date">AST Date<\/label>[\s\S]{0,300}?name="ast_date"/);
+  assert.ok(r.text.indexOf('name="handed_back_date"') < r.text.indexOf('name="ast_date"'), 'after Date handed back');
+  const prop = idFrom((await c.post('/app/properties', { address_line1: '6 Made-up Mews', status: 'let', ast_date: '2026-03-14' })).location);
+  assert.equal(db.prepare('SELECT ast_date FROM properties WHERE id = ?').get(prop).ast_date, '2026-03-14');
+  r = await c.get(`/app/properties/${prop}`);
+  assert.match(r.text, /AST Date[\s\S]{0,200}14\/03\/2026/);
+  r = await c.get('/app/properties/export.csv');
+  assert.match(r.buf.toString(), /,AST Date,[\s\S]*,2026-03-14,/);
+});
+
 test('saving account details keeps your own username (including the admin account)', async () => {
   const admin = new Client();
   await admin.login('admin', 'owner-password-123');
@@ -5364,7 +5377,7 @@ test('property form: rows of address/code, council/landlord/details, rents, stat
   let page = (await c.get('/app/properties/new')).text;
   const order = [...page.matchAll(/<label for="f-([a-z_0-9]+)">/g)].map((m) => m[1]);
   assert.deepEqual(order.filter((n) => !/^cert/.test(n)), ['address_line1', 'town', 'postcode', 'code', 'council_id', 'landlord_id', 'property_type', 'bedrooms', 'bathrooms', 'parking',
-    'rent_pence', 'tenant_rent_pence', 'landlord_rent_pence', 'price_per_night_pence', 'status', 'management_fee_pct', 'lease_start_date', 'acquired_date', 'handed_back_date', 'notes'],
+    'rent_pence', 'tenant_rent_pence', 'landlord_rent_pence', 'price_per_night_pence', 'status', 'management_fee_pct', 'lease_start_date', 'acquired_date', 'handed_back_date', 'ast_date', 'notes'],
     'address, town, postcode, code / council, landlord, type, beds, baths, parking / the rents / status, fee / dates / notes');
   for (const n of ['council_id', 'rent_pence', 'status', 'lease_start_date']) assert.match(page, new RegExp(`class="field\\s+row-start span-\\d"[^>]*>\\s*<label for="f-${n}"`), `${n} starts a row`);
   assert.ok(page.indexOf('name="notes"') < page.indexOf('Certificates'), 'certificates under the notes');

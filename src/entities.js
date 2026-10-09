@@ -63,13 +63,14 @@ const ENTITIES = {
       { name: 'price_per_night_pence', label: 'Price per night (£)', type: 'money', span: 3, help: 'For short stays.' },
       { name: 'status', label: 'Status', type: 'select', span: 3, options: ['vacant', 'let', 'managed', 'under offer', 'unavailable', 'handed back'], required: true, default: 'vacant', startRow: true },
       { name: 'management_fee_pct', label: 'Management fee %', type: 'number', span: 3, help: 'Taken from the rent.' },
-      { name: 'lease_start_date', label: 'Lease start with landlord', type: 'date', span: 4, startRow: true },
-      { name: 'acquired_date', label: 'Date acquired', type: 'date', span: 4, default: 'today' },
-      { name: 'handed_back_date', label: 'Date handed back', type: 'date', span: 4, help: 'Sets the status to handed back.' },
+      { name: 'lease_start_date', label: 'Lease start with landlord', type: 'date', span: 3, startRow: true },
+      { name: 'acquired_date', label: 'Date acquired', type: 'date', span: 3, default: 'today' },
+      { name: 'handed_back_date', label: 'Date handed back', type: 'date', span: 3, help: 'Sets the status to handed back.' },
+      { name: 'ast_date', label: 'AST Date', type: 'date', span: 3, help: 'Assured shorthold tenancy date.' },
       { name: 'notes', label: 'Notes', type: 'textarea' },
     ],
     // The property page's info box keeps Council near the top (the form has it beside Status).
-    detailsOrder: ['council_id', 'code', 'address_line1', 'town', 'postcode', 'landlord_id', 'property_type', 'bedrooms', 'bathrooms', 'parking', 'rent_pence', 'tenant_rent_pence', 'price_per_night_pence', 'landlord_rent_pence', 'management_fee_pct', 'status', 'lease_start_date', 'acquired_date', 'handed_back_date', 'notes'],
+    detailsOrder: ['council_id', 'code', 'address_line1', 'town', 'postcode', 'landlord_id', 'property_type', 'bedrooms', 'bathrooms', 'parking', 'rent_pence', 'tenant_rent_pence', 'price_per_night_pence', 'landlord_rent_pence', 'management_fee_pct', 'status', 'lease_start_date', 'acquired_date', 'handed_back_date', 'ast_date', 'notes'],
     columns: ['code', 'address_line1', 'council_id', 'landlord_id', 'cur_tenant', 'status'],
     computed: { cur_tenant: { label: 'Tenant' } },
     children: [

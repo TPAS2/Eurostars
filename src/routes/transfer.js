@@ -87,6 +87,7 @@ const KINDS = {
       ['acquired_date', 'Date acquired', ['acquired'], { type: 'date' }],
       ['lease_start_date', 'Lease start with landlord', ['lease start'], { type: 'date' }],
       ['handed_back_date', 'Date handed back', ['handed back'], { type: 'date' }],
+      ['ast_date', 'AST Date', ['ast', 'ast date', 'assured shorthold tenancy date'], { type: 'date' }],
       ['notes', 'Notes', ['note', 'comments'], T(2000)],
     ],
   },
