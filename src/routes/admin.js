@@ -253,6 +253,30 @@ module.exports = function adminRoutes(db, config) {
     res.redirect(`/admin/users/${other.id}?flash=${encodeURIComponent(msg)}#people`);
   }
 
+  // Rename an agency: the name everyone types in the Agency box and the company name on statements,
+  // for the account and everyone in it. It never moves the account or touches its records.
+  router.post('/users/:id/rename', (req, res) => {
+    const u = target(req, res);
+    if (!u) return;
+    const back = (key, msg) => res.redirect(`/admin/users/${u.id}?${key}=${encodeURIComponent(msg)}#rename`);
+    if (u.is_admin) return back('error', 'The admin account’s name is set in the server settings, so it can’t be renamed here.');
+    const name = String(req.body.new_name || '').trim().replace(/\s+/g, ' ').slice(0, 60);
+    if (!name || !USERNAME_RE.test(name)) return back('error', 'Enter the new agency name (up to 60 characters).');
+    const same = name.toLowerCase() === String(u.username).toLowerCase();
+    if (!same && (RESERVED_USERNAMES.has(name.toLowerCase()) || name.toLowerCase() === config.adminUsername.toLowerCase()
+      || db.prepare('SELECT 1 FROM users WHERE username = ? COLLATE NOCASE AND id != ? AND (company_id IS NULL OR company_id != ?)').get(name, u.id, u.id))) {
+      return back('error', `Another agency is already called "${name}". Pick a different name; renaming never joins two agencies together.`);
+    }
+    db.exec('BEGIN');
+    try {
+      db.prepare('UPDATE users SET username = ?, agency_name = ? WHERE id = ?').run(name, name, u.id);
+      // People inside the company carry the company's names in their own records.
+      db.prepare("UPDATE users SET username = ? || '.' || login_name, agency_name = ? WHERE company_id = ?").run(name, name, u.id);
+      db.exec('COMMIT');
+    } catch (err) { db.exec('ROLLBACK'); throw err; }
+    back('flash', `Renamed ${u.agency_name} to ${name}. Everyone there now types "${name}" in the Agency box when they sign in. All their records are unchanged.`);
+  });
+
   router.post('/users/:id/password', (req, res) => {
     const u = target(req, res);
     if (!u) return;

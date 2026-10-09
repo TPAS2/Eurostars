@@ -3288,6 +3288,30 @@ test('landlord invoice form: landlord, property, number / date, amount, pay over
   assert.match(form, /<div class="field span-2">\s*<label for="f-desc">/);
 });
 
+test('admin: rename an agency without moving or changing its records', async () => {
+  const c = await registerAndLogin('rename-me@example.com', 'Rename Me Lets');
+  const id = db.prepare("SELECT id FROM users WHERE username = 'rename-me'").get().id;
+  await c.post('/app/landlords', { ...LANDLORD, name: 'Kept Landlord' });
+  await registerAndLogin('taken-name@example.com', 'Taken Lets');
+  const admin = new Client();
+  await admin.login('admin', 'owner-password-123');
+  let r = await admin.get(`/admin/users/${id}`);
+  assert.match(r.text, /<h2>Rename agency<\/h2>[\s\S]*?name="new_name" value="rename-me"/);
+  r = await admin.post(`/admin/users/${id}/rename`, { new_name: 'Fresh Name Lets' });
+  assert.match(decodeURIComponent(r.location), /Renamed Rename Me Lets to Fresh Name Lets[\s\S]*?records are unchanged/);
+  const u = db.prepare('SELECT username, agency_name, company_id FROM users WHERE id = ?').get(id);
+  assert.deepEqual({ ...u }, { username: 'Fresh Name Lets', agency_name: 'Fresh Name Lets', company_id: null });
+  assert.equal(db.prepare("SELECT COUNT(*) n FROM landlords WHERE account_id = ? AND name = 'Kept Landlord'").get(id).n, 1, 'records stay with the agency');
+  // Another agency's name is refused (renaming never merges), and nothing changes.
+  r = await admin.post(`/admin/users/${id}/rename`, { new_name: 'taken-name' });
+  assert.match(decodeURIComponent(r.location), /Another agency is already called "taken-name"/);
+  assert.equal(db.prepare('SELECT username FROM users WHERE id = ?').get(id).username, 'Fresh Name Lets');
+  // They sign in with the new name.
+  const again = new Client();
+  const l = await again.login('Fresh Name Lets', 'kettle-harbour-58');
+  assert.match(l.location, /^\/app/, 'signs in with the new agency name');
+});
+
 test('tenants list is in tenancy number order, not name order', async () => {
   const c = await registerAndLogin('tenancy-order@example.com', 'Tenancy Order Lets');
   const prop = idFrom((await c.post('/app/properties', { address_line1: '3 Order Row', status: 'let' })).location);

@@ -38,6 +38,19 @@
   <a href="#people">People</a>
 </nav>
 
+<% if (!u.is_admin) { %>
+<section class="card" id="rename">
+  <h2>Rename agency</h2>
+  <form method="post" action="/admin/users/<%= u.id %>/rename" class="inline-form rename-form" data-no-keep data-confirm="Rename this agency? Everyone at it will type the new name in the Agency box when they sign in.">
+    <%- include('../partials/csrf') %>
+    <label for="r-name">New name</label>
+    <input id="r-name" name="new_name" value="<%= u.username %>" required maxlength="60" autocomplete="off" autocapitalize="none" spellcheck="false">
+    <button class="btn primary" type="submit">Rename</button>
+  </form>
+  <p class="muted small">Changes the name everyone types in the Agency box and the company name on statements and invoices, for everyone at <%= u.agency_name %>. Their landlords, properties, statements and everything else stay exactly as they are. It never joins two agencies.</p>
+</section>
+<% } %>
+
 <section class="card" id="details">
   <h2>Account details</h2>
   <p class="muted small">Only you can change these. The first three are what <%= isSelf ? 'you type' : 'they type' %> to sign in (capitals count).</p>
