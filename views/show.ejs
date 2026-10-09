@@ -315,7 +315,7 @@
   <div class="tick-sheet read-only">
     <div class="tick-head"><span>Safety Requirement</span><span>Answer</span></div>
     <% inspectionSheet.items.forEach(({ key, label }) => { %>
-    <div class="tick-row"><span class="tick-label"><%= label %></span><span class="tick-answer tick-<%= ck[key] === 'N/A' ? 'na' : ck[key].toLowerCase() %>"><%= ck[key] %><%= key === 'fire_door' && ck.fire_door_place ? ` · ${ck.fire_door_place}` : '' %></span></div>
+    <div class="tick-row"><span class="tick-label"><%= label %></span><span class="tick-answer tick-<%= ck[key] === 'N/A' ? 'na' : ck[key].toLowerCase() %>"><%= ck[key] %></span></div>
     <% }) %>
   </div>
   <div class="sign-grid">

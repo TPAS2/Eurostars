@@ -2641,7 +2641,8 @@ test('inspection sheet: tick sheet filled in, signed by the tenant, downloadable
 
   const prop = idFrom((await c.post('/app/properties', { address_line1: '9 Alarm Avenue', status: 'let' })).location);
   r = await c.get(`/app/inspections/new?property_id=${prop}`);
-  assert.match(r.text, /class="paper paper-inspection[\s\S]*?Property Address:[\s\S]*?Date of Inspection:[\s\S]*?Inspected By:[\s\S]*?Safety Requirement[\s\S]*?Window Restrictor \(All rooms above ground level\)[\s\S]*?name="checklist__window_restrictor" value="Yes"[\s\S]*?name="checklist__fire_door_place"[\s\S]*?Thumb Turn Lock \(To back door\)/);
+  assert.match(r.text, /class="paper paper-inspection[\s\S]*?Property Address:[\s\S]*?Date of Inspection:[\s\S]*?Inspected By:[\s\S]*?Safety Requirement[\s\S]*?Window Restrictor \(All rooms above ground level\)[\s\S]*?name="checklist__window_restrictor" value="Yes"[\s\S]*?Fire Check Door[\s\S]*?Thumb Turn Lock \(To back door\)/);
+  assert.doesNotMatch(r.text, /fire_door_place|Where\?/, 'no Where box for the fire check door');
   assert.match(r.text, /name="checklist__heat_sensor" value="N\/A" checked/, 'each starts as N/A, like the paper sheet');
   const ins = idFrom((await c.post('/app/inspections', { property_id: String(prop), inspection_date: '2026-10-03', inspection_type: 'Routine',
     checklist__window_restrictor: 'Yes', checklist__smoke_alarms: 'Yes', checklist__fire_blanket: 'No', checklist__fire_door: 'Yes',
@@ -2650,9 +2651,10 @@ test('inspection sheet: tick sheet filled in, signed by the tenant, downloadable
   assert.equal(saved.window_restrictor, 'Yes');
   assert.equal(saved.fire_blanket, 'No');
   assert.equal(saved.heat_sensor, 'N/A', 'anything else counts as N/A');
-  assert.equal(saved.fire_door_place, 'Kitchen');
+  assert.equal(saved.fire_door_place, undefined, 'where the fire check door is, is no longer kept');
   r = await c.get(`/app/inspections/${ins}`);
-  assert.match(r.text, /id="inspection-sheet"[\s\S]*?sheet\.pdf" download>Download PDF[\s\S]*?Fire Blanket<\/span><span class="tick-answer tick-no">No[\s\S]*?Yes · Kitchen/);
+  assert.match(r.text, /id="inspection-sheet"[\s\S]*?sheet\.pdf" download>Download PDF[\s\S]*?Fire Blanket<\/span><span class="tick-answer tick-no">No/);
+  assert.doesNotMatch(r.text, /Yes · Kitchen/);
   assert.match(r.text, /3 Yes · 1 No · 11 N\/A/);
   // The tenant can sign on the new inspection form itself.
   r = await c.get(`/app/inspections/new?property_id=${prop}`);

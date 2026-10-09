@@ -1,8 +1,8 @@
 'use strict';
 
 // The property safety inspection sheet, laid out like the agency's own tablet sheet: property
-// address, date and who inspected; the safety requirements, each answered Yes, No or N/A (with
-// where the fire check door is); notes; and the tenant's signature. Positions match the original
+// address, date and who inspected; the safety requirements, each answered Yes, No or N/A; notes;
+// and the tenant's signature. Positions match the original
 // sheet (A4, measured from the top of the page). Given no inspection, it is the blank template.
 
 const { PDFDocument, StandardFonts, rgb } = require('pdf-lib');
@@ -26,7 +26,6 @@ const SAFETY_ITEMS = [
   { key: 'thumb_back', label: 'Thumb Turn Lock (To back door)' },
 ];
 const ANSWERS = ['Yes', 'No', 'N/A'];
-const FIRE_DOOR_PLACES = ['Kitchen', 'Bedroom', 'Front door', 'No Fire Check Door'];
 
 // The answers from a submitted form (fields named checklist__<key>); anything missing is N/A.
 function parseChecklist(body) {
@@ -35,8 +34,6 @@ function parseChecklist(body) {
     const v = String(body[`checklist__${key}`] || '');
     out[key] = ANSWERS.includes(v) ? v : 'N/A';
   }
-  const place = String(body.checklist__fire_door_place || '');
-  out.fire_door_place = FIRE_DOOR_PLACES.includes(place) ? place : '';
   return out;
 }
 
@@ -107,7 +104,6 @@ async function buildInspectionSheet(data) {
       text(answer, 297.2, bottom - 3.5, 12, answer === 'N/A' ? font : bold, colour);
     }
   });
-  if (checklist && checklist.fire_door_place) text(checklist.fire_door_place, 383.6, 406.5, 12);
 
   // Notes.
   text('Notes', 52.7, 601.5, 8.2, bold);
@@ -136,4 +132,4 @@ async function buildInspectionSheet(data) {
   return doc.save();
 }
 
-module.exports = { SAFETY_ITEMS, ANSWERS, FIRE_DOOR_PLACES, parseChecklist, readChecklist, summary, buildInspectionSheet };
+module.exports = { SAFETY_ITEMS, ANSWERS, parseChecklist, readChecklist, summary, buildInspectionSheet };

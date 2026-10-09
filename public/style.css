@@ -1204,7 +1204,6 @@ td.nowrap-lines span { display: block; white-space: nowrap; }
 .tick-yes input:checked + span { background: var(--ok); border-color: var(--ok); color: #fff; }
 .tick-no input:checked + span { background: var(--bad); border-color: var(--bad); color: #fff; }
 .tick-na input:checked + span { background: var(--muted); border-color: var(--muted); color: var(--surface); }
-.tick-place { font-size: .85rem; padding: 6px; }
 .tick-answer { font-weight: 800; text-align: center; border-radius: 6px; padding: 4px 6px; }
 .tick-answer.tick-yes { background: var(--ok-soft); color: var(--ok); }
 .tick-answer.tick-no { background: var(--bad-soft); color: var(--bad); }
@@ -1214,7 +1213,6 @@ td.nowrap-lines span { display: block; white-space: nowrap; }
   .tick-head { display: none; }
   .tick-row { grid-template-columns: repeat(3, 1fr); }
   .tick-label { grid-column: 1 / -1; font-weight: 700; }
-  .tick-place { grid-column: 1 / -1; }
   .tick-sheet.read-only .tick-row { grid-template-columns: minmax(0, 1fr) auto; }
   .tick-sheet.read-only .tick-label { grid-column: auto; }
 }
@@ -1279,7 +1277,6 @@ td.nowrap-lines span { display: block; white-space: nowrap; }
 #inspection-sheet > .card-head, #job-sheet > .card-head { flex-direction: column; align-items: center; justify-content: center; gap: 8px; }
 #inspection-sheet > .card-head .actions, #job-sheet > .card-head .actions { justify-content: center; }
 .tick-sheet .tick-head span, .tick-sheet .tick-label, .tick-sheet .tick-answer { text-align: center; }
-.tick-sheet .tick-place { justify-self: center; text-align: center; }
 .sign-box { text-align: center; }
 .sign-box .sign-img { margin: 0 auto; }
 .sign-box form[data-signature] { justify-items: center; }
@@ -1325,7 +1322,6 @@ td.nowrap-lines span { display: block; white-space: nowrap; }
 .paper-answers { display: flex; gap: 6px; }
 .paper-check-head .paper-answers span { width: 52px; text-align: center; font-weight: 700; font-size: .78rem; color: #333; }
 .paper-answers .tick span { min-width: 52px; padding: 4px 0; }
-.paper-place { font-size: .88rem; }
 .paper-notes { margin-top: 22px; display: grid; gap: 4px; }
 .paper-notes label { font-weight: 700; font-size: .92rem; }
 .paper-notes textarea { width: 100%; max-width: 620px; min-height: 140px; border: 1.5px solid var(--paper-line); border-radius: 0; }
