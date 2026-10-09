@@ -1454,4 +1454,4 @@ td.nowrap-lines span { display: block; white-space: nowrap; }
 
 /* Admin: rename an agency. */
 .rename-form { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.rename-form input { max-width: 320px; }
+.rename-form input { flex: 1 1 420px; max-width: 640px; min-width: 0; }
