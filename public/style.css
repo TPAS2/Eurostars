@@ -1442,3 +1442,7 @@ td.nowrap-lines span { display: block; white-space: nowrap; }
 .stmt-no-box label { font-size: .8rem; font-weight: 700; color: var(--muted); }
 .stmt-no-row { display: flex; gap: 6px; }
 .stmt-no-row input { width: 100px; }
+
+/* Contractors: export / import, top right. */
+.transfer-box { display: inline-flex; gap: 6px; align-items: center; padding: 4px; border: 1px solid var(--border); border-radius: 10px; }
+.transfer-box form { margin: 0; }

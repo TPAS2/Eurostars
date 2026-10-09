@@ -188,6 +188,7 @@ function createApp(config, db, { writer = null, mailer = null } = {}) {
   app.use('/', require('./routes/auth')(db, config));
   app.get('/support', auth.requireLogin, (req, res) => res.render('support', { title: 'Support', section: 'support' }));
   app.use('/app/invoices', auth.requireLogin, require('./routes/invoices')(db, config));
+  app.use('/app/contractors', auth.requireLogin, require('./routes/contractorsTransfer')(db));
   app.use('/app/councils', auth.requireLogin, require('./routes/councilPhotos')(db));
   app.use('/app/councils', auth.requireLogin, require('./routes/councilDatabase')(db));
   app.use('/app/tenancies', auth.requireLogin, require('./routes/agreements')(db));

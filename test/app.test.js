@@ -3184,6 +3184,43 @@ test('statement expenditure: a deducted landlord invoice shows as itself, not as
   assert.match((await c.get(`/app/monthly/${s.id}`)).text, /EXPENDITURE[\s\S]*?Management fee[\s\S]*?100\.00[\s\S]*?Invoice LI-0001 - Boiler repair[\s\S]*?250\.00/);
 });
 
+test('contractors: export to a CSV file and import it into another agency', async () => {
+  const one = await registerAndLogin('ctr-export@example.com', 'Export Lets');
+  await one.post('/app/contractors', { name: 'Made-up Plumbing', code: 'C0001', trade: 'Plumber', phone: '0100 000001', email: 'plumb@example.com', notes: 'Fast, "reliable", cheap' });
+  await one.post('/app/contractors', { name: '=Sneaky Formula', code: 'C0002', trade: 'Roofer' });
+  let r = await one.get('/app/contractors');
+  assert.match(r.text, /href="\/app\/contractors\/export\.csv" download>Export<\/a>[\s\S]*?action="\/app\/contractors\/import"[\s\S]*?name="file"/);
+  r = await one.get('/app/contractors/export.csv');
+  assert.match(r.headers.get('content-type'), /text\/csv/);
+  const csv = r.buf.toString('utf8');
+  assert.match(csv, /^\ufeffContractor code,Name,Trade,Phone,Mobile,Fax,Email,Address,Notes\r\n/);
+  assert.match(csv, /C0001,Made-up Plumbing,Plumber,0100 000001,,,plumb@example\.com,,"Fast, ""reliable"", cheap"/);
+  assert.match(csv, /C0002,'=Sneaky Formula,Roofer/, 'formula-looking names are made safe for spreadsheets');
+
+  // Another agency imports it: both added with their codes and details.
+  const two = await registerAndLogin('ctr-import@example.com', 'Import Lets');
+  const b = db.prepare("SELECT id FROM users WHERE username = 'ctr-import'").get().id;
+  await two.post('/app/contractors', { name: 'made-up plumbing', code: 'C0001' }); // already there (any case), no phone yet
+  await two.get('/app/contractors');
+  r = await two.post('/app/contractors/import', { file: new File([r.buf], 'contractors.csv', { type: 'text/csv' }) }, { multipart: true });
+  assert.match(decodeURIComponent(r.location), /Imported contractors: 1 new, 1 updated with missing details, 0 already here/);
+  const rows = db.prepare('SELECT code, name, trade, phone, notes FROM contractors WHERE account_id = ? ORDER BY code').all(b).map((x) => ({ ...x }));
+  assert.deepEqual(rows, [
+    { code: 'C0001', name: 'made-up plumbing', trade: 'Plumber', phone: '0100 000001', notes: 'Fast, "reliable", cheap' },
+    { code: 'C0002', name: '=Sneaky Formula', trade: 'Roofer', phone: null, notes: null },
+  ]);
+  // Importing again changes nothing.
+  await two.get('/app/contractors');
+  const exported = (await one.get('/app/contractors/export.csv')).buf;
+  r = await two.post('/app/contractors/import', { file: new File([exported], 'contractors.csv') }, { multipart: true });
+  assert.match(decodeURIComponent(r.location), /0 new, 0 updated with missing details, 2 already here/);
+  // A file without a Name column is refused; the first agency's contractors are untouched.
+  await two.get('/app/contractors');
+  r = await two.post('/app/contractors/import', { file: new File(['Foo,Bar\n1,2\n'], 'x.csv') }, { multipart: true });
+  assert.match(decodeURIComponent(r.location), /no Name column/);
+  assert.equal(db.prepare("SELECT COUNT(*) n FROM contractors WHERE account_id = (SELECT id FROM users WHERE username = 'ctr-export')").get().n, 2);
+});
+
 test('tenants list is in tenancy number order, not name order', async () => {
   const c = await registerAndLogin('tenancy-order@example.com', 'Tenancy Order Lets');
   const prop = idFrom((await c.post('/app/properties', { address_line1: '3 Order Row', status: 'let' })).location);

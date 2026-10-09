@@ -7,6 +7,15 @@
     <% } %>
     <% if (def.key === 'maintenance') { %><a class="btn" href="/app/maintenance/job-sheet.pdf" download>Blank job sheet (PDF)</a><% } %>
     <% if (def.key === 'inspections') { %><a class="btn" href="/app/inspections/sheet.pdf" download>Blank inspection sheet (PDF)</a><% } %>
+    <% if (def.key === 'contractors') { %>
+    <div class="transfer-box" title="Use the same contractors in another agency: export here, then import there">
+      <a class="btn small" href="/app/contractors/export.csv" download>Export</a>
+      <form method="post" action="/app/contractors/import" enctype="multipart/form-data" class="inline-form" data-busy="Importing">
+        <%- include('partials/csrf') %>
+        <label class="btn small">Import<input type="file" name="file" accept=".csv,text/csv" data-autosubmit hidden></label>
+      </form>
+    </div>
+    <% } %>
     <a class="btn primary" href="/app/<%= def.key %>/new">+ Add <%= def.singular.toLowerCase() %></a>
   </div>
 </header>
