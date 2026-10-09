@@ -26,7 +26,7 @@
         <td><%= l.name %><% if (l.is_main) { %> <span class="badge">main contact</span><% } %></td>
         <td class="nowrap"><%= fmt.ukDateTime(l.last_login_at) %></td>
         <td><span class="badge <%= active ? 's-active' : 's-suspended' %>"><%= active ? 'active' : 'suspended' %></span></td>
-        <td><a class="btn small" href="<%= l.is_main ? `/admin/users/${l.company_id}#details` : `/admin/people/${l.id}/edit` %>">Edit</a></td>
+        <td><a class="btn small" href="<%= l.is_main ? `/admin/users/${l.company_id}#users` : `/admin/people/${l.id}/edit` %>">Edit</a></td>
       </tr>
     <% }) %>
     </tbody>

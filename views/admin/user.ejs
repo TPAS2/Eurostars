@@ -32,39 +32,58 @@
 </section>
 
 <nav class="jump-links" aria-label="On this page">
-  <a href="#details">Account details</a>
+  <a href="#agency">Agency details</a>
+  <a href="#users">Users</a>
+  <a href="#people">People</a>
   <a href="#activity">Activity</a>
   <a href="#sign-ins">Sign-in history</a>
-  <a href="#people">People</a>
 </nav>
 
-<% if (!u.is_admin) { %>
-<section class="card" id="rename">
-  <h2>Rename agency</h2>
-  <form method="post" action="/admin/users/<%= u.id %>/rename" class="inline-form rename-form" data-no-keep data-confirm="Rename this agency? Everyone at it will type the new name in the Agency box when they sign in.">
-    <%- include('../partials/csrf') %>
-    <label for="r-name">New name</label>
-    <input id="r-name" name="new_name" value="<%= u.username %>" required maxlength="60" autocomplete="off" autocapitalize="none" spellcheck="false">
-    <button class="btn primary" type="submit">Rename</button>
-  </form>
-  <p class="muted small">Changes the name everyone types in the Agency box and the company name on statements and invoices, for everyone at <%= u.agency_name %>. Their landlords, properties, statements and everything else stay exactly as they are. It never joins two agencies.</p>
-</section>
-<% } %>
-
-<section class="card" id="details">
-  <h2>Account details</h2>
-  <p class="muted small">Only you can change these. The first three are what <%= isSelf ? 'you type' : 'they type' %> to sign in (capitals count).</p>
+<details class="card fold" id="agency">
+  <summary><h2>Agency details</h2></summary>
+  <p class="muted small">The agency’s names, phone and address. Changing the names never moves or changes its landlords, properties, statements or anything else, and never joins two agencies.</p>
   <form method="post" action="/admin/users/<%= u.id %>/details" class="form-grid" data-no-keep>
     <%- include('../partials/csrf') %>
+    <input type="hidden" name="section" value="agency">
     <div class="field">
-      <label for="d-username">Agency <span class="req">*</span></label>
+      <label for="d-username">Agency name (typed to sign in) <span class="req">*</span></label>
       <input id="d-username" name="username" value="<%= u.username %>" required maxlength="60" autocomplete="off" autocapitalize="none" spellcheck="false"<%= u.is_admin ? ' readonly' : '' %>>
-      <% if (!u.is_admin) { %><div class="help">Everyone at this company types this in the Agency box. Type another agency here to move this login (and its people) into it, so they share its records; only allowed while this account has no records of its own.</div><% } %>
+      <div class="help"><%= u.is_admin ? 'Your admin Agency comes from the server settings (ADMIN_USERNAME).' : `Everyone at ${u.agency_name} types this in the Agency box when they sign in. Capitals count.` %></div>
     </div>
     <div class="field">
-      <label for="d-login_name">Your name <span class="req">*</span></label>
+      <label for="d-agency_name">Company name (on statements and invoices) <span class="req">*</span></label>
+      <input id="d-agency_name" name="agency_name" value="<%= u.agency_name %>" required maxlength="200">
+    </div>
+    <div class="field">
+      <label for="d-phone">Phone</label>
+      <input id="d-phone" name="phone" type="tel" value="<%= u.phone || '' %>" maxlength="50">
+    </div>
+    <div class="field wide">
+      <label for="d-address">Address</label>
+      <textarea id="d-address" name="address" rows="3" maxlength="1000"><%= u.address || '' %></textarea>
+    </div>
+    <div class="form-actions wide"><button class="btn primary" type="submit">Save agency details</button></div>
+  </form>
+</details>
+
+<details class="card fold" id="users">
+  <summary><h2>Users</h2></summary>
+  <p class="muted small">The main login: who signs in with the agency name and these details (capitals count). Everyone else is under People.</p>
+  <form method="post" action="/admin/users/<%= u.id %>/details" class="form-grid" data-no-keep>
+    <%- include('../partials/csrf') %>
+    <input type="hidden" name="section" value="users">
+    <div class="field">
+      <label for="d-login_name">Sign-in name <span class="req">*</span></label>
       <input id="d-login_name" name="login_name" value="<%= u.login_name || '' %>" required maxlength="30" autocomplete="off" autocapitalize="none" spellcheck="false"<%= u.is_admin ? ' readonly' : '' %>>
-      <% if (u.is_admin) { %><div class="help">Your admin Agency and name come from the server settings (ADMIN_USERNAME, ADMIN_LOGIN_NAME).</div><% } %>
+      <div class="help"><%= u.is_admin ? 'Your admin sign-in name comes from the server settings (ADMIN_LOGIN_NAME).' : 'What they type in “Your name” when signing in.' %></div>
+    </div>
+    <div class="field">
+      <label for="d-name">Contact name <span class="req">*</span></label>
+      <input id="d-name" name="name" value="<%= u.name %>" required maxlength="200">
+    </div>
+    <div class="field">
+      <label for="d-email">Email</label>
+      <input id="d-email" name="email" type="email" value="<%= u.email || '' %>" maxlength="254">
     </div>
     <div class="field">
       <label for="d-password">Password</label>
@@ -75,72 +94,12 @@
       </div>
       <div class="help">Passwords are stored scrambled, so nobody can look one up. Type a new one and click Change password<%= isSelf ? '' : ', then tell them what it is; they’ll be signed out' %>. At least <%= minPassword %> characters.</div>
     </div>
-    <div class="field">
-      <label for="d-email">Email</label>
-      <input id="d-email" name="email" type="email" value="<%= u.email || '' %>">
-    </div>
-    <div class="field">
-      <label for="d-phone">Phone</label>
-      <input id="d-phone" name="phone" type="tel" value="<%= u.phone || '' %>">
-    </div>
-    <h3 class="wide form-subhead">Shown on statements and invoices</h3>
-    <div class="field">
-      <label for="d-agency_name">Company name <span class="req">*</span></label>
-      <input id="d-agency_name" name="agency_name" value="<%= u.agency_name %>" required>
-    </div>
-    <div class="field">
-      <label for="d-name">Contact name <span class="req">*</span></label>
-      <input id="d-name" name="name" value="<%= u.name %>" required>
-    </div>
-    <div class="field wide">
-      <label for="d-address">Company address</label>
-      <textarea id="d-address" name="address" rows="3"><%= u.address || '' %></textarea>
-    </div>
-    <div class="form-actions wide"><button class="btn primary" type="submit">Save details</button></div>
+    <div class="form-actions wide"><button class="btn primary" type="submit">Save user</button></div>
   </form>
-</section>
-
-
-<details class="card fold" id="activity"<%= personFilter || activityFilter !== 'all' ? ' open' : '' %>>
-  <summary><h2>Activity <span class="count"><%= activityRows.length %><%= activityRows.length === 300 ? '+' : '' %></span></h2></summary>
-  <div class="card-head">
-    <nav class="tabs compact">
-      <a href="/admin/users/<%= u.id %>#activity" class="<%= activityFilter === 'all' ? 'active' : '' %>">Everything</a>
-      <a href="/admin/users/<%= u.id %>?activity=changes<%= personFilter ? '&person=' + personFilter : '' %>#activity" class="<%= activityFilter === 'changes' ? 'active' : '' %>">Changes only</a>
-    </nav>
-  </div>
-  <p class="muted small">Pages <%= isSelf ? 'you' : 'everyone at this company' %> opened and changes made, newest first. Kept for 6 months.
-    <% if (personFilter) { %>Showing one person only. <a href="/admin/users/<%= u.id %>#activity">Show everyone</a><% } %></p>
-  <% if (!activityRows.length) { %><p class="muted">No activity recorded yet.</p><% } else { %>
-  <div class="table-wrap activity-scroll"><table>
-    <thead><tr><th>When</th><th>Who</th><th>Activity</th><th>IP</th></tr></thead>
-    <tbody>
-    <% activityRows.forEach(e => { %>
-      <tr><td class="nowrap"><%= fmt.ukDateTime(e.created_at) %></td><td class="nowrap"><%= e.person_name %></td>
-      <td><span class="act act-<%= e.action.replace(/\s+/g, '-') %>"><%= e.action %></span> <%= e.summary %></td>
-      <td class="muted small"><%= e.ip %></td></tr>
-    <% }) %>
-    </tbody>
-  </table></div><% } %>
 </details>
 
-<details class="card fold" id="sign-ins">
-  <summary><h2>Sign-in history <span class="count"><%= logins.length %></span></h2></summary>
-  <% if (!logins.length) { %><p class="muted">No sign-ins yet.</p><% } else { %>
-  <div class="table-wrap"><table>
-    <thead><tr><th>When</th><th>Who</th><th>Result</th><th>IP</th><th>Device</th></tr></thead>
-    <tbody>
-    <% logins.forEach(e => { %>
-      <tr><td><%= fmt.ukDateTime(e.created_at) %></td><td class="nowrap"><%= e.person_name %></td><td><span class="badge <%= e.success ? 's-active' : 'bad' %>"><%= e.success ? 'success' : 'failed' %></span></td><td><%= e.ip %></td><td class="muted small"><%= e.user_agent %></td></tr>
-    <% }) %>
-    </tbody>
-  </table></div><% } %>
-</details>
-
-<section class="card" id="people">
-  <div class="card-head">
-    <h2>People <span class="count"><%= people.length %></span></h2>
-  </div>
+<details class="card fold" id="people">
+  <summary><h2>People <span class="count"><%= people.length %></span></h2></summary>
   <p class="muted small">Everyone who can sign in to <strong><%= u.agency_name %></strong>. They all type the username <code><%= u.username %></code> exactly as shown (capitals count), then their own name and password. They see the same company data.</p>
   <div class="table-wrap"><table>
     <thead><tr><th>Person</th><th>Signs in with</th><th>Tabs</th><th>Last login</th><th>Last active</th><th>Status</th><th></th></tr></thead>
@@ -193,7 +152,7 @@
                 <p class="muted small">Unticked tabs are removed from their menu and blocked. The dashboard and their account page are always there.</p>
                 <button class="btn small primary" type="submit">Save tabs</button>
               </form>
-              <a class="small" href="#reset-password">Reset password below</a>
+              <a class="small" href="#users">Change the password under Users</a>
             </div>
           </details>
           <% } %>
@@ -224,7 +183,45 @@
     </div>
     <div class="form-actions wide"><button class="btn primary" type="submit">Add person</button></div>
   </form>
-</section>
+</details>
+
+<details class="card fold" id="activity"<%= personFilter || activityFilter !== 'all' ? ' open' : '' %>>
+  <summary><h2>Activity <span class="count"><%= activityRows.length %><%= activityRows.length === 300 ? '+' : '' %></span></h2></summary>
+  <div class="card-head">
+    <nav class="tabs compact">
+      <a href="/admin/users/<%= u.id %>#activity" class="<%= activityFilter === 'all' ? 'active' : '' %>">Everything</a>
+      <a href="/admin/users/<%= u.id %>?activity=changes<%= personFilter ? '&person=' + personFilter : '' %>#activity" class="<%= activityFilter === 'changes' ? 'active' : '' %>">Changes only</a>
+    </nav>
+  </div>
+  <p class="muted small">Pages <%= isSelf ? 'you' : 'everyone at this company' %> opened and changes made, newest first. Kept for 6 months.
+    <% if (personFilter) { %>Showing one person only. <a href="/admin/users/<%= u.id %>#activity">Show everyone</a><% } %></p>
+  <% if (!activityRows.length) { %><p class="muted">No activity recorded yet.</p><% } else { %>
+  <div class="table-wrap activity-scroll"><table>
+    <thead><tr><th>When</th><th>Who</th><th>Activity</th><th>IP</th></tr></thead>
+    <tbody>
+    <% activityRows.forEach(e => { %>
+      <tr><td class="nowrap"><%= fmt.ukDateTime(e.created_at) %></td><td class="nowrap"><%= e.person_name %></td>
+      <td><span class="act act-<%= e.action.replace(/\s+/g, '-') %>"><%= e.action %></span> <%= e.summary %></td>
+      <td class="muted small"><%= e.ip %></td></tr>
+    <% }) %>
+    </tbody>
+  </table></div><% } %>
+</details>
+
+<details class="card fold" id="sign-ins">
+  <summary><h2>Sign-in history <span class="count"><%= logins.length %></span></h2></summary>
+  <% if (!logins.length) { %><p class="muted">No sign-ins yet.</p><% } else { %>
+  <div class="table-wrap"><table>
+    <thead><tr><th>When</th><th>Who</th><th>Result</th><th>IP</th><th>Device</th></tr></thead>
+    <tbody>
+    <% logins.forEach(e => { %>
+      <tr><td><%= fmt.ukDateTime(e.created_at) %></td><td class="nowrap"><%= e.person_name %></td><td><span class="badge <%= e.success ? 's-active' : 'bad' %>"><%= e.success ? 'success' : 'failed' %></span></td><td><%= e.ip %></td><td class="muted small"><%= e.user_agent %></td></tr>
+    <% }) %>
+    </tbody>
+  </table></div><% } %>
+</details>
+
+
 
 <% if (!isSelf) { %>
 <section class="card danger-zone">

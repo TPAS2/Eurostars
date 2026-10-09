@@ -809,7 +809,7 @@ test('admin adds an account and resets passwords', async () => {
   assert.match(decodeURIComponent(r.location), /error=.*already has its own records/);
   // All logins: an Edit button beside Status; people get their own edit page.
   r = await admin.get('/admin/accounts');
-  assert.match(r.text, new RegExp(`href="/admin/users/${id}#details">Edit</a>`), 'the main login edits on the agency page');
+  assert.match(r.text, new RegExp(`href="/admin/users/${id}#users">Edit</a>`), 'the main login edits on the agency page');
   const samId = db.prepare("SELECT id FROM users WHERE login_name = 'Sam' AND company_id = ?").get(id).id;
   assert.match(r.text, new RegExp(`href="/admin/people/${samId}/edit">Edit</a>`));
   assert.doesNotMatch(r.text, /<th>Password<\/th>|••••/, 'no password column');
@@ -3371,6 +3371,33 @@ test('job sheet: Contact for Access is a box you can type in; it fills in from t
   assert.equal(r.headers.get('content-type'), 'application/pdf');
 });
 
+test('admin agency page: Agency details, Users and People are separate fold-down boxes; each saves only its own boxes', async () => {
+  await registerAndLogin('split-agency@example.com', 'Split Agency Lets');
+  await registerAndLogin('split-other@example.com', 'Split Other Lets');
+  const id = db.prepare("SELECT id FROM users WHERE username = 'split-agency'").get().id;
+  const admin = new Client();
+  await admin.login('admin', 'owner-password-123');
+  let r = await admin.get(`/admin/users/${id}`);
+  assert.match(r.text, /<details class="card fold" id="agency">[\s\S]*?name="section" value="agency"[\s\S]*?name="username"[\s\S]*?name="agency_name"[\s\S]*?name="phone"[\s\S]*?name="address"[\s\S]*?<\/details>\s*<details class="card fold" id="users">[\s\S]*?name="section" value="users"[\s\S]*?name="login_name"[\s\S]*?name="name"[\s\S]*?name="email"[\s\S]*?name="password"[\s\S]*?<\/details>\s*<details class="card fold" id="people">/);
+  assert.doesNotMatch(r.text, /<h2>Rename agency<\/h2>|<h2>Account details<\/h2>/);
+  const before = { ...db.prepare('SELECT login_name, name, email FROM users WHERE id = ?').get(id) };
+  // Agency details: names, phone and address; the main login is left alone.
+  r = await admin.post(`/admin/users/${id}/details`, { section: 'agency', username: 'Split Renamed', agency_name: 'Split Renamed Ltd', phone: '0100 000070', address: '1 Made-up Street' });
+  assert.match(r.location, /flash=Agency\+details\+saved|flash=Agency%20details%20saved/);
+  assert.match(r.location, /#agency$/);
+  let u = { ...db.prepare('SELECT username, agency_name, phone, address, login_name, name, email FROM users WHERE id = ?').get(id) };
+  assert.deepEqual(u, { username: 'Split Renamed', agency_name: 'Split Renamed Ltd', phone: '0100 000070', address: '1 Made-up Street', ...before });
+  // Another agency's name is refused there, never joined.
+  r = await admin.post(`/admin/users/${id}/details`, { section: 'agency', username: 'split-other', agency_name: 'X', phone: '', address: '' });
+  assert.match(decodeURIComponent(r.location), /Another agency is already called "split-other"[\s\S]*#agency$/);
+  assert.equal(db.prepare('SELECT company_id FROM users WHERE id = ?').get(id).company_id, null);
+  // Users: the main login; the agency details are left alone.
+  r = await admin.post(`/admin/users/${id}/details`, { section: 'users', login_name: 'Pat', name: 'Pat Example', email: 'pat@example.com', password: '' });
+  assert.match(r.location, /#users$/);
+  u = { ...db.prepare('SELECT username, agency_name, phone, address, login_name, name, email FROM users WHERE id = ?').get(id) };
+  assert.deepEqual(u, { username: 'Split Renamed', agency_name: 'Split Renamed Ltd', phone: '0100 000070', address: '1 Made-up Street', login_name: 'Pat', name: 'Pat Example', email: 'pat@example.com' });
+});
+
 test('menu: a divider under Dashboard like between the other groups; contractors show a dash for nothing paid or unpaid', async () => {
   const c = await registerAndLogin('rail-split@example.com', 'Rail Split Lets');
   const page = (await c.get('/app')).text;
@@ -3399,7 +3426,7 @@ test('admin: rename an agency without moving or changing its records', async () 
   const admin = new Client();
   await admin.login('admin', 'owner-password-123');
   let r = await admin.get(`/admin/users/${id}`);
-  assert.match(r.text, /<h2>Rename agency<\/h2>[\s\S]*?name="new_name" value="rename-me"/);
+  assert.match(r.text, /<details class="card fold" id="agency">\s*<summary><h2>Agency details<\/h2><\/summary>[\s\S]*?name="username" value="rename-me"/);
   r = await admin.post(`/admin/users/${id}/rename`, { new_name: 'Fresh Name Lets' });
   assert.match(decodeURIComponent(r.location), /Renamed Rename Me Lets to Fresh Name Lets[\s\S]*?records are unchanged/);
   const u = db.prepare('SELECT username, agency_name, company_id FROM users WHERE id = ?').get(id);
@@ -3644,8 +3671,8 @@ test('account details on the admin panel: Agency, Your name, Password, Email, Ph
   const admin = new Client();
   await admin.login('admin', 'owner-password-123');
   const r = await admin.get(`/admin/users/${co.id}`);
-  const details = r.text.slice(r.text.indexOf('id="details"'), r.text.indexOf('id="people"'));
-  const order = ['Agency', 'Your name', 'Password', 'Email', 'Phone'].map((l) => details.indexOf(`>${l}`));
+  const details = r.text.slice(r.text.indexOf('id="agency"'), r.text.indexOf('id="people"'));
+  const order = ['Agency name', 'Company name', 'Phone', 'Address', 'Sign-in name', 'Contact name', 'Email', 'Password'].map((l) => details.indexOf(`>${l}`));
   assert.ok(order.every((i, k) => i > 0 && (k === 0 || i > order[k - 1])), `labels out of order: ${order}`);
   assert.doesNotMatch(r.text, /id="reset-password"/);
   assert.match(details, new RegExp(`formaction="/admin/users/${co.id}/password"[^>]*>Change password`));
