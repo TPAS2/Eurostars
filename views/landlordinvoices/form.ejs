@@ -7,9 +7,10 @@
 </header>
 <section class="card">
   <% if (Object.keys(errors).length) { %><div class="notice err">Please fix the highlighted fields.</div><% } %>
-  <form method="post" action="/app/landlord-invoices<%= inv ? '/' + inv.id : '' %>" class="form-grid" data-draft="landlord-invoice-<%= inv ? inv.id : 'new' %>">
+  <form method="post" action="/app/landlord-invoices<%= inv ? '/' + inv.id : '' %>" class="form-grid form-landlord-invoice" data-draft="landlord-invoice-<%= inv ? inv.id : 'new' %>">
     <%- include('../partials/csrf') %>
     <% const field = (name, label, html, req) => ({ name, label, html, req }); %>
+    <%# Three to a row: landlord, property, number; date, amount, pay over; contractor invoice, reason; then the works. %>
     <div class="field">
       <label for="f-landlord">Landlord <span class="req">*</span></label>
       <select id="f-landlord" name="landlord_id" required>
@@ -33,6 +34,11 @@
       <% if (errors.invoice_number) { %><div class="field-err"><%= errors.invoice_number %></div><% } %>
     </div>
     <div class="field">
+      <label for="f-date">Invoice date <span class="req">*</span></label>
+      <input id="f-date" type="date" name="invoice_date" value="<%= values.invoice_date || '' %>" required>
+      <% if (errors.invoice_date) { %><div class="field-err"><%= errors.invoice_date %></div><% } %>
+    </div>
+    <div class="field">
       <label for="f-amount">Amount (£) <span class="req">*</span></label>
       <input id="f-amount" name="amount" inputmode="decimal" placeholder="0.00" value="<%= values.amount || '' %>" required>
       <% if (errors.amount) { %><div class="field-err"><%= errors.amount %></div><% } %>
@@ -46,11 +52,6 @@
       <% if (errors.months) { %><div class="field-err"><%= errors.months %></div><% } %>
     </div>
     <div class="field">
-      <label for="f-date">Invoice date <span class="req">*</span></label>
-      <input id="f-date" type="date" name="invoice_date" value="<%= values.invoice_date || '' %>" required>
-      <% if (errors.invoice_date) { %><div class="field-err"><%= errors.invoice_date %></div><% } %>
-    </div>
-    <div class="field wide">
       <label for="f-contractor-invoice">Contractor invoice</label>
       <select id="f-contractor-invoice" name="contractor_invoice_id">
         <option value="">None</option>
@@ -59,7 +60,7 @@
       <div class="help">Optional. The contractor's invoice this bills the landlord for.</div>
       <% if (errors.contractor_invoice_id) { %><div class="field-err"><%= errors.contractor_invoice_id %></div><% } %>
     </div>
-    <div class="field wide">
+    <div class="field span-2">
       <label for="f-desc">Reason for invoice <span class="req">*</span></label>
       <input id="f-desc" name="description" value="<%= values.description || '' %>" placeholder="e.g. Tenant find fee, inventory check, annual inspection" required>
       <% if (errors.description) { %><div class="field-err"><%= errors.description %></div><% } %>

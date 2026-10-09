@@ -1215,6 +1215,11 @@ td.nowrap-lines span { display: block; white-space: nowrap; }
 .support-label { font-size: .75rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 700; }
 
 /* Adding or editing a property: a compact form, four smaller boxes to a row. */
+/* Landlord invoice form: three to a row. */
+@media (min-width: 900px) {
+  .form-grid.form-landlord-invoice { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .form-landlord-invoice .span-2 { grid-column: span 2; }
+}
 /* Adding or editing a contractor: three to a row, Address beside Notes. */
 @media (min-width: 900px) {
   .form-grid.form-contractors { grid-template-columns: repeat(3, minmax(0, 1fr)); }

@@ -3279,6 +3279,15 @@ test('menu: a divider under Dashboard like between the other groups; contractors
   assert.match(r.text, /Made-up Idle Co[\s\S]*?>\s*0\s*<\/td>\s*<td[^>]*>\s*—\s*<\/td>\s*<td[^>]*>\s*—\s*<\/td>/);
 });
 
+test('landlord invoice form: landlord, property, number / date, amount, pay over / contractor invoice, reason / works', async () => {
+  const c = await registerAndLogin('li-layout@example.com', 'LI Layout Lets');
+  const form = (await c.get('/app/landlord-invoices/new')).text;
+  const order = [...form.matchAll(/<label for="f-([a-z-]+)"/g)].map((m) => m[1]);
+  assert.deepEqual(order, ['landlord', 'property', 'number', 'date', 'amount', 'months', 'contractor-invoice', 'desc', 'notes']);
+  assert.match(form, /class="form-grid form-landlord-invoice"/);
+  assert.match(form, /<div class="field span-2">\s*<label for="f-desc">/);
+});
+
 test('tenants list is in tenancy number order, not name order', async () => {
   const c = await registerAndLogin('tenancy-order@example.com', 'Tenancy Order Lets');
   const prop = idFrom((await c.post('/app/properties', { address_line1: '3 Order Row', status: 'let' })).location);
