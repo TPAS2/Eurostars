@@ -3329,6 +3329,34 @@ test('landlords, properties and tenants: export to CSV and import into another a
   assert.equal(db.prepare('SELECT COUNT(*) n FROM landlords WHERE account_id = ?').get(a1).n, 2);
 });
 
+test('councils: export to CSV and import into another agency; several phone numbers and emails kept', async () => {
+  const one = await registerAndLogin('cncl-export@example.com', 'Council Export Lets');
+  let r = await one.get('/app/councils');
+  assert.match(r.text, /href="\/app\/councils\/export\.csv" download>Export<\/a>[\s\S]*?action="\/app\/councils\/import"/);
+  r = await one.post('/app/councils/import', { file: new File(['Local authority,Phone,Email\nMade-up Borough Council,"0100 000040\n0100 000041",housing@example.com\n'], 'c.csv') }, { multipart: true });
+  assert.match(decodeURIComponent(r.location), /Imported councils: 1 new/);
+  const csv = (await one.get('/app/councils/export.csv')).buf;
+  assert.match(csv.toString(), /^﻿Council,Phone number,Email,Website,Notes\r\nMade-up Borough Council,"0100 000040\n0100 000041",housing@example\.com,,/);
+  const two = await registerAndLogin('cncl-import@example.com', 'Council Import Lets');
+  const b = db.prepare("SELECT id FROM users WHERE username = 'cncl-import'").get().id;
+  db.prepare("INSERT INTO councils (account_id, name, council_tax_email) VALUES (?, 'made-up borough council', 'own@example.com')").run(b);
+  await two.get('/app/councils');
+  r = await two.post('/app/councils/import', { file: new File([csv], 'councils.csv') }, { multipart: true });
+  assert.match(decodeURIComponent(r.location), /0 new, 1 updated with missing details/);
+  const got = db.prepare('SELECT * FROM councils WHERE account_id = ?').all(b);
+  assert.equal(got.length, 1);
+  assert.equal(got[0].council_tax_email, 'own@example.com', 'not overwritten');
+  assert.equal(got[0].council_tax_phone, '0100 000040\n0100 000041');
+});
+
+test('top bar: agency badge and name, a divider before Sign out', async () => {
+  const c = await registerAndLogin('bar-look@example.com', 'Bar Look Lets');
+  const page = (await c.get('/app/landlords')).text;
+  const bar = page.slice(page.indexOf('<header class="topbar">'), page.indexOf('</header>', page.indexOf('<header class="topbar">')));
+  assert.match(bar, /<span class="agency-mark" aria-hidden="true">B<\/span><span class="agency-name">Bar Look Lets<\/span>/);
+  assert.match(bar, /class="topbar-sep"[\s\S]*?id="signout-form"[\s\S]*?class="topbar-btn topbar-signout"/);
+});
+
 test('menu: a divider under Dashboard like between the other groups; contractors show a dash for nothing paid or unpaid', async () => {
   const c = await registerAndLogin('rail-split@example.com', 'Rail Split Lets');
   const page = (await c.get('/app')).text;

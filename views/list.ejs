@@ -7,7 +7,7 @@
     <% } %>
     <% if (def.key === 'maintenance') { %><a class="btn" href="/app/maintenance/job-sheet.pdf" download>Blank job sheet (PDF)</a><% } %>
     <% if (def.key === 'inspections') { %><a class="btn" href="/app/inspections/sheet.pdf" download>Blank inspection sheet (PDF)</a><% } %>
-    <% if (['contractors', 'landlords', 'properties', 'tenants'].includes(def.key)) { const keyCol = { contractors: 'Company', landlords: 'Name', properties: 'Property address', tenants: 'Name' }[def.key]; %>
+    <% if (['contractors', 'councils', 'landlords', 'properties', 'tenants'].includes(def.key)) { const keyCol = { contractors: 'Company', councils: 'Council', landlords: 'Name', properties: 'Property address', tenants: 'Name' }[def.key]; %>
     <div class="transfer-box" title="Use the same <%= def.plural.toLowerCase() %> in another agency: export here, then import there. Import also takes a Word (.docx) or Excel (.xlsx) table with a <%= keyCol %> column.">
       <a class="btn small" href="/app/<%= def.key %>/export.csv" download>Export</a>
       <form method="post" action="/app/<%= def.key %>/import" enctype="multipart/form-data" class="inline-form" data-busy="Importing">

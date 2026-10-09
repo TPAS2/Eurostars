@@ -136,17 +136,29 @@ nav.rail { flex: 1; }
 .main-col { min-width: 0; display: flex; flex-direction: column; }
 .content { padding: 28px 32px 60px; width: 100%; min-width: 0; }
 /* The bar along the top of every page: who's signed in, My account and Sign out. Always visible. */
-.topbar { position: sticky; top: 0; z-index: 15; height: 56px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 24px; background: var(--sidebar); color: var(--sidebar-text); border-bottom: 1px solid var(--rail-border); }
-.topbar-agency { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-.topbar-actions { display: flex; align-items: center; gap: 10px; flex: none; }
+.topbar { position: sticky; top: 0; z-index: 15; height: 60px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 24px; color: var(--sidebar-text);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--sidebar) 88%, #1f5eff 12%), var(--sidebar));
+  box-shadow: 0 1px 0 var(--rail-border), 0 6px 18px -10px rgba(4, 10, 30, .55); }
+/* A thin brand-coloured line along the bottom, fading out at each end. */
+.topbar::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; pointer-events: none;
+  background: linear-gradient(90deg, transparent, var(--brand-rail) 25%, #7c5cff 60%, transparent); opacity: .7; }
+.topbar-agency { display: flex; align-items: center; gap: 12px; min-width: 0; font-weight: 700; font-size: 1.02rem; letter-spacing: .01em; }
+.agency-mark { flex: none; display: inline-grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; color: #fff; font-weight: 800; font-size: .95rem;
+  background: linear-gradient(135deg, var(--brand-rail), #7c5cff); box-shadow: 0 2px 8px rgba(31, 94, 255, .35), inset 0 1px 0 rgba(255, 255, 255, .25); }
+.agency-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.topbar-actions { display: flex; align-items: center; gap: 6px; flex: none; }
 .topbar-actions form { margin: 0; }
-.topbar-btn { display: inline-flex; align-items: center; gap: 10px; height: 40px; padding: 0 14px 0 8px; border-radius: 10px; border: 1px solid var(--rail-border); background: var(--rail-btn); color: var(--sidebar-text); font: inherit; font-weight: 600; font-size: .88rem; cursor: pointer; text-decoration: none; }
-.topbar-btn:hover, .topbar-btn:focus-visible { background: var(--sidebar-active); border-color: #6b7a96; color: #fff; text-decoration: none; }
-.topbar-btn.active { background: var(--brand-rail); border-color: #fff; color: #fff; }
-.topbar-btn .icon { width: 20px; height: 20px; margin-left: 4px; }
-.topbar-btn .avatar-initials { width: 26px; height: 26px; }
+.topbar-actions .theme-toggle { margin-right: 6px; }
+.topbar-sep { width: 1px; height: 28px; margin: 0 6px; background: var(--rail-border); }
+.topbar-btn { display: inline-flex; align-items: center; gap: 9px; height: 40px; padding: 0 14px 0 9px; border-radius: 999px; border: 1px solid transparent; background: transparent; color: var(--sidebar-text); font: inherit; font-weight: 600; font-size: .88rem; cursor: pointer; text-decoration: none; transition: background-color .15s, border-color .15s, color .15s; }
+.topbar-btn:hover, .topbar-btn:focus-visible { background: var(--rail-btn); border-color: var(--rail-border); color: #fff; text-decoration: none; }
+.topbar-btn.active { background: var(--brand-rail); border-color: transparent; color: #fff; box-shadow: 0 2px 10px rgba(31, 94, 255, .35); }
+.topbar-signout:hover, .topbar-signout:focus-visible { background: rgba(239, 68, 68, .14); border-color: rgba(239, 68, 68, .45); color: #fecaca; }
+.topbar-btn .icon { width: 19px; height: 19px; margin-left: 3px; opacity: .9; }
+.topbar-btn .avatar-initials { width: 30px; height: 30px; background: linear-gradient(135deg, #fff, #dbe4ff); box-shadow: 0 0 0 2px var(--sidebar), 0 0 0 3.5px var(--brand-rail); }
 .topbar-text { display: flex; flex-direction: column; line-height: 1.15; }
-.topbar-sub { font-weight: 400; font-size: .74rem; opacity: .75; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.topbar-sub { font-weight: 400; font-size: .74rem; opacity: .7; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { .topbar-btn { transition: none; } }
 
 .brand { display: inline-flex; align-items: center; gap: 10px; font-weight: 700; font-size: 1.1rem; color: var(--text); padding: 0 8px 4px; }
 .brand:hover { text-decoration: none; }
@@ -1013,6 +1025,8 @@ input, select, textarea { max-width: 100%; }
 @media (max-width: 600px) {
   .topbar-btn .topbar-text { display: none; }
   .topbar-btn { padding: 0 8px; }
+  .topbar-sep { display: none; }
+  .agency-mark { width: 30px; height: 30px; }
 }
 
 /* Sign-in: the eye button, to the right of the password box, shows or hides what's being typed

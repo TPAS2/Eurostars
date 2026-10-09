@@ -54,7 +54,8 @@
   </aside>
   <div class="main-col">
   <header class="topbar">
-    <span class="topbar-agency"><%= user.is_admin ? appName + ' admin' : user.agency_name %></span>
+    <% const barName = user.is_admin ? appName + ' admin' : (user.agency_name || ''); %>
+    <span class="topbar-agency"><span class="agency-mark" aria-hidden="true"><%= (barName.trim()[0] || 'R').toUpperCase() %></span><span class="agency-name"><%= barName %></span></span>
     <div class="topbar-actions">
       <button type="button" class="theme-toggle" role="switch" aria-checked="false" aria-label="Dark mode" title="Switch between light and dark" data-theme-toggle data-csrf="<%= csrfToken %>">
         <span class="theme-toggle-track" aria-hidden="true">
@@ -65,9 +66,10 @@
       </button>
       <a class="topbar-btn <%= s === 'support' ? 'active' : '' %>" href="/support" <%- s === 'support' ? 'aria-current="page"' : '' %>><%- include('icon', { name: 'support' }) %><span class="topbar-text">Support</span></a>
       <a class="topbar-btn <%= s === 'account' ? 'active' : '' %>" href="/app/account" <%- s === 'account' ? 'aria-current="page"' : '' %>><span class="avatar-initials"><%= initials %></span><span class="topbar-text">My account<span class="topbar-sub"><%= user.name %></span></span></a>
+      <span class="topbar-sep" aria-hidden="true"></span>
       <form method="post" action="/logout" id="signout-form">
         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-        <button class="topbar-btn" type="submit"><%- include('icon', { name: 'signout' }) %><span class="topbar-text">Sign out</span></button>
+        <button class="topbar-btn topbar-signout" type="submit"><%- include('icon', { name: 'signout' }) %><span class="topbar-text">Sign out</span></button>
       </form>
     </div>
   </header>

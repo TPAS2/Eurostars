@@ -1,6 +1,6 @@
 'use strict';
 
-// Export and import for contractors, landlords, properties and tenants: a CSV file of an agency's
+// Export and import for contractors, councils, landlords, properties and tenants: a CSV file of an agency's
 // records, so the same ones can be brought into another agency. Import also reads a table in a Word
 // document (.docx) or an Excel workbook's first sheet (.xlsx). Importing adds the ones that aren't
 // there yet (matched by company/name, or property address) and fills in any blank details on the
@@ -31,6 +31,16 @@ const KINDS = {
       ['fax', 'Fax', [], T(50)],
       ['email', 'Email', ['e-mail', 'email address'], T(254)],
       ['address', 'Address', [], T(500)],
+      ['notes', 'Notes', ['note', 'comments'], T(2000)],
+    ],
+  },
+  councils: {
+    table: 'councils', label: 'councils', file: 'councils.csv', key: 'name', keyHelp: 'Council', order: 'name COLLATE NOCASE',
+    columns: [
+      ['name', 'Council', ['council name', 'name', 'local authority', 'authority'], T(200)],
+      ['council_tax_phone', 'Phone number', ['phone', 'telephone', 'tel', 'phone numbers'], T(1000)],
+      ['council_tax_email', 'Email', ['e-mail', 'email address', 'emails'], T(2000)],
+      ['website', 'Website', ['web', 'web address', 'url'], T(300)],
       ['notes', 'Notes', ['note', 'comments'], T(2000)],
     ],
   },
@@ -184,7 +194,7 @@ function writeCell(row, field, kind, db, a) {
   return v;
 }
 
-// kindName: contractors, landlords, properties or tenants.
+// kindName: contractors, councils, landlords, properties or tenants.
 module.exports = function transferRoutes(db, kindName = 'contractors') {
   const K = KINDS[kindName];
   const router = express.Router();
