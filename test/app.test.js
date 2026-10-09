@@ -3357,6 +3357,20 @@ test('top bar: agency badge and name, a divider before Sign out', async () => {
   assert.match(bar, /class="topbar-sep"[\s\S]*?id="signout-form"[\s\S]*?class="topbar-btn topbar-signout"/);
 });
 
+test('job sheet: Contact for Access is a box you can type in; it fills in from the property and is saved and printed', async () => {
+  const c = await registerAndLogin('job-access@example.com', 'Job Access Lets');
+  const prop = idFrom((await c.post('/app/properties', { address_line1: '3 Made-up Close', status: 'let' })).location);
+  let r = await c.get(`/app/maintenance/new?property_id=${prop}`);
+  assert.match(r.text, /<label for="f-access_contact" class="paper-k">Contact for Access:<\/label>\s*<textarea id="f-access_contact"[^>]*name="access_contact"[^>]*data-auto="prop-access" data-was-auto="1"/);
+  const job = idFrom((await c.post('/app/maintenance', { property_id: String(prop), title: 'Made-up leak', priority: 'normal', status: 'open',
+    access_contact: 'Key with neighbour at no. 5\nMade-up Person - Tel: 0100 000060' })).location);
+  assert.equal(db.prepare('SELECT access_contact FROM maintenance_jobs WHERE id = ?').get(job).access_contact, 'Key with neighbour at no. 5\nMade-up Person - Tel: 0100 000060');
+  r = await c.get(`/app/maintenance/${job}/edit`);
+  assert.match(r.text, /data-was-auto="0"[^>]*>Key with neighbour at no\. 5\nMade-up Person - Tel: 0100 000060<\/textarea>/);
+  r = await c.get(`/app/maintenance/${job}/job-sheet.pdf`);
+  assert.equal(r.headers.get('content-type'), 'application/pdf');
+});
+
 test('menu: a divider under Dashboard like between the other groups; contractors show a dash for nothing paid or unpaid', async () => {
   const c = await registerAndLogin('rail-split@example.com', 'Rail Split Lets');
   const page = (await c.get('/app')).text;

@@ -59,8 +59,8 @@
   </div>
 
   <div class="paper-section">
-    <div class="paper-k">Contact for Access:</div>
-    <div class="paper-boxed paper-access" data-fill="prop-access"><% (prop ? prop.access : []).forEach(l => { %><div><%= l %></div><% }) %></div>
+    <label for="f-access_contact" class="paper-k">Contact for Access:</label>
+    <textarea id="f-access_contact" class="paper-boxed paper-access" name="access_contact" rows="3" maxlength="1000" data-auto="prop-access" data-was-auto="<%= values.access_contact ? '0' : '1' %>" placeholder="Who to contact to get in, and their phone number"><%= values.access_contact || (prop ? prop.access.join('\n') : '') %></textarea><%- err('access_contact') %>
   </div>
 
   <div class="paper-section">

@@ -489,20 +489,17 @@ const DRAFT_DAYS = 7;
       const fill = (name, text) => {
         const el = sheet.querySelector(`[data-fill="${name}"]`);
         if (el) el.textContent = text || '';
-        const box = sheet.querySelector(`input[data-auto="${name}"]`);
+        const box = sheet.querySelector(`input[data-auto="${name}"], textarea[data-auto="${name}"]`);
         if (box && (box.dataset.wasAuto === '1' || !box.value)) { box.value = text || ''; box.dataset.wasAuto = '1'; }
       };
-      sheet.querySelectorAll('input[data-auto]').forEach((box) => box.addEventListener('input', () => { box.dataset.wasAuto = '0'; }));
+      sheet.querySelectorAll('input[data-auto], textarea[data-auto]').forEach((box) => box.addEventListener('input', () => { box.dataset.wasAuto = '0'; }));
       const propSelect = sheet.querySelector('select[name=property_id]');
       const conInput = sheet.querySelector('input[name=contractor]');
       const showProperty = () => {
         const p = props[propSelect.value] || null;
         fill('prop-code', p && p.code);
         fill('prop-landlord', p && p.landlord);
-        const access = sheet.querySelector('[data-fill="prop-access"]');
-        if (access) {
-          access.replaceChildren(...((p && p.access) || []).map((line) => { const d = document.createElement('div'); d.textContent = line; return d; }));
-        }
+        fill('prop-access', ((p && p.access) || []).join('\n'));
       };
       const showContractor = () => {
         const name = conInput.value.trim().toLowerCase();

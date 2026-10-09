@@ -189,6 +189,7 @@ const ENTITIES = {
       { name: 'contractor_fax', label: 'Contractor fax', type: 'tel' },
       { name: 'contractor_email', label: 'Contractor email', type: 'email' },
       { name: 'billing_name', label: 'Billing name', type: 'text' },
+      { name: 'access_contact', label: 'Contact for access', type: 'textarea' },
       { name: 'added_by', label: 'Added by', type: 'person', locked: true },
     ],
     files: true,

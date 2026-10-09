@@ -598,6 +598,8 @@ function openDatabase(file) {
   addColumnIfMissing(db, 'maintenance_jobs', 'invoice_date', 'TEXT');
   addColumnIfMissing(db, 'maintenance_jobs', 'invoice_emailed_at', 'TEXT');
   addColumnIfMissing(db, 'maintenance_jobs', 'invoice_emailed_to', 'TEXT');
+  // Contact for access on the job sheet, as typed (filled in from the property and its tenants).
+  addColumnIfMissing(db, 'maintenance_jobs', 'access_contact', 'TEXT');
   // Every invoice supplier becomes a contractor (once), so the Contractors tab starts complete.
   for (const inv of db.prepare('SELECT id, account_id, supplier FROM invoices WHERE contractor_id IS NULL AND trim(supplier) != \'\'').all()) {
     db.prepare('UPDATE invoices SET contractor_id = ? WHERE id = ?').run(contractorFor(db, inv.account_id, inv.supplier), inv.id);

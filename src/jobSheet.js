@@ -96,7 +96,9 @@ async function buildJobSheet(data) {
   // Contact for access.
   text('Contact for Access:', L, 518, 10.5, timesB);
   box(524, 572);
-  ((job && job.access) || []).slice(0, 3).forEach((line, i) => text(line, L + 3, 536 + i * 12, 10));
+  // Three lines fit as usual; a fourth if typed, a little closer together.
+  const access = ((job && job.access) || []).slice(0, 4);
+  access.forEach((line, i) => (access.length > 3 ? text(line, L + 3, 534 + i * 10.5, 9.5) : text(line, L + 3, 536 + i * 12, 10)));
 
   // Description of work, then the signatures, in one box.
   text('Description of Work:', L, 592, 10.5, timesB);

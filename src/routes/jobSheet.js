@@ -67,7 +67,7 @@ module.exports = function jobSheetRoutes(db) {
       preferredStart: job.preferred_start_date ? fmt.ukDate(job.preferred_start_date) : 'N/A',
       goAhead: job.go_ahead || 'No',
       rating: RATING[job.priority] || job.priority || '',
-      access: [p.address_line1, ...tenants.map((t) => `${t.name}${t.phone ? ` - Tel: ${t.phone}` : ''}`)].filter(Boolean),
+      access: job.access_contact ? String(job.access_contact).split(/\r?\n/).map((l) => l.trim()).filter(Boolean) : [p.address_line1, ...tenants.map((t) => `${t.name}${t.phone ? ` - Tel: ${t.phone}` : ''}`)].filter(Boolean),
       work: [job.title, ...String(job.description || '').split(/\r?\n/)].map((l) => l.trim()).filter(Boolean).map((l) => `- ${l}`),
     };
   }
