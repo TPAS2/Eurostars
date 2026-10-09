@@ -3636,6 +3636,14 @@ test('a landlord page has no Transactions list', async () => {
   assert.doesNotMatch(r.text, /<h2>Transactions/);
 });
 
+test('a property page has no Transactions list', async () => {
+  const c = await registerAndLogin('prop-no-txn@example.com', 'No Txn Prop Lets');
+  const prop = idFrom((await c.post('/app/properties', { address_line1: '5 Made-up Row', status: 'let' })).location);
+  const r = await c.get(`/app/properties/${prop}`);
+  assert.equal(r.status, 200);
+  assert.doesNotMatch(r.text, /<h2>Transactions/);
+});
+
 test('saving account details keeps your own username (including the admin account)', async () => {
   const admin = new Client();
   await admin.login('admin', 'owner-password-123');

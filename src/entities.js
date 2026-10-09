@@ -76,7 +76,6 @@ const ENTITIES = {
       { entity: 'tenancies', fk: 'property_id' },
       { entity: 'maintenance', fk: 'property_id' },
       { entity: 'inspections', fk: 'property_id' },
-      { entity: 'transactions', fk: 'property_id' },
     ],
   },
 
