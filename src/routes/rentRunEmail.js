@@ -148,7 +148,7 @@ module.exports = function rentRunEmailRoutes(db, mailer, { page = 'rent-run' } =
 
 // What the email box on a page needs: who it's from, a subject, and what was sent that month.
 module.exports.emailOutFor = (db, mailer, { accountId, personId, page, month, subject }) => {
-  const me = db.prepare('SELECT COALESCE(m.email, c.email) AS email FROM users m JOIN users c ON c.id = COALESCE(m.company_id, m.id) WHERE m.id = ?').get(personId || accountId);
+  const me = db.prepare('SELECT COALESCE(c.email, m.email) AS email FROM users m JOIN users c ON c.id = COALESCE(m.company_id, m.id) WHERE m.id = ?').get(personId || accountId);
   return {
     from: senderFor(db, mailer, accountId).from || (me && me.email) || mailer.defaultFrom || '',
     subject,

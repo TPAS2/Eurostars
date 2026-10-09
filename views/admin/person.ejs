@@ -1,7 +1,8 @@
 <%- include('../partials/header') %>
 <header class="page-head">
   <div>
-    <a class="crumb" href="/admin/accounts">← All logins</a>
+    <% const backTo = from === 'agency' ? `/admin/users/${company.id}#users` : '/admin/accounts'; %>
+    <a class="crumb" href="<%= backTo %>">← <%= from === 'agency' ? company.agency_name : 'All logins' %></a>
     <h1>Edit <%= m.name %></h1>
     <p class="muted">A login at <a href="/admin/users/<%= company.id %>"><%= company.agency_name %></a>. They sign in with agency <code><%= company.username %></code>, their name and their password.</p>
   </div>
@@ -10,6 +11,7 @@
   <% if (error) { %><div class="notice err"><%= error %></div><% } %>
   <form method="post" action="/admin/people/<%= m.id %>/edit" class="form-grid" data-no-keep>
     <%- include('../partials/csrf') %>
+    <% if (from === 'agency') { %><input type="hidden" name="back" value="agency"><% } %>
     <div class="field">
       <label for="name">Full name <span class="req">*</span></label>
       <input id="name" name="name" value="<%= values.name || '' %>" required maxlength="200" autocomplete="off">
@@ -33,7 +35,7 @@
     </div>
     <div class="form-actions wide">
       <button class="btn primary" type="submit">Save</button>
-      <a class="btn" href="/admin/accounts">Cancel</a>
+      <a class="btn" href="<%= backTo %>">Cancel</a>
     </div>
   </form>
 </section>

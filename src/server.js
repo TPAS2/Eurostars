@@ -77,14 +77,17 @@ function loadConfig(env = process.env) {
 // on the next start (for when you've forgotten it).
 function ensureAdmin(db, config, log = console.log) {
   // Usernames are unique ignoring case; the stored case is updated to match ADMIN_USERNAME.
-  const byUsername = db.prepare('SELECT id, username FROM users WHERE username = ? COLLATE NOCASE AND company_id IS NULL').get(config.adminUsername);
-  const byEmail = config.adminEmail ? db.prepare('SELECT id, username FROM users WHERE email = ? AND company_id IS NULL ORDER BY is_admin DESC, id').get(config.adminEmail) : null;
+  // An agency record is never the admin: it doesn't sign in.
+  const byUsername = db.prepare('SELECT id, username FROM users WHERE username = ? COLLATE NOCASE AND company_id IS NULL AND is_agency = 0').get(config.adminUsername);
+  const byEmail = config.adminEmail ? db.prepare('SELECT id, username FROM users WHERE email = ? AND company_id IS NULL AND is_agency = 0 ORDER BY is_admin DESC, id').get(config.adminEmail) : null;
   let admin = byUsername || byEmail;
   if (config.adminPassword && config.adminPassword.length < 6) throw new Error('ADMIN_PASSWORD must be at least 6 characters.');
   if (config.adminPassword && config.adminPassword.length < 10) {
     log('Warning: ADMIN_PASSWORD is short. A longer password (10+ characters) is much harder to guess.');
   }
-  if (!admin && config.adminPassword) {
+  if (!admin && config.adminPassword && db.prepare('SELECT 1 FROM users WHERE username = ? COLLATE NOCASE').get(config.adminUsername)) {
+    log(`ADMIN_USERNAME "${config.adminUsername}" is an agency's name, so the admin account wasn't created. Choose another ADMIN_USERNAME.`);
+  } else if (!admin && config.adminPassword) {
     const info = db.prepare("INSERT INTO users (username, login_name, email, name, agency_name, password_hash) VALUES (?, ?, ?, ?, ?, ?)")
       .run(config.adminUsername, config.adminLoginName, config.adminEmail || null, config.adminLoginName, config.appName, auth.hashPassword(config.adminPassword));
     admin = { id: Number(info.lastInsertRowid), username: config.adminUsername };

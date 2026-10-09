@@ -42,7 +42,7 @@ module.exports = function appRoutes(db, mailer = { enabled: false, defaultFrom: 
 
   // Everyone at the company (its main login and its people), for "Added by" boxes.
   function peopleOptions(accountId) {
-    return db.prepare("SELECT id, name AS label FROM users WHERE (id = ? OR company_id = ?) AND status = 'active' ORDER BY company_id IS NOT NULL, name COLLATE NOCASE").all(accountId, accountId);
+    return db.prepare("SELECT id, name AS label FROM users WHERE (id = ? OR company_id = ?) AND is_agency = 0 AND status = 'active' ORDER BY company_id IS NOT NULL, name COLLATE NOCASE").all(accountId, accountId);
   }
 
   function refLabelMaps(def, accountId) {

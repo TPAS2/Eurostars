@@ -5,7 +5,7 @@ const crypto = require('node:crypto');
 const auth = require('../auth');
 const totp = require('../totp');
 const activity = require('../activity');
-const { USERNAME_RE, signInNameFrom } = require('../db');
+const { USERNAME_RE, signInNameFrom, createAgency } = require('../db');
 
 // No password we accept is longer than this (see register and the admin panel).
 const MAX_PASSWORD = 200;
@@ -61,9 +61,9 @@ module.exports = function authRoutes(db, config) {
       return fail(401, 'Incorrect agency, name or password.');
     }
     const company = findCompany.get(login);
-    // The company's own row is its main login (and the admin's login); everyone else is a
-    // person inside a company.
-    const user = !company ? null : company.login_name === member ? company : findPerson.get(company.id, member);
+    // An agency never signs in itself: everyone is a user under it. The admin account signs in
+    // as itself.
+    const user = !company ? null : (!company.is_agency && company.login_name === member) ? company : findPerson.get(company.id, member);
     const ok = auth.verifyPassword(password, user ? user.password_hash : auth.DUMMY_HASH) && !!user;
     if (!ok) {
       accountFails.fail(login.toLowerCase());
@@ -199,10 +199,12 @@ module.exports = function authRoutes(db, config) {
     if (registerLimited(req.ip)) errors.form = 'Too many sign-ups from your network. Please try again later.';
     if (Object.keys(errors).length) return res.status(422).render('register', { title: 'Create account', errors, values });
     // is_admin is never set here: the admin account comes only from ADMIN_EMAIL / create-admin.
-    const info = db.prepare('INSERT INTO users (username, login_name, email, name, agency_name, password_hash) VALUES (?, ?, ?, ?, ?, ?)')
-      .run(values.username, signInNameFrom(values.name), values.email || null, values.name, values.agency_name, auth.hashPassword(password));
-    const user = db.prepare('SELECT * FROM users WHERE id = ?').get(Number(info.lastInsertRowid));
-    logEvent.run(user.id, user.username, 1, req.ip, String(req.headers['user-agent'] || '').slice(0, 300));
+    const { personId } = createAgency(db, {
+      username: values.username, agencyName: values.agency_name, contactName: values.name, email: values.email,
+      loginName: signInNameFrom(values.name), passwordHash: auth.hashPassword(password),
+    });
+    const user = db.prepare('SELECT * FROM users WHERE id = ?').get(personId);
+    logEvent.run(user.id, values.username, 1, req.ip, String(req.headers['user-agent'] || '').slice(0, 300));
     startSession(user, res);
     res.redirect('/app?flash=' + encodeURIComponent(`Welcome to ${config.appName}! Your account is ready. You sign in with the username ${user.username}.`));
   });

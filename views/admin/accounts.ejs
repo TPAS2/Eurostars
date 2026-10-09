@@ -23,10 +23,10 @@
         <td><a href="/admin/users/<%= l.company_id %>"><%= l.agency_name %></a></td>
         <td><code><%= l.username %></code></td>
         <td><code><%= l.login_name %></code></td>
-        <td><%= l.name %><% if (l.is_main) { %> <span class="badge">main contact</span><% } %></td>
+        <td><%= l.name %></td>
         <td class="nowrap"><%= fmt.ukDateTime(l.last_login_at) %></td>
         <td><span class="badge <%= active ? 's-active' : 's-suspended' %>"><%= active ? 'active' : 'suspended' %></span></td>
-        <td><a class="btn small" href="<%= l.is_main ? `/admin/users/${l.company_id}#users` : `/admin/people/${l.id}/edit` %>">Edit</a></td>
+        <td><a class="btn small" href="/admin/people/<%= l.id %>/edit">Edit</a></td>
       </tr>
     <% }) %>
     </tbody>

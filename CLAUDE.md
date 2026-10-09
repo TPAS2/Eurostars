@@ -37,8 +37,12 @@ and holds real people's personal and bank details. It's deployed on Render from 
 
 ## Conventions
 
-- Multi-company: `req.user.id` is the company (every record has `account_id`);
+- Multi-company: `req.user.id` is the agency (every record has `account_id`);
   `req.user.person_id` is the person signed in. Scope every query by `account_id`.
+- An agency is its own `users` row (`company_id IS NULL`, `is_agency = 1`): names, contact
+  details, status. It never signs in. Everyone who signs in is a user under it (`company_id` =
+  the agency), all equal. Create agencies with `createAgency` in `src/db.js`. The admin account
+  is the one exception: a single row that signs in as itself.
 - Schema changes: add to `SCHEMA` or use `addColumnIfMissing` in `src/db.js` (no migrations
   framework). Generic list/show/edit pages come from `src/entities.js`.
 - Security middleware must stay on: CSRF on every POST (multipart routes call

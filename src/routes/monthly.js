@@ -122,7 +122,7 @@ module.exports = function monthlyRoutes(db, writer, mailer = { enabled: false })
          LEFT JOIN monthly_statements s ON s.landlord_id = l.id AND s.account_id = l.account_id AND s.month = ?
         WHERE l.account_id = ? ORDER BY l.name COLLATE NOCASE`
     ).all(month, a);
-    const me = db.prepare('SELECT COALESCE(m.email, c.email) AS email FROM users m JOIN users c ON c.id = COALESCE(m.company_id, m.id) WHERE m.id = ?').get(req.user.person_id);
+    const me = db.prepare('SELECT COALESCE(c.email, m.email) AS email FROM users m JOIN users c ON c.id = COALESCE(m.company_id, m.id) WHERE m.id = ?').get(req.user.person_id);
     const template = db.prepare('SELECT filename, uploaded_at FROM payment_templates WHERE account_id = ?').get(a) || null;
     res.render('rentrun', {
       title: 'Rent run', section: 'rentrun', month, thisMonth: fmt.today().slice(0, 7), monthLabel: st.monthLabel(month), rows, template,
@@ -230,7 +230,7 @@ module.exports = function monthlyRoutes(db, writer, mailer = { enabled: false })
       `SELECT COUNT(*) AS n FROM landlords l WHERE l.account_id = ?
          AND NOT EXISTS (SELECT 1 FROM monthly_statements s WHERE s.landlord_id = l.id AND s.account_id = l.account_id AND s.month = ?)`
     ).get(req.user.id, month).n;
-    const me = db.prepare('SELECT COALESCE(m.email, c.email) AS email FROM users m JOIN users c ON c.id = COALESCE(m.company_id, m.id) WHERE m.id = ?').get(req.user.person_id);
+    const me = db.prepare('SELECT COALESCE(c.email, m.email) AS email FROM users m JOIN users c ON c.id = COALESCE(m.company_id, m.id) WHERE m.id = ?').get(req.user.person_id);
     res.render('monthly/report', {
       title: report.label, section: 'rentrun', report, missing, fmt, emailEnabled: mailer.enabled, reportTo: (me && me.email) || '',
       step: req.query.step === '4' ? 4 : 3,

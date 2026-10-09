@@ -33,7 +33,7 @@
         <tr data-access-row>
           <td>
             <input type="hidden" name="people" value="<%= m.id %>">
-            <strong><%= m.name %></strong><% if (!m.company_id) { %> <span class="badge plain">main login</span><% } %><% if (m.status !== 'active') { %> <span class="badge s-suspended"><%= m.status %></span><% } %>
+            <strong><%= m.name %></strong><% if (m.status !== 'active') { %> <span class="badge s-suspended"><%= m.status %></span><% } %>
             <div class="muted small">signs in as <%= m.login_name %></div>
           </td>
           <% tabs.forEach(t => { %>

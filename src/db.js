@@ -644,7 +644,70 @@ function openDatabase(file) {
     db.prepare('INSERT OR IGNORE INTO statement_auto_runs (account_id, month) SELECT DISTINCT account_id, ? FROM monthly_statements').run(last);
   }
   numberStatements(db);
+  splitAgencies(db, file);
   return db;
+}
+
+// An agency is its own record (is_agency = 1): its names, contact details and status, and every
+// record of the agency points at it (account_id). It never signs in; everyone who does is a user
+// under it (company_id = the agency), all on an equal footing.
+function personUsername(db, agencyUsername, loginName, exceptId = 0) {
+  const base = `${agencyUsername}.${loginName}`;
+  let name = base;
+  for (let i = 2; db.prepare('SELECT 1 FROM users WHERE username = ? COLLATE NOCASE AND id != ?').get(name, exceptId); i++) name = `${base}~${i}`;
+  return name;
+}
+
+// A new agency with its first user. Returns { agencyId, personId }.
+function createAgency(db, { username, agencyName, contactName, email, phone, address, loginName, personName, personEmail, passwordHash }) {
+  const agencyId = Number(db.prepare(`INSERT INTO users (username, login_name, email, phone, address, name, agency_name, password_hash, is_agency)
+    VALUES (?, NULL, ?, ?, ?, ?, ?, '!', 1)`).run(username, email || null, phone || null, address || null, contactName, agencyName).lastInsertRowid);
+  const personId = Number(db.prepare(`INSERT INTO users (username, company_id, login_name, email, name, agency_name, password_hash)
+    VALUES (?, ?, ?, ?, ?, ?, ?)`).run(personUsername(db, username, loginName), agencyId, loginName, personEmail === undefined ? (email || null) : (personEmail || null),
+    personName || contactName, agencyName, passwordHash).lastInsertRowid);
+  return { agencyId, personId };
+}
+
+// Older databases: each agency's record was also its main login. Give that person their own user
+// under the agency (same name, password, email, tabs and settings), move what they did (sign-ins,
+// activity, "added by" and the like) and their sessions over to it, and keep the agency record
+// itself, so nothing filed under the agency moves. Runs once per agency.
+function splitAgencies(db, file = ':memory:') {
+  addColumnIfMissing(db, 'users', 'is_agency', 'INTEGER NOT NULL DEFAULT 0');
+  const todo = db.prepare("SELECT * FROM users WHERE company_id IS NULL AND is_admin = 0 AND is_agency = 0 AND login_name IS NOT NULL AND password_hash != '!'").all();
+  if (!todo.length) {
+    // Agencies that never had a login (none expected) still count as agencies.
+    db.prepare("UPDATE users SET is_agency = 1 WHERE company_id IS NULL AND is_admin = 0 AND is_agency = 0").run();
+    return;
+  }
+  // A copy of the whole database as it was, beside it on the same disk, before anything changes.
+  if (file !== ':memory:') {
+    const copy = `${file}.before-agency-split`;
+    if (!fs.existsSync(copy)) db.prepare('VACUUM INTO ?').run(copy);
+  }
+  // Every column holding who did something: user_id and anything ending in _by.
+  const personCols = [];
+  for (const { name: t } of db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name != 'users'").all()) {
+    for (const c of db.prepare(`PRAGMA table_info(${t})`).all()) {
+      if ((c.name === 'user_id' || /_by$/.test(c.name)) && /^INTEGER/i.test(c.type)) personCols.push([t, c.name]);
+    }
+  }
+  db.exec('BEGIN');
+  try {
+    for (const a of todo) {
+      const personId = Number(db.prepare(`INSERT INTO users (username, company_id, login_name, email, phone, name, agency_name, password_hash, status,
+          created_at, last_login_at, login_count, totp_secret, totp_enabled, totp_last_step, totp_recovery, hidden_tabs, theme)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+        personUsername(db, a.username, a.login_name), a.id, a.login_name, a.email, null, a.name, a.agency_name, a.password_hash,
+        a.created_at, a.last_login_at, a.login_count, a.totp_secret, a.totp_enabled, a.totp_last_step, a.totp_recovery, a.hidden_tabs, a.theme,
+      ).lastInsertRowid);
+      for (const [t, c] of personCols) db.prepare(`UPDATE ${t} SET ${c} = ? WHERE ${c} = ?`).run(personId, a.id);
+      db.prepare(`UPDATE users SET is_agency = 1, login_name = NULL, password_hash = '!', totp_secret = NULL, totp_enabled = 0,
+        totp_recovery = NULL, hidden_tabs = NULL, theme = NULL WHERE id = ?`).run(a.id);
+    }
+    db.prepare("UPDATE users SET is_agency = 1 WHERE company_id IS NULL AND is_admin = 0 AND is_agency = 0").run();
+    db.exec('COMMIT');
+  } catch (err) { db.exec('ROLLBACK'); throw err; }
 }
 
 // The contractor with this name (ignoring capitals and spaces at the ends), added if new.
@@ -826,4 +889,4 @@ function numberTenancies(db, accountId = null) {
   }
 }
 
-module.exports = { numberStatements, numberTenancies, contractorFor, openDatabase, transaction, uniqueUsername, signInNameFrom, USERNAME_RE, LOGIN_NAME_RE };
+module.exports = { createAgency, personUsername, splitAgencies, numberStatements, numberTenancies, contractorFor, openDatabase, transaction, uniqueUsername, signInNameFrom, USERNAME_RE, LOGIN_NAME_RE };

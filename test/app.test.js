@@ -23,6 +23,8 @@ const config = {
 };
 const db = openDatabase(':memory:');
 ensureAdmin(db, config, () => {});
+// The first user at an agency (the one who signed up), by the agency's name.
+const firstUser = (agency) => db.prepare('SELECT id FROM users WHERE company_id = (SELECT id FROM users WHERE username = ?) ORDER BY id').get(agency).id;
 let base;
 // Stand-in for the Claude call, swapped per test.
 let fakeWriter = async (facts) => ({ text: `${facts.landlord}: rent ${facts.rent_received}, net ${facts.net_for_month}.`, model: 'test-model' });
@@ -721,8 +723,11 @@ test('older databases get usernames when upgraded', () => {
     INSERT INTO landlords (account_id, name) VALUES (2, 'Kept landlord');`);
   old.close();
   const db2 = openDatabase(file);
-  const users = db2.prepare('SELECT id, username, email FROM users ORDER BY id').all();
+  const users = db2.prepare('SELECT id, username, email FROM users WHERE company_id IS NULL ORDER BY id').all();
   assert.deepEqual(users.map((u) => u.username), ['admin', 'jouser', 'jouser2'], 'short names padded to the 3-character minimum, clashes numbered');
+  // Each agency then gets its own user, who signs in; the agency record stays put.
+  assert.deepEqual(db2.prepare('SELECT company_id, login_name, password_hash FROM users WHERE company_id IS NOT NULL ORDER BY id').all().map((x) => ({ ...x })),
+    [{ company_id: 2, login_name: 'J', password_hash: 'h' }, { company_id: 3, login_name: 'J2', password_hash: 'h' }]);
   assert.equal(db2.prepare('SELECT account_id FROM landlords').get().account_id, 2, 'linked data kept');
   db2.close();
 });
@@ -764,6 +769,9 @@ test('admin adds an account and resets passwords', async () => {
   // Reset: old password stops working, they're signed out, new one works.
   await admin.get(`/admin/users/${id}`);
   r = await admin.post(`/admin/users/${id}/password`, { password: 'new-pass-2027' });
+  assert.match(decodeURIComponent(r.location), /An agency has no password of its own/, 'the agency itself never signs in');
+  const patId = db.prepare("SELECT id FROM users WHERE company_id = ? AND login_name = 'Pat'").get(id).id;
+  r = await admin.post(`/admin/people/${patId}/password`, { password: 'new-pass-2027' });
   assert.match(decodeURIComponent(r.location), /Password changed/);
   assert.equal((await coastal.get('/app')).location, '/login');
   assert.equal((await new Client().post('/login', { login: 'coastal', member: 'Pat', password: 'sea-view-2026' })).status, 401);
@@ -787,29 +795,23 @@ test('admin adds an account and resets passwords', async () => {
   assert.match(r.location, /\?created=1/);
   assert.equal((await new Client().login('Harbourlets', 'lantern-quay-208', 'Kim')).location, '/app');
   assert.doesNotMatch((await admin.get('/admin/users/new')).text, /name="agency_name"|name="email"|Company name/);
-  // Changing an empty account's Agency to an existing agency moves it in: same data afterwards.
+  // Changing an agency's name to another agency's never joins them.
   r = await admin.post('/admin/users', { username: 'stray', login_name: 'Lou', password: 'orchard-mile-773' });
   const strayId = Number(r.location.match(/users\/(\d+)/)[1]);
   await admin.get(`/admin/users/${strayId}`);
-  r = await admin.post(`/admin/users/${strayId}/details`, { username: 'Coastal', login_name: 'Lou', name: 'Lou Penn', agency_name: 'stray' });
-  assert.match(decodeURIComponent(r.location), new RegExp(`/admin/users/${id}\\?flash=Moved Lou Penn into Coastal Homes`));
+  r = await admin.post(`/admin/users/${strayId}/details`, { username: 'Coastal', name: 'Lou Penn', agency_name: 'stray' });
+  assert.match(decodeURIComponent(r.location), /Another agency is already called "Coastal"/);
+  // Users added to the same agency see the same records.
+  r = await admin.post('/admin/users', { username: 'Coastal', login_name: 'Lou', name: 'Lou Penn', password: 'orchard-mile-774' });
   const lou = new Client();
-  assert.equal((await lou.login('coastal', 'orchard-mile-773', 'Lou')).location, '/app');
+  assert.equal((await lou.login('coastal', 'orchard-mile-774', 'Lou')).location, '/app');
   await sam.get('/app/landlords/new');
   await sam.post('/app/landlords', { ...LANDLORD, name: 'Shared Landlord Test' });
   assert.match((await lou.get('/app/landlords')).text, /Shared Landlord Test/, 'people in the same agency see the same records');
-  // An account that already has records can't be moved (they'd be lost).
-  const kim = new Client();
-  await kim.login('Harbourlets', 'lantern-quay-208', 'Kim');
-  await kim.get('/app/landlords/new');
-  await kim.post('/app/landlords', { ...LANDLORD, name: 'Harbour Own Landlord' });
-  const harbourId = db.prepare("SELECT id FROM users WHERE username = 'Harbourlets'").get().id;
-  await admin.get(`/admin/users/${harbourId}`);
-  r = await admin.post(`/admin/users/${harbourId}/details`, { username: 'coastal', login_name: 'Kim', name: 'Kim', agency_name: 'Harbourlets' });
-  assert.match(decodeURIComponent(r.location), /error=.*already has its own records/);
   // All logins: an Edit button beside Status; people get their own edit page.
   r = await admin.get('/admin/accounts');
-  assert.match(r.text, new RegExp(`href="/admin/users/${id}#users">Edit</a>`), 'the main login edits on the agency page');
+  assert.match(r.text, new RegExp(`href="/admin/people/${patId}/edit">Edit</a>`), 'everyone, including the first user, has their own edit page');
+  assert.doesNotMatch(r.text, /main contact|main login/);
   const samId = db.prepare("SELECT id FROM users WHERE login_name = 'Sam' AND company_id = ?").get(id).id;
   assert.match(r.text, new RegExp(`href="/admin/people/${samId}/edit">Edit</a>`));
   assert.doesNotMatch(r.text, /<th>Password<\/th>|••••/, 'no password column');
@@ -915,28 +917,29 @@ test('account details: companies can only view them; the admin edits them', asyn
   const admin = new Client();
   await admin.login('admin', 'owner-password-123');
   r = await admin.get(`/admin/users/${u.id}`);
-  assert.match(r.text, /Account details/);
+  assert.match(r.text, /Agency details/);
   r = await admin.post(`/admin/users/${u.id}/details`, { name: 'Robin Hart', agency_name: 'After Lets', email: 'robin@after.example.com', phone: '0117 000 1111', address: '1 Quay St', password: '' });
-  assert.match(decodeURIComponent(r.location), /Account details saved/);
+  assert.match(decodeURIComponent(r.location), /Agency details saved/);
   const after = db.prepare('SELECT * FROM users WHERE id = ?').get(u.id);
   assert.equal(after.agency_name, 'After Lets');
   assert.equal(after.phone, '0117 000 1111');
   assert.equal(after.username, 'myaccount');
-  assert.ok(require('../src/auth').verifyPassword('kettle-harbour-58', after.password_hash));
+  const person = db.prepare('SELECT * FROM users WHERE company_id = ?').get(u.id);
+  assert.ok(require('../src/auth').verifyPassword('kettle-harbour-58', person.password_hash), 'the user’s password is unchanged');
   assert.match((await c.get('/app/account')).text, /After Lets[\s\S]*0117 000 1111/);
   assert.doesNotMatch((await c.get('/app/account')).text, /Company address/);
 
   r = await admin.post(`/admin/users/${u.id}/details`, { name: '', agency_name: 'After Lets' });
   assert.match(decodeURIComponent(r.location), /Enter the contact name/);
 
-  // The Password box resets it: too short is refused; a good one is saved and signs them out.
-  r = await admin.post(`/admin/users/${u.id}/details`, { name: 'Robin Hart', agency_name: 'After Lets', password: 'short' });
-  assert.match(decodeURIComponent(r.location), /at least 8 characters/);
-  assert.ok(require('../src/auth').verifyPassword('kettle-harbour-58', db.prepare('SELECT password_hash FROM users WHERE id = ?').get(u.id).password_hash));
-  r = await admin.post(`/admin/users/${u.id}/details`, { name: 'Robin Hart', agency_name: 'After Lets', password: 'brand-new-pass-1' });
-  assert.match(decodeURIComponent(r.location), /password saved/);
-  assert.ok(require('../src/auth').verifyPassword('brand-new-pass-1', db.prepare('SELECT password_hash FROM users WHERE id = ?').get(u.id).password_hash));
-  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM sessions WHERE user_id = ?').get(u.id).n, 0);
+  // A user's password is reset on their own edit page: too short is refused; a good one is saved and signs them out.
+  r = await admin.post(`/admin/people/${person.id}/edit`, { name: person.name, login_name: person.login_name, password: 'short' });
+  assert.match(r.text, /at least 8 characters/);
+  assert.ok(require('../src/auth').verifyPassword('kettle-harbour-58', db.prepare('SELECT password_hash FROM users WHERE id = ?').get(person.id).password_hash));
+  r = await admin.post(`/admin/people/${person.id}/edit`, { name: person.name, login_name: person.login_name, password: 'brand-new-pass-1' });
+  assert.match(decodeURIComponent(r.location), /signed out and must use the new password/);
+  assert.ok(require('../src/auth').verifyPassword('brand-new-pass-1', db.prepare('SELECT password_hash FROM users WHERE id = ?').get(person.id).password_hash));
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM sessions WHERE user_id = ?').get(person.id).n, 0);
 });
 
 test('property certificates: gas, electrical and insurance with current, previous and status', async () => {
@@ -1018,7 +1021,7 @@ test('activity log: the admin sees each user\'s sign-ins, page views and changes
   await c.post(`/app/landlords/${lid}/delete`, {});
   await c.post('/app/landlords', { ...LANDLORD, name: '' }); // failed attempt: not logged
 
-  const rows = db.prepare('SELECT action, summary FROM activity_log WHERE user_id = ? ORDER BY id').all(uid).map((x) => `${x.action}: ${x.summary}`);
+  const rows = db.prepare('SELECT action, summary FROM activity_log WHERE user_id IN (SELECT id FROM users WHERE company_id = ?) ORDER BY id').all(uid).map((x) => `${x.action}: ${x.summary}`);
   for (const expected of ['signed in: Signed in', 'viewed: Viewed landlords', 'created: Added landlord: Martha Quinn',
     'viewed: Viewed landlord: Martha Quinn', 'updated: Edited landlord: Martha Quinn', 'deleted: Deleted landlord: Martha Quinn']) {
     assert.ok(rows.includes(expected), `missing "${expected}" in ${JSON.stringify(rows)}`);
@@ -1087,7 +1090,7 @@ test('several people at one company share its username, each with their own name
 
   // The admin sees who did what, and the company is listed once.
   r = await admin.get(`/admin/users/${companyId}`);
-  assert.match(r.text, /id="people"[\s\S]*John Price[\s\S]*<code>john<\/code>/);
+  assert.match(r.text, /id="users"[\s\S]*John Price[\s\S]*<code>john<\/code>/);
   assert.match(r.text, /id="activity"[\s\S]*John Price[\s\S]*Added landlord: Shared Landlord/);
   r = await admin.get('/admin');
   assert.equal((r.text.match(/<code>eurostars<\/code><\/td>/g) || []).length, 1, 'company listed once in the users table');
@@ -1126,8 +1129,9 @@ test('existing "main" logins switch to the contact\'s first name', () => {
   d1.prepare("INSERT INTO users (username, login_name, name, agency_name, password_hash) VALUES ('odd', 'main', '!!', 'Odd', 'h')").run();
   d1.close();
   const d2 = openDatabase(file);
-  assert.equal(d2.prepare("SELECT login_name FROM users WHERE username = 'acme'").get().login_name, 'Olivia');
-  assert.equal(d2.prepare("SELECT login_name FROM users WHERE username = 'odd'").get().login_name, 'User');
+  const userOf = (agency) => d2.prepare('SELECT login_name FROM users WHERE company_id = (SELECT id FROM users WHERE username = ?)').get(agency).login_name;
+  assert.equal(userOf('acme'), 'Olivia');
+  assert.equal(userOf('odd'), 'User');
   d2.close();
 });
 
@@ -1226,16 +1230,16 @@ test('admin can fix a company username\'s capitals; people follow', async () => 
   assert.equal((await new Client().post('/login', { login: 'CapitalLets', member: 'Theo', password: 'Sample-Pass-9!' })).status, 401);
 
   await admin.get(`/admin/users/${id}`);
-  r = await admin.post(`/admin/users/${id}/details`, { username: 'CapitalLets', login_name: 'Theo', name: 'Theo Grey', agency_name: 'Capital Lets' });
-  assert.match(decodeURIComponent(r.location), /Account details saved/);
+  r = await admin.post(`/admin/users/${id}/details`, { username: 'CapitalLets', name: 'Theo Grey', agency_name: 'Capital Lets' });
+  assert.match(decodeURIComponent(r.location), /Agency details saved/);
   assert.equal((await new Client().post('/login', { login: 'CapitalLets', member: 'Theo', password: 'Sample-Pass-9!' })).location, '/app');
   assert.equal((await new Client().post('/login', { login: 'CapitalLets', member: 'Ann', password: 'anns-pass-1' })).location, '/app');
   assert.equal((await new Client().post('/login', { login: 'capitallets', member: 'Theo', password: 'Sample-Pass-9!' })).status, 401);
 
-  // Another agency's username moves this (empty) account and its people into that agency.
-  r = await admin.post(`/admin/users/${id}/details`, { username: 'eurostars', login_name: 'Theo2', name: 'Theo Grey', agency_name: 'Capital Lets' });
-  assert.match(decodeURIComponent(r.location), /Moved Theo Grey, Ann into Eurostars Lettings/);
-  assert.equal((await new Client().post('/login', { login: 'eurostars', member: 'Ann', password: 'anns-pass-1' })).location, '/app');
+  // Another agency's name is refused: agencies are never joined.
+  r = await admin.post(`/admin/users/${id}/details`, { username: 'eurostars', name: 'Theo Grey', agency_name: 'Capital Lets' });
+  assert.match(decodeURIComponent(r.location), /Another agency is already called "eurostars"/);
+  assert.equal((await new Client().post('/login', { login: 'CapitalLets', member: 'Ann', password: 'anns-pass-1' })).location, '/app');
 });
 
 test('councils list shows how many properties each has, and which', async () => {
@@ -1398,7 +1402,7 @@ test('any invoice can be deleted, from its page or from a list', async () => {
 
 test('signed out after an hour without use, then back to the same page', async () => {
   const c = await registerAndLogin('idle@example.com', 'Idle Lets');
-  const person = db.prepare("SELECT id FROM users WHERE username = 'idle'").get().id;
+  const person = db.prepare("SELECT id FROM users WHERE company_id = (SELECT id FROM users WHERE username = 'idle')").get().id;
   const ageSession = (mins) => db.prepare("UPDATE sessions SET last_seen_at = datetime('now', ?) WHERE user_id = ?").run(`-${mins} minutes`, person);
   let r = await c.post('/app/landlords', { ...LANDLORD, name: 'Ivy Idle' });
   const landlordId = idFrom(r.location);
@@ -1780,7 +1784,9 @@ test('admin Tab access page: every person against every tab, saved in one go', a
 
   assert.match((await admin.get('/admin')).text, /aria-label="Tab access"/, 'in the admin menu');
   let r = await admin.get(`/admin/access?company=${companyId}`);
-  assert.match(r.text, /Grid Lets[\s\S]*?Test User[\s\S]*?main login[\s\S]*?Bea Clerk/);
+  assert.match(r.text, /Grid Lets[\s\S]*?Bea Clerk/);
+  assert.match(r.text, /Grid Lets[\s\S]*?Test User/);
+  assert.doesNotMatch(r.text, /main login/);
   assert.match(r.text, new RegExp(`name="t_${bea}" value="councilrec" checked`));
   // Bea: only Rent run and Monthly statements. The main login (companyId) keeps everything.
   const all = ['councils', 'councilrec', 'councilinvoices', 'properties', 'inspections', 'landlords', 'tenants', 'maintenance', 'contractors', 'invoices', 'landlordinvoices', 'rentrun', 'monthly'];
@@ -2142,14 +2148,14 @@ test('contractor invoices: no invoice number or due date on the form; file, supp
   const pdf = new File([Buffer.from('%PDF-1.4\n%x\n')], 'i.pdf');
   r = await c.post('/app/invoices', await invoiceBody(c, { supplier: 'Lock Co', amount: '75', invoice_date: '2026-09-01', added_by: String(pat), file: pdf }), { multipart: true });
   const id = idFrom(r.location);
-  assert.equal(db.prepare('SELECT added_by FROM invoices WHERE id = ?').get(id).added_by, companyId, 'a different person sent in is ignored: it is whoever is signed in');
+  assert.equal(db.prepare('SELECT added_by FROM invoices WHERE id = ?').get(id).added_by, db.prepare("SELECT id FROM users WHERE company_id = ? AND login_name = 'Test'").get(companyId).id, 'a different person sent in is ignored: it is whoever is signed in');
   assert.match((await c.get(`/app/invoices/${id}`)).text, /<dt>Added by<\/dt><dd>Test User<\/dd>/);
   // Editing keeps an existing invoice number / due date.
   db.prepare("UPDATE invoices SET invoice_number = 'INV-9', due_date = '2026-09-30' WHERE id = ?").run(id);
   await c.get(`/app/invoices/${id}/edit`);
   const cur = db.prepare('SELECT maintenance_job_id, property_id FROM invoices WHERE id = ?').get(id);
   await c.post(`/app/invoices/${id}`, { supplier: 'Lock Co', amount: '80', invoice_date: '2026-09-01', added_by: String(pat), maintenance_job_id: String(cur.maintenance_job_id), property_id: String(cur.property_id), description: 'Lock change', charge_landlord: 'yes', landlord_amount: '80' }, { multipart: true });
-  assert.deepEqual({ ...db.prepare('SELECT invoice_number, due_date, amount_pence, added_by FROM invoices WHERE id = ?').get(id) }, { invoice_number: 'INV-9', due_date: '2026-09-30', amount_pence: 8000, added_by: companyId });
+  assert.deepEqual({ ...db.prepare('SELECT invoice_number, due_date, amount_pence, added_by FROM invoices WHERE id = ?').get(id) }, { invoice_number: 'INV-9', due_date: '2026-09-30', amount_pence: 8000, added_by: firstUser('added-by') });
 });
 
 test('contractor invoice form offers the saved contractors as a type-to-narrow list', async () => {
@@ -3371,31 +3377,31 @@ test('job sheet: Contact for Access is a box you can type in; it fills in from t
   assert.equal(r.headers.get('content-type'), 'application/pdf');
 });
 
-test('admin agency page: Agency details, Users and People are separate fold-down boxes; each saves only its own boxes', async () => {
+test('admin agency page: Agency details then Users, both fold down; agency details never touch its users', async () => {
   await registerAndLogin('split-agency@example.com', 'Split Agency Lets');
   await registerAndLogin('split-other@example.com', 'Split Other Lets');
   const id = db.prepare("SELECT id FROM users WHERE username = 'split-agency'").get().id;
   const admin = new Client();
   await admin.login('admin', 'owner-password-123');
   let r = await admin.get(`/admin/users/${id}`);
-  assert.match(r.text, /<details class="card fold" id="agency">[\s\S]*?name="section" value="agency"[\s\S]*?name="username"[\s\S]*?name="agency_name"[\s\S]*?name="phone"[\s\S]*?name="address"[\s\S]*?<\/details>\s*<details class="card fold" id="users">[\s\S]*?name="section" value="users"[\s\S]*?name="login_name"[\s\S]*?name="name"[\s\S]*?name="email"[\s\S]*?name="password"[\s\S]*?<\/details>\s*<details class="card fold" id="people">/);
-  assert.doesNotMatch(r.text, /<h2>Rename agency<\/h2>|<h2>Account details<\/h2>/);
-  const before = { ...db.prepare('SELECT login_name, name, email FROM users WHERE id = ?').get(id) };
-  // Agency details: names, phone and address; the main login is left alone.
-  r = await admin.post(`/admin/users/${id}/details`, { section: 'agency', username: 'Split Renamed', agency_name: 'Split Renamed Ltd', phone: '0100 000070', address: '1 Made-up Street' });
-  assert.match(r.location, /flash=Agency\+details\+saved|flash=Agency%20details%20saved/);
-  assert.match(r.location, /#agency$/);
-  let u = { ...db.prepare('SELECT username, agency_name, phone, address, login_name, name, email FROM users WHERE id = ?').get(id) };
-  assert.deepEqual(u, { username: 'Split Renamed', agency_name: 'Split Renamed Ltd', phone: '0100 000070', address: '1 Made-up Street', ...before });
+  assert.match(r.text, /<details class="card fold" id="agency">[\s\S]*?name="username"[\s\S]*?name="agency_name"[\s\S]*?name="name"[\s\S]*?name="email"[\s\S]*?name="phone"[\s\S]*?name="address"[\s\S]*?<\/details>\s*<details class="card fold" id="users">[\s\S]*?Test User[\s\S]*?Add a user/);
+  assert.doesNotMatch(r.text, /<h2>Rename agency<\/h2>|<h2>Account details<\/h2>|id="people"|main login/);
+  const person = { ...db.prepare('SELECT id, login_name, name, email, password_hash FROM users WHERE company_id = ?').get(id) };
+  r = await admin.post(`/admin/users/${id}/details`, { username: 'Split Renamed', agency_name: 'Split Renamed Ltd', name: 'Pat Example', email: 'office@example.com', phone: '0100 000070', address: '1 Made-up Street' });
+  assert.match(decodeURIComponent(r.location), /Agency details saved[\s\S]*#agency$/);
+  assert.deepEqual({ ...db.prepare('SELECT username, agency_name, name, email, phone, address FROM users WHERE id = ?').get(id) },
+    { username: 'Split Renamed', agency_name: 'Split Renamed Ltd', name: 'Pat Example', email: 'office@example.com', phone: '0100 000070', address: '1 Made-up Street' });
+  assert.deepEqual({ ...db.prepare('SELECT id, login_name, name, email, password_hash FROM users WHERE company_id = ?').get(id) }, person, 'the user is untouched');
+  assert.equal((await new Client().login('Split Renamed', 'kettle-harbour-58')).location, '/app', 'they sign in with the new agency name');
   // Another agency's name is refused there, never joined.
-  r = await admin.post(`/admin/users/${id}/details`, { section: 'agency', username: 'split-other', agency_name: 'X', phone: '', address: '' });
+  r = await admin.post(`/admin/users/${id}/details`, { username: 'split-other' });
   assert.match(decodeURIComponent(r.location), /Another agency is already called "split-other"[\s\S]*#agency$/);
-  assert.equal(db.prepare('SELECT company_id FROM users WHERE id = ?').get(id).company_id, null);
-  // Users: the main login; the agency details are left alone.
-  r = await admin.post(`/admin/users/${id}/details`, { section: 'users', login_name: 'Pat', name: 'Pat Example', email: 'pat@example.com', password: '' });
-  assert.match(r.location, /#users$/);
-  u = { ...db.prepare('SELECT username, agency_name, phone, address, login_name, name, email FROM users WHERE id = ?').get(id) };
-  assert.deepEqual(u, { username: 'Split Renamed', agency_name: 'Split Renamed Ltd', phone: '0100 000070', address: '1 Made-up Street', login_name: 'Pat', name: 'Pat Example', email: 'pat@example.com' });
+  // The only user can't be removed or suspended (nobody could sign in); with a second user they can.
+  r = await admin.post(`/admin/people/${person.id}/delete`, {});
+  assert.match(decodeURIComponent(r.location), /only user at this agency who can sign in/);
+  await admin.post(`/admin/users/${id}/people`, { name: 'Second Person', login_name: 'second', password: 'made-up-pass-551' });
+  r = await admin.post(`/admin/people/${person.id}/suspend`, {});
+  assert.match(decodeURIComponent(r.location), /Suspended/);
 });
 
 test('menu: a divider under Dashboard like between the other groups; contractors show a dash for nothing paid or unpaid', async () => {
@@ -3620,8 +3626,8 @@ test('saving account details keeps your own username (including the admin accoun
   const me = db.prepare('SELECT * FROM users WHERE is_admin = 1').get();
   await admin.get(`/admin/users/${me.id}`);
   let r = await admin.post(`/admin/users/${me.id}/details`, { username: me.username, login_name: me.login_name, name: me.name, agency_name: me.agency_name || 'Owner', email: me.email || '', phone: '0113 000 0000', address: '' });
-  assert.doesNotMatch(decodeURIComponent(r.location), /taken/, 'the admin can save their own details');
-  assert.match(decodeURIComponent(r.location), /Account details saved/);
+  assert.doesNotMatch(decodeURIComponent(r.location), /already called/, 'the admin can save their own details');
+  assert.match(decodeURIComponent(r.location), /Agency details saved/);
   assert.equal(db.prepare('SELECT phone FROM users WHERE id = ?').get(me.id).phone, '0113 000 0000');
   // The admin's username can't be changed here (it comes from the ADMIN_USERNAME setting).
   r = await admin.post(`/admin/users/${me.id}/details`, { username: 'SomethingElse', login_name: me.login_name, name: me.name, agency_name: me.agency_name || 'Owner' });
@@ -3632,23 +3638,22 @@ test('saving account details keeps your own username (including the admin accoun
   await registerAndLogin('keep-name@example.com', 'Keep Name Lets');
   const co = db.prepare("SELECT * FROM users WHERE username = 'keep-name'").get();
   await admin.get(`/admin/users/${co.id}`);
-  r = await admin.post(`/admin/users/${co.id}/details`, { username: 'keep-name', login_name: co.login_name, name: co.name, agency_name: co.agency_name, email: co.email });
-  assert.match(decodeURIComponent(r.location), /Account details saved/);
-  r = await admin.post(`/admin/users/${co.id}/details`, { username: 'Keep-Name', login_name: co.login_name, name: co.name, agency_name: co.agency_name, email: co.email });
-  assert.match(decodeURIComponent(r.location), /Account details saved/, 'changing only the capitals is allowed');
+  r = await admin.post(`/admin/users/${co.id}/details`, { username: 'keep-name', name: co.name, agency_name: co.agency_name, email: co.email });
+  assert.match(decodeURIComponent(r.location), /Agency details saved/);
+  r = await admin.post(`/admin/users/${co.id}/details`, { username: 'Keep-Name', name: co.name, agency_name: co.agency_name, email: co.email });
+  assert.match(decodeURIComponent(r.location), /Agency details saved/, 'changing only the capitals is allowed');
   await registerAndLogin('other-name@example.com', 'Other Name Lets');
-  r = await admin.post(`/admin/users/${co.id}/details`, { username: 'admin', login_name: co.login_name, name: co.name, agency_name: co.agency_name, email: co.email });
-  assert.match(decodeURIComponent(r.location), /That username is taken/);
+  r = await admin.post(`/admin/users/${co.id}/details`, { username: 'admin', name: co.name, agency_name: co.agency_name, email: co.email });
+  assert.match(decodeURIComponent(r.location), /Another agency is already called "admin"/);
 });
 
-test('the admin sign-in name is shown read-only and cannot be changed from the form', async () => {
+test('the admin sign-in name cannot be changed from the agency page', async () => {
   const admin = new Client();
   await admin.login('admin', 'owner-password-123');
   const me = db.prepare('SELECT * FROM users WHERE is_admin = 1').get();
   const r0 = await admin.get(`/admin/users/${me.id}`);
-  assert.match(r0.text, /name="login_name"[^>]*readonly/);
-  const r = await admin.post(`/admin/users/${me.id}/details`, { login_name: 'Someone', name: me.name, agency_name: me.agency_name || 'Owner' });
-  assert.match(decodeURIComponent(r.location), /ADMIN_LOGIN_NAME/);
+  assert.doesNotMatch(r0.text, /id="d-login_name"/, 'not in the agency details at all');
+  await admin.post(`/admin/users/${me.id}/details`, { login_name: 'Someone', name: me.name, agency_name: me.agency_name || 'Owner' });
   assert.equal(db.prepare('SELECT login_name FROM users WHERE id = ?').get(me.id).login_name, me.login_name);
 });
 
@@ -3665,24 +3670,21 @@ test('the admin account picks up the Rift name instead of the old Nexus one', ()
   assert.equal(dbx.prepare('SELECT agency_name FROM users WHERE is_admin = 1').get().agency_name, 'Theo Lettings');
 });
 
-test('account details on the admin panel: Agency, Your name, Password, Email, Phone; saving without a username keeps it', async () => {
+test('agency details on the admin panel: Agency name, Company name, Contact name, Email, Phone, Address; no password of its own', async () => {
   await registerAndLogin('no-username-box@example.com', 'No Box Lets');
   const co = db.prepare("SELECT * FROM users WHERE username = 'no-username-box'").get();
   const admin = new Client();
   await admin.login('admin', 'owner-password-123');
   const r = await admin.get(`/admin/users/${co.id}`);
-  const details = r.text.slice(r.text.indexOf('id="agency"'), r.text.indexOf('id="people"'));
-  const order = ['Agency name', 'Company name', 'Phone', 'Address', 'Sign-in name', 'Contact name', 'Email', 'Password'].map((l) => details.indexOf(`>${l}`));
+  const details = r.text.slice(r.text.indexOf('id="agency"'), r.text.indexOf('id="users"'));
+  const order = ['Agency name', 'Company name', 'Contact name', 'Email', 'Phone', 'Address'].map((l) => details.indexOf(`>${l}`));
   assert.ok(order.every((i, k) => i > 0 && (k === 0 || i > order[k - 1])), `labels out of order: ${order}`);
   assert.doesNotMatch(r.text, /id="reset-password"/);
-  assert.match(details, new RegExp(`formaction="/admin/users/${co.id}/password"[^>]*>Change password`));
-  let pw = await admin.post(`/admin/users/${co.id}/password`, { password: '' });
-  assert.match(decodeURIComponent(pw.location), /Type a new password first/);
-  pw = await admin.post(`/admin/users/${co.id}/password`, { password: 'changed-by-button-1', name: 'ignored' });
-  assert.match(decodeURIComponent(pw.location), /Password changed/);
-  assert.ok(require('../src/auth').verifyPassword('changed-by-button-1', db.prepare('SELECT password_hash FROM users WHERE id = ?').get(co.id).password_hash));
-  const saved = await admin.post(`/admin/users/${co.id}/details`, { login_name: co.login_name, name: 'New Contact', agency_name: co.agency_name, email: co.email });
-  assert.match(decodeURIComponent(saved.location), /Account details saved/);
+  assert.doesNotMatch(details, /name="password"/, 'an agency has no password; each user has their own');
+  const pw = await admin.post(`/admin/users/${co.id}/password`, { password: 'changed-by-button-1' });
+  assert.match(decodeURIComponent(pw.location), /An agency has no password of its own/);
+  const saved = await admin.post(`/admin/users/${co.id}/details`, { name: 'New Contact', agency_name: co.agency_name, email: co.email });
+  assert.match(decodeURIComponent(saved.location), /Agency details saved/);
   assert.deepEqual({ ...db.prepare('SELECT username, name FROM users WHERE id = ?').get(co.id) }, { username: 'no-username-box', name: 'New Contact' });
 });
 
@@ -3732,15 +3734,15 @@ test('several accounts can share one email address', async () => {
   const c = new Client();
   const r = await c.post('/register', { username: 'shared-two', name: 'Test User', agency_name: 'Second Shared Lets', email: 'shared@example.com', password: 'kettle-harbour-58', password_confirm: 'kettle-harbour-58' });
   assert.equal(r.status, 302, r.text);
-  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM users WHERE email = 'shared@example.com'").get().n, 2);
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM users WHERE email = 'shared@example.com' AND company_id IS NULL").get().n, 2);
 
   // The admin can give another account the same email too.
   const admin = new Client();
   await admin.login('admin', 'owner-password-123');
   const other = await registerAndLogin('someone-else@example.com', 'Third Shared Lets');
   const third = db.prepare("SELECT * FROM users WHERE username = 'someone-else'").get();
-  const saved = await admin.post(`/admin/users/${third.id}/details`, { login_name: third.login_name, name: third.name, agency_name: third.agency_name, email: 'SHARED@example.com' });
-  assert.match(decodeURIComponent(saved.location), /Account details saved/);
+  const saved = await admin.post(`/admin/users/${third.id}/details`, { name: third.name, agency_name: third.agency_name, email: 'SHARED@example.com' });
+  assert.match(decodeURIComponent(saved.location), /Agency details saved/);
   assert.ok(other);
 });
 
@@ -3754,9 +3756,9 @@ test('older databases with one-email-per-account are converted, keeping every ro
   old.prepare("INSERT INTO users (username, email, name, agency_name, password_hash) VALUES ('oldco', 'a@b.com', 'Old', 'Old Co', 'x')").run();
   old.close();
   const migrated = openDatabase(file);
-  assert.equal(migrated.prepare("SELECT username FROM users WHERE email = 'a@b.com'").get().username, 'oldco');
+  assert.equal(migrated.prepare("SELECT username FROM users WHERE email = 'a@b.com' AND company_id IS NULL").get().username, 'oldco');
   migrated.prepare("INSERT INTO users (username, email, name, agency_name, password_hash) VALUES ('newco', 'A@b.com', 'New', 'New Co', 'x')").run();
-  assert.equal(migrated.prepare("SELECT COUNT(*) AS n FROM users WHERE email = 'a@b.com'").get().n, 2);
+  assert.equal(migrated.prepare("SELECT COUNT(*) AS n FROM users WHERE email = 'a@b.com' AND company_id IS NULL").get().n, 2);
   assert.throws(() => migrated.prepare("INSERT INTO users (username, name, agency_name, password_hash) VALUES ('OLDCO', 'Dup', 'Dup', 'x')").run(), /UNIQUE/);
   migrated.close();
 });
@@ -4889,7 +4891,7 @@ test('maintenance: files when adding, contractor list, who added it, date comple
   assert.equal(r.status, 302);
   assert.match(decodeURIComponent(r.headers.get('location')), /Added with 2 files/);
   const job = db.prepare("SELECT * FROM maintenance_jobs WHERE title = 'Leaking tap'").get();
-  assert.equal(job.added_by, co, 'always the person signed in');
+  assert.equal(job.added_by, firstUser('maint-new'), 'always the person signed in');
   assert.ok(sam);
   assert.equal(db.prepare('SELECT COUNT(*) n FROM maintenance_files WHERE job_id = ?').get(job.id).n, 2);
   // Saved as completed: dated today.
@@ -4900,7 +4902,7 @@ test('maintenance: files when adding, contractor list, who added it, date comple
   // Someone from another company sent in as "Added by" is ignored too.
   const bad = await c.post('/app/maintenance', { property_id: prop, title: 'X', priority: 'normal', status: 'open', added_by: '1' });
   assert.equal(bad.status, 302);
-  assert.equal(db.prepare('SELECT added_by FROM maintenance_jobs WHERE id = ?').get(idFrom(bad.location)).added_by, co);
+  assert.equal(db.prepare('SELECT added_by FROM maintenance_jobs WHERE id = ?').get(idFrom(bad.location)).added_by, firstUser('maint-new'));
 });
 
 test('properties: address label, lease start with landlord, certificates when adding, notes of tenant calls', async () => {
@@ -4937,7 +4939,7 @@ test('properties: address label, lease start with landlord, certificates when ad
   r = await c.post(`/app/properties/${pid}/notes`, { note_date: '2026-09-21', body: '  ' });
   assert.match(decodeURIComponent(r.location), /Write the note first/);
   r = await c.post(`/app/properties/${pid}/notes`, { body: 'x', added_by: '1' });
-  assert.equal(db.prepare("SELECT added_by FROM property_notes WHERE property_id = ? AND body = 'x'").get(pid).added_by, co, 'someone else sent in is ignored');
+  assert.equal(db.prepare("SELECT added_by FROM property_notes WHERE property_id = ? AND body = 'x'").get(pid).added_by, firstUser('prop-notes'), 'someone else sent in is ignored');
   const other = await registerAndLogin('prop-notes2@example.com', 'Other Lets');
   r = await other.post(`/app/properties/${pid}/notes`, { body: 'sneaky' });
   assert.equal(r.status, 404);

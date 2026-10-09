@@ -9,7 +9,7 @@ const totp = require('../totp');
 const QRCode = require('qrcode');
 const auth = require('../auth');
 const tabs = require('../tabs');
-const { USERNAME_RE, LOGIN_NAME_RE, signInNameFrom } = require('../db');
+const { USERNAME_RE, LOGIN_NAME_RE, signInNameFrom, createAgency, personUsername } = require('../db');
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const RESERVED_USERNAMES = new Set(['admin', 'administrator', 'root', 'support', 'letwise', 'nexus', 'rift', 'system']);
@@ -24,7 +24,7 @@ function backupEvery(hours) {
 module.exports = function adminRoutes(db, config) {
   const router = express.Router();
 
-  // A company is its main login row (company_id IS NULL) plus the people added to it.
+  // An agency is its own record (company_id IS NULL) plus its users (company_id = the agency).
   const PEOPLE = '(SELECT m.id FROM users m WHERE m.id = u.id OR m.company_id = u.id)';
   const USAGE_SQL = `
     SELECT u.id, u.username, u.login_name, u.email, u.phone, u.address, u.name, u.agency_name, u.is_admin, u.status, u.created_at,
@@ -56,9 +56,9 @@ module.exports = function adminRoutes(db, config) {
     const n = (sql) => db.prepare(sql).get().n;
     const totals = {
       users: n('SELECT COUNT(*) n FROM users WHERE company_id IS NULL'),
-      people: n('SELECT COUNT(*) n FROM users'),
-      active30: n("SELECT COUNT(*) n FROM users WHERE last_login_at >= datetime('now', '-30 days')"),
-      new30: n("SELECT COUNT(*) n FROM users WHERE created_at >= datetime('now', '-30 days')"),
+      people: n('SELECT COUNT(*) n FROM users WHERE is_agency = 0'),
+      active30: n("SELECT COUNT(*) n FROM users WHERE is_agency = 0 AND last_login_at >= datetime('now', '-30 days')"),
+      new30: n("SELECT COUNT(*) n FROM users WHERE is_agency = 0 AND created_at >= datetime('now', '-30 days')"),
       suspended: n("SELECT COUNT(*) n FROM users WHERE status = 'suspended'"),
       onlineNow: n("SELECT COUNT(DISTINCT user_id) n FROM sessions WHERE expires_at > datetime('now')"),
       properties: n('SELECT COUNT(*) n FROM properties'),
@@ -84,10 +84,10 @@ module.exports = function adminRoutes(db, config) {
   router.get('/accounts', (req, res) => {
     // What each person types to sign in. Passwords are hashed and can't be shown.
     const logins = db.prepare(
-      `SELECT m.id, m.name, m.login_name, m.status, m.last_login_at, m.company_id IS NULL AS is_main,
+      `SELECT m.id, m.name, m.login_name, m.status, m.last_login_at,
               c.id AS company_id, c.username, c.agency_name, c.status AS company_status
          FROM users m JOIN users c ON c.id = COALESCE(m.company_id, m.id)
-        WHERE c.is_admin = 0
+        WHERE c.is_admin = 0 AND m.is_agency = 0
         ORDER BY c.agency_name COLLATE NOCASE, m.company_id IS NOT NULL, m.name COLLATE NOCASE`
     ).all();
     const companies = db.prepare('SELECT id, username, agency_name FROM users WHERE company_id IS NULL AND is_admin = 0 ORDER BY agency_name COLLATE NOCASE').all();
@@ -142,9 +142,9 @@ module.exports = function adminRoutes(db, config) {
         return res.status(422).render('admin/new-user', { title: 'Add account', section: 'admin', values, errors, minPassword: MIN_PASSWORD });
       }
       db.prepare('INSERT INTO users (username, company_id, login_name, email, name, agency_name, password_hash) VALUES (?, ?, ?, ?, ?, ?, ?)')
-        .run(`${agency.username}.${values.login_name}`, agency.id, values.login_name, values.email || null, values.name, agency.agency_name, auth.hashPassword(password));
+        .run(personUsername(db, agency.username, values.login_name), agency.id, values.login_name, values.email || null, values.name, agency.agency_name, auth.hashPassword(password));
       const msg = `Added ${values.name} to ${agency.agency_name}. They sign in with agency "${agency.username}", name "${values.login_name}" and the password you chose.`;
-      return res.redirect(`/admin/users/${agency.id}?flash=${encodeURIComponent(msg)}#people`);
+      return res.redirect(`/admin/users/${agency.id}?flash=${encodeURIComponent(msg)}#users`);
     }
     if (!values.agency_name) values.agency_name = values.username;
     if (!USERNAME_RE.test(values.username)) errors.username = 'Enter the agency (up to 60 characters).';
@@ -160,111 +160,55 @@ module.exports = function adminRoutes(db, config) {
     if (Object.keys(errors).length) {
       return res.status(422).render('admin/new-user', { title: 'Add account', section: 'admin', values, errors, minPassword: MIN_PASSWORD });
     }
-    const info = db.prepare('INSERT INTO users (username, login_name, email, name, agency_name, password_hash) VALUES (?, ?, ?, ?, ?, ?)')
-      .run(values.username, values.login_name, values.email || null, values.name, values.agency_name, auth.hashPassword(password));
-    res.redirect(`/admin/users/${info.lastInsertRowid}?created=1`);
+    const { agencyId } = createAgency(db, {
+      username: values.username, agencyName: values.agency_name, contactName: values.name, email: values.email,
+      loginName: values.login_name, passwordHash: auth.hashPassword(password),
+    });
+    res.redirect(`/admin/users/${agencyId}?created=1`);
   });
 
+  // Agency details: its names, contact name, email, phone and address. A user's own details are
+  // edited on their own page. A name another agency uses is refused: this never joins two agencies.
   router.post('/users/:id/details', (req, res) => {
     const u = target(req, res);
     if (!u) return;
-    // The page has two boxes: Agency details (names, phone, address) and Users (the main login).
-    // Each sends only its own boxes; anything not sent stays as it is.
-    const section = req.body.section === 'agency' ? 'agency' : req.body.section === 'users' ? 'users' : '';
-    const anchor = section || 'details';
     const text = (k, max) => (k in req.body ? String(req.body[k] ?? '').trim().slice(0, max) : String(u[k] ?? ''));
     const values = {
       name: text('name', 200), agency_name: text('agency_name', 200),
       email: text('email', 254).toLowerCase(), phone: text('phone', 50), address: text('address', 1000),
-      login_name: text('login_name', 60) || u.login_name,
       username: text('username', 60) || u.username,
     };
-    let error = '';
-    // Keeping your own username (or only changing its capitals) is always fine.
+    const back = (key, msg) => res.redirect(`/admin/users/${u.id}?${key}=${encodeURIComponent(msg)}#agency`);
     const sameName = values.username.toLowerCase() === String(u.username).toLowerCase();
-    // Typing another agency's username moves this login (and anyone in it) into that agency.
-    const other = !sameName && !u.is_admin
-      ? db.prepare('SELECT * FROM users WHERE username = ? COLLATE NOCASE AND company_id IS NULL AND is_admin = 0 AND id != ?').get(values.username, u.id) : null;
-    // From the Agency details box a name that's taken is refused: editing the name never joins two agencies.
-    if (other && section === 'agency') return res.redirect(`/admin/users/${u.id}?error=${encodeURIComponent(`Another agency is already called "${values.username}". Pick a different name; changing the name never joins two agencies together.`)}#agency`);
-    if (other) return joinAgency(req, res, u, other, values);
-    // The username can be changed too (e.g. to fix its capitals); it stays unique ignoring case.
+    let error = '';
     if (u.is_admin && values.username !== u.username) error = 'The admin username is set in the server settings (ADMIN_USERNAME), so it can’t be changed here.';
-    else if (u.is_admin && values.login_name !== u.login_name) error = 'The admin sign-in name is set in the server settings (ADMIN_LOGIN_NAME), so it can’t be changed here.';
-    else if (!USERNAME_RE.test(values.username)) error = 'Enter a username (up to 60 characters).';
+    else if (!USERNAME_RE.test(values.username)) error = 'Enter the agency name (up to 60 characters).';
     else if (!sameName && (RESERVED_USERNAMES.has(values.username.toLowerCase()) || values.username.toLowerCase() === config.adminUsername.toLowerCase()
       || db.prepare('SELECT 1 FROM users WHERE username = ? COLLATE NOCASE AND id != ? AND (company_id IS NULL OR company_id != ?)').get(values.username, u.id, u.id))) {
-      error = 'That username is taken.';
-    }
-    if (error) return res.redirect(`/admin/users/${u.id}?error=${encodeURIComponent(error)}#${anchor}`);
-    if (!LOGIN_NAME_RE.test(values.login_name || '')) error = 'The sign-in name must be 1–30 letters, numbers, dashes or underscores.';
-    else if (db.prepare('SELECT 1 FROM users WHERE company_id = ? AND login_name = ? COLLATE NOCASE').get(u.id, values.login_name)) error = `Someone else at ${u.agency_name} already uses the name "${values.login_name}".`;
+      error = `Another agency is already called "${values.username}". Pick a different name; changing the name never joins two agencies together.`;
+    } else if (!values.agency_name) error = 'Enter the company name.';
     else if (!values.name) error = 'Enter the contact name.';
-    else if (!values.agency_name) error = 'Enter the company name.';
     else if (values.email && !EMAIL_RE.test(values.email)) error = 'Enter a valid email address, or leave it blank.';
-    // A new password, if one was typed (blank keeps the current one).
-    const password = String(req.body.password || '');
-    if (!error && password && (password.length < MIN_PASSWORD || password.length > 200)) error = `The new password must be at least ${MIN_PASSWORD} characters.`;
-    if (!error && password) error = auth.weakPassword(password, [values.username, values.agency_name, values.name, values.login_name]) || null;
-    if (error) return res.redirect(`/admin/users/${u.id}?error=${encodeURIComponent(error)}#${anchor}`);
-    db.prepare('UPDATE users SET name = ?, agency_name = ?, email = ?, phone = ?, address = ?, login_name = ?, username = ? WHERE id = ?')
-      .run(values.name, values.agency_name, values.email || null, values.phone || null, values.address || null, values.login_name, values.username, u.id);
-    if (password) {
-      db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(auth.hashPassword(password), u.id);
-      if (u.id !== req.user.id) db.prepare('DELETE FROM sessions WHERE user_id = ?').run(u.id);
-    }
-    // People inside the company carry the company username in their own record.
-    db.prepare("UPDATE users SET username = ? || '.' || login_name, agency_name = ? WHERE company_id = ?").run(values.username, values.agency_name, u.id);
-    res.redirect(`/admin/users/${u.id}?flash=${encodeURIComponent(password ? `Account details and password saved.${u.id !== req.user.id ? ' They have been signed out and must use the new password.' : ''}` : section === 'agency' ? 'Agency details saved.' : section === 'users' ? 'Main login saved.' : 'Account details saved.')}#${anchor}`);
-  });
-
-  // Every table holding a company's records (anything with an account_id).
-  const accountTables = () => db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all().map(t => t.name)
-    .filter(t => db.prepare(`PRAGMA table_info(${t})`).all().some(c => c.name === 'account_id'));
-
-  // Moves company account u into agency `other`: u and its people become people of `other`,
-  // keeping their own names and passwords. Only for an account with no records of its own,
-  // since those would no longer be reachable.
-  function joinAgency(req, res, u, other, values) {
-    const back = (msg) => res.redirect(`/admin/users/${u.id}?error=${encodeURIComponent(msg)}#agency`);
-    if (accountTables().some(t => db.prepare(`SELECT 1 FROM ${t} WHERE account_id = ? LIMIT 1`).get(u.id))) {
-      return back(`${u.agency_name} already has its own records (landlords, properties, settings or similar), so it can't be moved into ${other.agency_name}: they would be lost. Add this person to ${other.agency_name} with Add account instead, or delete this account first.`);
-    }
-    if (!LOGIN_NAME_RE.test(values.login_name || '')) return back('The sign-in name must be 1–30 letters, numbers, dashes or underscores.');
-    const movers = [{ ...u, login_name: values.login_name }, ...db.prepare('SELECT * FROM users WHERE company_id = ?').all(u.id)];
-    const names = movers.map(m => m.login_name.toLowerCase());
-    const clash = movers.find((m, i) => names.indexOf(names[i]) !== i
-      || db.prepare('SELECT 1 FROM users WHERE (company_id = ? OR id = ?) AND login_name = ? COLLATE NOCASE').get(other.id, other.id, m.login_name));
-    if (clash) return back(`${other.agency_name} already has someone signing in as "${clash.login_name}". Change the name first, then try again.`);
-    const password = String(req.body.password || '');
-    if (password && (password.length < MIN_PASSWORD || password.length > 200)) return back(`The new password must be at least ${MIN_PASSWORD} characters.`);
-    const weak = password && auth.weakPassword(password, [other.username, other.agency_name, values.name, values.login_name]);
-    if (weak) return back(weak);
-    if (values.email && !EMAIL_RE.test(values.email)) return back('Enter a valid email address, or leave it blank.');
-    const ids = movers.map(m => m.id);
+    if (error) return back('error', error);
     db.exec('BEGIN');
     try {
-      db.prepare('UPDATE users SET name = ?, email = ?, phone = ?, login_name = ? WHERE id = ?')
-        .run(values.name || values.login_name, values.email || null, values.phone || null, values.login_name, u.id);
-      if (password) db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(auth.hashPassword(password), u.id);
-      // People first (they point at u), then u itself.
-      for (const id of [...ids.slice(1), u.id]) {
-        db.prepare("UPDATE users SET company_id = ?, agency_name = ?, address = NULL, username = ? || '.' || login_name WHERE id = ?").run(other.id, other.agency_name, other.username, id);
+      db.prepare('UPDATE users SET name = ?, agency_name = ?, email = ?, phone = ?, address = ?, username = ? WHERE id = ?')
+        .run(values.name, values.agency_name, values.email || null, values.phone || null, values.address || null, values.username, u.id);
+      // Its users carry the agency's names in their own records.
+      for (const m of db.prepare('SELECT id, login_name FROM users WHERE company_id = ?').all(u.id)) {
+        db.prepare('UPDATE users SET username = ?, agency_name = ? WHERE id = ?').run(personUsername(db, values.username, m.login_name, m.id), values.agency_name, m.id);
       }
-      db.prepare(`DELETE FROM sessions WHERE user_id IN (${ids.map(() => '?').join(',')})`).run(...ids);
       db.exec('COMMIT');
     } catch (err) { db.exec('ROLLBACK'); throw err; }
-    const who = movers.map(m => m.id === u.id ? (values.name || values.login_name) : m.name).join(', ');
-    const msg = `Moved ${who} into ${other.agency_name}. They now sign in with agency "${other.username}", their own name and their own password.`;
-    res.redirect(`/admin/users/${other.id}?flash=${encodeURIComponent(msg)}#people`);
-  }
+    back('flash', sameName || u.is_admin ? 'Agency details saved.' : `Agency details saved. Everyone at ${values.agency_name} now types "${values.username}" in the Agency box when they sign in.`);
+  });
 
   // Rename an agency: the name everyone types in the Agency box and the company name on statements,
-  // for the account and everyone in it. It never moves the account or touches its records.
+  // for the agency and everyone in it. It never moves the agency or touches its records.
   router.post('/users/:id/rename', (req, res) => {
     const u = target(req, res);
     if (!u) return;
-    const back = (key, msg) => res.redirect(`/admin/users/${u.id}?${key}=${encodeURIComponent(msg)}#rename`);
+    const back = (key, msg) => res.redirect(`/admin/users/${u.id}?${key}=${encodeURIComponent(msg)}#agency`);
     if (u.is_admin) return back('error', 'The admin account’s name is set in the server settings, so it can’t be renamed here.');
     const name = String(req.body.new_name || '').trim().replace(/\s+/g, ' ').slice(0, 60);
     if (!name || !USERNAME_RE.test(name)) return back('error', 'Enter the new agency name (up to 60 characters).');
@@ -276,16 +220,19 @@ module.exports = function adminRoutes(db, config) {
     db.exec('BEGIN');
     try {
       db.prepare('UPDATE users SET username = ?, agency_name = ? WHERE id = ?').run(name, name, u.id);
-      // People inside the company carry the company's names in their own records.
-      db.prepare("UPDATE users SET username = ? || '.' || login_name, agency_name = ? WHERE company_id = ?").run(name, name, u.id);
+      for (const m of db.prepare('SELECT id, login_name FROM users WHERE company_id = ?').all(u.id)) {
+        db.prepare('UPDATE users SET username = ?, agency_name = ? WHERE id = ?').run(personUsername(db, name, m.login_name, m.id), name, m.id);
+      }
       db.exec('COMMIT');
     } catch (err) { db.exec('ROLLBACK'); throw err; }
     back('flash', `Renamed ${u.agency_name} to ${name}. Everyone there now types "${name}" in the Agency box when they sign in. All their records are unchanged.`);
   });
 
+  // The admin's own password (agencies don't sign in; each user's password is on their own page).
   router.post('/users/:id/password', (req, res) => {
     const u = target(req, res);
     if (!u) return;
+    if (!u.is_admin) return res.redirect(`/admin/users/${u.id}?error=${encodeURIComponent('An agency has no password of its own. Change a user’s password under Users.')}#users`);
     const password = String(req.body.password || '');
     if (password.length < MIN_PASSWORD || password.length > 200) {
       return res.redirect(`/admin/users/${u.id}?error=` + encodeURIComponent(password ? `The new password must be at least ${MIN_PASSWORD} characters.` : 'Type a new password first, or click Suggest.') + '#users');
@@ -293,8 +240,7 @@ module.exports = function adminRoutes(db, config) {
     const weak = auth.weakPassword(password, [u.username, u.agency_name, u.name, u.login_name]);
     if (weak) return res.redirect(`/admin/users/${u.id}?error=${encodeURIComponent(weak)}#users`);
     db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(auth.hashPassword(password), u.id);
-    if (u.id !== req.user.id) db.prepare('DELETE FROM sessions WHERE user_id = ?').run(u.id);
-    res.redirect(`/admin/users/${u.id}?flash=` + encodeURIComponent(`Password changed for @${u.username}.` + (u.id !== req.user.id ? ' They have been signed out and must use the new password.' : '')) + '#users');
+    res.redirect(`/admin/users/${u.id}?flash=` + encodeURIComponent('Password changed.') + '#users');
   });
 
   // ---------- people inside a company (only the admin adds them) ----------
@@ -302,12 +248,12 @@ module.exports = function adminRoutes(db, config) {
   router.post('/users/:id/people', (req, res) => {
     const u = target(req, res);
     if (!u) return;
-    addPerson(req, u, (msg, ok) => res.redirect(`/admin/users/${u.id}?${ok ? 'flash' : 'error'}=${encodeURIComponent(msg)}#people`));
+    addPerson(req, u, (msg, ok) => res.redirect(`/admin/users/${u.id}?${ok ? 'flash' : 'error'}=${encodeURIComponent(msg)}#users`));
   });
 
   // The same, from the Account details page: the agency is picked from a list.
   router.post('/accounts/people', (req, res) => {
-    const back = (msg, ok) => res.redirect(`/admin/accounts?${ok ? 'flash' : 'error'}=${encodeURIComponent(msg)}#people`);
+    const back = (msg, ok) => res.redirect(`/admin/accounts?${ok ? 'flash' : 'error'}=${encodeURIComponent(msg)}#users`);
     const id = Number(req.body.company_id);
     const u = Number.isInteger(id) && db.prepare(`${USAGE_SQL} WHERE u.id = ? AND u.company_id IS NULL AND u.is_admin = 0`).get(id);
     if (!u) return back('Choose which agency they work for.');
@@ -325,7 +271,7 @@ module.exports = function adminRoutes(db, config) {
     const weak = auth.weakPassword(password, [u.username, u.agency_name, name, loginName]);
     if (weak) return back(weak);
     db.prepare('INSERT INTO users (username, company_id, login_name, name, agency_name, password_hash) VALUES (?, ?, ?, ?, ?, ?)')
-      .run(`${u.username}.${loginName}`, u.id, loginName, name, u.agency_name, auth.hashPassword(password));
+      .run(personUsername(db, u.username, loginName), u.id, loginName, name, u.agency_name, auth.hashPassword(password));
     back(`Added ${name} to ${u.agency_name}. They sign in with username "${u.username}", name "${loginName}" and the password you chose.`, true);
   }
 
@@ -340,7 +286,7 @@ module.exports = function adminRoutes(db, config) {
     const m = person(req, res);
     if (!m) return;
     const password = String(req.body.password || '');
-    const back = (msg, ok) => res.redirect(`/admin/users/${m.company_id}?${ok ? 'flash' : 'error'}=${encodeURIComponent(msg)}#people`);
+    const back = (msg, ok) => res.redirect(`/admin/users/${m.company_id}?${ok ? 'flash' : 'error'}=${encodeURIComponent(msg)}#users`);
     if (password.length < MIN_PASSWORD || password.length > 200) return back(`The new password must be at least ${MIN_PASSWORD} characters.`);
     const weak = auth.weakPassword(password, [m.username, m.agency_name, m.name, m.login_name]);
     if (weak) return back(weak);
@@ -350,14 +296,14 @@ module.exports = function adminRoutes(db, config) {
   });
 
   // Editing one person's login: their name, sign-in name, email and (optionally) password.
-  function renderPerson(res, m, values, error, status = 200) {
+  function renderPerson(res, m, values, error, status = 200, from = '') {
     const company = db.prepare('SELECT id, username, agency_name FROM users WHERE id = ?').get(m.company_id);
-    res.status(status).render('admin/person', { title: `Edit ${m.name}`, section: 'accounts', m, company, values, error, minPassword: MIN_PASSWORD });
+    res.status(status).render('admin/person', { title: `Edit ${m.name}`, section: from === 'agency' ? 'admin' : 'accounts', m, company, values, error, minPassword: MIN_PASSWORD, from });
   }
 
   router.get('/people/:pid/edit', (req, res) => {
     const m = person(req, res);
-    if (m) renderPerson(res, m, m, '');
+    if (m) renderPerson(res, m, m, '', 200, req.query.from === 'agency' ? 'agency' : '');
   });
 
   router.post('/people/:pid/edit', (req, res) => {
@@ -378,26 +324,32 @@ module.exports = function adminRoutes(db, config) {
     } else if (values.email && !EMAIL_RE.test(values.email)) error = 'Enter a valid email address, or leave it blank.';
     else if (password && (password.length < MIN_PASSWORD || password.length > 200)) error = `The new password must be at least ${MIN_PASSWORD} characters.`;
     else if (password) error = auth.weakPassword(password, [company.username, company.agency_name, values.name, values.login_name]) || '';
-    if (error) return renderPerson(res, m, values, error, 422);
+    if (error) return renderPerson(res, m, values, error, 422, req.body.back === 'agency' ? 'agency' : '');
     db.prepare('UPDATE users SET name = ?, login_name = ?, email = ?, username = ? WHERE id = ?')
-      .run(values.name, values.login_name, values.email || null, `${company.username}.${values.login_name}`, m.id);
+      .run(values.name, values.login_name, values.email || null, personUsername(db, company.username, values.login_name, m.id), m.id);
     if (password) {
       db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(auth.hashPassword(password), m.id);
       db.prepare('DELETE FROM sessions WHERE user_id = ?').run(m.id);
     }
     const msg = `Saved ${values.name}'s details.${password ? ' They have been signed out and must use the new password.' : ''}`;
-    res.redirect(`/admin/accounts?flash=${encodeURIComponent(msg)}`);
+    res.redirect(req.body.back === 'agency' ? `/admin/users/${company.id}?flash=${encodeURIComponent(msg)}#users` : `/admin/accounts?flash=${encodeURIComponent(msg)}`);
   });
 
   router.post('/people/:pid/:change(suspend|activate|delete)', (req, res) => {
     const m = person(req, res);
     if (!m) return;
     const change = req.params.change;
+    // An agency always keeps at least one user who can sign in.
+    const others = db.prepare("SELECT COUNT(*) n FROM users WHERE company_id = ? AND id != ? AND status = 'active'").get(m.company_id, m.id).n;
+    const company = db.prepare('SELECT is_admin FROM users WHERE id = ?').get(m.company_id);
+    if (change !== 'activate' && !others && !(company && company.is_admin)) {
+      return res.redirect(`/admin/users/${m.company_id}?error=${encodeURIComponent(`${m.name} is the only user at this agency who can sign in. Add someone else first, or suspend or delete the whole agency at the top of the page.`)}#users`);
+    }
     if (change === 'delete') db.prepare('DELETE FROM users WHERE id = ?').run(m.id);
     else db.prepare('UPDATE users SET status = ? WHERE id = ?').run(change === 'suspend' ? 'suspended' : 'active', m.id);
     if (change !== 'activate') db.prepare('DELETE FROM sessions WHERE user_id = ?').run(m.id);
     const done = { suspend: 'Suspended', activate: 'Reactivated', delete: 'Removed' }[change];
-    res.redirect(`/admin/users/${m.company_id}?flash=${encodeURIComponent(`${done} ${m.name}.`)}#people`);
+    res.redirect(`/admin/users/${m.company_id}?flash=${encodeURIComponent(`${done} ${m.name}.`)}#users`);
   });
 
   // Tab access: every person at every company against every tab, in one grid.
@@ -406,7 +358,7 @@ module.exports = function adminRoutes(db, config) {
     const people = db.prepare(
       `SELECT m.id, m.name, m.login_name, m.status, m.hidden_tabs, m.company_id, c.id AS cid, c.username, c.agency_name
          FROM users m JOIN users c ON c.id = COALESCE(m.company_id, m.id)
-        WHERE c.is_admin = 0 ${Number.isInteger(companyId) && companyId > 0 ? 'AND c.id = ' + companyId : ''}
+        WHERE c.is_admin = 0 AND m.is_agency = 0 ${Number.isInteger(companyId) && companyId > 0 ? 'AND c.id = ' + companyId : ''}
         ORDER BY c.agency_name COLLATE NOCASE, c.id, m.company_id IS NOT NULL, m.name COLLATE NOCASE`
     ).all().map((m) => ({ ...m, hidden: tabs.parseHidden(m.hidden_tabs) }));
     const companies = db.prepare('SELECT id, agency_name, username FROM users WHERE company_id IS NULL AND is_admin = 0 ORDER BY agency_name COLLATE NOCASE').all();
@@ -440,7 +392,7 @@ module.exports = function adminRoutes(db, config) {
     const hidden = tabs.TABS.map((t) => t.key).filter((k) => !chosen.has(k));
     db.prepare('UPDATE users SET hidden_tabs = ? WHERE id = ?').run(hidden.length ? JSON.stringify(hidden) : null, m.id);
     const shown = tabs.TABS.length - hidden.length;
-    res.redirect(`/admin/users/${u.id}?flash=${encodeURIComponent(`${m.name} now sees ${shown === tabs.TABS.length ? 'all tabs' : `${shown} of ${tabs.TABS.length} tabs`}.`)}#people`);
+    res.redirect(`/admin/users/${u.id}?flash=${encodeURIComponent(`${m.name} now sees ${shown === tabs.TABS.length ? 'all tabs' : `${shown} of ${tabs.TABS.length} tabs`}.`)}#users`);
   });
 
   // Everything one agency has stored, as a JSON file (admin only).
@@ -465,7 +417,7 @@ module.exports = function adminRoutes(db, config) {
     if (!u) return;
     const people = db.prepare(
       `SELECT m.*, (SELECT MAX(created_at) FROM activity_log WHERE user_id = m.id) AS last_active
-         FROM users m WHERE m.id = ? OR m.company_id = ? ORDER BY m.company_id IS NOT NULL, m.name COLLATE NOCASE`
+         FROM users m WHERE (m.id = ? OR m.company_id = ?) AND m.is_agency = 0 ORDER BY m.company_id IS NOT NULL, m.name COLLATE NOCASE`
     ).all(u.id, u.id);
     const logins = db.prepare(
       `SELECT e.*, m.name AS person_name, m.login_name FROM login_events e JOIN users m ON m.id = e.user_id
