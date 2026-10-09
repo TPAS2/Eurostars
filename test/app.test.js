@@ -3377,6 +3377,38 @@ test('council invoices: the same email box, as a folding section under the month
   assert.doesNotMatch((await c.get('/app/rent-run?month=2026-09')).text, /council@example\.com/);
 });
 
+test('email box presets (Rent run 5.2 and Council Invoices): save, fill in, replace and remove', async () => {
+  const c = await registerAndLogin('email-presets@example.com', 'Email Presets Lets');
+  const a = db.prepare("SELECT id FROM users WHERE username = 'email-presets'").get().id;
+  await c.get('/app/rent-run?month=2026-09');
+  let r = await c.post('/app/rent-run/email-presets', { month: '2026-09', preset_name: 'Metro Bank', from: 'office@example.com', to: 'bank@example.com', cc: 'me@example.com', subject: 'Bulk payment', message: 'Please find attached.' }, { multipart: true });
+  assert.match(decodeURIComponent(r.location), /Saved the email preset “Metro Bank”/);
+  r = await c.get('/app/rent-run?month=2026-09');
+  assert.match(r.text, /data-email-preset-pick[\s\S]*?<option value="\d+" data-preset="[^"]*bank@example\.com[^"]*">Metro Bank<\/option>/);
+  assert.match(r.text, /Presets \(1\)/);
+  // Saving with the same name replaces it.
+  await c.post('/app/rent-run/email-presets', { month: '2026-09', preset_name: 'Metro Bank', to: 'payments@example.com', subject: 'Bulk payment v2' }, { multipart: true });
+  const presets = db.prepare('SELECT page, name, data_json FROM email_presets WHERE account_id = ?').all(a);
+  assert.equal(presets.length, 1);
+  assert.equal(JSON.parse(presets[0].data_json).to, 'payments@example.com');
+  // Council Invoices keeps its own.
+  await c.get('/app/council-invoices?month=2026-09');
+  await c.post('/app/council-invoices/email-presets', { month: '2026-09', preset_name: 'Made-up Council', to: 'council@example.com', subject: 'Invoices' }, { multipart: true });
+  assert.match((await c.get('/app/council-invoices?month=2026-09')).text, />Made-up Council<\/option>/);
+  assert.doesNotMatch((await c.get('/app/council-invoices?month=2026-09')).text, />Metro Bank<\/option>/);
+  // A name is needed; remove works; another company can't remove ours.
+  r = await c.post('/app/rent-run/email-presets', { month: '2026-09', preset_name: '' }, { multipart: true });
+  assert.match(decodeURIComponent(r.location), /Give the email preset a name/);
+  const id = db.prepare("SELECT id FROM email_presets WHERE account_id = ? AND name = 'Metro Bank'").get(a).id;
+  const other = await registerAndLogin('email-presets-2@example.com', 'Other Presets Lets');
+  await other.get('/app/rent-run');
+  assert.equal((await other.post(`/app/rent-run/email-presets/${id}/delete`, { month: '2026-09' })).status, 404);
+  await c.get('/app/rent-run?month=2026-09');
+  r = await c.post(`/app/rent-run/email-presets/${id}/delete`, { month: '2026-09' });
+  assert.match(decodeURIComponent(r.location), /Removed the email preset “Metro Bank”/);
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM email_presets WHERE account_id = ?').get(a).n, 1);
+});
+
 test('tenants list is in tenancy number order, not name order', async () => {
   const c = await registerAndLogin('tenancy-order@example.com', 'Tenancy Order Lets');
   const prop = idFrom((await c.post('/app/properties', { address_line1: '3 Order Row', status: 'let' })).location);

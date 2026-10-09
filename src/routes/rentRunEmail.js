@@ -29,6 +29,27 @@ module.exports = function rentRunEmailRoutes(db, mailer, { page = 'rent-run' } =
   const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_FILE_BYTES, files: MAX_FILES, fields: 20 } }).array('files', MAX_FILES);
   const sent = new Map(); // account → times of recent sends
 
+  // Presets: save what's in the email boxes under a name (the same name replaces it), or remove one.
+  const PRESET_FIELDS = { from: 254, to: 2000, cc: 2000, bcc: 2000, subject: 300, message: 20000 };
+  const formOnly = (req, res, next) => upload(req, res, () => { req.body = req.body || {}; auth.checkCsrfAfterUpload(req, res, next); });
+  router.post('/email-presets', formOnly, (req, res) => {
+    const month = st.isMonth(req.body.month) ? String(req.body.month) : fmt.today().slice(0, 7);
+    const back = (key, msg) => res.redirect(`/app/${page}?month=${month}&${key}=${encodeURIComponent(msg)}#send-email`);
+    const name = String(req.body.preset_name || '').replace(/[\r\n]+/g, ' ').trim().slice(0, 60);
+    if (!name) return back('error', 'Give the email preset a name.');
+    const data = Object.fromEntries(Object.entries(PRESET_FIELDS).map(([k, max]) => [k, String(req.body[k] || '').slice(0, max)]));
+    db.prepare(`INSERT INTO email_presets (account_id, page, name, data_json) VALUES (?, ?, ?, ?)
+      ON CONFLICT (account_id, page, name) DO UPDATE SET data_json = excluded.data_json`).run(req.user.id, page, name, JSON.stringify(data));
+    back('flash', `Saved the email preset “${name}”.`);
+  });
+  router.post('/email-presets/:pid(\\d+)/delete', (req, res) => {
+    const month = st.isMonth(req.body.month) ? String(req.body.month) : fmt.today().slice(0, 7);
+    const p = db.prepare('SELECT id, name FROM email_presets WHERE id = ? AND account_id = ? AND page = ?').get(Number(req.params.pid), req.user.id, page);
+    if (!p) return res.status(404).render('error', { title: 'Not found', message: 'That email preset was not found.' });
+    db.prepare('DELETE FROM email_presets WHERE id = ? AND account_id = ?').run(p.id, req.user.id);
+    res.redirect(`/app/${page}?month=${month}&flash=${encodeURIComponent(`Removed the email preset “${p.name}”.`)}#send-email`);
+  });
+
   router.post('/send-email', (req, res, next) => {
     upload(req, res, (err) => {
       if (err) {
@@ -99,6 +120,8 @@ module.exports.emailOutFor = (db, mailer, { accountId, personId, page, month, su
   return {
     from: senderFor(db, mailer, accountId).from || (me && me.email) || mailer.defaultFrom || '',
     subject,
+    presets: db.prepare('SELECT id, name, data_json FROM email_presets WHERE account_id = ? AND page = ? ORDER BY name COLLATE NOCASE').all(accountId, page)
+      .map((x) => ({ id: x.id, name: x.name, data: JSON.parse(x.data_json) })),
     sent: db.prepare(`SELECT e.*, u.name AS sent_by_name FROM rentrun_emails e LEFT JOIN users u ON u.id = e.sent_by
       WHERE e.account_id = ? AND COALESCE(e.page, 'rent-run') = ? AND e.month = ? ORDER BY e.sent_at DESC, e.id DESC`).all(accountId, page, month),
   };

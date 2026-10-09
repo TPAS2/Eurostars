@@ -816,6 +816,23 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 })();
 
+// Email box (Rent run 5.2, Council Invoices): "Fill in" copies the chosen email preset into the boxes.
+(function () {
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-email-preset-fill]');
+    if (!btn) return;
+    const pick = document.querySelector('[data-email-preset-pick]');
+    const opt = pick && pick.selectedOptions[0];
+    if (!opt || !opt.dataset.preset) { if (pick) pick.focus(); return; }
+    const data = JSON.parse(opt.dataset.preset);
+    const form = document.querySelector(btn.dataset.emailPresetFill);
+    for (const [k, v] of Object.entries(data)) {
+      const el = form && form.elements[k];
+      if (el && v) el.value = v;
+    }
+  });
+})();
+
 // Rent run step 5: the total in figures always reads like £5,000-00, and typing it fills in
 // the total in words.
 document.addEventListener('DOMContentLoaded', () => {

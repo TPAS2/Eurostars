@@ -619,6 +619,15 @@ function openDatabase(file) {
     sent_at    TEXT NOT NULL DEFAULT (datetime('now'))
   )`);
   addColumnIfMissing(db, 'rentrun_emails', 'page', "TEXT NOT NULL DEFAULT 'rent-run'"); // or 'council-invoices'
+  // Saved email boxes (From, To, Cc, Bcc, Subject, Message) to fill the email in one click.
+  db.exec(`CREATE TABLE IF NOT EXISTS email_presets (
+    id         INTEGER PRIMARY KEY,
+    account_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    page       TEXT NOT NULL,
+    name       TEXT NOT NULL,
+    data_json  TEXT NOT NULL,
+    UNIQUE (account_id, page, name)
+  )`);
   // Months the automatic statement job has already done for each company, so statements deleted
   // afterwards aren't made again. Companies already using statements count last month as done.
   db.exec(`CREATE TABLE IF NOT EXISTS statement_auto_runs (

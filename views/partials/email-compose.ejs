@@ -2,7 +2,36 @@
 <details class="<%= detailsClass %>" id="send-email">
   <summary><h2><%- title %></h2></summary>
   <p class="muted"><%= intro %><% if (!emailEnabled) { %> <strong class="warn-text">Email isn’t set up yet.</strong><% } %></p>
-  <form method="post" action="<%= action %>" enctype="multipart/form-data" class="mail-compose" data-busy="Sending…" data-no-keep>
+<% const presetBase = action.replace(/\/send-email$/, ''); %>
+  <div class="presets-bar">
+    <label for="email-preset-pick" class="strong">Preset</label>
+    <select id="email-preset-pick" data-email-preset-pick>
+      <option value="">Choose a preset…</option>
+      <% emailOut.presets.forEach(p => { %><option value="<%= p.id %>" data-preset="<%= JSON.stringify(p.data) %>"><%= p.name %></option><% }) %>
+    </select>
+    <button class="btn small primary" type="button" data-email-preset-fill="#email-compose-form">Fill in</button>
+    <button class="btn small" type="button" data-toggle="#email-preset-manage" aria-controls="email-preset-manage" aria-expanded="false">Presets (<%= emailOut.presets.length %>)</button>
+  </div>
+  <div id="email-preset-manage" class="metro-docs" hidden>
+    <h3>Email presets</h3>
+    <p class="muted small">Ready-made emails (who it's to, the subject and message) to fill in with one click. Fill in the boxes below, then save them as a preset; saving with the same name replaces it.</p>
+    <% if (emailOut.presets.length) { %>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Name</th><th>To</th><th>Subject</th><th></th></tr></thead>
+      <tbody>
+      <% emailOut.presets.forEach(p => { %><tr>
+        <td><strong><%= p.name %></strong></td><td><%= p.data.to %></td><td><%= p.data.subject %></td>
+        <td class="num nowrap"><form method="post" action="<%= presetBase %>/email-presets/<%= p.id %>/delete" class="inline" data-confirm="Remove the email preset <%= p.name %>?"><%- include('csrf') %><input type="hidden" name="month" value="<%= month %>"><button class="btn small link" type="submit">Remove</button></form></td>
+      </tr><% }) %>
+      </tbody>
+    </table></div>
+    <% } %>
+    <div class="inline-form preset-save">
+      <input form="email-compose-form" name="preset_name" placeholder="Preset name, e.g. Metro Bank payments" maxlength="60" aria-label="Email preset name">
+      <button form="email-compose-form" class="btn small" type="submit" formaction="<%= presetBase %>/email-presets" formnovalidate>Save boxes as preset</button>
+    </div>
+  </div>
+  <form method="post" action="<%= action %>" enctype="multipart/form-data" class="mail-compose" id="email-compose-form" data-busy="Sending…" data-no-keep>
     <%- include('csrf') %>
     <input type="hidden" name="month" value="<%= month %>">
     <div class="mail-head">
