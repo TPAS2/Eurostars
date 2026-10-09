@@ -1469,3 +1469,8 @@ td.nowrap-lines span { display: block; white-space: nowrap; }
 .mail-attach { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
 .mail-attach svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .mail-compose + .muted, #send-email > .muted.small { margin-top: 6px; }
+
+/* Contractor invoice: change the paid date. */
+.paid-date-form { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 10px 0 6px; }
+.paid-date-form label { font-weight: 600; }
+.paid-date-form input { width: auto; }

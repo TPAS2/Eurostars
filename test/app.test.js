@@ -3343,6 +3343,26 @@ test('rent run 5.2: send an email with From, To, Cc, Bcc, subject, message and a
   assert.equal(sentMail.length, 1);
 });
 
+test('contractor invoices: change the paid date of a paid invoice', async () => {
+  const c = await registerAndLogin('paid-date@example.com', 'Paid Date Lets');
+  await c.get('/app/invoices/new');
+  const id = idFrom((await c.post('/app/invoices', await invoiceBody(c, { supplier: 'Made-up Fixers', amount: '75', invoice_date: '2026-09-01', file: new File([Buffer.from('%PDF-1.4\n%x\n')], 'i.pdf') }), { multipart: true })).location);
+  await c.get(`/app/invoices/${id}`);
+  await c.post(`/app/invoices/${id}/pay`, { paid_date: '2026-09-10', payment_method: 'Card' });
+  let r = await c.get(`/app/invoices/${id}`);
+  assert.match(r.text, new RegExp(`action="/app/invoices/${id}/paid-date"[\\s\\S]*?name="paid_date" value="2026-09-10"`));
+  r = await c.post(`/app/invoices/${id}/paid-date`, { paid_date: '2026-09-14' });
+  assert.match(decodeURIComponent(r.location), /Paid date changed to 14\/09\/2026/);
+  assert.equal(db.prepare('SELECT paid_date FROM invoices WHERE id = ?').get(id).paid_date, '2026-09-14');
+  r = await c.post(`/app/invoices/${id}/paid-date`, { paid_date: 'soon' });
+  assert.match(decodeURIComponent(r.location), /Enter a valid paid date/);
+  assert.equal(db.prepare('SELECT paid_date FROM invoices WHERE id = ?').get(id).paid_date, '2026-09-14');
+  // Another company can't change it.
+  const other = await registerAndLogin('paid-date-2@example.com', 'Other Paid Lets');
+  await other.get('/app/invoices');
+  assert.equal((await other.post(`/app/invoices/${id}/paid-date`, { paid_date: '2026-01-01' })).status, 404);
+});
+
 test('tenants list is in tenancy number order, not name order', async () => {
   const c = await registerAndLogin('tenancy-order@example.com', 'Tenancy Order Lets');
   const prop = idFrom((await c.post('/app/properties', { address_line1: '3 Order Row', status: 'let' })).location);

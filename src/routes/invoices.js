@@ -344,6 +344,22 @@ module.exports = function invoiceRoutes(db, config) {
     });
   }
 
+  // Change the date a paid invoice was paid (and the date of any older landlord charge with it).
+  router.post('/:id/paid-date', (req, res) => {
+    const inv = loadInvoice(req, res);
+    if (!inv) return;
+    const a = req.user.id;
+    const back = (key, msg) => res.redirect(`/app/invoices/${inv.id}?${key}=${encodeURIComponent(msg)}#pay`);
+    if (inv.status !== 'paid') return back('error', 'This invoice isn’t paid yet.');
+    const date = String(req.body.paid_date || '').trim();
+    if (!fmt.isIsoDate(date)) return back('error', 'Enter a valid paid date.');
+    transaction(db, () => {
+      db.prepare('UPDATE invoices SET paid_date = ? WHERE id = ? AND account_id = ?').run(date, inv.id, a);
+      if (inv.payment_txn_id) db.prepare('UPDATE transactions SET txn_date = ? WHERE id = ? AND account_id = ?').run(date, inv.payment_txn_id, a);
+    });
+    back('flash', `Paid date changed to ${fmt.ukDate(date)}.`);
+  });
+
   router.post('/:id/unpay', (req, res) => {
     const inv = loadInvoice(req, res);
     if (!inv) return;

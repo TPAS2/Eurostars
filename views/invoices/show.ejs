@@ -59,6 +59,12 @@
         <div><dt>Reference</dt><dd><%= inv.payment_reference || '—' %></dd></div>
         <% if (deduction && deduction.deduction_id) { %><div><dt>Deducted from landlord</dt><dd><span class="yes-no yes">Yes</span> <%= deduction.deducted_landlord || '' %> · <a href="<%= statementLink(deduction) %>">View statement</a> · <a href="/app/transactions/<%= inv.payment_txn_id %>">Transaction</a></dd></div><% } %>
       </dl>
+      <form method="post" action="/app/invoices/<%= inv.id %>/paid-date" class="inline-form paid-date-form" data-no-keep>
+        <%- include('../partials/csrf') %>
+        <label for="pd-date">Paid date</label>
+        <input id="pd-date" type="date" name="paid_date" value="<%= inv.paid_date %>" required>
+        <button class="btn small" type="submit">Change</button>
+      </form>
       <form method="post" action="/app/invoices/<%= inv.id %>/unpay" data-confirm="Undo this payment? The invoice will go back to unpaid and the landlord charge will be removed." class="spaced">
         <%- include('../partials/csrf') %><button class="btn small" type="submit">Undo payment</button>
       </form>
