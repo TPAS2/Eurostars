@@ -150,8 +150,8 @@ const ENTITIES = {
     order: "CASE WHEN code IS NULL OR code = '' THEN 1 ELSE 0 END, code COLLATE NOCASE, name COLLATE NOCASE",
     searchBar: true,
     fields: [
-      // Laid out three to a row: Name, Trade, Contractor code; Phone, Email, Notes.
-      { name: 'name', label: 'Name', type: 'text', required: true, help: 'Invoices from this supplier are matched by name.' },
+      // Laid out three to a row: Company, Trade, Contractor code; Phone, Email, Notes.
+      { name: 'name', label: 'Company', type: 'text', required: true, help: 'Invoices from this company are matched by its name.' },
       { name: 'trade', label: 'Trade', type: 'text', help: 'e.g. Plumber, Electrician, Roofer.' },
       { name: 'code', label: 'Contractor code', type: 'text', help: 'Filled in with the next number automatically; shown on job sheets.' },
       { name: 'phone', label: 'Phone', type: 'tel' },

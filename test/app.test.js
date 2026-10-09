@@ -2917,6 +2917,7 @@ test('properties tab: a Profit box beside the rent totals (council + tenant rent
 test('contractors: no Fax, Mobile or Address box; Name, Trade, Code / Phone, Email, Notes', async () => {
   const c = await registerAndLogin('no-fax@example.com', 'No Fax Lets');
   const form = (await c.get('/app/contractors/new')).text;
+  assert.match(form, /<label for="f-name">Company <span class="req">\*<\/span>/, 'Company, not Name');
   assert.doesNotMatch(form, /name="fax"|>Fax<|name="mobile"|>Mobile<|name="address"|>Address</, 'no Fax, Mobile or Address');
   // Name, Trade, Contractor code; then Phone, Email, Notes.
   const order = ['name', 'trade', 'code', 'phone', 'email', 'notes'].map((n) => form.indexOf(`name="${n}"`));
@@ -2951,7 +2952,7 @@ test('contractors list: Invoices, Total paid and Total unpaid are all time', asy
   const r = await c.get('/app/contractors');
   const heads = [...r.text.slice(r.text.indexOf('<thead'), r.text.indexOf('</thead>')).matchAll(/<th[^>]*>([^<]+)</g)].map((m) => m[1].trim()).filter(Boolean);
   assert.deepEqual(heads.slice(-3), ['Invoices (all time)', 'Total paid', 'Total unpaid'], 'the last two headings are Total paid and Total unpaid');
-  assert.deepEqual(heads.slice(0, 2), ['Contractor code', 'Name'], 'code to the left of the name');
+  assert.deepEqual(heads.slice(0, 2), ['Contractor code', 'Company'], 'code to the left of the company');
   assert.match(r.text, /C0001\s*<\/td>\s*<td[^>]*>\s*<a[^>]*>Made-up Roofing/, 'the name is still the link');
   assert.match(r.text, /Made-up Roofing[\s\S]*?>\s*3\s*<\/td>[\s\S]*?£125\.00[\s\S]*?£40\.00/);
 });
@@ -3193,7 +3194,7 @@ test('contractors: export to a CSV file and import it into another agency', asyn
   r = await one.get('/app/contractors/export.csv');
   assert.match(r.headers.get('content-type'), /text\/csv/);
   const csv = r.buf.toString('utf8');
-  assert.match(csv, /^\ufeffContractor code,Name,Trade,Phone,Mobile,Fax,Email,Address,Notes\r\n/);
+  assert.match(csv, /^\ufeffContractor code,Company,Trade,Phone,Mobile,Fax,Email,Address,Notes\r\n/);
   assert.match(csv, /C0001,Made-up Plumbing,Plumber,0100 000001,,,plumb@example\.com,,"Fast, ""reliable"", cheap"/);
   assert.match(csv, /C0002,'=Sneaky Formula,Roofer/, 'formula-looking names are made safe for spreadsheets');
 
@@ -3217,7 +3218,11 @@ test('contractors: export to a CSV file and import it into another agency', asyn
   // A file without a Name column is refused; the first agency's contractors are untouched.
   await two.get('/app/contractors');
   r = await two.post('/app/contractors/import', { file: new File(['Foo,Bar\n1,2\n'], 'x.csv') }, { multipart: true });
-  assert.match(decodeURIComponent(r.location), /no Name column/);
+  assert.match(decodeURIComponent(r.location), /no Company column/);
+  // An older file with a Name column still imports.
+  await two.get('/app/contractors');
+  r = await two.post('/app/contractors/import', { file: new File(['Name,Trade\nOld Style Glazing,Glazier\n'], 'old.csv') }, { multipart: true });
+  assert.match(decodeURIComponent(r.location), /1 new/);
   assert.equal(db.prepare("SELECT COUNT(*) n FROM contractors WHERE account_id = (SELECT id FROM users WHERE username = 'ctr-export')").get().n, 2);
 });
 

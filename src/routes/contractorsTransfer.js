@@ -12,7 +12,7 @@ const { csvCell } = require('../monthend');
 const MAX_BYTES = 1024 * 1024;
 const MAX_ROWS = 2000;
 const COLUMNS = [
-  ['code', 'Contractor code'], ['name', 'Name'], ['trade', 'Trade'], ['phone', 'Phone'], ['mobile', 'Mobile'],
+  ['code', 'Contractor code'], ['name', 'Company'], ['trade', 'Trade'], ['phone', 'Phone'], ['mobile', 'Mobile'],
   ['fax', 'Fax'], ['email', 'Email'], ['address', 'Address'], ['notes', 'Notes'],
 ];
 const LIMITS = { code: 30, name: 200, trade: 100, phone: 50, mobile: 50, fax: 50, email: 254, address: 500, notes: 2000 };
@@ -81,7 +81,8 @@ module.exports = function contractorsTransferRoutes(db) {
     const head = (rows.shift() || []).map((h) => String(h).trim().toLowerCase());
     // Columns by their heading (the export's, or the plain field names).
     const at = Object.fromEntries(COLUMNS.map(([c, h]) => [c, head.findIndex((x) => x === h.toLowerCase() || x === c)]));
-    if (at.name < 0) return back('error', 'That file has no Name column. Use a file exported from Contractors.');
+    if (at.name < 0) at.name = head.indexOf('name'); // files exported before the column was called Company
+    if (at.name < 0) return back('error', 'That file has no Company column. Use a file exported from Contractors.');
     if (rows.length > MAX_ROWS) return back('error', `That file has more than ${MAX_ROWS} contractors.`);
 
     let added = 0;
