@@ -3406,6 +3406,20 @@ test('admin agency page: Agency details then Users, both fold down; agency detai
   assert.match(decodeURIComponent(r.location), /Suspended/);
 });
 
+test('admin dashboard: an Agencies fold-down box listing every agency with an Edit button, then a Users box', async () => {
+  await registerAndLogin('dash-agency@example.com', 'Dash Agency Lets');
+  const id = db.prepare("SELECT id FROM users WHERE username = 'dash-agency'").get().id;
+  const admin = new Client();
+  await admin.login('admin', 'owner-password-123');
+  const page = (await admin.get('/admin')).text;
+  const box = page.slice(page.indexOf('<details class="card fold" id="agencies">'), page.indexOf('<details class="card fold" id="users"'));
+  assert.match(box, /<summary><h2>Agencies <span class="count">\d+<\/span><\/h2><\/summary>/, 'folded up to start');
+  assert.match(box, new RegExp(`Dash Agency Lets[\\s\\S]*?<code>dash-agency</code>[\\s\\S]*?href="/admin/users/${id}#agency">Edit</a>`));
+  assert.doesNotMatch(box, /<code>admin<\/code>/, 'the admin account is not an agency');
+  const person = db.prepare('SELECT id FROM users WHERE company_id = ?').get(id).id;
+  assert.match(page, new RegExp(`id="users"[\\s\\S]*?Test User[\\s\\S]*?Dash Agency Lets[\\s\\S]*?<code>dash-agency</code> \\+ <code>Test</code>[\\s\\S]*?href="/admin/people/${person}/edit\\?from=agency">Edit</a>`));
+});
+
 test('menu: a divider under Dashboard like between the other groups; contractors show a dash for nothing paid or unpaid', async () => {
   const c = await registerAndLogin('rail-split@example.com', 'Rail Split Lets');
   const page = (await c.get('/app')).text;

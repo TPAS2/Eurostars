@@ -45,20 +45,31 @@ module.exports = function adminRoutes(db, config) {
   router.get('/', (req, res) => {
     const q = String(req.query.q || '').trim().slice(0, 100);
     const status = ['active', 'suspended'].includes(req.query.status) ? req.query.status : '';
-    const where = ['u.company_id IS NULL'];
+    // Agencies: every agency (not the admin account), each with an Edit button.
+    const agencies = db.prepare(`${USAGE_SQL} WHERE u.company_id IS NULL AND u.is_admin = 0 ORDER BY u.agency_name COLLATE NOCASE`).all();
+    // Users: everyone who signs in at an agency, filtered by the search box.
+    const where = ['c.is_admin = 0', 'm.is_agency = 0'];
     const params = [];
     if (q) {
-      where.push('(u.username LIKE ? OR u.email LIKE ? OR u.name LIKE ? OR u.agency_name LIKE ?)');
-      params.push(`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`);
+      where.push('(m.name LIKE ? OR m.login_name LIKE ? OR m.email LIKE ? OR c.username LIKE ? OR c.agency_name LIKE ?)');
+      params.push(...Array(5).fill(`%${q}%`));
     }
-    if (status) { where.push('u.status = ?'); params.push(status); }
-    const users = db.prepare(`${USAGE_SQL} WHERE ${where.join(' AND ')} ORDER BY u.created_at DESC`).all(...params);
+    if (status) { where.push('m.status = ?'); params.push(status); }
+    const users = db.prepare(
+      `SELECT m.id, m.name, m.login_name, m.email, m.status, m.created_at, m.last_login_at, m.login_count,
+              c.id AS company_id, c.username, c.agency_name, c.status AS company_status,
+              (SELECT MAX(created_at) FROM activity_log WHERE user_id = m.id) AS last_active,
+              (SELECT COUNT(*) FROM sessions WHERE user_id = m.id AND expires_at > datetime('now')) AS live_sessions
+         FROM users m JOIN users c ON c.id = m.company_id
+        WHERE ${where.join(' AND ')}
+        ORDER BY c.agency_name COLLATE NOCASE, m.name COLLATE NOCASE`
+    ).all(...params);
     const n = (sql) => db.prepare(sql).get().n;
     const totals = {
-      users: n('SELECT COUNT(*) n FROM users WHERE company_id IS NULL'),
-      people: n('SELECT COUNT(*) n FROM users WHERE is_agency = 0'),
-      active30: n("SELECT COUNT(*) n FROM users WHERE is_agency = 0 AND last_login_at >= datetime('now', '-30 days')"),
-      new30: n("SELECT COUNT(*) n FROM users WHERE is_agency = 0 AND created_at >= datetime('now', '-30 days')"),
+      agencies: n('SELECT COUNT(*) n FROM users WHERE company_id IS NULL AND is_admin = 0'),
+      people: n('SELECT COUNT(*) n FROM users WHERE is_agency = 0 AND is_admin = 0'),
+      active30: n("SELECT COUNT(*) n FROM users WHERE is_agency = 0 AND is_admin = 0 AND last_login_at >= datetime('now', '-30 days')"),
+      new30: n("SELECT COUNT(*) n FROM users WHERE is_agency = 0 AND is_admin = 0 AND created_at >= datetime('now', '-30 days')"),
       suspended: n("SELECT COUNT(*) n FROM users WHERE status = 'suspended'"),
       onlineNow: n("SELECT COUNT(DISTINCT user_id) n FROM sessions WHERE expires_at > datetime('now')"),
       properties: n('SELECT COUNT(*) n FROM properties'),
@@ -76,7 +87,7 @@ module.exports = function adminRoutes(db, config) {
     ).all(req.user.id);
     // The admin sees every company's data, so nudge them to protect it with two-step login.
     const me = db.prepare('SELECT totp_enabled FROM users WHERE id = ?').get(req.user.person_id || req.user.id);
-    res.render('admin/index', { title: 'Admin', section: 'admin', users, totals, recentLogins, recentActivity, q, status, fmt, flash: req.query.flash || '', noTwoStep: !(me && me.totp_enabled) });
+    res.render('admin/index', { title: 'Admin', section: 'admin', agencies, users, totals, recentLogins, recentActivity, q, status, fmt, flash: req.query.flash || '', noTwoStep: !(me && me.totp_enabled) });
   });
 
   // ---------- account details: every login at every agency ----------

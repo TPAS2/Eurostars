@@ -6,24 +6,49 @@
   </div>
   <div class="actions">
     <a class="btn" href="/admin/users.csv">Export CSV</a>
-    <a class="btn primary" href="/admin/users/new">+ Add account</a>
+    <a class="btn primary" href="/admin/users/new">+ Add agency or user</a>
   </div>
 </header>
 <% if (flash) { %><div class="notice ok"><%= flash %></div><% } %>
 <% if (noTwoStep) { %><div class="notice warn">Two-step login is off for your admin account. This account can see every company's data, so if its password were guessed or leaked, everything would be exposed. <a href="/admin/security">Switch on two-step login</a> — it takes a minute with an authenticator app.</div><% } %>
 
 <section class="tiles">
-  <div class="tile"><span class="label">Total users</span><span class="value"><%= totals.users %></span><span class="sub"><%= totals.new30 %> joined in 30 days</span></div>
+  <div class="tile"><span class="label">Agencies</span><span class="value"><%= totals.agencies %></span><span class="sub"><%= totals.people %> user<%= totals.people === 1 ? '' : 's' %> · <%= totals.new30 %> new in 30 days</span></div>
   <div class="tile"><span class="label">Active (30 days)</span><span class="value"><%= totals.active30 %></span><span class="sub"><%= totals.onlineNow %> with a live session</span></div>
   <div class="tile <%= totals.suspended ? 'warn' : '' %>"><span class="label">Suspended</span><span class="value"><%= totals.suspended %></span><span class="sub">&nbsp;</span></div>
   <div class="tile <%= totals.failedLogins24h > 20 ? 'alert' : '' %>"><span class="label">Failed logins (24h)</span><span class="value"><%= totals.failedLogins24h %></span><span class="sub">&nbsp;</span></div>
 </section>
 
+<details class="card fold" id="agencies">
+  <summary><h2>Agencies <span class="count"><%= agencies.length %></span></h2></summary>
+  <% if (!agencies.length) { %><p class="muted">No agencies yet. Use “+ Add agency or user” to add one.</p><% } else { %>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Agency</th><th>Signs in with</th><th class="num">Users</th><th>Joined</th><th>Last active</th><th class="num">Actions (7 days)</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+    <% agencies.forEach(a => { %>
+      <tr>
+        <td><a href="/admin/users/<%= a.id %>"><strong><%= a.agency_name %></strong></a><% if (a.email) { %><div class="muted small"><%= a.email %></div><% } %></td>
+        <td><code><%= a.username %></code></td>
+        <td class="num"><%= a.people %></td>
+        <td><%= fmt.ukDate(a.created_at) %></td>
+        <td><%= a.last_active ? fmt.ukDateTime(a.last_active) : 'No activity' %><% if (a.live_sessions) { %> <span class="dot" title="Someone has a live session"></span><% } %></td>
+        <td class="num"><%= a.actions_7d %><% if (a.changes_7d) { %><div class="muted small"><%= a.changes_7d %> change<%= a.changes_7d === 1 ? '' : 's' %></div><% } %></td>
+        <td><span class="badge s-<%= a.status %>"><%= a.status %></span></td>
+        <td class="num"><a class="btn small" href="/admin/users/<%= a.id %>#agency">Edit</a></td>
+      </tr>
+    <% }) %>
+    </tbody>
+  </table>
+  </div>
+  <% } %>
+</details>
+
 <details class="card fold" id="users"<%= q || status ? ' open' : '' %>>
   <summary><h2>Users <span class="count"><%= users.length %></span></h2></summary>
   <div class="card-head">
     <form method="get" action="/admin#users" class="search inline-form">
-      <input type="search" name="q" value="<%= q %>" placeholder="Search username, name, email, agency…">
+      <input type="search" name="q" value="<%= q %>" placeholder="Search name, agency, email…">
       <select name="status">
         <option value="">All statuses</option>
         <option value="active" <%= status === 'active' ? 'selected' : '' %>>Active</option>
@@ -34,20 +59,18 @@
   </div>
   <div class="table-wrap">
   <table>
-    <thead><tr><th>User</th><th>Username</th><th class="num">People</th><th>Agency</th><th>Joined</th><th>Last login</th><th>Last active</th><th class="num">Actions (7 days)</th><th class="num">Logins</th><th>Status</th></tr></thead>
+    <thead><tr><th>User</th><th>Agency</th><th>Signs in with</th><th>Last login</th><th>Last active</th><th class="num">Logins</th><th>Status</th><th></th></tr></thead>
     <tbody>
-    <% users.forEach(u => { %>
+    <% users.forEach(m => { %>
       <tr>
-        <td><a href="/admin/users/<%= u.id %>"><strong><%= u.name %></strong></a><% if (u.email) { %><div class="muted small"><%= u.email %></div><% } %></td>
-        <td><code><%= u.username %></code></td>
-        <td class="num"><%= u.people + 1 %></td>
-        <td><%= u.agency_name %><% if (u.is_admin) { %> <span class="badge s-admin">you</span><% } %></td>
-        <td><%= fmt.ukDate(u.created_at) %></td>
-        <td><%= fmt.ukDateTime(u.last_login_at) %><% if (u.live_sessions) { %> <span class="dot" title="Has a live session"></span><% } %></td>
-        <td><%= u.last_active ? fmt.ukDateTime(u.last_active) : 'No activity' %></td>
-        <td class="num"><%= u.actions_7d %><% if (u.changes_7d) { %><div class="muted small"><%= u.changes_7d %> change<%= u.changes_7d === 1 ? '' : 's' %></div><% } %></td>
-        <td class="num"><%= u.login_count %></td>
-        <td><span class="badge s-<%= u.status %>"><%= u.status %></span></td>
+        <td><strong><%= m.name %></strong><% if (m.email) { %><div class="muted small"><%= m.email %></div><% } %></td>
+        <td><a href="/admin/users/<%= m.company_id %>"><%= m.agency_name %></a></td>
+        <td><code><%= m.username %></code> + <code><%= m.login_name %></code></td>
+        <td><%= fmt.ukDateTime(m.last_login_at) %><% if (m.live_sessions) { %> <span class="dot" title="Has a live session"></span><% } %></td>
+        <td><%= m.last_active ? fmt.ukDateTime(m.last_active) : 'No activity' %></td>
+        <td class="num"><%= m.login_count %></td>
+        <td><span class="badge s-<%= m.company_status === 'active' ? m.status : 'suspended' %>"><%= m.company_status === 'active' ? m.status : 'agency suspended' %></span></td>
+        <td class="num"><a class="btn small" href="/admin/people/<%= m.id %>/edit?from=agency">Edit</a></td>
       </tr>
     <% }) %>
     </tbody>
