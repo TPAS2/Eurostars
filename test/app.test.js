@@ -3226,6 +3226,48 @@ test('contractors: export to a CSV file and import it into another agency', asyn
   assert.equal(db.prepare("SELECT COUNT(*) n FROM contractors WHERE account_id = (SELECT id FROM users WHERE username = 'ctr-export')").get().n, 2);
 });
 
+test('contractors import: a table in a Word document (.docx) or an Excel file (.xlsx)', async () => {
+  const JSZip = require('jszip');
+  const c = await registerAndLogin('ctr-docx@example.com', 'Docx Lets');
+  const a = db.prepare("SELECT id FROM users WHERE username = 'ctr-docx'").get().id;
+  // A Word document with a title, then a table: Company Name | Trade | Tel | E-mail | Address (two lines).
+  const cell = (t) => `<w:tc><w:tcPr/>${String(t).split('\n').map((l) => `<w:p><w:r><w:t xml:space="preserve">${l}</w:t></w:r></w:p>`).join('')}</w:tc>`;
+  const row = (...cells) => `<w:tr>${cells.map(cell).join('')}</w:tr>`;
+  const xml = `<?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>
+    <w:p><w:r><w:t>Our contractors</w:t></w:r></w:p>
+    <w:tbl>${row('Company Name', 'Trade', 'Tel', 'E-mail', 'Address')}${row('Made-up Gas &amp; Heating', 'Gas engineer', '0100 000010', 'gas@example.com', '1 Pipe Street\nExampletown')}${row('Made-up Locks', 'Locksmith', '0100 000011', '', '')}</w:tbl>
+  </w:body></w:document>`;
+  const zip = new JSZip();
+  zip.file('[Content_Types].xml', '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"/>');
+  zip.file('word/document.xml', xml);
+  const docx = await zip.generateAsync({ type: 'nodebuffer' });
+  await c.get('/app/contractors');
+  let r = await c.post('/app/contractors/import', { file: new File([docx], 'contractors.docx') }, { multipart: true });
+  assert.match(decodeURIComponent(r.location), /Imported contractors: 2 new/);
+  const got = db.prepare('SELECT name, trade, phone, email, address FROM contractors WHERE account_id = ? ORDER BY name').all(a).map((x) => ({ ...x }));
+  assert.deepEqual(got, [
+    { name: 'Made-up Gas & Heating', trade: 'Gas engineer', phone: '0100 000010', email: 'gas@example.com', address: '1 Pipe Street\nExampletown' },
+    { name: 'Made-up Locks', trade: 'Locksmith', phone: '0100 000011', email: null, address: null },
+  ]);
+  // An Excel file.
+  const ExcelJS = require('exceljs');
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet('Contractors');
+  ws.addRow(['Company', 'Trade', 'Mobile']);
+  ws.addRow(['Made-up Roofs', 'Roofer', '07000 000012']);
+  const xlsx = Buffer.from(await wb.xlsx.writeBuffer());
+  await c.get('/app/contractors');
+  r = await c.post('/app/contractors/import', { file: new File([xlsx], 'contractors.xlsx') }, { multipart: true });
+  assert.match(decodeURIComponent(r.location), /1 new/);
+  assert.equal(db.prepare("SELECT mobile FROM contractors WHERE account_id = ? AND name = 'Made-up Roofs'").get(a).mobile, '07000 000012');
+  // A Word document without such a table says so.
+  const plain = new JSZip();
+  plain.file('word/document.xml', '<w:document xmlns:w="x"><w:body><w:p><w:r><w:t>Hello</w:t></w:r></w:p></w:body></w:document>');
+  await c.get('/app/contractors');
+  r = await c.post('/app/contractors/import', { file: new File([await plain.generateAsync({ type: 'nodebuffer' })], 'letter.docx') }, { multipart: true });
+  assert.match(decodeURIComponent(r.location), /no Company column/);
+});
+
 test('tenants list is in tenancy number order, not name order', async () => {
   const c = await registerAndLogin('tenancy-order@example.com', 'Tenancy Order Lets');
   const prop = idFrom((await c.post('/app/properties', { address_line1: '3 Order Row', status: 'let' })).location);

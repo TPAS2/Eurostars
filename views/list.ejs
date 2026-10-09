@@ -8,11 +8,11 @@
     <% if (def.key === 'maintenance') { %><a class="btn" href="/app/maintenance/job-sheet.pdf" download>Blank job sheet (PDF)</a><% } %>
     <% if (def.key === 'inspections') { %><a class="btn" href="/app/inspections/sheet.pdf" download>Blank inspection sheet (PDF)</a><% } %>
     <% if (def.key === 'contractors') { %>
-    <div class="transfer-box" title="Use the same contractors in another agency: export here, then import there">
+    <div class="transfer-box" title="Use the same contractors in another agency: export here, then import there. Import also takes a Word (.docx) or Excel (.xlsx) table with a Company column.">
       <a class="btn small" href="/app/contractors/export.csv" download>Export</a>
       <form method="post" action="/app/contractors/import" enctype="multipart/form-data" class="inline-form" data-busy="Importing">
         <%- include('partials/csrf') %>
-        <label class="btn small">Import<input type="file" name="file" accept=".csv,text/csv" data-autosubmit hidden></label>
+        <label class="btn small">Import<input type="file" name="file" accept=".csv,.docx,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" data-autosubmit hidden></label>
       </form>
     </div>
     <% } %>
