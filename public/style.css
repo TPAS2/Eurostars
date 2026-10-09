@@ -1455,3 +1455,17 @@ td.nowrap-lines span { display: block; white-space: nowrap; }
 /* Admin: rename an agency. */
 .rename-form { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .rename-form input { flex: 1 1 420px; max-width: 640px; min-width: 0; }
+
+/* Rent run 5.2: an email laid out like a mail program's new message window. */
+.mail-compose { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: var(--surface); margin-top: 10px; }
+.mail-head { display: flex; flex-direction: column; }
+.mail-row { display: grid; grid-template-columns: 80px minmax(0, 1fr); align-items: center; border-bottom: 1px solid var(--border); margin: 0; }
+.mail-row span { padding: 0 12px; color: var(--muted); font-size: .9rem; font-weight: 600; }
+.mail-compose .mail-row input { border: 0; border-radius: 0; box-shadow: none; padding: 10px 12px; margin: 0; background: transparent; width: 100%; }
+.mail-compose .mail-row input:focus { outline: 2px solid var(--brand); outline-offset: -2px; }
+.mail-compose .mail-body { display: block; width: 100%; border: 0; border-radius: 0; padding: 12px; min-height: 200px; resize: vertical; margin: 0; background: transparent; }
+.mail-compose .mail-body:focus { outline: 2px solid var(--brand); outline-offset: -2px; }
+.mail-foot { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 12px; border-top: 1px solid var(--border); background: var(--surface-2); }
+.mail-attach { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.mail-attach svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.mail-compose + .muted, #send-email > .muted.small { margin-top: 6px; }

@@ -56,7 +56,7 @@ class Client {
     let payload;
     if (body && multipart) {
       payload = new FormData();
-      for (const [k, v] of Object.entries({ _csrf: this.csrf, ...body })) payload.append(k, v);
+      for (const [k, v] of Object.entries({ _csrf: this.csrf, ...body })) [].concat(v).forEach((x) => payload.append(k, x));
     } else if (body) {
       headers['content-type'] = 'application/x-www-form-urlencoded';
       // Lists are sent as repeated fields, the way a browser sends ticked checkboxes.
@@ -3310,6 +3310,37 @@ test('admin: rename an agency without moving or changing its records', async () 
   const again = new Client();
   const l = await again.login('Fresh Name Lets', 'kettle-harbour-58');
   assert.match(l.location, /^\/app/, 'signs in with the new agency name');
+});
+
+test('rent run 5.2: send an email with From, To, Cc, Bcc, subject, message and attached files', async () => {
+  const c = await registerAndLogin('rr-email@example.com', 'RR Email Lets');
+  const a = db.prepare("SELECT id FROM users WHERE username = 'rr-email'").get().id;
+  let r = await c.get('/app/rent-run?month=2026-09');
+  assert.match(r.text, /<details class="card step5 fold" id="send-email">\s*<summary><h2><span class="step-no">5\.2<\/span> Send an email/);
+  for (const n of ['from', 'to', 'cc', 'bcc', 'subject', 'message', 'files']) assert.match(r.text, new RegExp(`name="${n}"`), n);
+  assert.match(r.text, /name="subject" value="RR Email Lets - September 2026 payments"/);
+  sentMail.length = 0;
+  r = await c.post('/app/rent-run/send-email', {
+    month: '2026-09', from: 'office@example.com', to: 'bank@example.com, second@example.com', cc: 'boss@example.com', bcc: 'records@example.com',
+    subject: 'September payments', message: 'Hello,\nPlease find attached.\nThanks',
+    files: [new File(['%PDF-1.4 made up'], 'instruction.pdf', { type: 'application/pdf' }), new File(['made up'], 'bulk.xlsm')],
+  }, { multipart: true });
+  assert.match(decodeURIComponent(r.location), /Email sent to bank@example\.com, second@example\.com \(cc boss@example\.com\) with 2 files attached/);
+  assert.equal(sentMail.length, 1);
+  const m = sentMail[0];
+  assert.deepEqual([m.to, m.cc, m.bcc, m.subject, m.replyTo], [['bank@example.com', 'second@example.com'], ['boss@example.com'], ['records@example.com'], 'September payments', 'office@example.com']);
+  assert.deepEqual(m.attachments.map((x) => x.filename), ['instruction.pdf', 'bulk.xlsm']);
+  assert.match(m.html, /Hello,<br>Please find attached\.<br>Thanks/);
+  // Noted on the page (not the files themselves).
+  r = await c.get('/app/rent-run?month=2026-09');
+  assert.match(r.text, /Sent for September 2026[\s\S]*?bank@example\.com, second@example\.com[\s\S]*?cc boss@example\.com[\s\S]*?September payments[\s\S]*?instruction\.pdf, bulk\.xlsm/);
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM rentrun_emails WHERE account_id = ?').get(a).n, 1);
+  // Bad addresses and a missing subject are refused.
+  r = await c.post('/app/rent-run/send-email', { month: '2026-09', from: 'office@example.com', to: 'not-an-email', subject: 'x' }, { multipart: true });
+  assert.match(decodeURIComponent(r.location), /“not-an-email” isn’t a valid email address/);
+  r = await c.post('/app/rent-run/send-email', { month: '2026-09', from: 'office@example.com', to: 'bank@example.com', subject: '' }, { multipart: true });
+  assert.match(decodeURIComponent(r.location), /Enter a subject/);
+  assert.equal(sentMail.length, 1);
 });
 
 test('tenants list is in tenancy number order, not name order', async () => {

@@ -137,6 +137,13 @@ module.exports = function monthlyRoutes(db, writer, mailer = { enabled: false })
         `SELECT d.id, d.month, d.filename, d.total_pence, d.payments, d.created_at, u.name AS created_by_name
            FROM metro_documents d LEFT JOIN users u ON u.id = d.created_by WHERE d.account_id = ? ORDER BY d.created_at DESC, d.id DESC`
       ).all(a).map((d) => ({ ...d, monthLabel: st.monthLabel(d.month) })),
+      // Step 5.2: send an email with files; sent from the agency's usual address unless changed.
+      emailOut: {
+        from: senderFor(a).from || (me && me.email) || mailer.defaultFrom || '',
+        subject: `${req.user.agency_name} - ${st.monthLabel(month)} payments`,
+        sent: db.prepare(`SELECT e.*, u.name AS sent_by_name FROM rentrun_emails e LEFT JOIN users u ON u.id = e.sent_by
+          WHERE e.account_id = ? AND e.month = ? ORDER BY e.sent_at DESC, e.id DESC`).all(a, month),
+      },
       flash: String(req.query.flash || '').slice(0, 1000), error: String(req.query.error || '').slice(0, 1000),
     });
   };

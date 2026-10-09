@@ -406,6 +406,15 @@ const DRAFT_DAYS = 7;
         form.submit();
       });
     });
+    // Files chosen to attach: their names shown beside the button.
+    document.querySelectorAll('input[type=file][data-file-list]').forEach((input) => {
+      const out = document.querySelector(input.dataset.fileList);
+      if (!out) return;
+      input.addEventListener('change', () => {
+        const names = [...input.files].map((f) => f.name);
+        out.textContent = names.length ? `Attached: ${names.join(', ')}` : 'No files attached';
+      });
+    });
     // A picture is uploaded as soon as one is chosen.
     document.querySelectorAll('input[type=file][data-autosubmit]').forEach((input) => {
       input.addEventListener('change', () => {

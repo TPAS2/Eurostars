@@ -35,7 +35,8 @@ function createMailer(config) {
         method: 'POST',
         headers: { Authorization: `Bearer ${config.resendApiKey}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          from: msg.from, to: [msg.to], subject: msg.subject, text: msg.text, html: msg.html,
+          from: msg.from, to: [].concat(msg.to), subject: msg.subject, text: msg.text, html: msg.html,
+          ...(msg.cc && msg.cc.length ? { cc: msg.cc } : {}), ...(msg.bcc && msg.bcc.length ? { bcc: msg.bcc } : {}),
           reply_to: msg.replyTo || undefined,
           attachments: (msg.attachments || []).map((a) => ({
             filename: a.filename, content: Buffer.from(a.content).toString('base64'),
@@ -58,7 +59,8 @@ function createMailer(config) {
       auth: config.smtpUser ? { user: config.smtpUser, pass: config.smtpPass } : undefined,
     });
     transport = (msg) => smtp.sendMail({
-      from: msg.from, to: msg.to, subject: msg.subject, text: msg.text, html: msg.html, replyTo: msg.replyTo || undefined,
+      from: msg.from, to: [].concat(msg.to).join(', '), subject: msg.subject, text: msg.text, html: msg.html, replyTo: msg.replyTo || undefined,
+      cc: msg.cc && msg.cc.length ? msg.cc.join(', ') : undefined, bcc: msg.bcc && msg.bcc.length ? msg.bcc.join(', ') : undefined,
       attachments: (msg.attachments || []).map((a) => ({ filename: a.filename, content: a.content, contentType: a.contentType, ...(a.cid ? { cid: a.cid } : {}) })),
     });
   }
@@ -69,12 +71,15 @@ function createMailer(config) {
     defaultFrom: isEmail(fromAddress) ? fromAddress : '',
     // Sends one email. fromName is shown as the sender (e.g. the agency's name); from, if a
     // valid address, replaces EMAIL_FROM (it must be on a domain the email service accepts).
-    async send({ to, subject, text, html, attachments, replyTo, fromName, from: fromOverride }) {
+    // to may be one address or a list; cc and bcc are optional lists.
+    async send({ to, cc = [], bcc = [], subject, text, html, attachments, replyTo, fromName, from: fromOverride }) {
       if (!transport) throw new Error('Email is not set up.');
-      if (!isEmail(to)) throw new Error(`Not a valid email address: ${to}`);
+      const tos = [].concat(to).map((x) => String(x || '').trim());
+      for (const addr of [...tos, ...cc, ...bcc]) if (!isEmail(addr)) throw new Error(`Not a valid email address: ${addr}`);
+      if (!tos.length) throw new Error('No one to send it to.');
       await transport({
-        from: fromHeader(fromName, isEmail(fromOverride) ? String(fromOverride).trim() : fromAddress), to: String(to).trim(), subject: String(subject).replace(/[\r\n]+/g, ' '),
-        text, html, attachments, replyTo: isEmail(replyTo) ? replyTo : null,
+        from: fromHeader(fromName, isEmail(fromOverride) ? String(fromOverride).trim() : fromAddress), to: tos.length === 1 ? tos[0] : tos, cc, bcc,
+        subject: String(subject).replace(/[\r\n]+/g, ' '), text, html, attachments, replyTo: isEmail(replyTo) ? replyTo : null,
       });
     },
   };

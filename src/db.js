@@ -609,6 +609,15 @@ function openDatabase(file) {
   numberTenancies(db);
   addColumnIfMissing(db, 'monthly_statements', 'statement_no', 'INTEGER');
   addColumnIfMissing(db, 'users', 'last_statement_no', 'INTEGER');
+  // Emails sent from the Rent run (step 5.2): who to, the subject and the files' names (not the files).
+  db.exec(`CREATE TABLE IF NOT EXISTS rentrun_emails (
+    id         INTEGER PRIMARY KEY,
+    account_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    month      TEXT NOT NULL,
+    from_addr  TEXT, to_addr TEXT NOT NULL, cc TEXT, bcc TEXT, subject TEXT NOT NULL, files TEXT,
+    sent_by    INTEGER,
+    sent_at    TEXT NOT NULL DEFAULT (datetime('now'))
+  )`);
   // Months the automatic statement job has already done for each company, so statements deleted
   // afterwards aren't made again. Companies already using statements count last month as done.
   db.exec(`CREATE TABLE IF NOT EXISTS statement_auto_runs (
