@@ -122,7 +122,7 @@
       <%- include('partials/csrf') %>
       <label>From <input type="email" name="from" value="<%= listing.from %>" required maxlength="254" autocomplete="email"></label>
       <label>To <input type="email" name="to" required maxlength="254" placeholder="name@example.com" autocomplete="off"></label>
-      <label>Message <span class="muted small">(optional)</span><textarea name="message" rows="3" maxlength="2000"></textarea></label>
+      <label class="grow"><span>Message <span class="muted small">(optional)</span></span><textarea name="message" rows="3" maxlength="2000"></textarea></label>
       <button class="btn primary" type="submit">Send email</button>
     </form>
     <% } %>
@@ -492,17 +492,20 @@
 </section>
 <% } %>
 
-<% const strip = def.key === 'properties'; if (strip) { %><div class="below-certs"><% } %>
-<% if (invoices) { const q = { maintenance: 'maintenance_job_id', contractors: 'contractor_id' }[def.key] || 'property_id'; %>
-<section class="card">
+<%# On a property page, Invoices, Current tenancies, Maintenance, Inspections and Tenant calls are
+    full-width fold-down boxes, folded up to start. %>
+<% const strip = def.key === 'properties'; %>
+<% if (invoices) { const q = { maintenance: 'maintenance_job_id', contractors: 'contractor_id' }[def.key] || 'property_id';
+   const invTitle = `Invoices <span class="count">${invoices.length}</span>`; %>
+<% if (strip) { %><details class="card fold" id="property-invoices"><summary><h2><%- invTitle %></h2></summary><% } else { %><section class="card"><% } %>
   <div class="card-head">
-    <h2>Invoices <span class="count"><%= invoices.length %></span><% if (def.key === 'contractors') { const paid = invoices.filter(i => i.status === 'paid').reduce((t, i) => t + i.amount_pence, 0); %> <span class="muted small">· <%= fmt.money(paid) %> paid in total</span><% } %></h2>
+    <% if (!strip) { %><h2><%- invTitle %><% if (def.key === 'contractors') { const paid = invoices.filter(i => i.status === 'paid').reduce((t, i) => t + i.amount_pence, 0); %> <span class="muted small">· <%= fmt.money(paid) %> paid in total</span><% } %></h2><% } else { %><span></span><% } %>
     <a class="btn small" href="/app/invoices/new?<%= q %>=<%= row.id %>">+ Upload invoice</a>
   </div>
   <% if (!invoices.length) { %><p class="muted">No invoices yet.</p><% } else { %>
     <%- include('invoices/table', { invoices, showProperty: def.key === 'contractors', backTo: `/app/${def.key}/${row.id}` }) %>
   <% } %>
-</section>
+<% if (strip) { %></details><% } else { %></section><% } %>
 <% } %>
 
 <% related.forEach(r => { %>
@@ -519,8 +522,8 @@
 </section>
 <% }) %>
 
-<% children.forEach(c => { const fold = def.key === 'councils'; const heading = `${c.title ? c.title : def.key === 'landlords' && c.def.key === 'properties' ? 'Properties owned' : def.key === 'councils' && c.def.key === 'properties' ? 'Properties in this council' : c.def.plural}`; %>
-<% if (fold) { %><details class="card fold" id="council-properties"><summary><h2><%= heading %> <span class="count"><%= c.rows.length %></span></h2></summary><% } else { %><section class="card"><% } %>
+<% children.forEach(c => { const fold = def.key === 'councils' || strip; const heading = `${c.title ? c.title : def.key === 'landlords' && c.def.key === 'properties' ? 'Properties owned' : def.key === 'councils' && c.def.key === 'properties' ? 'Properties in this council' : c.def.plural}`; %>
+<% if (fold) { %><details class="card fold" id="<%= def.key === 'councils' ? 'council-properties' : `property-${c.def.key}` %>"><summary><h2><%= heading %> <span class="count"><%= c.rows.length %></span></h2></summary><% } else { %><section class="card"><% } %>
   <div class="card-head">
     <% if (!fold) { %><h2><%= heading %> <span class="count"><%= c.rows.length %></span></h2><% } else { %><span></span><% } %>
     <% if (c.previous) { %>
@@ -556,7 +559,6 @@
   <% }) %>
 </details>
 <% } %>
-<% if (strip) { %></div><% } %>
 <% if (typeof landlordStatements !== 'undefined' && landlordStatements) { %>
 <details class="card fold" id="landlord-statements">
   <summary><h2>Statements <span class="count"><%= landlordStatements.length %></span></h2></summary>

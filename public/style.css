@@ -1122,7 +1122,14 @@ input, select, textarea { max-width: 100%; }
 .key-facts dt { font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 700; }
 .key-facts dd { margin: 6px 0 0; display: flex; align-items: center; gap: 8px; font-size: 1.1rem; font-weight: 700; }
 .key-facts svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
-.listing-side { margin-bottom: 0; position: sticky; top: 72px; }
+/* The email box stays where it is and fills the height beside the photos and key facts; its
+   message box grows to fill the space, with the PDF button at the bottom. */
+.listing-side { margin-bottom: 0; align-self: stretch; display: flex; flex-direction: column; }
+.listing-side .stack { flex: 1; grid-template-rows: auto auto 1fr auto; }
+.listing-side .stack label.grow { grid-template-rows: auto 1fr; }
+.listing-side .stack textarea { height: 100%; min-height: 90px; resize: none; }
+.listing-side .listing-pdf { margin-top: auto; }
+.listing-side .stack + .listing-pdf { margin-top: 12px; }
 .listing-side h2 { margin-top: 0; }
 .listing-side .stack { display: grid; gap: 10px; }
 .listing-side label { display: grid; gap: 4px; font-weight: 700; font-size: .9rem; }

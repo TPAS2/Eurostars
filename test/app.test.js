@@ -2428,7 +2428,8 @@ test('property page: listing at the top, and emailing it sends only the listing'
   assert.match(r.text, /key-facts[\s\S]*?Property type[\s\S]*?Flat[\s\S]*?Bedrooms[\s\S]*?Bathrooms[\s\S]*?Parking[\s\S]*?Permit/);
   assert.match(r.text, /Management details[\s\S]*?Private Landlord Name/);
   assert.match(r.text, /id="email-listing"[\s\S]*?name="from"[\s\S]*?name="to"/);
-  assert.match(r.text, /<div class="below-certs">[\s\S]*?Invoices[\s\S]*?Current tenancies[\s\S]*?Tenant calls[\s\S]*?<\/div>/);
+  assert.match(r.text, /<details class="card fold" id="property-invoices"><summary><h2>Invoices[\s\S]*?<details class="card fold" id="property-tenancies"><summary><h2>Current tenancies[\s\S]*?<details class="card fold" id="property-maintenance"><summary><h2>Maintenance[\s\S]*?<details class="card fold" id="property-inspections"><summary><h2>Inspections[\s\S]*?<details class="card fold" id="call-notes">\s*<summary><h2>Tenant calls/, 'full-width fold-down boxes, folded up to start');
+  assert.doesNotMatch(r.text, /class="below-certs"/);
   // Only filled-in details appear: no bathrooms fact on a property without one.
   const bare = idFrom((await c.post('/app/properties', { address_line1: '1 Bare Street', status: 'vacant' })).location);
   r = await c.get(`/app/properties/${bare}`);
@@ -3642,6 +3643,14 @@ test('a property page has no Transactions list', async () => {
   const r = await c.get(`/app/properties/${prop}`);
   assert.equal(r.status, 200);
   assert.doesNotMatch(r.text, /<h2>Transactions/);
+});
+
+test('property page: Email this property fills the height beside the photos and does not follow the page', () => {
+  const css = fs.readFileSync(path.join(__dirname, '..', 'public', 'style.css'), 'utf8');
+  const rule = css.match(/\.listing-side \{[^}]*\}/)[0];
+  assert.doesNotMatch(rule, /sticky/);
+  assert.match(rule, /align-self: stretch/);
+  assert.match(fs.readFileSync(path.join(__dirname, '..', 'views', 'show.ejs'), 'utf8'), /<label class="grow"><span>Message/);
 });
 
 test('saving account details keeps your own username (including the admin account)', async () => {
@@ -5355,9 +5364,9 @@ test('property form: rows of address/code, council/landlord/details, rents, stat
   let page = (await c.get('/app/properties/new')).text;
   const order = [...page.matchAll(/<label for="f-([a-z_0-9]+)">/g)].map((m) => m[1]);
   assert.deepEqual(order.filter((n) => !/^cert/.test(n)), ['address_line1', 'town', 'postcode', 'code', 'council_id', 'landlord_id', 'property_type', 'bedrooms', 'bathrooms', 'parking',
-    'rent_pence', 'tenant_rent_pence', 'landlord_rent_pence', 'price_per_night_pence', 'status', 'management_fee_pct', 'acquired_date', 'lease_start_date', 'handed_back_date', 'notes'],
+    'rent_pence', 'tenant_rent_pence', 'landlord_rent_pence', 'price_per_night_pence', 'status', 'management_fee_pct', 'lease_start_date', 'acquired_date', 'handed_back_date', 'notes'],
     'address, town, postcode, code / council, landlord, type, beds, baths, parking / the rents / status, fee / dates / notes');
-  for (const n of ['council_id', 'rent_pence', 'status', 'acquired_date']) assert.match(page, new RegExp(`class="field\\s+row-start span-\\d"[^>]*>\\s*<label for="f-${n}"`), `${n} starts a row`);
+  for (const n of ['council_id', 'rent_pence', 'status', 'lease_start_date']) assert.match(page, new RegExp(`class="field\\s+row-start span-\\d"[^>]*>\\s*<label for="f-${n}"`), `${n} starts a row`);
   assert.ok(page.indexOf('name="notes"') < page.indexOf('Certificates'), 'certificates under the notes');
   assert.match(page, /name="code" value="P0001"/);
   let r = await c.post('/app/properties', { address_line1: '1 Code Street', status: 'vacant' }); // code left blank
