@@ -67,5 +67,8 @@ Steps 4, 5 and 5.1 all come from the Rift report (`src/bulkPayment.js`), so thei
 
 - Upgrade the Resend plan: the free plan stops at 100 emails a day / 3,000 a month, too few for
   emailing every landlord their statement in one go.
-- Buy the agency's own domain and verify it in Resend (DNS records in Resend's dashboard), so
-  emails can come from any address on it. Then set EMAIL_FROM in Render to an address on it.
+- Buy a website domain for Rift (e.g. rift-something.co.uk) and add it in Render (the service's
+  Settings → Custom Domains, then the DNS records Render shows; HTTPS is automatic). Rift needs no
+  change: it has no fixed web address in its settings.
+- Verify that same domain in Resend too (its DNS records), so emails can come from any address on
+  it; then set EMAIL_FROM in Render to an address on it.
