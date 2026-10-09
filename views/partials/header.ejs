@@ -44,7 +44,8 @@
     <a class="rail-btn brand-btn <%= home.on ? 'active' : '' %>" href="<%= home.href %>" aria-label="<%= home.label %>" <%- home.on ? 'aria-current="page"' : '' %>><img class="logo logo-img" src="/static/galaxy-icon-192.png" alt="" width="30" height="30"><span class="rail-label"><%= home.label %></span></a>
     <nav class="rail" aria-label="Main">
       <% groups.filter(g => g.some(([key]) => !(user.hidden_tabs || []).includes(key))).forEach((g, gi) => { %>
-        <% if (gi) { %><span class="rail-sep" aria-hidden="true"></span><% } %>
+        <%# A divider before each group, the first one under the Dashboard button. %>
+        <span class="rail-sep" aria-hidden="true"></span>
         <% g.filter(([key]) => !(user.hidden_tabs || []).includes(key)).forEach(([key, href, label]) => { %>
           <a class="rail-btn <%= s === key ? 'active' : '' %> <%= key === 'councilrec' || key === 'councilinvoices' || key === 'rentrun' ? 'rail-red' : '' %>" href="<%= href %>" aria-label="<%= label %>" <%- s === key ? 'aria-current="page"' : '' %>><%- include('icon', { name: key }) %><span class="rail-label"><%= label %></span></a>
         <% }) %>

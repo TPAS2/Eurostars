@@ -833,13 +833,15 @@ module.exports = function appRoutes(db) {
       for (const row of rows) {
         const s = stats.get(row.id) || { n: 0, paid: 0, unpaid: 0 };
         row.invoice_count = { text: String(s.n) };
-        row.total_paid = { text: fmt.money(s.paid) };
-        row.unpaid = { text: fmt.money(s.unpaid) };
+        // Nothing paid or owed shows as a dash rather than £0.00.
+        const moneyOrDash = (p) => (p ? fmt.money(p) : '—');
+        row.total_paid = { text: moneyOrDash(s.paid) };
+        row.unpaid = { text: moneyOrDash(s.unpaid) };
       }
       totalsRow = { label: 'Total', cells: {
         invoice_count: String([...stats.values()].reduce((t, s) => t + s.n, 0)),
-        total_paid: fmt.money([...stats.values()].reduce((t, s) => t + s.paid, 0)),
-        unpaid: fmt.money([...stats.values()].reduce((t, s) => t + s.unpaid, 0)),
+        total_paid: ((n) => (n ? fmt.money(n) : '—'))([...stats.values()].reduce((t, s) => t + s.paid, 0)),
+        unpaid: ((n) => (n ? fmt.money(n) : '—'))([...stats.values()].reduce((t, s) => t + s.unpaid, 0)),
       } };
     }
     // The properties list ends with the three monthly rent totals, side by side.

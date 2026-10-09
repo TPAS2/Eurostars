@@ -3268,6 +3268,17 @@ test('contractors import: a table in a Word document (.docx) or an Excel file (.
   assert.match(decodeURIComponent(r.location), /no Company column/);
 });
 
+test('menu: a divider under Dashboard like between the other groups; contractors show a dash for nothing paid or unpaid', async () => {
+  const c = await registerAndLogin('rail-split@example.com', 'Rail Split Lets');
+  const page = (await c.get('/app')).text;
+  const sidebar = page.slice(page.indexOf('<aside class="sidebar">'), page.indexOf('</aside>'));
+  assert.match(sidebar, /aria-label="Dashboard"[\s\S]*?<nav class="rail"[^>]*>\s*(<%#[\s\S]*?%>\s*)?<span class="rail-sep"/);
+  assert.equal((sidebar.match(/class="rail-sep"/g) || []).length, 4, 'one under Dashboard and one between each of the 4 groups');
+  await c.post('/app/contractors', { name: 'Made-up Idle Co', code: 'C0001' });
+  const r = await c.get('/app/contractors');
+  assert.match(r.text, /Made-up Idle Co[\s\S]*?>\s*0\s*<\/td>\s*<td[^>]*>\s*—\s*<\/td>\s*<td[^>]*>\s*—\s*<\/td>/);
+});
+
 test('tenants list is in tenancy number order, not name order', async () => {
   const c = await registerAndLogin('tenancy-order@example.com', 'Tenancy Order Lets');
   const prop = idFrom((await c.post('/app/properties', { address_line1: '3 Order Row', status: 'let' })).location);
