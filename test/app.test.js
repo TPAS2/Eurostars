@@ -3363,6 +3363,20 @@ test('contractor invoices: change the paid date of a paid invoice', async () => 
   assert.equal((await other.post(`/app/invoices/${id}/paid-date`, { paid_date: '2026-01-01' })).status, 404);
 });
 
+test('council invoices: the same email box, as a folding section under the month', async () => {
+  const c = await registerAndLogin('ci-email@example.com', 'CI Email Lets');
+  let r = await c.get('/app/council-invoices?month=2026-09');
+  assert.match(r.text, /<\/section>\s*<details class="card fold" id="send-email">\s*<summary><h2>Send an email<\/h2><\/summary>/);
+  assert.match(r.text, /action="\/app\/council-invoices\/send-email"[\s\S]*?name="subject" value="CI Email Lets - September 2026 council invoices"/);
+  sentMail.length = 0;
+  r = await c.post('/app/council-invoices/send-email', { month: '2026-09', from: 'office@example.com', to: 'council@example.com', cc: 'me@example.com', subject: 'Invoices', message: 'Attached.', files: new File(['made up'], 'invoice.pdf') }, { multipart: true });
+  assert.match(r.location, /^\/app\/council-invoices\?month=2026-09&flash=/);
+  assert.deepEqual([sentMail[0].to, sentMail[0].cc], [['council@example.com'], ['me@example.com']]);
+  // Noted on this tab, not on the Rent run.
+  assert.match((await c.get('/app/council-invoices?month=2026-09')).text, /Sent for September 2026[\s\S]*?council@example\.com/);
+  assert.doesNotMatch((await c.get('/app/rent-run?month=2026-09')).text, /council@example\.com/);
+});
+
 test('tenants list is in tenancy number order, not name order', async () => {
   const c = await registerAndLogin('tenancy-order@example.com', 'Tenancy Order Lets');
   const prop = idFrom((await c.post('/app/properties', { address_line1: '3 Order Row', status: 'let' })).location);

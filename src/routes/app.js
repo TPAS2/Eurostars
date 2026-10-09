@@ -21,7 +21,7 @@ const UK_BANKS = ['Allied Irish Bank', 'Bank of Scotland', 'Barclays', 'Chase', 
   'Halifax', 'HSBC', 'Lloyds', 'Metro Bank', 'Monzo', 'Nationwide', 'NatWest', 'Revolut', 'Royal Bank of Scotland', 'Santander', 'Starling',
   'Tide', 'TSB', 'Virgin Money'];
 
-module.exports = function appRoutes(db) {
+module.exports = function appRoutes(db, mailer = { enabled: false, defaultFrom: '' }) {
   const router = express.Router();
 
   // Tenancies whose end date has come are marked ended (a future end date takes effect on the day).
@@ -481,6 +481,11 @@ module.exports = function appRoutes(db) {
     res.render('councilinvoices', {
       title: 'Council Invoices', section: 'councilinvoices', month, monthLabel: statements.monthLabel(month),
       prev: shiftMonth(month, -1), next: shiftMonth(month, 1), thisMonth: fmt.today().slice(0, 7), rows: rec.rows, fmt,
+      emailEnabled: mailer.enabled,
+      emailOut: require('./rentRunEmail').emailOutFor(db, mailer, {
+        accountId: a, personId: req.user.person_id, page: 'council-invoices', month, subject: `${req.user.agency_name} - ${statements.monthLabel(month)} council invoices`,
+      }),
+      flash: String(req.query.flash || '').slice(0, 1000), error: String(req.query.error || '').slice(0, 1000),
     });
   });
 

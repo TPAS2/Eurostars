@@ -1,0 +1,34 @@
+<%# locals: action, title (HTML), intro, detailsClass, month, monthLabel, emailOut, emailEnabled %>
+<details class="<%= detailsClass %>" id="send-email">
+  <summary><h2><%- title %></h2></summary>
+  <p class="muted"><%= intro %><% if (!emailEnabled) { %> <strong class="warn-text">Email isn’t set up yet.</strong><% } %></p>
+  <form method="post" action="<%= action %>" enctype="multipart/form-data" class="mail-compose" data-busy="Sending…" data-no-keep>
+    <%- include('csrf') %>
+    <input type="hidden" name="month" value="<%= month %>">
+    <div class="mail-head">
+      <label class="mail-row"><span>From</span><input type="email" name="from" value="<%= emailOut.from %>" required maxlength="254" autocomplete="email"></label>
+      <label class="mail-row"><span>To</span><input name="to" required maxlength="2000" placeholder="name@example.com" autocomplete="off"></label>
+      <label class="mail-row"><span>Cc</span><input name="cc" maxlength="2000" autocomplete="off"></label>
+      <label class="mail-row"><span>Bcc</span><input name="bcc" maxlength="2000" autocomplete="off"></label>
+      <label class="mail-row"><span>Subject</span><input name="subject" value="<%= emailOut.subject %>" required maxlength="300"></label>
+    </div>
+    <textarea name="message" rows="10" class="mail-body" placeholder="Write your message…" maxlength="20000"></textarea>
+    <div class="mail-foot">
+      <button class="btn primary" type="submit" <%= emailEnabled ? '' : 'disabled' %>>Send</button>
+      <label class="btn mail-attach"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 11.5l-8.5 8.5a5 5 0 0 1-7-7l8.5-8.5a3.5 3.5 0 0 1 5 5L10.5 18a2 2 0 0 1-3-3l7.5-7.5"/></svg> Attach files<input type="file" name="files" multiple hidden data-file-list="#mail-files"></label>
+      <span class="muted small" id="mail-files">No files attached</span>
+    </div>
+  </form>
+  <p class="muted small">Separate several addresses with commas. Up to 10 files, 10 MB each. If the From address isn’t on your email service’s domain, the email comes from your usual sending address and replies go to the From address.</p>
+  <% if (emailOut.sent.length) { %>
+  <h3>Sent for <%= monthLabel %></h3>
+  <div class="table-wrap"><table class="centered">
+    <thead><tr><th>Sent</th><th>To</th><th>Subject</th><th>Files</th><th>By</th></tr></thead>
+    <tbody>
+    <% emailOut.sent.forEach(e => { %>
+      <tr><td><%= fmt.ukDateTime(e.sent_at) %></td><td><%= e.to_addr %><% if (e.cc) { %><div class="muted small">cc <%= e.cc %></div><% } %></td><td><%= e.subject %></td><td class="small"><%= e.files || '—' %></td><td><%= e.sent_by_name || '' %></td></tr>
+    <% }) %>
+    </tbody>
+  </table></div>
+  <% } %>
+</details>

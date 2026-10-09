@@ -193,6 +193,7 @@ function createApp(config, db, { writer = null, mailer = null } = {}) {
   app.use('/app/councils', auth.requireLogin, require('./routes/councilDatabase')(db));
   app.use('/app/tenancies', auth.requireLogin, require('./routes/agreements')(db));
   app.use('/app/rent-run', auth.requireLogin, require('./routes/rentRunEmail')(db, mailer));
+  app.use('/app/council-invoices', auth.requireLogin, require('./routes/rentRunEmail')(db, mailer, { page: 'council-invoices' }));
   app.use('/app/rent-run', auth.requireLogin, require('./routes/payments')(db));
   app.use('/app/maintenance', auth.requireLogin, require('./routes/jobFiles')(db));
   app.use('/app/maintenance', auth.requireLogin, require('./routes/jobSheet')(db));
@@ -209,7 +210,7 @@ function createApp(config, db, { writer = null, mailer = null } = {}) {
   const monthly = require('./routes/monthly')(db, writer, mailer);
   app.use('/app/monthly', auth.requireLogin, monthly);
   app.get('/app/rent-run', auth.requireLogin, monthly.runPage);
-  app.use('/app', auth.requireLogin, require('./routes/app')(db));
+  app.use('/app', auth.requireLogin, require('./routes/app')(db, mailer));
   app.use('/admin', auth.requireAdmin, require('./routes/admin')(db, config));
 
   app.use((req, res) => res.status(404).render('error', { title: 'Not found', message: 'Page not found.' }));

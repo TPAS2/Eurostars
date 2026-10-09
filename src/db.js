@@ -618,6 +618,7 @@ function openDatabase(file) {
     sent_by    INTEGER,
     sent_at    TEXT NOT NULL DEFAULT (datetime('now'))
   )`);
+  addColumnIfMissing(db, 'rentrun_emails', 'page', "TEXT NOT NULL DEFAULT 'rent-run'"); // or 'council-invoices'
   // Months the automatic statement job has already done for each company, so statements deleted
   // afterwards aren't made again. Companies already using statements count last month as done.
   db.exec(`CREATE TABLE IF NOT EXISTS statement_auto_runs (

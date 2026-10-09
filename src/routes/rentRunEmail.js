@@ -23,7 +23,8 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '
 // "a@x.com, b@y.com; c@z.com" into a list.
 const addresses = (s) => String(s || '').split(/[,;\s]+/).map((x) => x.trim()).filter(Boolean);
 
-module.exports = function rentRunEmailRoutes(db, mailer) {
+// page: where it's used ('rent-run' or 'council-invoices'); emails are noted against that page.
+module.exports = function rentRunEmailRoutes(db, mailer, { page = 'rent-run' } = {}) {
   const router = express.Router();
   const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_FILE_BYTES, files: MAX_FILES, fields: 20 } }).array('files', MAX_FILES);
   const sent = new Map(); // account → times of recent sends
@@ -41,7 +42,7 @@ module.exports = function rentRunEmailRoutes(db, mailer) {
     try {
       const a = req.user.id;
       const month = st.isMonth(req.body.month) ? String(req.body.month) : fmt.today().slice(0, 7);
-      const back = (key, msg) => res.redirect(`/app/rent-run?month=${month}&${key}=${encodeURIComponent(msg)}#send-email`);
+      const back = (key, msg) => res.redirect(`/app/${page}?month=${month}&${key}=${encodeURIComponent(msg)}#send-email`);
       if (req.uploadError) return back('error', req.uploadError);
       if (!mailer.enabled) return back('error', 'Email isn’t set up yet, so nothing was sent. Ask your administrator to add the email settings.');
       const from = String(req.body.from || '').trim().slice(0, 254);
@@ -82,12 +83,23 @@ module.exports = function rentRunEmailRoutes(db, mailer) {
       }
       recent.push(Date.now());
       sent.set(a, recent);
-      db.prepare(`INSERT INTO rentrun_emails (account_id, month, from_addr, to_addr, cc, bcc, subject, files, sent_by)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(a, month, from, to.join(', '), cc.join(', ') || null, bcc.join(', ') || null, subject,
+      db.prepare(`INSERT INTO rentrun_emails (account_id, page, month, from_addr, to_addr, cc, bcc, subject, files, sent_by)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(a, page, month, from, to.join(', '), cc.join(', ') || null, bcc.join(', ') || null, subject,
         attachments.map((x) => x.filename).join(', ') || null, req.user.person_id || a);
       back('flash', `Email sent to ${to.join(', ')}${cc.length ? ` (cc ${cc.join(', ')})` : ''}${attachments.length ? ` with ${attachments.length} file${attachments.length === 1 ? '' : 's'} attached` : ''}.${sameDomain ? '' : ` Replies will go to ${from}.`}`);
     } catch (err) { next(err); }
   });
 
   return router;
+};
+
+// What the email box on a page needs: who it's from, a subject, and what was sent that month.
+module.exports.emailOutFor = (db, mailer, { accountId, personId, page, month, subject }) => {
+  const me = db.prepare('SELECT COALESCE(m.email, c.email) AS email FROM users m JOIN users c ON c.id = COALESCE(m.company_id, m.id) WHERE m.id = ?').get(personId || accountId);
+  return {
+    from: senderFor(db, mailer, accountId).from || (me && me.email) || mailer.defaultFrom || '',
+    subject,
+    sent: db.prepare(`SELECT e.*, u.name AS sent_by_name FROM rentrun_emails e LEFT JOIN users u ON u.id = e.sent_by
+      WHERE e.account_id = ? AND COALESCE(e.page, 'rent-run') = ? AND e.month = ? ORDER BY e.sent_at DESC, e.id DESC`).all(accountId, page, month),
+  };
 };

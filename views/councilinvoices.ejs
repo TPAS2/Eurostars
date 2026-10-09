@@ -7,6 +7,8 @@
 </header>
 
 <%- include('partials/month-nav', { base: '/app/council-invoices' }) %>
+<% if (flash) { %><div class="notice ok"><%= flash %></div><% } %>
+<% if (error) { %><div class="notice err"><%= error %></div><% } %>
 
 <section class="card">
   <div class="card-head"><h2><%= monthLabel %></h2></div>
@@ -27,4 +29,6 @@
   </table></div>
   <% } %>
 </section>
+
+<%- include('partials/email-compose', { action: '/app/council-invoices/send-email', title: 'Send an email', intro: 'Send a council (or anyone) an email with files attached, such as this month’s invoices.', detailsClass: 'card fold' }) %>
 <%- include('partials/footer') %>
