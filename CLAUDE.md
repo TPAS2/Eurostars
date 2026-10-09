@@ -62,3 +62,10 @@ Steps 4, 5 and 5.1 all come from the Rift report (`src/bulkPayment.js`), so thei
 - Check UI changes in a real browser (Playwright is available) before saying they're done.
 - Commit and push to `claude/hopeful-ramanujan-jdgrpx` only. Don't open pull requests unless asked.
 - No model names in commits or code.
+
+## Owner's to-do (remind them when email comes up)
+
+- Upgrade the Resend plan: the free plan stops at 100 emails a day / 3,000 a month, too few for
+  emailing every landlord their statement in one go.
+- Buy the agency's own domain and verify it in Resend (DNS records in Resend's dashboard), so
+  emails can come from any address on it. Then set EMAIL_FROM in Render to an address on it.
