@@ -75,6 +75,7 @@ const KINDS = {
       ['landlord_id', 'Landlord', ['landlord code', 'landlord name'], { type: 'landlord' }],
       ['council_id', 'Council', [], { type: 'council' }],
       ['property_type', 'Type', ['property type'], { type: 'select', options: ['House', 'Flat', 'Maisonette', 'HMO', 'Bungalow', 'Studio', 'Commercial', 'Other'] }],
+      ['floor_number', 'Floor number', ['floor', 'floor no', 'floor no.'], T(30)],
       ['bedrooms', 'Bedrooms', ['beds'], { type: 'int' }],
       ['bathrooms', 'Bathrooms', ['baths'], { type: 'int' }],
       ['parking', 'Parking', [], { type: 'select', options: ['None', 'Street', 'Permit', 'Driveway', 'Allocated space', 'Garage'] }],

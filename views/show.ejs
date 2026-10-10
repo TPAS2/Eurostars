@@ -52,7 +52,7 @@
   <div class="tile"><span class="label">Last paid</span><span class="value sm"><%= cs.last ? fmt.ukDate(cs.last) : '—' %></span><span class="sub"><%= plural(cs.invoicesN) %> in total</span></div>
 </section>
 <% } %>
-<% if (typeof listing !== 'undefined' && listing) { const ph = (propertyPhotos || []).filter(f => f.mime !== 'image/heic'); const purl = (f) => `/app/properties/${row.id}/photos/${f.id}`; const icons = { 'Property type': '<path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/>', 'Bedrooms': '<path d="M3 18v-8a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v8"/><path d="M3 14h18"/><path d="M7 8V6h4v2"/><path d="M3 18v2M21 18v2"/>', 'Bathrooms': '<path d="M4 12h16v3a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4z"/><path d="M6 12V6a2 2 0 0 1 4 0"/><path d="M7 19l-1 2M17 19l1 2"/>', 'Parking': '<rect x="4" y="3" width="16" height="18" rx="3"/><path d="M10 16V8h3a2.5 2.5 0 0 1 0 5h-3"/>' }; %>
+<% if (typeof listing !== 'undefined' && listing) { const ph = (propertyPhotos || []).filter(f => f.mime !== 'image/heic'); const purl = (f) => `/app/properties/${row.id}/photos/${f.id}`; const icons = { 'Property type': '<path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/>', 'Floor': '<path d="M3 20h5v-4h5v-4h5V8h3"/><path d="M3 20h18"/>', 'Bedrooms': '<path d="M3 18v-8a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v8"/><path d="M3 14h18"/><path d="M7 8V6h4v2"/><path d="M3 18v2M21 18v2"/>', 'Bathrooms': '<path d="M4 12h16v3a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4z"/><path d="M6 12V6a2 2 0 0 1 4 0"/><path d="M7 19l-1 2M17 19l1 2"/>', 'Parking': '<rect x="4" y="3" width="16" height="18" rx="3"/><path d="M10 16V8h3a2.5 2.5 0 0 1 0 5h-3"/>' }; %>
 <section class="listing">
   <div class="listing-main">
     <% if (ph.length) { %>

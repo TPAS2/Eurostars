@@ -3308,7 +3308,7 @@ test('landlords, properties and tenants: export to CSV and import into another a
   const csvL = (await one.get('/app/landlords/export.csv')).buf;
   assert.match(csvL.toString(), /L0001,Made-up Landlord One,,Email,0100 000020,2024-03-05,,Yes/);
   const csvP = (await one.get('/app/properties/export.csv')).buf;
-  assert.match(csvP.toString(), /P0001,1 Made-up Road,,ZZ1 1ZZ,Made-up Landlord One,Made-up Council,,2,,,1250\.50/);
+  assert.match(csvP.toString(), /P0001,1 Made-up Road,,ZZ1 1ZZ,Made-up Landlord One,Made-up Council,,,2,,,1250\.50/);
   const csvT = (await one.get('/app/tenants/export.csv')).buf;
 
   // Another agency: landlords first, then properties link to them; blanks filled, nothing overwritten.
@@ -3664,6 +3664,22 @@ test('properties: an AST Date box, saved, shown on the property page and in the 
   assert.match(r.text, /AST Date[\s\S]{0,200}14\/03\/2026/);
   r = await c.get('/app/properties/export.csv');
   assert.match(r.buf.toString(), /,AST Date,[\s\S]*,2026-03-14,/);
+});
+
+test('properties: Floor number beside Type, shown beside Property type on the page and in the PDF overview', async () => {
+  const c = await registerAndLogin('floor-no@example.com', 'Floor No Lets');
+  let r = await c.get('/app/properties/new');
+  const order = [...r.text.matchAll(/<label for="f-([a-z_0-9]+)">/g)].map((m) => m[1]);
+  assert.equal(order[order.indexOf('property_type') + 1], 'floor_number', 'Floor number right of Type');
+  assert.match(r.text, /<label for="f-floor_number">Floor number<\/label>/);
+  const prop = idFrom((await c.post('/app/properties', { address_line1: '8 Made-up Heights', status: 'let', property_type: 'Flat', floor_number: '3rd', bedrooms: '2' })).location);
+  assert.equal(db.prepare('SELECT floor_number FROM properties WHERE id = ?').get(prop).floor_number, '3rd');
+  r = await c.get(`/app/properties/${prop}`);
+  assert.match(r.text, /<dt>Property type<\/dt>[\s\S]*?Flat[\s\S]*?<dt>Floor<\/dt>[\s\S]*?3rd[\s\S]*?<dt>Bedrooms<\/dt>/);
+  r = await c.get(`/app/properties/${prop}/overview.pdf`);
+  assert.equal(r.headers.get('content-type'), 'application/pdf');
+  const { PDFDocument } = require('pdf-lib');
+  assert.equal((await PDFDocument.load(r.buf)).getPageCount(), 1);
 });
 
 test('saving account details keeps your own username (including the admin account)', async () => {
@@ -5376,7 +5392,7 @@ test('property form: rows of address/code, council/landlord/details, rents, stat
   const c = await registerAndLogin('prop-code@example.com', 'Prop Code Lets');
   let page = (await c.get('/app/properties/new')).text;
   const order = [...page.matchAll(/<label for="f-([a-z_0-9]+)">/g)].map((m) => m[1]);
-  assert.deepEqual(order.filter((n) => !/^cert/.test(n)), ['address_line1', 'town', 'postcode', 'code', 'council_id', 'landlord_id', 'property_type', 'bedrooms', 'bathrooms', 'parking',
+  assert.deepEqual(order.filter((n) => !/^cert/.test(n)), ['address_line1', 'town', 'postcode', 'code', 'council_id', 'landlord_id', 'property_type', 'floor_number', 'bedrooms', 'bathrooms', 'parking',
     'rent_pence', 'tenant_rent_pence', 'landlord_rent_pence', 'price_per_night_pence', 'status', 'management_fee_pct', 'lease_start_date', 'acquired_date', 'handed_back_date', 'ast_date', 'notes'],
     'address, town, postcode, code / council, landlord, type, beds, baths, parking / the rents / status, fee / dates / notes');
   for (const n of ['council_id', 'rent_pence', 'status', 'lease_start_date']) assert.match(page, new RegExp(`class="field\\s+row-start span-\\d"[^>]*>\\s*<label for="f-${n}"`), `${n} starts a row`);

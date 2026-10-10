@@ -54,8 +54,9 @@ const ENTITIES = {
       { name: 'council_id', label: 'Council', type: 'ref', ref: 'councils', span: 2, startRow: true },
       { name: 'landlord_id', label: 'Landlord', type: 'ref', ref: 'landlords', search: true, span: 2, help: 'Type a name or landlord code, then pick from the list.' },
       { name: 'property_type', label: 'Type', type: 'select', span: 2, options: ['House', 'Flat', 'Maisonette', 'HMO', 'Bungalow', 'Studio', 'Commercial', 'Other'] },
-      { name: 'bedrooms', label: 'Bedrooms', type: 'integer', span: 2 },
-      { name: 'bathrooms', label: 'Bathrooms', type: 'integer', span: 2 },
+      { name: 'floor_number', label: 'Floor number', type: 'text', span: 2 },
+      { name: 'bedrooms', label: 'Bedrooms', type: 'integer', span: 1 },
+      { name: 'bathrooms', label: 'Bathrooms', type: 'integer', span: 1 },
       { name: 'parking', label: 'Parking', type: 'select', span: 2, options: ['None', 'Street', 'Permit', 'Driveway', 'Allocated space', 'Garage'] },
       { name: 'rent_pence', label: 'Rent from council (£ per month)', type: 'money', span: 3, startRow: true, help: 'Charged on the Rent run.' },
       { name: 'tenant_rent_pence', label: 'Rent from tenant (£ per month)', type: 'money', span: 3, help: 'Only if the person staying pays rent.' },
@@ -70,7 +71,7 @@ const ENTITIES = {
       { name: 'notes', label: 'Notes', type: 'textarea' },
     ],
     // The property page's info box keeps Council near the top (the form has it beside Status).
-    detailsOrder: ['council_id', 'code', 'address_line1', 'town', 'postcode', 'landlord_id', 'property_type', 'bedrooms', 'bathrooms', 'parking', 'rent_pence', 'tenant_rent_pence', 'price_per_night_pence', 'landlord_rent_pence', 'management_fee_pct', 'status', 'lease_start_date', 'acquired_date', 'handed_back_date', 'ast_date', 'notes'],
+    detailsOrder: ['council_id', 'code', 'address_line1', 'town', 'postcode', 'landlord_id', 'property_type', 'floor_number', 'bedrooms', 'bathrooms', 'parking', 'rent_pence', 'tenant_rent_pence', 'price_per_night_pence', 'landlord_rent_pence', 'management_fee_pct', 'status', 'lease_start_date', 'acquired_date', 'handed_back_date', 'ast_date', 'notes'],
     columns: ['code', 'address_line1', 'council_id', 'landlord_id', 'cur_tenant', 'status'],
     computed: { cur_tenant: { label: 'Tenant' } },
     children: [

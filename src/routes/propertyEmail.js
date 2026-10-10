@@ -25,6 +25,7 @@ function listingOf(p) {
   if (p.price_per_night_pence) prices.push(`${fmt.money(p.price_per_night_pence)} per night`);
   const facts = [
     ['Property type', p.property_type],
+    ['Floor', p.floor_number],
     ['Bedrooms', p.bedrooms || p.bedrooms === 0 ? String(p.bedrooms) : ''],
     ['Bathrooms', p.bathrooms || p.bathrooms === 0 ? String(p.bathrooms) : ''],
     ['Parking', p.parking],

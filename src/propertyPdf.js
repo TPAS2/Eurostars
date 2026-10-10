@@ -107,9 +107,12 @@ async function buildPropertyPdf(data) {
       page.drawRectangle({ x, y: H - top - 54, width: bw, height: 54, color: SOFT });
       page.drawRectangle({ x, y: H - top - 54, width: 3, height: 54, color: BLUE });
       text(String(label).toUpperCase(), x + 14, top + 20, 7.5, bold, GREY);
+      // Smaller writing for a long word before cutting any of it off.
       let v = safe(value);
-      while (bold.widthOfTextAtSize(v, 15) > bw - 22 && v.length > 1) v = v.slice(0, -1);
-      text(v, x + 14, top + 41, 15, bold);
+      let size = 15;
+      while (bold.widthOfTextAtSize(v, size) > bw - 22 && size > 10) size -= 0.5;
+      while (bold.widthOfTextAtSize(v, size) > bw - 22 && v.length > 1) v = v.slice(0, -1);
+      text(v, x + 14, top + 41, size, bold);
     });
     top += 54;
   }
